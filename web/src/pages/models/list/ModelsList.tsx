@@ -2,7 +2,6 @@ import { useRouter } from "@tanstack/react-router";
 import { Button, SearchInput, cn } from "obp-ui";
 import {
     type KeyboardEvent,
-    type ReactNode,
     type RefObject,
     useLayoutEffect,
     useMemo,
@@ -196,12 +195,21 @@ function GroupBand({ group }: { group: Group }) {
     );
 }
 
-function Toolbar({ search, chips }: { search: ReactNode; chips: ReactNode }) {
+function FilterChipsRow(props: Parameters<typeof FilterChips>[0]) {
+    const chips = <FilterChips {...props} />;
+    return <div className="flex min-w-0 flex-wrap items-center gap-2 empty:hidden">{chips}</div>;
+}
+
+export function ModelsSearchBox() {
+    const { search, update } = useModelsSearch("/models");
     return (
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {search}
-            {chips}
-        </div>
+        <SearchInput
+            aria-label="Search models, versions and variants"
+            placeholder="Search"
+            value={search.q ?? ""}
+            onValueChange={(value) => update({ q: value })}
+            className="w-64 shrink-0"
+        />
     );
 }
 
@@ -216,7 +224,10 @@ export function ModelsList() {
     const [expanded, setExpanded] = useStored<Record<string, boolean>>(EXPANDED_KEY, {});
     const [nested, setNested] = useStored<boolean>(NESTED_KEY, false);
     const [columns, setColumns] = useStored<Column[]>(COLUMNS_KEY, DEFAULT_COLUMNS);
-    const [searchToggles, setSearchToggles] = useState<Record<string, boolean>>({});
+    const [toggled, setToggled] = useState<{ q: string; open: Record<string, boolean> }>({
+        q: "",
+        open: {},
+    });
     const [selection, setSelection] = useState<string[]>([]);
     const [focusKey, setFocusKey] = useState<string | null>(null);
     const [peek, setPeek] = useState<string | null>(null);
@@ -241,6 +252,7 @@ export function ModelsList() {
     const tableLayout = fitTable(chosenColumns, useWidthInRem(table));
     const shownColumns = tableLayout.columns;
     const text = (search.q ?? "").trim().toLowerCase();
+    const searchToggles = toggled.q === text ? toggled.open : {};
     const setFilters = (next: Filters) => update(filterSearch(next));
     const pool = useMemo(() => models.filter((model) => matchesText(model, text)), [models, text]);
     const groups = GROUPS.map((group): Group => {
@@ -337,7 +349,7 @@ export function ModelsList() {
             setSelection(picked.filter((key) => !children.has(key)));
         }
         if (childHits(line.model, text) > 0) {
-            setSearchToggles({ ...searchToggles, [line.model.id]: next });
+            setToggled({ q: text, open: { ...searchToggles, [line.model.id]: next } });
         } else {
             setExpanded({ ...expanded, [line.model.id]: next });
         }
@@ -477,21 +489,7 @@ export function ModelsList() {
                 onClear={clear}
             />
         ) : (
-            <Toolbar
-                search={
-                    <SearchInput
-                        aria-label="Search models, versions and variants"
-                        placeholder="Search"
-                        value={search.q ?? ""}
-                        onValueChange={(value) => {
-                            update({ q: value });
-                            setSearchToggles({});
-                        }}
-                        className="w-64 shrink-0"
-                    />
-                }
-                chips={<FilterChips models={models} filters={filters} onFilters={setFilters} />}
-            />
+            <FilterChipsRow models={models} filters={filters} onFilters={setFilters} />
         );
     const empty = rows.length === 0;
     const viewOptions = (
