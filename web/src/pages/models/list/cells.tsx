@@ -4,7 +4,7 @@ import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { HealthStatus } from "~/components/models/HealthStatus";
-import { ProgressBar, StatusText } from "~/components/models/StatusText";
+import { ProgressBar, StatusText, percentOf } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { jobHref } from "~/lib/modelLinks";
 import {
@@ -151,6 +151,8 @@ function Explained({ detail, children }: { detail?: string; children: ReactNode 
     );
 }
 
+const IN_PROGRESS = new Set(["starting", "training", "transfer"]);
+
 export function StatusLineText({
     line,
     name,
@@ -181,7 +183,12 @@ export function StatusLineText({
         return <Muted>{line.text}</Muted>;
     }
     const text = (
-        <StatusText tone={line.tone}>
+        <StatusText
+            tone={line.tone}
+            active={IN_PROGRESS.has(line.kind)}
+            waiting={line.kind === "transfer" && line.row.activity.state === "queued"}
+            progress={"progress" in line ? percentOf(line.progress) : null}
+        >
             <span className="tabular-nums">{line.text}</span>
         </StatusText>
     );
@@ -278,7 +285,7 @@ export function VersionStatus({
                 : ` · ${Math.round(version.progress * 100)}%`;
         return (
             <span className="flex items-center gap-2 whitespace-nowrap">
-                <StatusText tone="info">
+                <StatusText tone="info" active progress={percentOf(version.progress)}>
                     <span className="tabular-nums">{`${state.label}${share}`}</span>
                 </StatusText>
                 {version.job_id && (

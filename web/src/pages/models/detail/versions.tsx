@@ -46,7 +46,7 @@ import {
 } from "~/api/client";
 import { useJobs } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
-import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { ProgressBar, StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { durationText, jobSeconds } from "~/lib/jobs";
@@ -134,10 +134,19 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
     return { tone: "neutral", label: "Ready" };
 }
 
+const IN_PROGRESS = new Set(["training", "evaluating"]);
+
 export function VersionStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const status = versionStatus(row, version);
+    const queued = status.label === "Queued";
+    const training = version.status === "training" && !queued;
     const text = (
-        <StatusText tone={status.tone}>
+        <StatusText
+            tone={status.tone}
+            active={IN_PROGRESS.has(version.status) && !queued}
+            waiting={queued}
+            progress={training ? percentOf(version.job?.progress ?? 0) : null}
+        >
             <span className="tabular-nums">{status.label}</span>
         </StatusText>
     );

@@ -217,7 +217,9 @@ function useDebounced(value: string, onSettle: (value: string) => void) {
 export function LiveControl({ paused, onToggle }: { paused: boolean; onToggle: () => void }) {
     return (
         <div className="flex items-center gap-3">
-            <StatusText tone={paused ? "neutral" : "info"}>{paused ? "Paused" : "Live"}</StatusText>
+            <StatusText tone={paused ? "neutral" : "info"} active={!paused}>
+                {paused ? "Paused" : "Live"}
+            </StatusText>
             <Button variant="outline" onClick={onToggle} aria-pressed={paused}>
                 {paused ? "Resume" : "Pause"}
             </Button>

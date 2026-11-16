@@ -62,7 +62,12 @@ export function JobState({ job }: { job: JobInfo }) {
     const state = jobState(job);
     const running = job.status === "running";
     const text = (
-        <StatusText tone={state.tone}>
+        <StatusText
+            tone={state.tone}
+            active={running}
+            waiting={job.status === "queued"}
+            progress={running && job.progress > 0 ? job.progress * 100 : null}
+        >
             {state.label}
             {running && job.progress > 0 && (
                 <span className="tabular-nums">{` · ${Math.round(job.progress * 100)}%`}</span>

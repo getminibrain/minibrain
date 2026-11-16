@@ -32,7 +32,7 @@ import { type CatalogEntry, type CatalogResponse, api, unwrap } from "~/api/clie
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { ProgressBar, StatusText } from "~/components/models/StatusText";
+import { ProgressBar, StatusText, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
@@ -238,7 +238,12 @@ function AddedStatus({ entry }: { entry: CatalogEntry }) {
     if (moving) {
         const progress = moving.progress;
         return (
-            <StatusText tone="info" className="text-sm tabular-nums">
+            <StatusText
+                tone="info"
+                active
+                progress={percentOf(progress)}
+                className="text-sm tabular-nums"
+            >
                 {moving.state === "importing" ? "Importing" : "Downloading"}
                 {progress !== null && progress !== undefined
                     ? ` · ${Math.round(progress * 100)}%`

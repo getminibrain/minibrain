@@ -9,7 +9,7 @@ export function TeardownStatus({ teardown, name }: { teardown: Teardown; name: s
         <Tooltip>
             <TooltipTrigger asChild>
                 <button type="button" className="flex items-center gap-2 rounded-sm text-left">
-                    <StatusText tone={failed || deleting ? "destructive" : "info"}>
+                    <StatusText tone={failed || deleting ? "destructive" : "info"} active={!failed}>
                         {teardown.label}
                     </StatusText>
                     {!failed && (

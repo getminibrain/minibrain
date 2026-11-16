@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Link,
+    StatusDot,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -723,12 +724,7 @@ function ChildBox({
 }
 
 function LiveDot({ live }: { live: boolean }) {
-    return (
-        <span
-            aria-hidden="true"
-            className={cn("size-1.5 shrink-0 rounded-full", live ? "bg-success" : "bg-transparent")}
-        />
-    );
+    return <StatusDot tone="success" className={cn(!live && "invisible")} />;
 }
 
 function VersionMenu({

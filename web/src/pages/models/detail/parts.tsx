@@ -79,7 +79,11 @@ export function TeardownNotice({
             )}
         >
             <div className="flex min-w-0 max-w-3xl flex-col gap-1">
-                <StatusText tone={failed ? "destructive" : "info"} className="font-semibold">
+                <StatusText
+                    tone={failed ? "destructive" : "info"}
+                    active={!failed}
+                    className="font-semibold"
+                >
                     {teardown.label}
                 </StatusText>
                 <p>{teardown.detail}</p>

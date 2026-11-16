@@ -13,6 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
     Link,
+    StatusDot,
     cn,
 } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -396,12 +397,7 @@ function LiveStatus({
     return (
         <StatusLine
             tone="text-muted-foreground"
-            icon={
-                <span
-                    aria-hidden="true"
-                    className="size-2 animate-pulse rounded-full bg-muted-foreground motion-reduce:animate-none"
-                />
-            }
+            icon={<StatusDot tone="neutral" active={deployed} />}
             text={deployed ? "Waiting for the first request…" : "Not deployed yet"}
             detail={
                 deployed

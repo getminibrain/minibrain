@@ -1,5 +1,12 @@
 import { History } from "lucide-react";
-import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
+import {
+    Link,
+    StatusDot,
+    type StatusDotTone,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { useState } from "react";
 import type { ModelRow } from "~/api/client";
 import { type ModelActivityEvent, useModelActivity } from "~/api/modelPageQueries";
@@ -19,10 +26,10 @@ type Entry = { key: string; head: ModelActivityEvent; run: ModelActivityEvent[] 
 
 type TimelineRow = { kind: "day"; key: string; label: string } | { kind: "entry"; entry: Entry };
 
-const MARKER: Record<Tone, string> = {
-    neutral: "bg-faint",
-    success: "bg-success",
-    failed: "bg-destructive",
+const MARKER: Record<Tone, StatusDotTone> = {
+    neutral: "muted",
+    success: "success",
+    failed: "destructive",
 };
 
 function hrefOf(row: ModelRow, event: ModelActivityEvent): string | null {
@@ -271,13 +278,9 @@ function When({ at }: { at: string }) {
 
 function Marker({ tone }: { tone: Tone }) {
     return (
-        <span
-            aria-hidden="true"
-            className={cn(
-                "relative z-10 mt-2.5 size-2 shrink-0 rounded-full ring-4 ring-card",
-                MARKER[tone],
-            )}
-        />
+        <span className="relative z-10 mt-2.5 flex size-2 shrink-0 items-center justify-center">
+            <StatusDot tone={MARKER[tone]} className="rounded-full bg-card ring-4 ring-card" />
+        </span>
     );
 }
 

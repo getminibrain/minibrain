@@ -30,7 +30,12 @@ export function Deployment({ row, short = false }: { row: ModelRow; short?: bool
         row.kind === "custom" ? deploymentPageHref(row.key) : modelPageHref(row.key, "api");
     return (
         <Link href={href} className="hover:underline">
-            <StatusText tone={DEPLOYMENT_TONES[state] ?? "neutral"}>{label}</StatusText>
+            <StatusText
+                tone={DEPLOYMENT_TONES[state] ?? "neutral"}
+                active={state === "starting" || state === "stopping"}
+            >
+                {label}
+            </StatusText>
         </Link>
     );
 }

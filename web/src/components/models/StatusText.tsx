@@ -1,28 +1,30 @@
-import { cn } from "obp-ui";
+import { StatusDot, cn } from "obp-ui";
 import type { ReactNode } from "react";
 
 export type Tone = "success" | "info" | "warning" | "destructive" | "neutral";
 
-const DOT: Record<Tone, string> = {
-    success: "bg-success",
-    info: "bg-info",
-    warning: "bg-warning",
-    destructive: "bg-destructive",
-    neutral: "bg-faint",
-};
+export function percentOf(fraction: number | null | undefined): number | null {
+    return fraction === null || fraction === undefined ? null : fraction * 100;
+}
 
 export function StatusText({
     tone,
+    active = false,
+    waiting = false,
+    progress = null,
     children,
     className,
 }: {
     tone: Tone;
+    active?: boolean;
+    waiting?: boolean;
+    progress?: number | null;
     children: ReactNode;
     className?: string;
 }) {
     return (
         <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
-            <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", DOT[tone])} />
+            <StatusDot tone={tone} active={active} waiting={waiting} progress={progress} />
             {children}
         </span>
     );
