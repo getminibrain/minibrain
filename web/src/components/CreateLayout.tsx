@@ -55,7 +55,7 @@ export function CreateLayout({
         <form noValidate className="@container" onSubmit={send} onKeyDown={onKeyDown}>
             <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex min-w-0 flex-col gap-6 [&>:last-child]:flex-1">{form}</div>
-                <aside aria-label={summaryLabel} className="flex min-w-0 flex-col [&>*]:flex-1">
+                <aside aria-label={summaryLabel} className="flex min-w-0 flex-col self-start">
                     {summary}
                 </aside>
             </div>
