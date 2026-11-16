@@ -188,6 +188,7 @@ function VersionMenu({
     const ready = version.status === "ready";
     const exportable = ready && version.kind === "lora";
     const isLive = isDeployed(row) && row.current_version === version.number;
+    const baseline = version.number === 0;
     const others = versions
         .filter((item) => item.number !== version.number && item.status === "ready")
         .sort((a, b) => b.number - a.number);
@@ -305,11 +306,15 @@ function VersionMenu({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 variant="destructive"
-                                disabled={isLive}
+                                disabled={isLive || baseline}
                                 onSelect={remove}
                             >
                                 <Trash2 />
-                                {isLive ? "Delete version (live)" : "Delete version"}
+                                {baseline
+                                    ? "Delete version (v0 is the baseline)"
+                                    : isLive
+                                      ? "Delete version (live)"
+                                      : "Delete version"}
                             </DropdownMenuItem>
                         </>
                     )}
