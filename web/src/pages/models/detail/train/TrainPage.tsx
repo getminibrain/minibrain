@@ -467,7 +467,9 @@ function TrainForm({
             />
             <CreateLayout
                 form={form}
-                summary={<RunSummary run={run} blocked={blocked} changed={changed} />}
+                summary={
+                    <RunSummary slug={row.key} run={run} blocked={blocked} changed={changed} />
+                }
                 summaryLabel="Run summary"
                 submit={
                     <>

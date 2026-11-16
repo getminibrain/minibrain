@@ -9,6 +9,7 @@ import {
     Server,
     Timer,
 } from "lucide-react";
+import { useFeedbackTrainingRows } from "~/api/feedbackQueries";
 import {
     BlockedReasons,
     SummaryCard,
@@ -139,11 +140,31 @@ function ScoreSummary({
     );
 }
 
+function trainedOn(rows: number, feedback: number): string {
+    const base = `trained on ${count(rows)} rows`;
+    if (feedback === 0) {
+        return base;
+    }
+    return `${base} plus ${count(feedback)} accepted feedback ${feedback === 1 ? "row" : "rows"}`;
+}
+
+function ResultLine({ slug, run }: { slug: string; run: TrainRun }) {
+    const feedback = useFeedbackTrainingRows(slug, run.chosen?.id ?? null).data?.rows ?? 0;
+    const rows = run.info?.rows ?? run.available;
+    return (
+        <SummaryLine icon={GraduationCap} className="tabular-nums">
+            {`v${run.number} · ${trainedOn(rows, feedback)}, ${heldOutText(run)}`}
+        </SummaryLine>
+    );
+}
+
 export function RunSummary({
+    slug,
     run,
     blocked,
     changed,
 }: {
+    slug: string;
     run: TrainRun;
     blocked: string | null;
     changed: boolean;
@@ -197,9 +218,7 @@ export function RunSummary({
                 {unknown && <p className="text-muted-foreground">{unknown}</p>}
             </SummarySection>
             <SummarySection title="Result">
-                <SummaryLine icon={GraduationCap} className="tabular-nums">
-                    {`v${run.number} · trained on ${count(info?.rows ?? run.available)} rows, ${heldOutText(run)}`}
-                </SummaryLine>
+                <ResultLine slug={slug} run={run} />
             </SummarySection>
             <BlockedReasons reasons={problemsOf(run, blocked)} />
         </SummaryCard>
