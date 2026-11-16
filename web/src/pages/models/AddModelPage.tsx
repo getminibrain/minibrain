@@ -244,6 +244,7 @@ export function AddModelPage() {
         demoAdder.addDemo(demo.file);
     };
     const demoBusy = demoAdder.pending !== null || maker.isPending;
+    const demoOver = useOverLimit(maker.error, maker.isPending && Boolean(maker.variables?.sample));
     const suggestion = useOutputSuggestion(chosenSlug);
     const [output, setOutput] = useState(BLANK_OUTPUT);
     useEffect(() => {
@@ -478,7 +479,19 @@ export function AddModelPage() {
                             </span>
                         )}
                         <ErrorLine error={datasets.error} onRetry={datasets.refetch} />
-                        <ErrorLine error={demoAdder.error ?? maker.error} />
+                        {demoOver && maker.variables ? (
+                            <SampleOffer
+                                subject="file"
+                                total={demoOver.total_rows}
+                                limit={demoOver.row_limit}
+                                pending={maker.isPending}
+                                onTake={(sample) =>
+                                    maker.variables && maker.mutate({ ...maker.variables, sample })
+                                }
+                            />
+                        ) : (
+                            <ErrorLine error={demoAdder.error ?? maker.error} />
+                        )}
                         {over && chosenSlug && (
                             <SampleOffer
                                 subject="dataset"
