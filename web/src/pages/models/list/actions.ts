@@ -19,9 +19,13 @@ export async function deployRows(
     deployed: boolean,
     pool?: string,
 ): Promise<void> {
-    for (const row of rows) {
-        await setDeployed(row, deployed, pool);
-    }
+    await runAll(
+        rows.map((row) => ({
+            name: row.variant_label ?? row.name,
+            run: () => setDeployed(row, deployed, pool),
+        })),
+        deployed ? "deployed" : "undeployed",
+    );
 }
 
 function unique(rows: ModelRow[]): ModelRow[] {
@@ -44,28 +48,28 @@ function cascading(whole: ModelRow[], rows: ModelRow[], cascade: boolean): Set<s
     );
 }
 
-export type DeleteFailure = { name: string; error: string };
+export type StepFailure = { name: string; error: string };
 
-export class PartialDeleteError extends Error {
-    deleted: string[];
-    failed: DeleteFailure[];
+export class PartialError extends Error {
+    done: string[];
+    failed: StepFailure[];
 
-    constructor(deleted: string[], failed: DeleteFailure[]) {
-        super(`${failed.length} of ${deleted.length + failed.length} could not be deleted`);
-        this.deleted = deleted;
+    constructor(verb: string, done: string[], failed: StepFailure[]) {
+        super(`${failed.length} of ${done.length + failed.length} could not be ${verb}`);
+        this.done = done;
         this.failed = failed;
     }
 }
 
 type Step = { name: string; run: () => Promise<unknown> };
 
-async function runAll(steps: Step[]): Promise<void> {
-    const deleted: string[] = [];
-    const failed: DeleteFailure[] = [];
+async function runAll(steps: Step[], verb: string): Promise<void> {
+    const done: string[] = [];
+    const failed: StepFailure[] = [];
     for (const step of steps) {
         try {
             await step.run();
-            deleted.push(step.name);
+            done.push(step.name);
         } catch (error) {
             failed.push({
                 name: step.name,
@@ -74,7 +78,7 @@ async function runAll(steps: Step[]): Promise<void> {
         }
     }
     if (failed.length > 0) {
-        throw new PartialDeleteError(deleted, failed);
+        throw new PartialError(verb, done, failed);
     }
 }
 
@@ -107,5 +111,5 @@ export async function deleteEntries(
                 deleteModel(row, { undeploy: true, cascade: dropped.has(row.key), cancelJobs }),
         });
     }
-    await runAll(steps);
+    await runAll(steps, "deleted");
 }

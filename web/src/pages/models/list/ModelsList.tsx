@@ -284,8 +284,11 @@ export function ModelsList() {
         setConfirmation({
             ...step,
             run: async () => {
-                await step.run();
-                await done();
+                try {
+                    await step.run();
+                } finally {
+                    await done();
+                }
             },
         });
     const on: Handlers = {

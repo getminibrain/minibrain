@@ -19,7 +19,8 @@ import { ErrorLine } from "~/components/Section";
 import { DeployBaseDialog } from "../detail/deploy";
 import { ModelAvatar } from "../detail/header";
 import { AUTO_POOL, fitText, resolvedPool } from "../detail/poolPicker";
-import { deployRows } from "./actions";
+import { PartialOutcome } from "./PartialOutcome";
+import { PartialError, deployRows } from "./actions";
 import { plural } from "./model";
 
 type Fit = { target: string | null; text: string; runs: boolean };
@@ -118,14 +119,41 @@ function BulkDeployDialog({
         .map((item) => item.row);
     const loading = placements.some((query) => query.isPending);
     const deploy = useMutation({
-        mutationFn: () => deployRows(runnable, true, pool),
-        onSuccess: async () => {
-            await after();
+        mutationFn: async () => {
+            try {
+                await deployRows(runnable, true, pool);
+            } finally {
+                await after();
+            }
+        },
+        onSuccess: () => {
             onOpenChange(false);
             toast({ title: `${plural(runnable.length, "model")} deployed`, tone: "success" });
         },
     });
     const skipped = rows.length - runnable.length - cannot;
+    const outcome = deploy.error instanceof PartialError ? deploy.error : null;
+    if (outcome) {
+        return (
+            <Dialog open onOpenChange={onOpenChange}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Some could not be deployed</DialogTitle>
+                        <DialogDescription>
+                            The list shows what is deployed now. Fix the reasons below, then deploy
+                            them again.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <PartialOutcome outcome={outcome} done="Deployed" failed="Could not deploy" />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
     return (
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-xl">
