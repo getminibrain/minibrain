@@ -373,7 +373,6 @@ function TrainForm({
         blocked,
         method,
         instructions: changed ? text : null,
-        onDone: back,
     });
     const [attempted, setAttempted] = useState(false);
     const problems = fieldProblems(run, text);

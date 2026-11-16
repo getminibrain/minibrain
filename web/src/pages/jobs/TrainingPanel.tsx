@@ -79,7 +79,7 @@ function latest(values: (number | null | undefined)[]): number | null {
     return null;
 }
 
-function stepText(training: TrainingMetrics): string {
+export function stepText(training: TrainingMetrics): string {
     if (training.step === null || training.step === undefined) {
         return "–";
     }
@@ -158,10 +158,16 @@ function waiting(job: JobDetail): string {
         : "This run recorded no training steps.";
 }
 
-export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
+export function LossBody({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
     const training = metrics?.training;
+    if (!training || training.points.length === 0) {
+        return <p className="text-muted-foreground">{waiting(job)}</p>;
+    }
+    return <LossChart job={job} training={training} previous={metrics?.previous} />;
+}
+
+export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
     const previous = metrics?.previous;
-    const recorded = training && training.points.length > 0;
     return (
         <PanelSection
             icon={ChartLine}
@@ -172,11 +178,7 @@ export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetr
                     : "Training loss per step, held-out loss at each evaluation."
             }
         >
-            {recorded ? (
-                <LossChart job={job} training={training} previous={previous} />
-            ) : (
-                <p className="text-muted-foreground">{waiting(job)}</p>
-            )}
+            <LossBody job={job} metrics={metrics} />
         </PanelSection>
     );
 }

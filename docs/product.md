@@ -157,8 +157,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Traffic, latency, errors, versions, callers and requests of one model.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
 - **Version page** · shipped · product, ml
-  A version's score, differences from live, its run, loss, logs and files.
-  UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events
+  Live training and scoring, then score, differences, run, loss, logs, files.
+  UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/models/{name}, GET /api/models/{name}/versions/{number}/files
@@ -258,7 +258,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   A dataset in use by a run cannot change or be deleted.
   UI: Models › model › Train › Data, Data › dataset › Used by, Data › dataset › Delete · API: PUT /api/models/{name}/dataset, DELETE /api/datasets/{slug}
 - **LoRA training** · shipped · product, ml
-  Train a LoRA version, fresh or from an earlier version's settings.
+  Train a LoRA version, then watch it train on its version page.
   UI: Models › model › Train, Versions › Train again · API: POST /api/models/{name}/versions
 - **Training list** · shipped · product, ml
   Every training run across models, filtered by model, status and method.

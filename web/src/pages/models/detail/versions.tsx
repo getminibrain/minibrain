@@ -361,9 +361,9 @@ function VersionRow({
     const toast = useToast();
     const again = useMutation({
         mutationFn: () => retry(row.key, version.number),
-        onSuccess: async (started) => {
+        onSuccess: async () => {
             await client.invalidateQueries();
-            router.history.push(jobHref(started));
+            router.history.push(modelVersionHref(row.key, version.number));
         },
         onError: async (error) => {
             toast({ title: "Retry failed", description: error.message, tone: "destructive" });

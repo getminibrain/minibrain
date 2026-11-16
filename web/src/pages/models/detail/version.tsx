@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
     BookOpen,
@@ -40,11 +40,13 @@ import {
     type ExampleAnswer,
     type JobDetail,
     type JobInfo,
+    type JobMetrics,
     type ModelRow,
     type VersionInfo,
     api,
     unwrap,
 } from "~/api/client";
+import { useDatasetVersions } from "~/api/dataQueries";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import {
     isActiveJob,
@@ -59,14 +61,15 @@ import { CopyButton } from "~/components/CopyButton";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
+import { canCancel } from "~/components/JobSelection";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
-import { durationText } from "~/lib/jobs";
+import { durationText, jobDuration } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
 import {
     jobHref,
@@ -78,7 +81,7 @@ import {
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
-import { LossSection, RateSection } from "../../jobs/TrainingPanel";
+import { LossBody, LossSection, RateSection, stepText } from "../../jobs/TrainingPanel";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { InlineFacts, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
 import {
@@ -319,26 +322,121 @@ function Differs({
     );
 }
 
+const TRAINING_STATES = ["queued", "training"];
+const RUNNING_STATES = [...TRAINING_STATES, "evaluating"];
+
+function CancelRun({ job }: { job: JobInfo }) {
+    const can = useCan();
+    const client = useQueryClient();
+    const cancel = useMutation({
+        mutationFn: () =>
+            unwrap(api.POST("/api/jobs/{job_id}/cancel", { params: { path: { job_id: job.id } } })),
+        onSettled: () => client.invalidateQueries(),
+    });
+    if (!can.build || !canCancel(job)) {
+        return null;
+    }
+    return (
+        <>
+            <ErrorLine error={cancel.error} />
+            <Button variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+                Cancel
+            </Button>
+        </>
+    );
+}
+
+function useHeldOutRows(version: VersionInfo, enabled: boolean): number | null {
+    const data = useDatasetVersions(version.dataset_slug ?? "", enabled);
+    const found = data.data?.find((item) => item.id === version.dataset_version_id);
+    return found?.counts.eval ?? null;
+}
+
+function runTitle(version: VersionInfo, rows: number | null): string {
+    if (version.status !== "evaluating") {
+        return `Training v${version.number}`;
+    }
+    return rows
+        ? `Scoring v${version.number} on ${count(rows)} held-out rows`
+        : `Scoring v${version.number}`;
+}
+
+function runStats(job: JobInfo, metrics: JobMetrics | undefined): [string, string][] {
+    if (job.status === "queued") {
+        return [];
+    }
+    const stats: [string, string][] = [];
+    const training = metrics?.training;
+    if (job.kind === "train") {
+        stats.push(["Step", training ? stepText(training) : "–"]);
+    }
+    const counted = metrics?.counted;
+    if (job.kind !== "train" && counted) {
+        stats.push(["Rows scored", `${count(counted.done)} of ${count(counted.total)}`]);
+    }
+    stats.push(["Elapsed", jobDuration(job)]);
+    if (job.kind === "train" && job.status === "running") {
+        const eta = training?.eta_seconds;
+        stats.push(["Time left", eta === null || eta === undefined ? "–" : durationText(eta)]);
+    }
+    return stats;
+}
+
 function Progress({
     row,
     versions,
     version,
-}: { row: ModelRow; versions: VersionInfo[]; version: VersionInfo }) {
-    const progress = version.job?.progress ?? 0;
+    job,
+    train,
+}: {
+    row: ModelRow;
+    versions: VersionInfo[];
+    version: VersionInfo;
+    job: JobInfo;
+    train: JobDetail | undefined;
+}) {
+    const metrics = useJobMetrics(job.id, isActiveJob(job));
+    const scoring = version.status === "evaluating";
+    const rows = useHeldOutRows(version, scoring);
     const live = isDeployed(row) ? liveOf(versions) : undefined;
+    const stats = runStats(job, metrics.data);
+    const curve = !scoring && train?.id === job.id ? train : undefined;
     return (
         <PanelSection
             icon={Hourglass}
-            title="Progress"
+            title={runTitle(version, rows)}
             tip={`Scored against ${live ? `deployed v${live.number} and ` : ""}v0 · Baseline when it finishes.`}
+            actions={
+                <>
+                    <CancelRun job={job} />
+                    <Button variant="outline" asChild>
+                        <Link href={jobHref(job)}>{`Job #${job.id}`}</Link>
+                    </Button>
+                </>
+            }
         >
-            <div className="flex flex-col gap-2">
-                <VersionStatus row={row} version={version} />
-                <ProgressBar
-                    value={progress}
-                    label={`v${version.number} progress`}
-                    className="w-full"
-                />
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    <VersionStatus row={row} version={version} />
+                    <ProgressBar
+                        value={version.job?.progress ?? 0}
+                        label={`v${version.number} progress`}
+                        className="w-full"
+                    />
+                </div>
+                {job.status === "queued" ? (
+                    <p className="text-muted-foreground">Waiting for a worker.</p>
+                ) : (
+                    <div className="flex flex-wrap gap-x-10 gap-y-3">
+                        {stats.map(([label, value]) => (
+                            <Stat key={label} label={label} value={value} />
+                        ))}
+                    </div>
+                )}
+                <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
+                {curve && curve.status !== "queued" && (
+                    <LossBody job={curve} metrics={metrics.data} />
+                )}
             </div>
         </PanelSection>
     );
@@ -859,12 +957,12 @@ function LiveButton({
     );
 }
 
-function Curves({ job }: { job: JobDetail }) {
+function Curves({ job, loss }: { job: JobDetail; loss: boolean }) {
     const metrics = useJobMetrics(job.id, isActiveJob(job));
     return (
         <>
-            <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
-            <LossSection job={job} metrics={metrics.data} />
+            {loss && <ErrorLine error={metrics.error} onRetry={metrics.refetch} />}
+            {loss && <LossSection job={job} metrics={metrics.data} />}
             <RateSection metrics={metrics.data} />
         </>
     );
@@ -942,11 +1040,23 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                 {version.status === "ready" && (
                     <ScoreSection row={row} versions={list} version={version} />
                 )}
-                {["training", "evaluating", "queued"].includes(version.status) && (
-                    <Progress row={row} versions={list} version={version} />
+                {RUNNING_STATES.includes(version.status) && version.job && (
+                    <Progress
+                        row={row}
+                        versions={list}
+                        version={version}
+                        job={version.job}
+                        train={job}
+                    />
                 )}
                 {version.status === "failed" && <Failure version={version} />}
-                {job?.kind === "train" && <Curves key={`curves-${job.id}`} job={job} />}
+                {job?.kind === "train" && (
+                    <Curves
+                        key={`curves-${job.id}`}
+                        job={job}
+                        loss={!TRAINING_STATES.includes(version.status)}
+                    />
+                )}
                 <Differs row={row} versions={list} version={version} />
                 <MadeFrom row={row} versions={list} version={version} job={run} detail={job} />
                 <Identifiers row={row} version={version} />

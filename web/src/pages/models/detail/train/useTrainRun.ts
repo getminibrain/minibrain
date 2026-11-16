@@ -13,7 +13,7 @@ import { type DatasetVersionInfo, useDatasetVersions } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
 import { errorMessage } from "~/components/Section";
 import { jobSeconds } from "~/lib/jobs";
-import { type TrainMethod, jobHref, modelVersionHref } from "~/lib/modelLinks";
+import { type TrainMethod, modelVersionHref } from "~/lib/modelLinks";
 import { nextVersion } from "../header";
 import { AUTO, type PresetTime } from "./parts";
 import { poolsOf } from "./pools";
@@ -92,7 +92,6 @@ export function useTrainRun({
     blocked,
     method,
     instructions,
-    onDone,
 }: {
     row: ModelRow;
     detail: ModelDetail;
@@ -101,7 +100,6 @@ export function useTrainRun({
     blocked: string | null;
     method: TrainMethod;
     instructions: string | null;
-    onDone: () => void;
 }) {
     const training = method === "sft";
     const router = useRouter();
@@ -215,11 +213,7 @@ export function useTrainRun({
                     : undefined,
                 tone: "success",
             });
-            if (job) {
-                router.history.push(jobHref(job));
-            } else {
-                onDone();
-            }
+            router.history.push(modelVersionHref(row.key, version.number));
         },
         onError: (error, force) => {
             const reason = errorMessage(error) ?? "";
