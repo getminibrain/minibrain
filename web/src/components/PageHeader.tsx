@@ -45,26 +45,16 @@ export function PageHeader({
     return (
         <header className="flex flex-col gap-8 pb-3">
             <PageCrumbs items={crumbs ?? [{ label: title }]} />
-            {icon ? (
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 grow basis-48 items-center gap-4">
-                        {icon}
-                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                            {titleRow}
-                            {captionLine}
-                        </div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div className="flex min-w-0 grow basis-48 items-center gap-4">
+                    {icon}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        {titleRow}
+                        {captionLine}
                     </div>
-                    {actionsBox}
                 </div>
-            ) : (
-                <div className="flex flex-col gap-1">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 grow basis-48">{titleRow}</div>
-                        {actionsBox}
-                    </div>
-                    {captionLine}
-                </div>
-            )}
+                {actionsBox}
+            </div>
         </header>
     );
 }
