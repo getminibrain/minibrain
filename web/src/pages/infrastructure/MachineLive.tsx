@@ -3,7 +3,7 @@ import { useMachineMetrics } from "~/api/machineQueries";
 import type { components } from "~/api/schema";
 import { Facts } from "~/components/Facts";
 import { ErrorLine } from "~/components/Section";
-import { type SparkPoint, Sparkline } from "~/components/Sparkline";
+import { type SparkDomain, type SparkPoint, Sparkline } from "~/components/Sparkline";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import type { MachineRow } from "./machines";
 
@@ -12,7 +12,8 @@ type NodeMetrics = components["schemas"]["NodeMetrics"];
 
 const MAX_POINTS = 60;
 const MINUTE = 60_000;
-const SPARK_WIDTH = 240;
+const SPARK_WIDTH = 280;
+const PERCENT: SparkDomain = [0, 100];
 const SPARK_HEIGHT = 32;
 
 function perMinute(points: MetricsPoint[]): MetricsPoint[] {
@@ -44,18 +45,26 @@ function Trend({
     now,
     points,
     format,
+    domain,
 }: {
     title: string;
     now: string;
     points: SparkPoint[];
     format: (value: number) => string;
+    domain?: SparkDomain;
 }) {
+    const peak = points.length > 0 ? Math.max(...points.map((point) => point.value)) : null;
     return (
-        <div className="flex min-w-0 flex-col gap-1">
-            <span className="flex items-baseline justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <div className="flex min-w-0 flex-col">
                 <span className="text-sm text-muted-foreground">{title}</span>
-                <span className="text-sm tabular-nums">{now}</span>
-            </span>
+                <span className="tabular-nums">{now}</span>
+                {peak !== null && (
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                        {`Peak ${format(peak)} this hour`}
+                    </span>
+                )}
+            </div>
             {points.length > 1 ? (
                 <Sparkline
                     points={points}
@@ -63,6 +72,8 @@ function Trend({
                     height={SPARK_HEIGHT}
                     label={`${title} over the last hour`}
                     format={format}
+                    domain={domain}
+                    className="rounded-md bg-secondary"
                 />
             ) : (
                 <span className="text-sm text-muted-foreground">
@@ -142,7 +153,7 @@ export function LiveMetrics({ row }: { row: MachineRow }) {
     return (
         <div className="flex min-w-0 flex-col gap-4">
             <ErrorLine error={metrics.error} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-4">
                 <Trend
                     title="GPU busy"
                     now={
@@ -152,6 +163,7 @@ export function LiveMetrics({ row }: { row: MachineRow }) {
                     }
                     points={gpu}
                     format={percentText}
+                    domain={PERCENT}
                 />
                 <Trend
                     title="Memory in use"
@@ -164,6 +176,7 @@ export function LiveMetrics({ row }: { row: MachineRow }) {
                     }
                     points={memory}
                     format={(value) => bytes(value)}
+                    domain={total ? [0, total] : undefined}
                 />
             </div>
             <Facts items={[...gpuFacts(current), ...hostFacts(current)]} />

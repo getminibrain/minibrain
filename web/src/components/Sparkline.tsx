@@ -4,11 +4,20 @@ export type SparkPoint = { key: string; label: string; value: number; marked?: b
 
 const DOT = 4;
 
-function placed(points: SparkPoint[], width: number, height: number) {
+export type SparkDomain = [number, number];
+
+function bounds(points: SparkPoint[], domain: SparkDomain | undefined) {
+    if (domain && domain[1] > domain[0]) {
+        return { low: domain[0], high: domain[1], pad: 0 };
+    }
     const values = points.map((point) => point.value);
     const low = Math.min(...values);
     const high = Math.max(...values);
-    const pad = Math.max((high - low) * 0.12, 0.005);
+    return { low, high, pad: Math.max((high - low) * 0.12, 0.005) };
+}
+
+function placed(points: SparkPoint[], width: number, height: number, domain?: SparkDomain) {
+    const { low, high, pad } = bounds(points, domain);
     const range = high - low + pad * 2;
     const inner = height - DOT * 2;
     const step = points.length > 1 ? (width - DOT * 2) / (points.length - 1) : 0;
@@ -25,6 +34,7 @@ export function Sparkline({
     height,
     label,
     format,
+    domain,
     className,
 }: {
     points: SparkPoint[];
@@ -32,12 +42,13 @@ export function Sparkline({
     height: number;
     label: string;
     format: (value: number) => string;
+    domain?: SparkDomain;
     className?: string;
 }) {
     if (points.length === 0) {
         return null;
     }
-    const spots = placed(points, width, height);
+    const spots = placed(points, width, height, domain);
     const path = spots.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
     const column = width / spots.length;
     const summary = points.map((point) => `${point.label} ${format(point.value)}`).join(", ");
