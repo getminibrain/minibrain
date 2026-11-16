@@ -184,9 +184,11 @@ def test_builders_see_and_change_only_their_own_keys(harness: Harness, tmp_path:
 def test_keys_take_an_expiry_within_the_policy(harness: Harness, tmp_path: Path) -> None:
     two_models(harness, tmp_path)
     custom = [{"kind": "custom", "key": SLUG}]
+    assert harness.client.get("/api/keys/expiry").json() == {"max_days": None}
     soon = harness.client.post("/api/keys", json={"name": "soon", "models": custom, "expires_in_days": 7}).json()
     lasts = datetime.fromisoformat(soon["expires_at"]) - datetime.fromisoformat(soon["created_at"])
     assert lasts.days in (6, 7)
     assert harness.client.put("/api/policies/key_expiry_days", json={"value": 30}).status_code == 200
+    assert harness.client.get("/api/keys/expiry").json() == {"max_days": 30}
     late = harness.client.post("/api/keys", json={"name": "late", "models": custom, "expires_in_days": 90})
     assert late.status_code == 422

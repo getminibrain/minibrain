@@ -223,6 +223,14 @@ export function useKeys() {
     return useQuery({ queryKey: keys.apiKeys, queryFn: () => unwrap(api.GET("/api/keys")) });
 }
 
+export function useKeyExpiry(enabled: boolean) {
+    return useQuery({
+        queryKey: [...keys.apiKeys, "expiry"],
+        queryFn: () => unwrap(api.GET("/api/keys/expiry")),
+        enabled,
+    });
+}
+
 export function useRecentJobs(limit = 15) {
     return useQuery({
         queryKey: ["jobs", limit] as const,

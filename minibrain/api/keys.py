@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder
 from minibrain.api.deps import SessionDep
-from minibrain.api.schemas import KeyCreate, KeyCreated, KeyInfo, KeyScopeUpdate, ModelRef
+from minibrain.api.schemas import KeyCreate, KeyCreated, KeyExpiry, KeyInfo, KeyScopeUpdate, ModelRef
 from minibrain.api.views import key_info
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import LABELS, Role, allows
@@ -101,6 +101,16 @@ def expiry_days(session: Session, wanted: int | None) -> int | None:
 @router.get("", dependencies=[Depends(builder)], summary="List API keys")
 def list_keys(session: SessionDep) -> list[KeyInfo]:
     return [key_info(session, key) for key in session.scalars(visible_keys())]
+
+
+@router.get(
+    "/expiry",
+    dependencies=[Depends(builder)],
+    summary="Read the longest an API key may last",
+    description="From the API key expiry policy; null when keys never have to expire.",
+)
+def key_expiry(session: SessionDep) -> KeyExpiry:
+    return KeyExpiry(max_days=key_expiry_limit(session) or None)
 
 
 @router.post("", status_code=201, dependencies=[Depends(builder)], summary="Create an API key")

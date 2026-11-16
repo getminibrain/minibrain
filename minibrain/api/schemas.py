@@ -1176,6 +1176,10 @@ class KeyCreate(KeyScopeUpdate):
     )
 
 
+class KeyExpiry(BaseModel):
+    max_days: int | None = Field(description="New keys expire within this many days; null when they need not.")
+
+
 KeyStatus = Literal["active", "expired", "no_access"]
 
 

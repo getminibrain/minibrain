@@ -22,7 +22,7 @@ import {
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, unwrap } from "~/api/client";
-import { keys, useKeys } from "~/api/queries";
+import { keys, useKeyExpiry, useKeys } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { AllModelsLabel, type Choice, ModelPicker, idOf, refOf, useChoices } from "./scope";
@@ -32,13 +32,26 @@ export type KeyEditing = { mode: "create"; models: ModelRef[] } | { mode: "edit"
 type Scope = "models" | "all";
 
 const DEFAULT_EXPIRY = "default";
-const EXPIRY_OPTIONS = [
-    { value: DEFAULT_EXPIRY, label: "Install default" },
-    { value: "30", label: "30 days" },
-    { value: "90", label: "90 days" },
-    { value: "180", label: "180 days" },
-    { value: "365", label: "1 year" },
-];
+const PRESET_DAYS = [30, 90, 180, 365];
+
+function daysText(days: number): string {
+    return days === 365 ? "1 year" : `${days} days`;
+}
+
+function expiryOptions(maxDays: number | null): { value: string; label: string }[] {
+    const presets = PRESET_DAYS.filter((days) => maxDays === null || days < maxDays).map(
+        (days) => ({ value: String(days), label: daysText(days) }),
+    );
+    const fallback =
+        maxDays === null ? "Install default" : `${daysText(maxDays)} · install maximum`;
+    return [{ value: DEFAULT_EXPIRY, label: fallback }, ...presets];
+}
+
+function expiryHint(maxDays: number | null): string {
+    return maxDays === null
+        ? "Install default follows the API key expiry policy."
+        : `Keys on this install expire within ${daysText(maxDays)}, set by the API key expiry policy.`;
+}
 
 export function useRefreshKeys() {
     const client = useQueryClient();
@@ -108,14 +121,22 @@ function ScopeChoice({ value, onChange }: { value: Scope; onChange: (scope: Scop
     );
 }
 
-function ExpirySelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function ExpirySelect({
+    value,
+    maxDays,
+    onChange,
+}: {
+    value: string;
+    maxDays: number | null;
+    onChange: (value: string) => void;
+}) {
     return (
         <Select value={value} onValueChange={(next) => onChange(String(next ?? DEFAULT_EXPIRY))}>
             <SelectTrigger id="key-expiry" className="w-56">
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
-                {EXPIRY_OPTIONS.map((option) => (
+                {expiryOptions(maxDays).map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                         {option.label}
                     </SelectItem>
@@ -138,6 +159,8 @@ export function KeyDialog({
     const refresh = useRefreshKeys();
     const choices = useChoices();
     const existing = useKeys();
+    const limit = useKeyExpiry(editing?.mode === "create");
+    const maxDays = limit.data?.max_days ?? null;
     const [touched, setTouched] = useState(false);
     const [name, setName] = useState("");
     const [scope, setScope] = useState<Scope>("models");
@@ -172,7 +195,8 @@ export function KeyDialog({
                 );
                 return;
             }
-            const days = expiry === DEFAULT_EXPIRY ? null : Number(expiry);
+            const within = maxDays === null || Number(expiry) < maxDays;
+            const days = expiry === DEFAULT_EXPIRY || !within ? null : Number(expiry);
             onCreated(
                 await unwrap(
                     api.POST("/api/keys", {
@@ -261,12 +285,16 @@ export function KeyDialog({
                             </div>
                         )}
                         {creating && (
-                            <Field
-                                id="key-expiry"
-                                label="Expires"
-                                hint="Install default follows the API key expiry policy."
-                            >
-                                <ExpirySelect value={expiry} onChange={setExpiry} />
+                            <Field id="key-expiry" label="Expires" hint={expiryHint(maxDays)}>
+                                <ExpirySelect
+                                    value={
+                                        maxDays !== null && Number(expiry) >= maxDays
+                                            ? DEFAULT_EXPIRY
+                                            : expiry
+                                    }
+                                    maxDays={maxDays}
+                                    onChange={setExpiry}
+                                />
                             </Field>
                         )}
                     </FieldGroup>

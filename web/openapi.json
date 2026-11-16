@@ -7801,6 +7801,28 @@
         }
       }
     },
+    "/api/keys/expiry": {
+      "get": {
+        "tags": [
+          "Keys"
+        ],
+        "summary": "Read the longest an API key may last",
+        "description": "From the API key expiry policy; null when keys never have to expire.",
+        "operationId": "key_expiry_api_keys_expiry_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyExpiry"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/keys/{key_id}/models": {
       "put": {
         "tags": [
@@ -20590,6 +20612,27 @@
           "secret"
         ],
         "title": "KeyCreated"
+      },
+      "KeyExpiry": {
+        "properties": {
+          "max_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Days",
+            "description": "New keys expire within this many days; null when they need not."
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_days"
+        ],
+        "title": "KeyExpiry"
       },
       "KeyInfo": {
         "properties": {

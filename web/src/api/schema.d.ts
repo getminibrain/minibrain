@@ -2302,6 +2302,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/keys/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the longest an API key may last
+         * @description From the API key expiry policy; null when keys never have to expire.
+         */
+        get: operations["key_expiry_api_keys_expiry_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/keys/{key_id}/models": {
         parameters: {
             query?: never;
@@ -6260,6 +6280,14 @@ export interface components {
             status: "active" | "expired" | "no_access";
             /** Secret */
             secret: string;
+        };
+        /** KeyExpiry */
+        KeyExpiry: {
+            /**
+             * Max Days
+             * @description New keys expire within this many days; null when they need not.
+             */
+            max_days: number | null;
         };
         /** KeyInfo */
         KeyInfo: {
@@ -14588,6 +14616,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    key_expiry_api_keys_expiry_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyExpiry"];
                 };
             };
         };
