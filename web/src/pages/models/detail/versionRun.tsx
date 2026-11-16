@@ -300,12 +300,10 @@ export function TrainingSection({
     const active = version.job && canCancel(version.job) ? version.job : undefined;
     const shownJob = active ?? run;
     const training = metrics?.training;
-    const compareTo = peers.live ?? previousTrained(versions, version);
-    const compareLabel = peers.live
-        ? `live v${peers.live.number}`
-        : compareTo
-          ? `v${compareTo.number}`
-          : "";
+    const startedFrom = versions.find((item) => item.number === version.from_version);
+    const compareTo = startedFrom ?? peers.live ?? previousTrained(versions, version);
+    const liveLabel = !startedFrom && compareTo === peers.live ? "live " : "";
+    const compareLabel = compareTo ? `${liveLabel}v${compareTo.number}` : "";
     const actions = (
         <>
             {active && <CancelRun job={active} />}
@@ -472,6 +470,17 @@ export function LineageSection({
             </Link>,
         );
     }
+    if (version.from_version !== null && version.from_version !== undefined) {
+        items.push(
+            <Link
+                key="from"
+                href={modelVersionHref(row.key, version.from_version)}
+                className="text-primary hover:underline"
+            >
+                {`started from v${version.from_version}`}
+            </Link>,
+        );
+    }
     items.push(
         <span key="this" aria-current="page" className="font-semibold">
             {`v${version.number}`}
@@ -496,7 +505,7 @@ export function LineageSection({
         <PanelSection
             icon={GitBranch}
             title="Lineage"
-            tip="The base it runs on and the data it learnt from. The version a run's settings were copied from is not recorded."
+            tip="The base it runs on, the data it learnt from and the version its settings started from."
         >
             <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 {items.map((item, index) => (

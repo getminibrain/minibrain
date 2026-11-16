@@ -339,6 +339,7 @@ def training_values(training: CardTraining) -> Values:
         ("training:examples", training.examples),
         ("training:few_shot_examples", training.few_shot_examples),
         ("training:train_loss", training.train_loss),
+        ("training:started_from", f"v{training.started_from}" if training.started_from is not None else None),
     ]
     if training.recipe is not None:
         found += [(f"recipe:{name}", value) for name, value in training.recipe.model_dump().items()]

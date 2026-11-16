@@ -132,6 +132,7 @@ class CardTraining(BaseModel):
     train_loss: float | None
     run: CardRun | None
     duplicated_from: CardOrigin | None = None
+    started_from: int | None = Field(default=None, description="The version whose settings this run started from.")
 
 
 class CardScore(BaseModel):

@@ -165,6 +165,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Step between versions** · shipped · product, ml
   Previous and next arrows beside a version's title skip deleted numbers.
   UI: Models › model › Versions › version · API: GET /api/models/{name}/versions
+- **Started-from lineage** · shipped · product, ml, admin
+  Each run records the version its settings came from.
+  UI: Models › model › Train, Models › model › Versions › version · API: POST /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/card, GET /api/models/{name}/versions/{number}/aibom.json
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/models/{name}, GET /api/models/{name}/versions/{number}/files

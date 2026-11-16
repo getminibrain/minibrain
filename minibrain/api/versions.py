@@ -98,8 +98,10 @@ def start_version(
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
     pool: str | None = None,
+    from_version: int | None = None,
 ) -> Version:
     version = new_version(session, store, model, kind, dataset_version, recipe, breaking)
+    version.from_version = from_version
     audit_version(
         session,
         model,
@@ -109,6 +111,7 @@ def start_version(
         dataset_version=dataset_version.hash if dataset_version is not None else None,
         recipe=dict(version.recipe),
         contract=version.contract_number,
+        **({"from_version": from_version} if from_version is not None else {}),
     )
     if kind == VersionKind.LORA:
         version.base_hash = base_hash(session, version.base_model)
@@ -228,9 +231,11 @@ def add_version(
     require_usable(session, settings, model.base_model)
     if kind == VersionKind.LORA:
         require_trainable(session, settings, model)
+    if body.from_version is not None:
+        get_version(model, body.from_version)
     save_instructions(session, model, body.instructions)
     if kind == VersionKind.PROMPT and needs_no_data(model, body):
-        version = start_version(session, settings, store, model, kind, None, {}, body.breaking)
+        version = start_version(session, settings, store, model, kind, None, {}, body.breaking, None, body.from_version)
         session.commit()
         return version_info(model, version)
     dataset_version = training_dataset_version(session, settings, model, body.dataset_version_id)
@@ -242,7 +247,9 @@ def add_version(
         refuse(found)
         recipe = found.recipe()
         pool = job_pool(body, found)
-    version = start_version(session, settings, store, model, kind, dataset_version, recipe, body.breaking, pool)
+    version = start_version(
+        session, settings, store, model, kind, dataset_version, recipe, body.breaking, pool, body.from_version
+    )
     session.commit()
     return version_info(model, version)
 

@@ -48,7 +48,7 @@ function trainRows(version: DatasetVersionInfo | undefined): number {
     return (version.counts.train ?? 0) + (version.feedback_rows ?? 0);
 }
 
-export type TrainStart = Start & { data: number | null };
+export type TrainStart = Start & { data: number | null; from: number | null };
 
 function presetTime(failed: boolean, plan: PlanInfo | undefined): PresetTime {
     if (failed) {
@@ -175,7 +175,10 @@ export function useTrainRun({
 
     const create = useMutation({
         mutationFn: (force: boolean) => {
-            const saved = instructions === null ? {} : { instructions };
+            const saved = {
+                ...(instructions === null ? {} : { instructions }),
+                ...(start.from === null ? {} : { from_version: start.from }),
+            };
             const body = training
                 ? { kind: "lora" as const, ...query, breaking: force, ...saved }
                 : {

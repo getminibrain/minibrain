@@ -13499,6 +13499,18 @@
                 "type": "null"
               }
             ]
+          },
+          "started_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started From",
+            "description": "The version whose settings this run started from."
           }
         },
         "type": "object",
@@ -31008,6 +31020,19 @@
             "title": "Breaking",
             "default": false
           },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version",
+            "description": "The version whose settings this run started from, if any."
+          },
           "instructions": {
             "anyOf": [
               {
@@ -31318,6 +31343,18 @@
                 "type": "null"
               }
             ]
+          },
+          "from_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Version",
+            "description": "The version whose settings this run started from."
           },
           "base_model": {
             "type": "string",

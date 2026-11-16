@@ -359,6 +359,7 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         live_at=version.live_at,
         view=view_of(version),
         duplicated_from=VersionOrigin.model_validate(version.duplicated_from) if version.duplicated_from else None,
+        from_version=version.from_version,
         base_model=version.base_model,
         base_refusal=refusal_of(model, version),
     )

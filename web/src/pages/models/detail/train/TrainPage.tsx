@@ -113,7 +113,11 @@ function useStart(versions: VersionInfo[]): TrainStart {
         from === null ? lastTrained(versions) : versions.find((item) => item.number === from);
     const start = startFrom(source?.recipe);
     const fromData = from === null ? null : (source?.dataset_version_id ?? null);
-    return { ...start, data: data ?? fromData };
+    return {
+        ...start,
+        data: data ?? fromData,
+        from: from === null ? null : (source?.number ?? null),
+    };
 }
 
 function useMethod(): [TrainMethod, (next: TrainMethod) => void] {

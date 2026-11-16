@@ -285,14 +285,17 @@ def training_section(card: ModelCard) -> list[str]:
     training = card.training
     recipe = training.recipe
     origin = origin_text(training.duplicated_from)
+    started = f"v{training.started_from}" if training.started_from is not None else None
     if training.method != "lora" or recipe is None:
         text = (
             "Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and "
             f"{training.few_shot_examples or 0} few-shot examples from the training split."
         )
-        return section("## Training", [text] + ([f"Duplicated from {origin}."] if origin else []))
+        notes = ([f"Duplicated from {origin}."] if origin else []) + ([f"Started from {started}."] if started else [])
+        return section("## Training", [text, *notes])
     rows: Facts = [
         *([("Duplicated from", origin)] if origin else []),
+        *([("Started from", started)] if started else []),
         ("Method", "LoRA adapter"),
         ("Strategy", recipe.strategy),
         ("Rows trained on", training.examples),

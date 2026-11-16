@@ -814,6 +814,7 @@ class VersionInfo(BaseModel):
     live_at: datetime | None = None
     view: str | None = None
     duplicated_from: VersionOrigin | None = None
+    from_version: int | None = Field(default=None, description="The version whose settings this run started from.")
     base_model: str = Field(default="", description="The base the version was made on and runs on.")
     base_refusal: str | None = Field(
         default=None, description="Why the version can't be deployed: it was made on a base the model has left."
@@ -1008,6 +1009,9 @@ class VersionCreate(TrainingSettings):
     kind: Literal["prompt", "lora"]
     dataset_version_id: int | None = None
     breaking: bool = False
+    from_version: int | None = Field(
+        default=None, ge=0, description="The version whose settings this run started from, if any."
+    )
     instructions: str | None = Field(
         default=None,
         max_length=8000,

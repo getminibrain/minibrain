@@ -335,6 +335,7 @@ def training_card(session: Session, model: Model, version: Version) -> CardTrain
             train_loss=None,
             run=None,
             duplicated_from=origin,
+            started_from=version.from_version,
         )
     job = training_job(session, model, version)
     recipe = dict((job.params.get("recipe") if job is not None else None) or {}) | dict(version.recipe or {})
@@ -346,6 +347,7 @@ def training_card(session: Session, model: Model, version: Version) -> CardTrain
         train_loss=rounded(recipe.get("train_loss")),
         run=run_card(session, job, recipe.get("device")),
         duplicated_from=origin,
+        started_from=version.from_version,
     )
 
 

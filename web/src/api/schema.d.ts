@@ -3853,6 +3853,11 @@ export interface components {
             train_loss: number | null;
             run: components["schemas"]["CardRun"] | null;
             duplicated_from?: components["schemas"]["CardOrigin"] | null;
+            /**
+             * Started From
+             * @description The version whose settings this run started from.
+             */
+            started_from?: number | null;
         };
         /** CardUse */
         CardUse: {
@@ -9676,6 +9681,11 @@ export interface components {
              */
             breaking?: boolean;
             /**
+             * From Version
+             * @description The version whose settings this run started from, if any.
+             */
+            from_version?: number | null;
+            /**
              * Instructions
              * @description New model instructions saved with this version; empty restores the preset's default.
              */
@@ -9761,6 +9771,11 @@ export interface components {
             /** View */
             view?: string | null;
             duplicated_from?: components["schemas"]["VersionOrigin"] | null;
+            /**
+             * From Version
+             * @description The version whose settings this run started from.
+             */
+            from_version?: number | null;
             /**
              * Base Model
              * @description The base the version was made on and runs on.
