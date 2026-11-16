@@ -3,7 +3,7 @@ import hmac
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
@@ -156,15 +156,23 @@ def start_session(session: Session, user: User, ip: str | None, user_agent: str 
     return row, token
 
 
+def idle_session(row: LoginSession, limits: Lifetimes, moment: datetime) -> bool:
+    return limits.idle is not None and moment - row.last_seen_at > limits.idle
+
+
+def session_alive(row: LoginSession, limits: Lifetimes, moment: datetime) -> bool:
+    ends = min(row.expires_at, row.created_at + limits.absolute)
+    return ends > moment and not idle_session(row, limits, moment)
+
+
 def checked_session(session: Session, token: str) -> tuple[LoginSession | None, str | None]:
     row = session.scalar(select(LoginSession).where(LoginSession.token_hash == token_digest(token)))
     if row is None:
         return None, None
     moment = now()
     limits = lifetimes(session)
-    ends = min(row.expires_at, row.created_at + limits.absolute)
-    idle = limits.idle is not None and moment - row.last_seen_at > limits.idle
-    if ends <= moment or idle or row.user.disabled:
+    idle = idle_session(row, limits, moment)
+    if not session_alive(row, limits, moment) or row.user.disabled:
         session.delete(row)
         if row.user.disabled:
             return None, None
@@ -186,13 +194,26 @@ def end_sessions(session: Session, user: User) -> None:
 
 
 def end_other_sessions(session: Session, user: User, keep: int | None) -> list[int]:
-    query = select(LoginSession.id).where(LoginSession.user_id == user.id)
+    query = select(LoginSession).where(LoginSession.user_id == user.id)
     if keep is not None:
         query = query.where(LoginSession.id != keep)
-    ended = list(session.scalars(query))
-    if ended:
-        session.execute(delete(LoginSession).where(LoginSession.id.in_(ended)))
+    rows = list(session.scalars(query))
+    moment = now()
+    limits = lifetimes(session)
+    ended = [row.id for row in rows if session_alive(row, limits, moment)]
+    if rows:
+        session.execute(delete(LoginSession).where(LoginSession.id.in_([row.id for row in rows])))
     return ended
+
+
+def live_session_counts(session: Session) -> dict[int, int]:
+    moment = now()
+    limits = lifetimes(session)
+    counts: dict[int, int] = {}
+    for row in session.scalars(select(LoginSession)):
+        if session_alive(row, limits, moment):
+            counts[row.user_id] = counts.get(row.user_id, 0) + 1
+    return counts
 
 
 def ensure_csrf_key(session: Session) -> bytes:

@@ -17,13 +17,14 @@ from minibrain.auth.accounts import (
     end_sessions,
     get_user,
     issue_reset,
+    live_session_counts,
     person_for,
     person_of,
 )
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.identity import current_actor, current_person
 from minibrain.auth.roles import Role, role_of
-from minibrain.registry.models import AuditEvent, LoginSession, User, now
+from minibrain.registry.models import AuditEvent, User, now
 
 router = APIRouter(prefix="/api/accounts")
 
@@ -91,11 +92,6 @@ def auth_config(request: Request) -> AuthConfig:
 AuthDep = Annotated[AuthConfig, Depends(auth_config)]
 
 
-def session_counts(session: Session) -> dict[int, int]:
-    query = select(LoginSession.user_id, func.count(LoginSession.id)).group_by(LoginSession.user_id)
-    return {user_id: count for user_id, count in session.execute(query).all()}
-
-
 def account_info(session: Session, config: AuthConfig, user: User, sessions: int) -> AccountInfo:
     person = person_for(session, user, config)
     pending = user.reset_expires_at is not None and user.reset_expires_at > now()
@@ -118,7 +114,7 @@ def account_info(session: Session, config: AuthConfig, user: User, sessions: int
 
 
 def one_account(session: Session, config: AuthConfig, user: User) -> AccountInfo:
-    return account_info(session, config, user, session_counts(session).get(user.id, 0))
+    return account_info(session, config, user, live_session_counts(session).get(user.id, 0))
 
 
 def cleaned(name: str | None) -> str:
@@ -147,7 +143,7 @@ def is_last_admin(session: Session, user: User) -> bool:
 
 @router.get("", dependencies=[Depends(admin)], summary="List accounts")
 def accounts(session: SessionDep, config: AuthDep) -> AccountsInfo:
-    counts = session_counts(session)
+    counts = live_session_counts(session)
     people = session.scalars(select(User).order_by(func.lower(User.name), User.id))
     proxy = config.proxy
     return AccountsInfo(

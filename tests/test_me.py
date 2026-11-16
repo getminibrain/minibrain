@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +8,7 @@ from sqlalchemy import select
 from minibrain.auth.passwords import verify_password
 from minibrain.auth.roles import Role
 from minibrain.auth.throttle import LOCK_AFTER
-from minibrain.registry.models import LoginSession, User
+from minibrain.registry.models import LoginSession, User, now
 from minibrain.settings import Settings
 from tests.conftest import Harness
 from tests.test_accounts import ADMIN, PASSWORD, Install, csrf, set_up, start
@@ -174,3 +175,21 @@ def test_single_sign_on_accounts_cannot_set_a_password(proxied: Proxied) -> None
     renamed = client.patch("/api/me", json={"name": "Bea Smith"}, headers=headers)
     assert renamed.status_code == 200 and renamed.json()["name"] == "Bea Smith"
     assert client.get("/api/auth/session", headers=person).json()["person"]["name"] == "Bea Smith"
+
+
+def test_expired_sessions_are_not_counted_as_signed_in(install: Install) -> None:
+    admin = set_up(install)
+    signed_in(install)
+    stale = signed_in(install)
+    stale_id = next(row["id"] for row in stale.get("/api/me/sessions").json() if row["current"])
+    with install.sessions() as session:
+        row = session.get(LoginSession, stale_id)
+        assert row is not None
+        row.expires_at = now() - timedelta(minutes=1)
+        session.commit()
+    assert len(admin.get("/api/me/sessions").json()) == 2
+    [person] = admin.get("/api/accounts").json()["people"]
+    assert person["sessions"] == 2
+    ended = admin.delete("/api/me/sessions", headers=csrf(admin))
+    assert ended.json() == {"ended": 1}
+    assert len(session_ids(install)) == 1

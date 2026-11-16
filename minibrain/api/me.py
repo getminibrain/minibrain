@@ -21,6 +21,7 @@ from minibrain.auth.accounts import (
     lifetimes,
     person_for,
     person_of,
+    session_alive,
 )
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.gate import Identity
@@ -122,14 +123,6 @@ def audit_self(session: Session, user: User, action: str, detail: dict[str, Any]
     session.add(AuditEvent(actor=actor, actor_id=user.id, action=action, target=actor, detail=detail))
 
 
-def live(session: Session, row: LoginSession) -> bool:
-    moment = now()
-    limits = lifetimes(session)
-    ends = min(row.expires_at, row.created_at + limits.absolute)
-    idle = limits.idle is not None and moment - row.last_seen_at > limits.idle
-    return ends > moment and not idle
-
-
 @router.get("", dependencies=[Depends(signed_in)], summary="Read your own account")
 def read_profile(session: SessionDep, found: IdentityDep, config: AuthDep) -> Profile:
     return profile_of(session, config, own_account(session, found))
@@ -173,6 +166,8 @@ def my_sessions(session: SessionDep, found: IdentityDep) -> list[SignInSession]:
     user = own_account(session, found)
     current = current_session_id(session, found)
     query = select(LoginSession).where(LoginSession.user_id == user.id).order_by(LoginSession.last_seen_at.desc())
+    moment = now()
+    limits = lifetimes(session)
     return [
         SignInSession(
             id=row.id,
@@ -184,7 +179,7 @@ def my_sessions(session: SessionDep, found: IdentityDep) -> list[SignInSession]:
             current=row.id == current,
         )
         for row in session.scalars(query)
-        if row.id == current or live(session, row)
+        if row.id == current or session_alive(row, limits, moment)
     ]
 
 
