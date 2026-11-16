@@ -317,7 +317,13 @@ function serving(row: ModelRow): StatusLine | null {
 
 function deployedLine(row: ModelRow): StatusLine {
     if (row.deployment.state === "starting") {
-        return { kind: "starting", text: lastPart(row.deployment.label), tone: "info", row };
+        return {
+            kind: "starting",
+            text: lastPart(row.deployment.label),
+            tone: "info",
+            waiting: row.deployment.waiting,
+            row,
+        };
     }
     if (isDeployed(row)) {
         return { kind: "on", text: "Deployed", tone: "success", row };

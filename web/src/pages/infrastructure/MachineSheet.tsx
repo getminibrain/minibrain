@@ -16,7 +16,7 @@ import { type ReactNode, useRef } from "react";
 import { Facts } from "~/components/Facts";
 import { PoolLink } from "~/components/PoolLink";
 import { UsageGauge } from "~/components/UsageGauge";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref } from "~/lib/modelLinks";
@@ -155,6 +155,15 @@ function HardwareBlock({ row, info }: { row: MachineRow; info: InfrastructureInf
     );
 }
 
+function MachineState({ row }: { row: MachineRow }) {
+    const status = machineStatus(row.node, row.engines);
+    return (
+        <StatusText tone={status.tone} active={status.active}>
+            {status.label}
+        </StatusText>
+    );
+}
+
 function EngineItem({ engine }: { engine: ReplicaInfo }) {
     const state = ENGINE_STATES[engine.state] ?? ENGINE_STATES.loading;
     return (
@@ -162,7 +171,9 @@ function EngineItem({ engine }: { engine: ReplicaInfo }) {
             <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="flex items-baseline gap-2">
                     <span className="font-medium">{engineLabel(engine.engine)}</span>
-                    <StatusText tone={state.tone}>{state.label}</StatusText>
+                    <StatusText tone={state.tone} active={state.tone === "info"}>
+                        {state.label}
+                    </StatusText>
                 </span>
                 <span className="text-sm text-muted-foreground tabular-nums">
                     {`${bytes(engine.weights_bytes)} weights`}
@@ -234,7 +245,13 @@ function RunningBlock({ row }: { row: MachineRow }) {
                             className="flex flex-wrap items-baseline justify-between gap-x-3 py-2"
                         >
                             <span>
-                                <StatusText tone="info">{kindNoun(job.kind)}</StatusText>{" "}
+                                <StatusText
+                                    tone="info"
+                                    active
+                                    progress={job.progress > 0 ? percentOf(job.progress) : null}
+                                >
+                                    {kindNoun(job.kind)}
+                                </StatusText>{" "}
                                 <Link href={jobLink(job)} className={LINK}>
                                     {jobSubject(job)}
                                 </Link>
@@ -478,9 +495,7 @@ export function MachineSheet({
                         <SheetHeader>
                             <SheetTitle className="font-mono">{row.node.host}</SheetTitle>
                             <SheetDescription className="flex flex-wrap items-baseline gap-x-2">
-                                <StatusText tone={machineStatus(row.node, row.engines).tone}>
-                                    {machineStatus(row.node, row.engines).label}
-                                </StatusText>
+                                <MachineState row={row} />
                                 <span>{`· ${row.node.roles.join(", ")} · ${hardwareText(row.node)}`}</span>
                             </SheetDescription>
                         </SheetHeader>

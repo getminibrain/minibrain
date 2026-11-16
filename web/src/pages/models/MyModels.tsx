@@ -33,6 +33,7 @@ export function Deployment({ row, short = false }: { row: ModelRow; short?: bool
             <StatusText
                 tone={DEPLOYMENT_TONES[state] ?? "neutral"}
                 active={state === "starting" || state === "stopping"}
+                waiting={state === "starting" && row.deployment.waiting}
             >
                 {label}
             </StatusText>

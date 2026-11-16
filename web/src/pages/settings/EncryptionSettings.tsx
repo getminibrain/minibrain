@@ -324,7 +324,13 @@ function Files({ status }: { status: EncryptionStatus }) {
         <div className="flex flex-col gap-2">
             {running && task ? (
                 <p>
-                    <StatusText tone="info">{TASKS[task.kind] ?? task.kind}</StatusText>
+                    <StatusText
+                        tone="info"
+                        active={task.state === "running"}
+                        waiting={task.state === "queued"}
+                    >
+                        {TASKS[task.kind] ?? task.kind}
+                    </StatusText>
                     {task.progress && (
                         <span className="ml-2 text-muted-foreground tabular-nums">
                             {task.progress.files} files seen, {task.progress.encrypted} encrypted,{" "}

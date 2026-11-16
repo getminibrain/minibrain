@@ -101,25 +101,47 @@ export function failureReason(version: VersionInfo): string {
 
 const IN_PROGRESS = new Set(["training", "evaluating"]);
 
-export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
+type ShownStatus = {
+    tone: Tone;
+    label: string;
+    active?: boolean;
+    waiting?: boolean;
+    progress?: number | null;
+};
+
+function jobProgress(version: VersionInfo): Pick<ShownStatus, "active" | "progress"> {
+    const share = version.job?.progress ?? 0;
+    return share > 0 ? { progress: percentOf(share) } : { active: true };
+}
+
+export function versionStatus(row: ModelRow, version: VersionInfo): ShownStatus {
+    if (version.current && row.deployment.state === "starting") {
+        return row.deployment.waiting
+            ? { tone: "warning", label: "Waiting for a machine", waiting: true }
+            : { tone: "info", label: "Deploying", active: true };
+    }
     if (version.current && isDeployed(row)) {
         return { tone: "success", label: "Deployed" };
     }
     if (cancelling(version)) {
-        return { tone: "warning", label: "Cancelling…" };
+        return { tone: "warning", label: "Cancelling…", active: true };
     }
     if (
         version.status === "queued" ||
         (IN_PROGRESS.has(version.status) && version.job?.status === "queued")
     ) {
-        return { tone: "neutral", label: "Queued" };
+        return { tone: "neutral", label: "Queued", waiting: true };
     }
     if (version.status === "training") {
         const progress = version.job?.progress ?? 0;
-        return { tone: "info", label: `Training ${Math.round(progress * 100)}%` };
+        return {
+            tone: "info",
+            label: `Training ${Math.round(progress * 100)}%`,
+            ...jobProgress(version),
+        };
     }
     if (version.status === "evaluating") {
-        return { tone: "info", label: "Scoring" };
+        return { tone: "info", label: "Scoring", ...jobProgress(version) };
     }
     if (isCancelled(version)) {
         return { tone: "neutral", label: "Cancelled" };
@@ -128,7 +150,7 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
         return { tone: "destructive", label: "Failed" };
     }
     if (version.status === "deleting") {
-        return { tone: "neutral", label: "Deleting" };
+        return { tone: "neutral", label: "Deleting", active: true };
     }
     if (version.live_at) {
         return { tone: "neutral", label: "Was deployed" };
@@ -138,14 +160,12 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
 
 export function VersionStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const status = versionStatus(row, version);
-    const queued = status.label === "Queued";
-    const training = version.status === "training" && !queued;
     const text = (
         <StatusText
             tone={status.tone}
-            active={IN_PROGRESS.has(version.status) && !queued}
-            waiting={queued}
-            progress={training ? percentOf(version.job?.progress ?? 0) : null}
+            active={status.active}
+            waiting={status.waiting}
+            progress={status.progress}
         >
             <span className="tabular-nums">{status.label}</span>
         </StatusText>

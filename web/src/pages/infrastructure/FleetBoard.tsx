@@ -3,7 +3,7 @@ import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
 import { BASIS_LABELS, GaugeLegend, UsageGauge, kindLegend } from "~/components/UsageGauge";
-import { StatusText } from "~/components/models/StatusText";
+import { StatusText, percentOf } from "~/components/models/StatusText";
 import { kindNoun } from "~/lib/jobs";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
@@ -56,7 +56,9 @@ function EngineActivity({ engine }: { engine: ReplicaInfo }) {
               ];
     return (
         <li className="flex min-w-0 flex-wrap items-baseline gap-x-1">
-            <StatusText tone={tone}>{verb}</StatusText>
+            <StatusText tone={tone} active={tone === "info"}>
+                {verb}
+            </StatusText>
             {targets.map((target, index) => (
                 <span key={String(index)}>
                     {target}
@@ -71,7 +73,13 @@ function JobActivity({ job }: { job: NodeJob }) {
     const subject = jobSubject(job);
     return (
         <li className="flex min-w-0 flex-wrap items-baseline gap-x-1">
-            <StatusText tone="info">{kindNoun(job.kind)}</StatusText>
+            <StatusText
+                tone="info"
+                active
+                progress={job.progress > 0 ? percentOf(job.progress) : null}
+            >
+                {kindNoun(job.kind)}
+            </StatusText>
             <Link href={jobLink(job)} className="text-primary hover:underline">
                 {subject}
             </Link>
@@ -125,7 +133,7 @@ function MachineTile({ node, engines }: { node: NodeInfo; engines: ReplicaInfo[]
         <li className="flex min-w-0 flex-col gap-2 px-4 py-3">
             <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <span className="flex min-w-0 items-baseline gap-2">
-                    <MachineName node={node} />
+                    <MachineName node={node} busy={busy} />
                     {draining && (
                         <span className="text-sm text-muted-foreground">
                             {machineStatus(node, engines).label}

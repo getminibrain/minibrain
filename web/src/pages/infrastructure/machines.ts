@@ -34,7 +34,7 @@ export const STATUSES = [
 
 export type LowDisk = { key: string; name: string; mount: string | null; free_bytes: number };
 
-export type MachineStatus = { label: string; tone: Tone };
+export type MachineStatus = { label: string; tone: Tone; active?: boolean };
 
 export function busyOf(node: NodeInfo, engines: ReplicaInfo[]): boolean {
     return node.jobs.length > 0 || engines.length > 0;
@@ -42,8 +42,13 @@ export function busyOf(node: NodeInfo, engines: ReplicaInfo[]): boolean {
 
 export function machineStatus(node: NodeInfo, engines: ReplicaInfo[]): MachineStatus {
     if (node.state === "draining") {
-        const label = busyOf(node, engines) ? "Draining" : "Drained";
-        return { label: node.online ? label : `${label}, offline`, tone: "warning" };
+        const busy = busyOf(node, engines);
+        const label = busy ? "Draining" : "Drained";
+        return {
+            label: node.online ? label : `${label}, offline`,
+            tone: "warning",
+            active: busy && node.online,
+        };
     }
     return node.online
         ? { label: "Online", tone: "success" }

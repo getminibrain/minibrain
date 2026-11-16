@@ -46,10 +46,15 @@ export function RoomLine({ room }: { room: PoolRoom | null | undefined }) {
     );
 }
 
-export function MachineName({ node }: { node: NodeInfo }) {
-    const tone = node.state === "draining" ? "warning" : node.online ? "success" : "neutral";
+export function MachineName({ node, busy = false }: { node: NodeInfo; busy?: boolean }) {
+    const draining = node.state === "draining";
+    const tone = draining ? "warning" : node.online ? "success" : "neutral";
     return (
-        <StatusText tone={tone} className="min-w-0 font-mono">
+        <StatusText
+            tone={tone}
+            active={draining && busy && node.online}
+            className="min-w-0 font-mono"
+        >
             <span className="truncate">{node.host}</span>
         </StatusText>
     );

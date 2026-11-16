@@ -282,7 +282,9 @@ function MachineLine({
             )}
         >
             <TableCell className="py-2">
-                <StatusText tone={status.tone}>{status.label}</StatusText>
+                <StatusText tone={status.tone} active={status.active}>
+                    {status.label}
+                </StatusText>
             </TableCell>
             <TableCell className="py-2">
                 <span className="flex min-w-0 items-center gap-2">

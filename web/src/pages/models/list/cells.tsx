@@ -290,7 +290,11 @@ export function VersionStatus({
             </span>
         );
     }
-    const text = <StatusText tone={state.tone}>{state.label}</StatusText>;
+    const text = (
+        <StatusText tone={state.tone} active={version.status === "deleting"}>
+            {state.label}
+        </StatusText>
+    );
     if (version.status === "failed") {
         return (
             <Explained detail={version.error || "The job failed without a message."}>

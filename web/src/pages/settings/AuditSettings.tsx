@@ -318,7 +318,9 @@ export function AuditStatus({ policy }: { policy: PolicyInfo | undefined }) {
     ].filter((part): part is string => part !== null);
     return (
         <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground tabular-nums">
-            <StatusText tone={tone}>{chainText}</StatusText>
+            <StatusText tone={tone} active={!chain.data && !chain.isError}>
+                {chainText}
+            </StatusText>
             {parts.map((part) => (
                 <Fragment key={part}>
                     <span aria-hidden>·</span>

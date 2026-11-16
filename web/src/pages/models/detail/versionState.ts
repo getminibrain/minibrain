@@ -40,6 +40,7 @@ export type Peers = {
     live: VersionInfo | undefined;
     zero: VersionInfo | undefined;
     isLive: boolean;
+    starting: "deploying" | "waiting" | null;
 };
 
 export function peersOf(row: ModelRow, versions: VersionInfo[], version: VersionInfo): Peers {
@@ -49,6 +50,12 @@ export function peersOf(row: ModelRow, versions: VersionInfo[], version: Version
         live: live && live.number !== version.number ? live : undefined,
         zero: zero && zero.number !== version.number ? zero : undefined,
         isLive: live?.number === version.number,
+        starting:
+            live?.number !== version.number || row.deployment.state !== "starting"
+                ? null
+                : row.deployment.waiting
+                  ? "waiting"
+                  : "deploying",
     };
 }
 
@@ -95,7 +102,17 @@ export function shortReason(text: string | null | undefined): string {
     return line.length > SHORT_REASON ? `${line.slice(0, SHORT_REASON - 1)}…` : line;
 }
 
-export type VerdictText = { tone: Tone; text: string };
+export type VerdictText = {
+    tone: Tone;
+    text: string;
+    active?: boolean;
+    waiting?: boolean;
+    progress?: number | null;
+};
+
+function running(progress: number): Pick<VerdictText, "active" | "progress"> {
+    return progress > 0 ? { progress } : { active: true };
+}
 
 export function verdictLine({
     version,
@@ -110,20 +127,32 @@ export function verdictLine({
     eta: number | null | undefined;
     heldOutRows: number | null;
 }): VerdictText {
-    const progress = Math.round((version.job?.progress ?? 0) * 100);
+    const share = (version.job?.progress ?? 0) * 100;
+    const progress = Math.round(share);
     if (cancelling(version) && UNSCORED.includes(phase)) {
-        return { tone: "warning", text: "Cancelling…" };
+        return { tone: "warning", text: "Cancelling…", active: true };
     }
     if (phase === "queued") {
-        return { tone: "neutral", text: "Queued · waiting for a worker to start training" };
+        return {
+            tone: "neutral",
+            text: "Queued · waiting for a worker to start training",
+            waiting: true,
+        };
     }
     if (phase === "training") {
         const left = typeof eta === "number" ? ` · about ${durationText(eta)} left` : "";
-        return { tone: "info", text: `Training · ${progress}%${left}` };
+        return { tone: "info", text: `Training · ${progress}%${left}`, ...running(share) };
+    }
+    if (phase === "scoring" && version.job?.status === "queued") {
+        return {
+            tone: "neutral",
+            text: "Queued · waiting for a worker to start scoring",
+            waiting: true,
+        };
     }
     if (phase === "scoring") {
         const rows = heldOutRows ? `${count(heldOutRows)} held-out rows` : "held-out rows";
-        return { tone: "info", text: `Scoring on ${rows} · ${progress}%` };
+        return { tone: "info", text: `Scoring on ${rows} · ${progress}%`, ...running(share) };
     }
     if (phase === "failed") {
         const what = version.job?.kind === "eval" ? "Scoring" : "Training";
@@ -136,7 +165,7 @@ export function verdictLine({
         return { tone: "neutral", text };
     }
     if (phase === "deleting") {
-        return { tone: "neutral", text: "Deleting" };
+        return { tone: "neutral", text: "Deleting", active: true };
     }
     return readyVerdict(version, peers);
 }
@@ -148,6 +177,12 @@ function readyVerdict(version: VersionInfo, peers: Peers): VerdictText {
     const versusZero = scored(peers.zero)
         ? ` · ${pts(version.score - (peers.zero.score ?? 0))} vs v0`
         : "";
+    if (peers.starting === "waiting") {
+        return { tone: "warning", text: `Waiting for a machine${versusZero}`, waiting: true };
+    }
+    if (peers.starting === "deploying") {
+        return { tone: "info", text: `Deploying${versusZero}`, active: true };
+    }
     if (peers.isLive) {
         return { tone: "success", text: `Live${versusZero}` };
     }

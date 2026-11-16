@@ -407,7 +407,13 @@ function VerdictLine({
     const verdict = verdictLine({ version, phase, peers, eta, heldOutRows: rows });
     return (
         <p className="flex min-h-6 min-w-0 items-center" aria-live="polite">
-            <StatusText tone={verdict.tone} className="min-w-0">
+            <StatusText
+                tone={verdict.tone}
+                active={verdict.active}
+                waiting={verdict.waiting}
+                progress={verdict.progress}
+                className="min-w-0"
+            >
                 <span className="truncate tabular-nums" title={verdict.text}>
                     {verdict.text}
                 </span>
