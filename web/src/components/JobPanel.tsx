@@ -38,7 +38,11 @@ export function JobPanel({ job, slug }: { job: JobInfo; slug: string }) {
                 </div>
                 <div className="flex items-center gap-2">
                     {can.build && active && !job.cancel_requested && (
-                        <Button variant="outline" size="sm" onClick={() => cancel.mutate()}>
+                        <Button
+                            variant="destructive-outline"
+                            size="sm"
+                            onClick={() => cancel.mutate()}
+                        >
                             Cancel
                         </Button>
                     )}

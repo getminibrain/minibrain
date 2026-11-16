@@ -213,7 +213,7 @@ function Actions({ job }: { job: JobDetail }) {
             <ErrorLine error={cancel.error ?? retry.error} />
             {canCancel(job) && (
                 <Button
-                    variant="outline"
+                    variant="destructive-outline"
                     disabled={cancel.isPending}
                     onClick={() => cancel.mutate()}
                 >

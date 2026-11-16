@@ -99,7 +99,7 @@ function BulkButton({
     jobs,
     none,
     note,
-    destructive,
+    variant = "outline",
     pending,
     onClick,
 }: {
@@ -108,11 +108,10 @@ function BulkButton({
     jobs: JobInfo[];
     none: string;
     note?: string;
-    destructive?: boolean;
+    variant?: "outline" | "destructive" | "destructive-outline";
     pending?: boolean;
     onClick: () => void;
 }) {
-    const variant = destructive ? "destructive" : "outline";
     const button =
         jobs.length > 0 ? (
             <Button variant={variant} disabled={pending} onClick={onClick}>
@@ -187,6 +186,7 @@ function JobSelectionBar({
                     icon={CircleX}
                     label="Cancel"
                     jobs={cancellable}
+                    variant="destructive-outline"
                     none="None of the selected jobs is queued or running."
                     onClick={() =>
                         setConfirmation(
@@ -198,7 +198,7 @@ function JobSelectionBar({
                     icon={Trash2}
                     label="Delete"
                     jobs={deletable}
-                    destructive
+                    variant="destructive"
                     none={kept.length > 0 ? refusalSummary(kept) : "Select jobs to delete."}
                     note={kept.length > 0 ? refusalSummary(kept) : undefined}
                     onClick={() => setDeleting(jobs)}
