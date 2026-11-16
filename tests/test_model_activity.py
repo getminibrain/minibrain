@@ -2,7 +2,7 @@ from typing import Any
 
 from minibrain.registry.models import JobKind
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, create_with_dataset, finish
+from tests.test_flow import SLUG, add_version, create_on_data, create_with_dataset, finish
 
 
 def events(harness: Harness) -> list[dict[str, Any]]:
@@ -28,3 +28,16 @@ def test_links_to_a_deleted_version_say_it_was_deleted(harness: Harness) -> None
     harness.settle()
     links = version_links(harness, 1)
     assert links and all(link["deleted"] for link in links)
+
+
+def test_v0_is_queued_for_scoring_until_its_scoring_finishes(harness: Harness) -> None:
+    create_on_data(harness)
+    texts = [event["text"] for event in events(harness)]
+    assert "queued v0 for scoring, prompt only" in texts
+    assert not [text for text in texts if text.startswith("scored")]
+    finish(harness, JobKind.EVAL, accuracy=1.0)
+    found = events(harness)
+    texts = [event["text"] for event in found]
+    assert "scored v0" in texts and "queued v0 for scoring, prompt only" not in texts
+    scored = next(event for event in found if event["text"] == "scored v0")
+    assert scored["action"] == "version.scored" and scored["score"] is not None

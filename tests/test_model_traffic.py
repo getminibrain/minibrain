@@ -262,7 +262,7 @@ def test_activity_of_a_recreated_model_holds_only_its_own_events(harness: Harnes
         old = {event.id for event in session.query(AuditEvent).all()}
     assert create_model(harness)["slug"] == f"{SLUG}-2"
     found = activity(harness, f"{SLUG}-2")
-    assert [event["text"] for event in found["events"]] == ["scored v0, prompt only", "created Support Triage"]
+    assert [event["text"] for event in found["events"]] == ["added v0, prompt only", "created Support Triage"]
     assert found["total"] == 2 and not old & {event["id"] for event in found["events"]}
     assert page(harness, f"{SLUG}-2")["created_by"]
 
@@ -314,7 +314,7 @@ def test_activity_names_people_and_tells_how_training_ended(harness: Harness) ->
         ("Dana Ilie", "trained v0"),
         ("lee.chan", "changed the avatar"),
     ]
-    assert "scored v0, prompt only" not in [text for _, text in named]
+    assert not [text for _, text in named if text.endswith("prompt only")]
     assert found["events"][0]["tone"] == "failed" and found["events"][0]["link"]["version"] == 7
     assert found["events"][1]["actor"] == ADMIN_EMAIL
     assert named[-1][0] == "Dana Ilie" and found["total"] == len(named)

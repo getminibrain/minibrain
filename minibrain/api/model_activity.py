@@ -12,9 +12,19 @@ from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
 from minibrain.auth.accounts import users_by_handle
-from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model, VersionStatus
+from minibrain.registry.models import (
+    SYSTEM_ACTOR,
+    AuditEvent,
+    Job,
+    JobKind,
+    JobStatus,
+    Model,
+    VersionKind,
+    VersionStatus,
+)
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
+from minibrain.tasks.rescore import RESCORE
 from minibrain.tasks.service import held_out_score
 
 router = APIRouter(prefix="/api")
@@ -120,8 +130,10 @@ def version_said(owner: Owner, event: AuditEvent) -> Said:
     if event.action == "version.create":
         if (event.detail or {}).get("duplicated_from"):
             return Said(f"copied {name} from another model", link)
+        if detail_text(event, "kind") == "prompt" and detail_text(event, "dataset_version") is None:
+            return Said(f"added {name}, prompt only", link)
         if detail_text(event, "kind") == "prompt":
-            return Said(f"scored {name}, prompt only", link)
+            return Said(f"queued {name} for scoring, prompt only", link)
         return Said(f"started training {name}", link)
     if event.action == "version.promote":
         return Said(f"deployed {name}", link, "success")
@@ -327,16 +339,17 @@ def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: dict[s
     name = f"v{number}"
     failed = job.status == JobStatus.FAILED
     actor = SYSTEM_ACTOR if failed or started is None else started.actor
+    verb = "trained" if job.kind == JobKind.TRAIN else "scored"
     if failed:
         text = f"{name} failed{failure_reason(job)}"
     else:
-        text = f"{name} trained" if actor == SYSTEM_ACTOR else f"trained {name}"
+        text = f"{name} {verb}" if actor == SYSTEM_ACTOR else f"{verb} {name}"
     return ModelActivityEvent(
         id=-job.id,
         at=aware(job.finished_at or job.created_at),
         actor=actor,
         actor_name=name_of(actor, names),
-        action="version.failed" if failed else "version.trained",
+        action="version.failed" if failed else f"version.{verb}",
         text=text,
         link=version_link(owner, number),
         tone="failed" if failed else "neutral",
@@ -344,17 +357,21 @@ def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: dict[s
     )
 
 
-def finished_training(session: Session, owner: Owner) -> list[Job]:
+def prompt_scoring(job: Job) -> bool:
+    return job.version is not None and job.version.kind == VersionKind.PROMPT and RESCORE not in job.params
+
+
+def finished_runs(session: Session, owner: Owner) -> list[Job]:
     if owner.model_id is None:
         return []
     query = select(Job).where(
         Job.model_id == owner.model_id,
-        Job.kind == JobKind.TRAIN,
+        Job.kind.in_((JobKind.TRAIN, JobKind.EVAL)),
         Job.status.in_((JobStatus.SUCCEEDED, JobStatus.FAILED)),
         Job.version_number.is_not(None),
         Job.finished_at >= owner.created_at,
     )
-    return list(session.scalars(query))
+    return [job for job in session.scalars(query) if job.kind == JobKind.TRAIN or prompt_scoring(job)]
 
 
 def starts_of(found: list[AuditEvent], jobs: list[Job]) -> dict[int, AuditEvent]:
@@ -384,7 +401,7 @@ def activity_of(session: Session, name: str, limit: int) -> ModelActivity:
     owner = owner_of(session, name)
     query = select(AuditEvent).where(candidates(owner)).order_by(AuditEvent.id.desc())
     found = [event for event in session.scalars(query) if belongs(owner, event)]
-    jobs = finished_training(session, owner)
+    jobs = finished_runs(session, owner)
     starts = starts_of(found, jobs)
     merged = {event.id for event in starts.values()}
     kept = [event for event in found if event.id not in merged]

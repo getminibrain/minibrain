@@ -199,6 +199,9 @@ function runText(head: ModelActivityEvent, count: number): string {
     if (action === "version.trained") {
         return head.actor_name ? `trained ${count} versions` : `${count} versions trained`;
     }
+    if (action === "version.scored") {
+        return head.actor_name ? `scored ${count} versions` : `${count} versions scored`;
+    }
     if (action === "version.failed") {
         return `${count} versions failed`;
     }
