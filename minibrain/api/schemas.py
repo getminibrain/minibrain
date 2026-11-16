@@ -1295,6 +1295,14 @@ class StoreInfo(BaseModel):
     used_bytes: int | None
     free_bytes: int | None
     total_bytes: int | None
+    disk: str | None = Field(default=None, description="Stores on the same physical disk share this id.")
+
+
+class StoredItem(BaseModel):
+    kind: Literal["model", "dataset"]
+    key: str
+    name: str
+    size_bytes: int
 
 
 class InfrastructureInfo(BaseModel):
@@ -1304,6 +1312,7 @@ class InfrastructureInfo(BaseModel):
     web: str
     stores: list[StoreInfo]
     dataset_versions: DatasetVersionUsage | None = None
+    largest: list[StoredItem]
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]

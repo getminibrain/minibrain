@@ -41,5 +41,5 @@ export function bytes(value: number | null | undefined): string {
     if (value >= 1024 ** 2) {
         return `${Math.round(value / 1024 ** 2)} MB`;
     }
-    return `${Math.max(1, Math.round(value / 1024))} KB`;
+    return value === 0 ? "0 KB" : `${Math.max(1, Math.round(value / 1024))} KB`;
 }

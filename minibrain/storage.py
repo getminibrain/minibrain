@@ -12,13 +12,14 @@ RESERVE_BYTES = GIB
 class Space:
     free: int
     total: int
+    device: int | None = None
 
 
 def disk_space(path: Path) -> Space | None:
     for candidate in (path, *path.parents):
         if candidate.exists():
             usage = shutil.disk_usage(candidate)
-            return Space(free=usage.free, total=usage.total)
+            return Space(free=usage.free, total=usage.total, device=candidate.stat().st_dev)
     return None
 
 

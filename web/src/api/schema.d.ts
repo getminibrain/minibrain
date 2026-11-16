@@ -5797,6 +5797,8 @@ export interface components {
             /** Stores */
             stores: components["schemas"]["StoreInfo"][];
             dataset_versions?: components["schemas"]["DatasetVersionUsage"] | null;
+            /** Largest */
+            largest: components["schemas"]["StoredItem"][];
         };
         /** InspectRequest */
         InspectRequest: {
@@ -7195,6 +7197,28 @@ export interface components {
             versions?: {
                 [key: string]: string;
             };
+            /** Jobs */
+            jobs: components["schemas"]["NodeJob"][];
+        };
+        /** NodeJob */
+        NodeJob: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string | null;
+            /** Model Name */
+            model_name: string | null;
+            /** Version */
+            version: number | null;
+            /** Progress */
+            progress: number;
+            /**
+             * Memory Bytes
+             * @description The training plan's peak memory, once planned.
+             */
+            memory_bytes?: number | null;
         };
         /** OpenAIErrorBody */
         OpenAIErrorBody: {
@@ -7716,6 +7740,13 @@ export interface components {
              * Format: date-time
              */
             seen_at: string;
+            /**
+             * Weights Bytes
+             * @description Size of the base model's weight files.
+             */
+            weights_bytes: number | null;
+            /** Serves */
+            serves: components["schemas"]["ServedModel"][];
         };
         /** RequestBodiesInfo */
         RequestBodiesInfo: {
@@ -8212,6 +8243,17 @@ export interface components {
             /** @description The catalogue's full-precision variant of the base. */
             switch_to: components["schemas"]["BaseTargetInfo"] | null;
         };
+        /** ServedModel */
+        ServedModel: {
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number | null;
+            /** Adapter Bytes */
+            adapter_bytes: number | null;
+        };
         /** ServingReplica */
         ServingReplica: {
             /** Host */
@@ -8567,6 +8609,25 @@ export interface components {
             free_bytes: number | null;
             /** Total Bytes */
             total_bytes: number | null;
+            /**
+             * Disk
+             * @description Stores on the same physical disk share this id.
+             */
+            disk?: string | null;
+        };
+        /** StoredItem */
+        StoredItem: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model" | "dataset";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
         };
         /** SystemInfo */
         SystemInfo: {

@@ -18,6 +18,7 @@ from minibrain.api.schemas import (
     StorageCheck,
     StorageSettings,
     StorageUpdate,
+    StoredItem,
     StoreInfo,
     SystemInfo,
 )
@@ -37,7 +38,7 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, DatasetVersion, Job, Version
+from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, Dataset, DatasetVersion, Job, Version
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -100,6 +101,7 @@ def folder_store(name: str, path: Path, used: int | None) -> StoreInfo:
         used_bytes=used,
         free_bytes=space.free if space else None,
         total_bytes=space.total if space else None,
+        disk=str(space.device) if space and space.device is not None else None,
     )
 
 
@@ -240,7 +242,28 @@ def infrastructure(
             artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
         ],
         dataset_versions=usage,
+        largest=largest_items(session),
     )
+
+
+LARGEST = 8
+
+
+def largest_items(session: Session) -> list[StoredItem]:
+    models = [
+        StoredItem(kind="model", key=base.id, name=base.name, size_bytes=base.size_bytes)
+        for base in session.scalars(select(BaseModel).where(*on_main(), BaseModel.size_bytes > 0))
+    ]
+    stored: dict[int, dict[str, int]] = {}
+    for version in session.scalars(select(DatasetVersion).where(DatasetVersion.dataset_id.is_not(None))):
+        stored.setdefault(version.dataset_id or 0, {})[version.artifact_id] = version.size
+    named = session.scalars(select(Dataset).where(Dataset.id.in_(stored)))
+    datasets = [
+        StoredItem(kind="dataset", key=dataset.slug, name=dataset.name, size_bytes=sum(stored[dataset.id].values()))
+        for dataset in named
+        if sum(stored[dataset.id].values()) > 0
+    ]
+    return sorted(models + datasets, key=lambda item: item.size_bytes, reverse=True)[:LARGEST]
 
 
 def dataset_version_usage(session: Session) -> DatasetVersionUsage:

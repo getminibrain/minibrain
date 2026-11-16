@@ -3,14 +3,31 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, StringConstraints
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep
+from minibrain.api.job_facts import TRAIN_START
 from minibrain.auth.identity import current_actor
-from minibrain.registry.compute import Pool, pools, replica_host
-from minibrain.registry.models import AuditEvent
+from minibrain.jobs.metrics import latest_data
+from minibrain.models.placement import pools_of, weights_of
+from minibrain.registry.compute import Pool, node_id, pools, replica_host
+from minibrain.registry.models import (
+    Artifact,
+    AuditEvent,
+    EngineReplica,
+    Job,
+    JobKind,
+    JobStatus,
+    Model,
+    Version,
+    Worker,
+)
+from minibrain.registry.models import BaseModel as BaseModel_
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
+from minibrain.tasks.service import live_version, serving_base
 
 router = APIRouter(prefix="/api/compute")
 
@@ -22,6 +39,16 @@ HourlyPrice = Annotated[float, Field(ge=0, le=MAX_HOURLY_PRICE)]
 class GpuInfo(BaseModel):
     name: str
     memory_bytes: int
+
+
+class NodeJob(BaseModel):
+    id: int
+    kind: str
+    model: str | None
+    model_name: str | None
+    version: int | None
+    progress: float
+    memory_bytes: int | None = Field(default=None, description="The training plan's peak memory, once planned.")
 
 
 class NodeInfo(BaseModel):
@@ -40,6 +67,14 @@ class NodeInfo(BaseModel):
     gpus: list[GpuInfo]
     engines: list[str]
     versions: dict[str, str] = {}
+    jobs: list[NodeJob]
+
+
+class ServedModel(BaseModel):
+    model: str
+    name: str
+    version: int | None
+    adapter_bytes: int | None
 
 
 class ReplicaInfo(BaseModel):
@@ -50,6 +85,8 @@ class ReplicaInfo(BaseModel):
     state: str
     host: str
     seen_at: datetime
+    weights_bytes: int | None = Field(description="Size of the base model's weight files.")
+    serves: list[ServedModel]
 
 
 class PoolInfo(BaseModel):
@@ -59,9 +96,80 @@ class PoolInfo(BaseModel):
     engines: list[ReplicaInfo]
 
 
+def planned_peak(session: Session, job: Job) -> int | None:
+    started = latest_data(session, job.id, (TRAIN_START,)) or {}
+    recipe = started.get("recipe")
+    plan = recipe.get("plan") if isinstance(recipe, dict) else None
+    peak = plan.get("peak_bytes") if isinstance(plan, dict) else None
+    return int(peak) if isinstance(peak, int | float) and not isinstance(peak, bool) else None
+
+
+def running_jobs(session: Session) -> dict[str, list[NodeJob]]:
+    found: dict[str, list[NodeJob]] = {}
+    query = select(Job, Worker).join(Worker, Worker.id == Job.lease_owner).where(Job.status == JobStatus.RUNNING)
+    for job, worker in session.execute(query.order_by(Job.id)):
+        found.setdefault(node_id(worker.pool, worker.host), []).append(
+            NodeJob(
+                id=job.id,
+                kind=job.kind,
+                model=job.model_slug,
+                model_name=job.model_name,
+                version=job.version_number,
+                progress=job.progress,
+                memory_bytes=planned_peak(session, job) if job.kind == JobKind.TRAIN else None,
+            )
+        )
+    return found
+
+
+def adapter_bytes(session: Session, version: Version | None) -> int | None:
+    if version is None or version.adapter_artifact_id is None:
+        return None
+    artifact = session.get(Artifact, version.adapter_artifact_id)
+    return artifact.size if artifact is not None else None
+
+
+def served_models(session: Session) -> dict[tuple[str, str], list[ServedModel]]:
+    found: dict[tuple[str, str], list[ServedModel]] = {}
+    for model in session.scalars(select(Model).where(Model.deployed.is_(True)).order_by(Model.name)):
+        live = live_version(model)
+        served = ServedModel(
+            model=model.slug,
+            name=model.name,
+            version=live.number if live is not None else None,
+            adapter_bytes=adapter_bytes(session, live),
+        )
+        for pool in pools_of(model):
+            found.setdefault((pool, serving_base(model)), []).append(served)
+    for base in session.scalars(select(BaseModel_).where(BaseModel_.deployed.is_(True)).order_by(BaseModel_.name)):
+        served = ServedModel(model=base.id, name=base.name, version=None, adapter_bytes=None)
+        for pool in pools_of(base):
+            found.setdefault((pool, base.id), []).append(served)
+    return found
+
+
+def replica_info(
+    session: Session, replica: EngineReplica, served: dict[tuple[str, str], list[ServedModel]]
+) -> ReplicaInfo:
+    weights = weights_of(session, replica.base_model)[0]
+    return ReplicaInfo(
+        id=replica.id,
+        base_model=replica.base_model,
+        engine=replica.engine,
+        url=replica.url,
+        state=replica.state,
+        host=replica_host(replica),
+        seen_at=replica.seen_at,
+        weights_bytes=weights or None,
+        serves=served.get((replica.pool, replica.base_model), []),
+    )
+
+
 @router.get("/pools", dependencies=[Depends(viewer)], summary="List compute pools")
 def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
     found: list[PoolInfo] = []
+    jobs = running_jobs(session)
+    served = served_models(session)
     for pool in pools(session, node):
         nodes = [
             NodeInfo(
@@ -70,22 +178,12 @@ def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
                 roles=item.roles,
                 online=item.online,
                 seen_at=item.seen_at,
+                jobs=jobs.get(item.id, []),
                 **{key: value for key, value in item.report.as_dict().items() if key != "host"},
             )
             for item in pool.nodes
         ]
-        engines = [
-            ReplicaInfo(
-                id=replica.id,
-                base_model=replica.base_model,
-                engine=replica.engine,
-                url=replica.url,
-                state=replica.state,
-                host=replica_host(replica),
-                seen_at=replica.seen_at,
-            )
-            for replica in pool.engines
-        ]
+        engines = [replica_info(session, replica, served) for replica in pool.engines]
         found.append(PoolInfo(name=pool.name, label=pool.label, nodes=nodes, engines=engines))
     return found
 

@@ -1,41 +1,35 @@
 import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-    Archive,
-    Cpu,
-    Gauge,
-    HardDrive,
-    MemoryStick,
-    Network,
-    Server,
-    TriangleAlert,
-} from "lucide-react";
+import { Cpu, MemoryStick, Server } from "lucide-react";
 import {
     Badge,
     DataGrid,
-    Link,
     TabNav,
     type TabNavItem,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
-    cn,
 } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { PageHeader } from "~/components/PageHeader";
-import { poolHref } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
-import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
+import { FleetBoard } from "./infrastructure/FleetBoard";
+import { NeedsALook, differences } from "./infrastructure/NeedsALook";
+import { SetupDiagram } from "./infrastructure/SetupDiagram";
+import { StorageTab } from "./infrastructure/StorageTab";
+import {
+    type InfrastructureInfo,
+    MachineName,
+    type NodeInfo,
+    type PoolInfo,
+    type ReplicaInfo,
+    plural,
+} from "./infrastructure/parts";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
-type PoolInfo = components["schemas"]["PoolInfo"];
-type NodeInfo = components["schemas"]["NodeInfo"];
-type ReplicaInfo = components["schemas"]["ReplicaInfo"];
-type StoreInfo = components["schemas"]["StoreInfo"];
-type InfrastructureInfo = components["schemas"]["InfrastructureInfo"];
 
 const LOOPS: Record<string, string> = {
     single: "Runs here",
@@ -65,18 +59,6 @@ const ENGINE_BADGES: Record<string, "success" | "destructive"> = {
 
 function engineNames(engines: string[]): string {
     return engines.map((engine) => ENGINE_LABEL[engine] ?? engine).join(", ");
-}
-
-const COMPARED = ["minibrain", "torch", "transformers", "peft"];
-
-function release(value: string): string {
-    return value.split("+")[0];
-}
-
-function differences(versions: Record<string, string>, main: Record<string, string>): string[] {
-    return COMPARED.filter(
-        (name) => versions[name] && main[name] && release(versions[name]) !== release(main[name]),
-    ).map((name) => `${name} ${versions[name]} (main has ${main[name]})`);
 }
 
 function VersionCell({ node }: { node: NodeInfo }) {
@@ -122,9 +104,8 @@ function nodeColumns(main: Record<string, string>): ColumnDef<NodeInfo, unknown>
             id: "host",
             enableHiding: false,
             cell: ({ row }) => (
-                <span className="flex items-center gap-2">
-                    <span className="font-mono">{row.original.host}</span>
-                    {!row.original.online && <Badge variant="warning">Offline</Badge>}
+                <span className="flex min-w-0 items-center gap-2">
+                    <MachineName node={row.original} />
                     <VersionWarning node={row.original} main={main} />
                 </span>
             ),
@@ -165,7 +146,12 @@ const NODE_COLUMNS: ColumnDef<NodeInfo, unknown>[] = [
     {
         header: "Seen",
         id: "seen",
-        cell: ({ row }) => (row.original.seen_at ? relativeTime(row.original.seen_at) : "Now"),
+        cell: ({ row }) =>
+            row.original.online
+                ? "Online now"
+                : row.original.seen_at
+                  ? relativeTime(row.original.seen_at)
+                  : "Never",
     },
 ];
 
@@ -192,10 +178,6 @@ const REPLICA_COLUMNS: ColumnDef<ReplicaInfo, unknown>[] = [
     },
     { header: "Seen", id: "seen", cell: ({ row }) => relativeTime(row.original.seen_at) },
 ];
-
-function plural(value: number, noun: string): string {
-    return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
-}
 
 function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, string> }) {
     const online = pool.nodes.filter((node) => node.online).length;
@@ -252,241 +234,6 @@ const LOADED_COLUMNS: ColumnDef<LoadedModel, unknown>[] = [
     },
 ];
 
-const SETUPS: Record<InfrastructureInfo["setup"], { title: string; body: string }> = {
-    one_machine: {
-        title: "One machine",
-        body: "main, the gateway, the worker and engines all run here, with SQLite and local folders.",
-    },
-    remote_gpus: {
-        title: "Local main, remote GPUs",
-        body: "main and its gateway run here; workers and engines on other machines join pools and pull work from main.",
-    },
-    distributed: {
-        title: "Distributed",
-        body: "Separate services: mains share a Postgres database, and gateways and GPU pools scale on their own.",
-    },
-};
-
-type Placed = { pool: string; hosts: string[] };
-
-function grouped(pairs: { pool: string; host: string }[]): Placed[] {
-    const groups = new Map<string, string[]>();
-    for (const { pool, host } of pairs) {
-        const hosts = groups.get(pool) ?? [];
-        groups.set(pool, hosts.includes(host) ? hosts : [...hosts, host]);
-    }
-    return [...groups.entries()].map(([pool, hosts]) => ({ pool, hosts }));
-}
-
-function hostsWith(pools: PoolInfo[], role: string): Placed[] {
-    return grouped(
-        pools.flatMap((pool) =>
-            pool.nodes
-                .filter((node) => node.online && node.roles.includes(role))
-                .map((node) => ({ pool: pool.name, host: node.host })),
-        ),
-    );
-}
-
-function Hosts({ places, none }: { places: Placed[]; none: string }) {
-    if (places.length === 0) {
-        return <span className="text-muted-foreground">{none}</span>;
-    }
-    return (
-        <span className="flex flex-col">
-            {places.map((place) => (
-                <span key={place.pool}>
-                    {`Pool ${place.pool}`}
-                    <span className="text-muted-foreground">
-                        {" · "}
-                        <span className="font-mono">{place.hosts.join(", ")}</span>
-                    </span>
-                </span>
-            ))}
-        </span>
-    );
-}
-
-function SetupSection({
-    info,
-    pools,
-    loops,
-}: {
-    info: InfrastructureInfo | undefined;
-    pools: PoolInfo[];
-    loops: string | undefined;
-}) {
-    const setup = info ? SETUPS[info.setup] : null;
-    const replicas = pools.flatMap((pool) => pool.engines);
-    const engineHosts = grouped(
-        pools.flatMap((pool) =>
-            pool.engines.map((replica) => ({ pool: pool.name, host: replica.host })),
-        ),
-    );
-    return (
-        <PanelSection icon={Network} title="Setup">
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-base font-semibold">{setup?.title ?? "…"}</span>
-                    <span className="text-sm text-muted-foreground">{setup?.body}</span>
-                </div>
-                <div className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Stat
-                        label="main"
-                        value={
-                            <span className="flex flex-col font-normal">
-                                <span>
-                                    {"Pool local"}
-                                    <span className="text-muted-foreground">
-                                        {" · "}
-                                        <span className="font-mono">{info?.host ?? "–"}</span>
-                                    </span>
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                    {LOOPS[loops ?? "single"]}
-                                </span>
-                            </span>
-                        }
-                    />
-                    <Stat
-                        label="Gateway"
-                        value={<span className="font-normal">Inside main</span>}
-                    />
-                    <Stat
-                        label="Workers"
-                        value={
-                            <span className="font-normal">
-                                <Hosts places={hostsWith(pools, "worker")} none="None online" />
-                            </span>
-                        }
-                    />
-                    <Stat
-                        label={`Engines · ${count(replicas.length)}`}
-                        value={
-                            <span className="font-normal">
-                                <Hosts places={engineHosts} none="None running" />
-                            </span>
-                        }
-                    />
-                </div>
-            </div>
-        </PanelSection>
-    );
-}
-
-const STORE_KIND: Record<StoreInfo["kind"], string> = {
-    sqlite: "SQLite file",
-    postgres: "Postgres",
-    folder: "Folder",
-    s3: "S3 bucket",
-};
-
-function diskTone(used: number): string {
-    if (used >= 0.9) {
-        return "bg-destructive";
-    }
-    return used >= 0.75 ? "bg-warning" : "bg-primary";
-}
-
-function DiskFree({ free, total }: { free: number; total: number | null | undefined }) {
-    const used = total ? Math.min(1, Math.max(0, (total - free) / total)) : null;
-    return (
-        <span className="flex w-44 flex-col gap-1.5">
-            <span className="tabular-nums">{`${bytes(free)} free of ${bytes(total)}`}</span>
-            {used !== null && (
-                <span
-                    aria-hidden="true"
-                    className="block h-1 overflow-hidden rounded-sm bg-secondary"
-                >
-                    <span
-                        className={cn("block h-full", diskTone(used))}
-                        style={{ width: `${used * 100}%` }}
-                    />
-                </span>
-            )}
-        </span>
-    );
-}
-
-const STORE_COLUMNS: ColumnDef<StoreInfo, unknown>[] = [
-    { header: "Holds", accessorKey: "name" },
-    { header: "Kind", id: "kind", cell: ({ row }) => STORE_KIND[row.original.kind] },
-    {
-        header: "Where",
-        id: "location",
-        cell: ({ row }) => (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span className="block max-w-64 truncate font-mono">
-                        {row.original.location}
-                    </span>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-96 font-mono break-all">
-                    {row.original.location}
-                </TooltipContent>
-            </Tooltip>
-        ),
-    },
-    {
-        header: "Used",
-        id: "used",
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.used_bytes)}</span>,
-    },
-    {
-        header: "Free on that disk",
-        id: "free",
-        cell: ({ row }) =>
-            row.original.free_bytes === null || row.original.free_bytes === undefined ? (
-                <span className="text-muted-foreground">Managed</span>
-            ) : (
-                <DiskFree free={row.original.free_bytes} total={row.original.total_bytes} />
-            ),
-    },
-];
-
-function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
-    return (
-        <PanelSection bare icon={HardDrive} title="Storage">
-            <div className="flex flex-col gap-3">
-                <DataGrid columns={STORE_COLUMNS} rows={info?.stores ?? []} />
-                <p className="text-sm text-muted-foreground">
-                    Everything lives under{" "}
-                    <span className="font-mono text-foreground">{info?.home ?? "…"}</span>. To move
-                    the install, set{" "}
-                    <span className="font-mono text-foreground">MINIBRAIN_HOME</span> before
-                    starting minibrain.
-                </p>
-            </div>
-        </PanelSection>
-    );
-}
-
-function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const usage = info?.dataset_versions;
-    return (
-        <PanelSection
-            icon={Archive}
-            title="Dataset versions"
-            description="Saved copies of dataset rows that models train and score on, and the copies that add accepted feedback. Identical rows are stored once."
-        >
-            <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                    <Stat label="Copies" value={count(usage?.count)} />
-                    <Stat label="Stored" value={bytes(usage?.size)} />
-                    <Stat label="Used by models" value={count(usage?.for_versions)} />
-                    <Stat label="Unused, kept" value={count(usage?.saved)} />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {`Versions a model uses are kept, and so is each dataset's latest; of the rest, the last ${count(usage?.keep)} per dataset stay. `}
-                    <Link href="/settings/data" className="text-primary hover:underline">
-                        Change retention
-                    </Link>
-                </p>
-            </div>
-        </PanelSection>
-    );
-}
-
 function gigabytes(megabytes: number | null | undefined): string {
     return megabytes === null || megabytes === undefined
         ? "–"
@@ -499,45 +246,6 @@ const SECTIONS: TabNavItem[] = [
     { label: "Storage", href: "/infrastructure/storage" },
 ];
 
-const LOW_FREE_SHARE = 0.1;
-const LOW_FREE_BYTES = 10 * 1024 ** 3;
-
-type Warning = { text: string; href: string };
-
-function warningsFor(
-    pools: PoolInfo[],
-    main: Record<string, string>,
-    info: InfrastructureInfo | undefined,
-): Warning[] {
-    const nodes = pools.flatMap((pool) => pool.nodes.map((node) => ({ ...node, pool: pool.name })));
-    const offline = nodes.filter((node) => !node.online);
-    const drifting = nodes.filter(
-        (node) => !node.roles.includes("main") && differences(node.versions ?? {}, main).length > 0,
-    );
-    const low = (info?.stores ?? []).filter(
-        (store) =>
-            store.free_bytes !== null &&
-            store.free_bytes !== undefined &&
-            store.total_bytes &&
-            (store.free_bytes < LOW_FREE_BYTES ||
-                store.free_bytes / store.total_bytes < LOW_FREE_SHARE),
-    );
-    return [
-        ...offline.map((node) => ({
-            text: `Pool ${node.pool}: ${node.host} is offline (last seen ${node.seen_at ? relativeTime(node.seen_at) : "never"})`,
-            href: poolHref(node.pool),
-        })),
-        ...drifting.map((node) => ({
-            text: `Pool ${node.pool}: ${node.host} runs different library versions from main`,
-            href: poolHref(node.pool),
-        })),
-        ...low.map((store) => ({
-            text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,
-            href: "/infrastructure/storage",
-        })),
-    ];
-}
-
 function Overview({
     info,
     pools,
@@ -549,49 +257,11 @@ function Overview({
     loops: string | undefined;
     main: Record<string, string>;
 }) {
-    const nodes = pools.flatMap((pool) => pool.nodes);
-    const engines = pools.flatMap((pool) => pool.engines);
-    const models = info?.stores.find((store) => store.name === "Model files");
-    const warnings = warningsFor(pools, main, info);
     return (
         <PanelSections>
-            <SetupSection info={info} pools={pools} loops={loops} />
-            <PanelSection icon={Gauge} title="At a glance">
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                    <Stat
-                        label="Machines online"
-                        value={`${count(nodes.filter((node) => node.online).length)} of ${count(nodes.length)}`}
-                    />
-                    <Stat label="Engines serving" value={count(engines.length)} />
-                    <Stat label="Pools" value={count(pools.length)} />
-                    <Stat
-                        label="Free for model files"
-                        value={
-                            models?.free_bytes === null || models?.free_bytes === undefined
-                                ? "Managed"
-                                : bytes(models.free_bytes)
-                        }
-                    />
-                </div>
-            </PanelSection>
-            <PanelSection icon={TriangleAlert} title="Needs a look">
-                {warnings.length === 0 ? (
-                    <p className="text-muted-foreground">
-                        Nothing: every machine is online and up to date.
-                    </p>
-                ) : (
-                    <ul className="flex flex-col gap-2">
-                        {warnings.map((warning) => (
-                            <li key={warning.text} className="flex flex-wrap items-center gap-2">
-                                <StatusText tone="warning">{warning.text}</StatusText>
-                                <Link href={warning.href} className="text-primary hover:underline">
-                                    Open
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </PanelSection>
+            <NeedsALook pools={pools} main={main} info={info} />
+            <FleetBoard pools={pools} />
+            <SetupDiagram info={info} pools={pools} loops={loops} />
         </PanelSections>
     );
 }
@@ -666,12 +336,7 @@ export function InfrastructurePage() {
                     </PanelSection>
                 </PanelSections>
             )}
-            {active === "/infrastructure/storage" && (
-                <PanelSections>
-                    <StorageSection info={infrastructure.data} />
-                    <VersionUsageSection info={infrastructure.data} />
-                </PanelSections>
-            )}
+            {active === "/infrastructure/storage" && <StorageTab info={infrastructure.data} />}
         </Page>
     );
 }

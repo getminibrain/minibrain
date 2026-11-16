@@ -19197,6 +19197,13 @@
                 "type": "null"
               }
             ]
+          },
+          "largest": {
+            "items": {
+              "$ref": "#/components/schemas/StoredItem"
+            },
+            "type": "array",
+            "title": "Largest"
           }
         },
         "type": "object",
@@ -19205,7 +19212,8 @@
           "host",
           "home",
           "web",
-          "stores"
+          "stores",
+          "largest"
         ],
         "title": "InfrastructureInfo"
       },
@@ -23540,6 +23548,13 @@
             "type": "object",
             "title": "Versions",
             "default": {}
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/NodeJob"
+            },
+            "type": "array",
+            "title": "Jobs"
           }
         },
         "type": "object",
@@ -23557,9 +23572,81 @@
           "accelerator_name",
           "usable_bytes",
           "gpus",
-          "engines"
+          "engines",
+          "jobs"
         ],
         "title": "NodeInfo"
+      },
+      "NodeJob": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "progress": {
+            "type": "number",
+            "title": "Progress"
+          },
+          "memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Bytes",
+            "description": "The training plan's peak memory, once planned."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "model",
+          "model_name",
+          "version",
+          "progress"
+        ],
+        "title": "NodeJob"
       },
       "OpenAIErrorBody": {
         "properties": {
@@ -25024,6 +25111,25 @@
             "type": "string",
             "format": "date-time",
             "title": "Seen At"
+          },
+          "weights_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Bytes",
+            "description": "Size of the base model's weight files."
+          },
+          "serves": {
+            "items": {
+              "$ref": "#/components/schemas/ServedModel"
+            },
+            "type": "array",
+            "title": "Serves"
           }
         },
         "type": "object",
@@ -25034,7 +25140,9 @@
           "url",
           "state",
           "host",
-          "seen_at"
+          "seen_at",
+          "weights_bytes",
+          "serves"
         ],
         "title": "ReplicaInfo"
       },
@@ -26444,6 +26552,48 @@
         ],
         "title": "ServeOnlyInfo"
       },
+      "ServedModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "adapter_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "name",
+          "version",
+          "adapter_bytes"
+        ],
+        "title": "ServedModel"
+      },
       "ServingReplica": {
         "properties": {
           "host": {
@@ -27530,6 +27680,18 @@
               }
             ],
             "title": "Total Bytes"
+          },
+          "disk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk",
+            "description": "Stores on the same physical disk share this id."
           }
         },
         "type": "object",
@@ -27542,6 +27704,38 @@
           "total_bytes"
         ],
         "title": "StoreInfo"
+      },
+      "StoredItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "dataset"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "size_bytes"
+        ],
+        "title": "StoredItem"
       },
       "SystemInfo": {
         "properties": {

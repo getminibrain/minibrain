@@ -472,7 +472,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Start UI, API, gateway, worker and engines with one command.
   CLI: minibrain serve · Config: MINIBRAIN_HOME, MINIBRAIN_UI_URL, MINIBRAIN_WEB_DIST
 - **Compute pools** · shipped · admin
-  See pools, machines, GPUs, workers and engines in one place.
+  See each machine's memory use, current work and issues with fixes.
   UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
@@ -487,8 +487,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep base weights in the bucket; machines fetch them by signed links.
   UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
-  See disk use by stores, models and dataset versions.
-  UI: Infrastructure › Storage
+  See each disk's use by category and the largest stored items.
+  UI: Infrastructure › Storage · API: GET /api/system/infrastructure
 - **Highly available main** · shipped · admin
   Run several mains on Postgres, with a leader for background work.
   Config: MINIBRAIN_DATABASE_URL

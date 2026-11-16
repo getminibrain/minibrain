@@ -3,7 +3,19 @@ from datetime import timedelta
 from typing import Any
 
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
-from minibrain.registry.models import EngineReplica, now
+from minibrain.registry.models import (
+    Artifact,
+    Dataset,
+    DatasetVersion,
+    EngineReplica,
+    Job,
+    JobEvent,
+    JobKind,
+    JobStatus,
+    Model,
+    Version,
+    now,
+)
 from tests.conftest import Harness
 
 RACK = NodeReport(
@@ -116,3 +128,99 @@ def test_machines_report_versions(harness: Harness) -> None:
     assert harness.internal("/register", current).status_code == 204
     rack = by_name(harness)["rack"]["nodes"]
     assert [node["versions"] for node in rack] == [{"minibrain": "0.0.1"}]
+
+
+def serve_on_rack(harness: Harness) -> None:
+    with harness.sessions() as session:
+        session.add(Artifact(id="adapter-1", kind="adapter", packing="raw", name="adapter", size=64 * 1024**2))
+        model = Model(
+            slug="triage",
+            name="Ticket Triage",
+            preset="classify",
+            base_model="qwen3-0.6b",
+            deployed=True,
+            current_version=4,
+            pool="rack",
+        )
+        session.add(model)
+        session.flush()
+        session.add(
+            Version(
+                model_id=model.id,
+                number=4,
+                kind="sft",
+                status="ready",
+                base_model="qwen3-0.6b",
+                adapter_artifact_id="adapter-1",
+            )
+        )
+        session.commit()
+
+
+def train_on_rack(harness: Harness) -> int:
+    with harness.sessions() as session:
+        job = Job(
+            kind=JobKind.TRAIN,
+            status=JobStatus.RUNNING,
+            lease_owner="w-rack",
+            progress=0.37,
+            model_slug="support",
+            model_name="Support triage",
+            version_number=7,
+        )
+        session.add(job)
+        session.flush()
+        plan = {"plan": {"peak_bytes": 9 * GIB}}
+        session.add(JobEvent(job_id=job.id, attempt=1, kind="data", name="train.start", data={"recipe": plan}))
+        session.commit()
+        return job.id
+
+
+def test_pools_say_what_each_machine_is_doing(harness: Harness) -> None:
+    join_rack(harness)
+    announce(harness)
+    serve_on_rack(harness)
+    job_id = train_on_rack(harness)
+    rack = by_name(harness)["rack"]
+    engine = rack["engines"][0]
+    assert engine["serves"] == [
+        {"model": "triage", "name": "Ticket Triage", "version": 4, "adapter_bytes": 64 * 1024**2}
+    ]
+    assert rack["nodes"][0]["jobs"] == [
+        {
+            "id": job_id,
+            "kind": "train",
+            "model": "support",
+            "model_name": "Support triage",
+            "version": 7,
+            "progress": 0.37,
+            "memory_bytes": 9 * GIB,
+        }
+    ]
+    assert by_name(harness)["local"]["nodes"][0]["jobs"] == []
+
+
+def test_storage_groups_stores_by_disk_and_lists_the_largest_items(harness: Harness) -> None:
+    with harness.sessions() as session:
+        session.add(Artifact(id="rows-1", kind="dataset_version", packing="parquet", name="rows", size=300))
+        session.add(Artifact(id="rows-2", kind="dataset_version", packing="parquet", name="rows", size=200))
+        dataset = Dataset(slug="tickets", name="Tickets")
+        session.add(dataset)
+        session.flush()
+        for number, artifact, size in ((1, "rows-1", 300), (2, "rows-1", 300), (3, "rows-2", 200)):
+            session.add(
+                DatasetVersion(
+                    dataset_id=dataset.id,
+                    number=number,
+                    hash=f"h{number}",
+                    artifact_id=artifact,
+                    counts={},
+                    labels=[],
+                    size=size,
+                )
+            )
+        session.commit()
+    info = harness.client.get("/api/system/infrastructure").json()
+    disks = {store["disk"] for store in info["stores"] if store["kind"] in ("folder", "sqlite")}
+    assert len(disks) == 1 and None not in disks
+    assert {"kind": "dataset", "key": "tickets", "name": "Tickets", "size_bytes": 500} in info["largest"]
