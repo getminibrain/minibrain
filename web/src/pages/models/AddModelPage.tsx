@@ -127,14 +127,17 @@ function heldOutOf(dataset: DatasetSummary | null): number | null {
     return counts ? (counts.eval ?? 0) : null;
 }
 
+function rowsMeta(dataset: DatasetSummary): string | null {
+    const sample = dataset.dataset_version?.sample;
+    if (sample) {
+        return `${count(sample.rows)} of ${count(sample.total)} rows sampled`;
+    }
+    return dataset.rows === null ? null : `${count(dataset.rows)} rows`;
+}
+
 function datasetMeta(dataset: DatasetSummary): string {
     const number = dataset.dataset_version?.number;
-    return [
-        dataset.rows === null ? null : `${count(dataset.rows)} rows`,
-        number ? `v${number}` : "no version",
-    ]
-        .filter(Boolean)
-        .join(" · ");
+    return [rowsMeta(dataset), number ? `v${number}` : "no version"].filter(Boolean).join(" · ");
 }
 
 function outcomeOf(dataset: DatasetSummary | null): string {
