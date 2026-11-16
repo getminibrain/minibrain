@@ -291,6 +291,7 @@ export function MakeDatasetDialog({
                 )}
                 {over ? (
                     <SampleOffer
+                        subject={chosen.length > 1 ? "sources" : "source"}
                         total={over.total_rows}
                         limit={over.row_limit}
                         pending={create.isPending}

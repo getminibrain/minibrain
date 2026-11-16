@@ -43,12 +43,23 @@ export function SampleNote({ sample }: { sample: SampleInfo | null | undefined }
     return <p className="text-muted-foreground tabular-nums">{sampleText(sample)}</p>;
 }
 
+export type SampleSubject = "query" | "file" | "source" | "sources" | "dataset";
+
+const SUBJECT_TEXT: Record<SampleSubject, string> = {
+    query: "This query returns",
+    file: "This file has",
+    source: "This source has",
+    sources: "These sources have",
+    dataset: "This dataset has",
+};
+
 function parsedRows(text: string): number {
     const digits = text.replaceAll(/[\s,_]/g, "");
     return /^\d+$/.test(digits) ? Number(digits) : Number.NaN;
 }
 
 export function SampleOffer({
+    subject = "query",
     total,
     limit,
     seed,
@@ -56,6 +67,7 @@ export function SampleOffer({
     error,
     onTake,
 }: {
+    subject?: SampleSubject;
     total: number;
     limit: number;
     seed?: number | null;
@@ -72,7 +84,7 @@ export function SampleOffer({
         <div className="flex flex-col gap-2">
             <p>
                 <StatusText tone="warning">
-                    {`This query returns ${count(total)} rows; the limit is ${count(limit)}.`}
+                    {`${SUBJECT_TEXT[subject]} ${count(total)} rows; the limit is ${count(limit)}.`}
                 </StatusText>
             </p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

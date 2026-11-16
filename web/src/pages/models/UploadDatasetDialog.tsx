@@ -116,6 +116,7 @@ export function UploadDatasetDialog({
                 />
                 {over && create.variables ? (
                     <SampleOffer
+                        subject="file"
                         total={over.total_rows}
                         limit={over.row_limit}
                         pending={create.isPending}

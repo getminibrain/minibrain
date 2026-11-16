@@ -188,6 +188,7 @@ export function RowLimitNotice({ dataset }: { dataset: DatasetSummary }) {
     }
     return (
         <SampleOffer
+            subject="dataset"
             total={dataset.rows ?? 0}
             limit={dataset.row_limit ?? 0}
             seed={sampled?.seed}
