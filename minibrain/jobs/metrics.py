@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
-from minibrain.registry.models import Job, JobEvent, JobKind, JobStatus
+from minibrain.registry.models import Job, JobEvent, JobKind, JobStatus, Version
 
 STEP = "train.step"
 EVAL = "train.eval"
@@ -97,21 +97,28 @@ def training_run(session: Session, job_id: int) -> Run:
     return run_of(named_events(session, job_id, (STEP, EVAL)))
 
 
-def previous_training(session: Session, job: Job) -> Job | None:
-    if job.model_id is None:
-        return None
+def comparable_runs(session: Session, job: Job) -> dict[int, Job]:
+    stepped = exists().where(JobEvent.job_id == Job.id, JobEvent.name == STEP)
     query = (
         select(Job)
+        .join(Version, Job.version_id == Version.id)
         .where(
             Job.model_id == job.model_id,
             Job.kind == JobKind.TRAIN,
             Job.status == JobStatus.SUCCEEDED,
-            Job.id < job.id,
+            Job.version_id.is_distinct_from(job.version_id),
+            stepped,
         )
-        .order_by(Job.id.desc())
-        .limit(1)
+        .order_by(Job.id)
     )
-    return session.scalar(query)
+    return {run.version.number: run for run in session.scalars(query) if run.version is not None}
+
+
+def default_comparison(job: Job, runs: dict[int, Job], live: int | None) -> Job | None:
+    if live is not None and live in runs:
+        return runs[live]
+    earlier = [run for run in runs.values() if run.id < job.id]
+    return max(earlier, key=lambda run: run.id, default=None)
 
 
 def device_of(session: Session, job_id: int) -> str | None:

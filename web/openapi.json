@@ -8817,6 +8817,24 @@
               "type": "integer",
               "title": "Job Id"
             }
+          },
+          {
+            "name": "versus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Version number whose training run to compare with",
+              "title": "Versus"
+            },
+            "description": "Version number whose training run to compare with"
           }
         ],
         "responses": {
@@ -14476,6 +14494,24 @@
           "max"
         ],
         "title": "ColumnStats"
+      },
+      "ComparableRun": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "live"
+        ],
+        "title": "ComparableRun"
       },
       "CompletionChoice": {
         "properties": {
@@ -20330,6 +20366,14 @@
               }
             ]
           },
+          "comparable": {
+            "items": {
+              "$ref": "#/components/schemas/ComparableRun"
+            },
+            "type": "array",
+            "title": "Comparable",
+            "default": []
+          },
           "transfer": {
             "anyOf": [
               {
@@ -24582,15 +24626,12 @@
             "title": "Job Id"
           },
           "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "integer",
             "title": "Version"
+          },
+          "same_data": {
+            "type": "boolean",
+            "title": "Same Data"
           }
         },
         "type": "object",
@@ -24598,7 +24639,8 @@
           "points",
           "evals",
           "job_id",
-          "version"
+          "version",
+          "same_data"
         ],
         "title": "PreviousTraining"
       },

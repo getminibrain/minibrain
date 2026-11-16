@@ -8,10 +8,11 @@ from sqlalchemy import Executable, delete, update
 from transformers import TrainerControl, TrainerState, TrainingArguments
 
 from minibrain.api import jobs
+from minibrain.auth.roles import Role
 from minibrain.jobs.output import OutputParser, guess_level, structured
 from minibrain.ml import train
 from minibrain.ml.context import emit
-from minibrain.registry.models import LoginSession, User
+from minibrain.registry.models import LoginSession, Model, User, Version
 from tests.conftest import Harness, fake_adapter
 from tests.test_flow import SLUG, add_version, create_with_dataset
 from tests.test_worker import FAKE, queued_training
@@ -241,21 +242,82 @@ def test_held_out_loss_falling_with_train_loss_gives_no_warning(harness: Harness
     assert metrics["rising_from"] is None
 
 
-def test_the_next_run_shows_the_previous_versions_curve(harness: Harness) -> None:
+def trained(harness: Harness, losses: list[float], worker: str) -> dict[str, Any]:
+    add_version(harness, "lora")
+    claim = harness.claim(["train"], worker_id=worker)
+    assert claim is not None
+    post(harness, claim, [step(index + 1, loss) for index, loss in enumerate(losses)] + [held_out(1, losses[0])])
+    finish(harness, claim)
+    assert harness.claim(["eval"], worker_id=worker) is not None
+    return claim
+
+
+def comparing(harness: Harness) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     create_with_dataset(harness)
+    first = trained(harness, [2.0, 1.0], "first-worker")
+    second = trained(harness, [1.9, 0.9, 0.7], "second-worker")
     add_version(harness, "lora")
-    first = start(harness)
-    post(harness, first, [step(1, 2.0), step(2, 1.0)])
-    finish(harness, first)
-    eval_claim = harness.claim(["eval"])
-    assert eval_claim is not None
-    add_version(harness, "lora")
-    second = harness.claim(["train"], worker_id="second-worker")
-    assert second is not None
-    post(harness, second, [step(1, 1.8)])
-    found = harness.client.get(f"/api/jobs/{second['job_id']}/metrics").json()["previous"]
-    assert (found["job_id"], [point["loss"] for point in found["points"]]) == (first["job_id"], [2.0, 1.0])
-    assert found["version"] == 1
+    third = harness.claim(["train"], worker_id="third-worker")
+    assert third is not None
+    post(harness, third, [step(1, 1.8)])
+    return first, second, third
+
+
+def metrics_of(harness: Harness, claim: dict[str, Any], query: str = "") -> Any:
+    return harness.client.get(f"/api/jobs/{claim['job_id']}/metrics{query}")
+
+
+def set_live(harness: Harness, number: int) -> None:
+    with harness.sessions() as session:
+        session.execute(update(Model).where(Model.slug == SLUG).values(current_version=number))
+        session.commit()
+
+
+def test_the_next_run_shows_the_previous_versions_curve(harness: Harness) -> None:
+    _, second, third = comparing(harness)
+    found = metrics_of(harness, third).json()
+    previous = found["previous"]
+    assert (previous["job_id"], [point["loss"] for point in previous["points"]]) == (second["job_id"], [1.9, 0.9, 0.7])
+    assert (previous["version"], previous["same_data"], previous["evals"]) == (2, True, [{"step": 1, "eval_loss": 1.9}])
+    assert found["comparable"] == [{"version": 1, "live": False}, {"version": 2, "live": False}]
+
+
+def test_the_live_version_is_the_default_comparison(harness: Harness) -> None:
+    first, _, third = comparing(harness)
+    set_live(harness, 1)
+    found = metrics_of(harness, third).json()
+    assert (found["previous"]["job_id"], found["previous"]["version"]) == (first["job_id"], 1)
+    assert found["comparable"] == [{"version": 1, "live": True}, {"version": 2, "live": False}]
+    set_live(harness, 3)
+    assert metrics_of(harness, third).json()["previous"]["version"] == 2
+
+
+def test_any_trained_version_can_be_compared(harness: Harness) -> None:
+    first, second, third = comparing(harness)
+    chosen = metrics_of(harness, third, "?versus=1").json()["previous"]
+    assert (chosen["job_id"], [point["loss"] for point in chosen["points"]]) == (first["job_id"], [2.0, 1.0])
+    back = metrics_of(harness, second, "?versus=1").json()
+    assert back["previous"]["version"] == 1
+    assert back["comparable"] == [{"version": 1, "live": False}]
+    with harness.sessions() as session:
+        session.execute(update(Version).where(Version.number == 1).values(dataset_version_id=None))
+        session.commit()
+    assert metrics_of(harness, third, "?versus=1").json()["previous"]["same_data"] is False
+
+
+@pytest.mark.parametrize("versus", [0, 3, 99])
+def test_only_another_trained_version_of_the_model_can_be_compared(harness: Harness, versus: int) -> None:
+    _, _, third = comparing(harness)
+    response = metrics_of(harness, third, f"?versus={versus}")
+    assert response.status_code == 404
+    assert f"v{versus}" in response.json()["detail"]
+
+
+def test_viewers_read_a_comparison_and_people_without_a_role_do_not(harness: Harness) -> None:
+    _, _, third = comparing(harness)
+    path = f"/api/jobs/{third['job_id']}/metrics?versus=1"
+    assert harness.person(Role.VIEWER).get(path).json()["previous"]["version"] == 1
+    assert harness.person(None).get(path).status_code == 403
 
 
 def test_score_and_transfer_jobs_report_their_own_progress(harness: Harness) -> None:

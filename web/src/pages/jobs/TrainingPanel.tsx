@@ -1,7 +1,9 @@
 import { ChartLine, TrendingDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "obp-ui";
+import { type ReactNode, useState } from "react";
 import type { JobDetail, JobMetrics, TrainingMetrics } from "~/api/client";
-import { PanelSection } from "~/components/Section";
+import { useComparedRun } from "~/api/jobPageQueries";
+import { ErrorLine, PanelSection } from "~/components/Section";
 import { StepChart, type StepRow, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
@@ -15,15 +17,40 @@ const LR_HEIGHT = 160;
 const LOSS = (value: number) => value.toFixed(3);
 const LOSS_AXIS = (value: number) => value.toFixed(2);
 const RATE = (value: number) => value.toExponential(1);
-const LEGEND = ["loss", "eval_loss", "previous"];
+const LEGEND = ["loss", "eval_loss", "previous", "previous_eval"];
+const NONE = "none";
 
 type Previous = NonNullable<JobMetrics["previous"]>;
+type Comparable = NonNullable<JobMetrics["comparable"]>[number];
+type Choice = number | typeof NONE | null;
 type Fact = [string, ReactNode];
 
-function lossRows(training: TrainingMetrics, previous: Previous | null | undefined): StepRow[] {
+function lastStep(points: { step: number }[]): number {
+    return points.at(-1)?.step ?? 0;
+}
+
+function domainEnd(training: TrainingMetrics, previous: Previous | null | undefined): number {
+    const own = Math.max(lastStep(training.points), lastStep(training.evals));
+    if (training.steps) {
+        return Math.max(training.steps, own);
+    }
+    return Math.max(own, lastStep(previous?.points ?? []));
+}
+
+function lossRows(
+    training: TrainingMetrics,
+    previous: Previous | null | undefined,
+    end: number,
+): StepRow[] {
     const rows = new Map<number, StepRow>();
     const row = (step: number) => {
-        const found = rows.get(step) ?? { step, loss: null, eval_loss: null, previous: null };
+        const found = rows.get(step) ?? {
+            step,
+            loss: null,
+            eval_loss: null,
+            previous: null,
+            previous_eval: null,
+        };
         rows.set(step, found);
         return found;
     };
@@ -34,7 +61,14 @@ function lossRows(training: TrainingMetrics, previous: Previous | null | undefin
         row(point.step).eval_loss = point.eval_loss;
     }
     for (const point of previous?.points ?? []) {
-        row(point.step).previous = point.loss ?? null;
+        if (point.step <= end) {
+            row(point.step).previous = point.loss ?? null;
+        }
+    }
+    for (const point of previous?.evals ?? []) {
+        if (point.step <= end) {
+            row(point.step).previous_eval = point.eval_loss;
+        }
     }
     return [...rows.values()].sort((left, right) => left.step - right.step);
 }
@@ -52,11 +86,19 @@ function lossSeries(
 ): StepSeries[] {
     const series: StepSeries[] = [];
     if (previous && previous.points.length > 0) {
-        const name =
-            previous.version === null || previous.version === undefined
-                ? "Last run"
-                : `v${previous.version}`;
-        series.push({ key: "previous", label: `${name} training loss`, color: PREVIOUS });
+        series.push({
+            key: "previous",
+            label: `v${previous.version} training loss`,
+            color: PREVIOUS,
+        });
+    }
+    if (previous && previous.evals.length > 0) {
+        series.push({
+            key: "previous_eval",
+            label: `v${previous.version} held-out loss`,
+            color: PREVIOUS,
+            dots: true,
+        });
     }
     series.push({ key: "loss", label: "Training loss", color: TRAIN });
     if (training.evals.length > 0) {
@@ -91,6 +133,44 @@ export function stepText(training: TrainingMetrics): string {
 function domainOf(training: TrainingMetrics, rows: StepRow[]): [number, number] {
     const last = rows.at(-1)?.step ?? 0;
     return [0, Math.max(training.steps ?? last, last)];
+}
+
+function choiceLabel(item: Comparable): string {
+    return item.live ? `v${item.version} (live)` : `v${item.version}`;
+}
+
+function CompareWith({
+    value,
+    comparable,
+    onChange,
+}: {
+    value: number | typeof NONE;
+    comparable: Comparable[];
+    onChange: (next: number | typeof NONE) => void;
+}) {
+    return (
+        <div className="ml-auto flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Compare with</span>
+            <Select
+                value={String(value)}
+                onValueChange={(next) =>
+                    next !== null && onChange(next === NONE ? NONE : Number(next))
+                }
+            >
+                <SelectTrigger size="sm" aria-label="Compare with" className="w-32">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {[...comparable].reverse().map((item) => (
+                        <SelectItem key={item.version} value={String(item.version)}>
+                            {choiceLabel(item)}
+                        </SelectItem>
+                    ))}
+                    <SelectItem value={NONE}>None</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    );
 }
 
 function lossText(value: number | null): string {
@@ -163,18 +243,24 @@ export function LossBody({ job, metrics }: { job: JobDetail; metrics: JobMetrics
     if (!training || training.points.length === 0) {
         return <p className="text-muted-foreground">{waiting(job)}</p>;
     }
-    return <LossChart job={job} training={training} previous={metrics?.previous} />;
+    return (
+        <LossChart
+            job={job}
+            training={training}
+            fallback={metrics?.previous}
+            comparable={metrics?.comparable ?? []}
+        />
+    );
 }
 
 export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
-    const previous = metrics?.previous;
     return (
         <PanelSection
             icon={ChartLine}
             title="Loss"
             tip={
-                previous && previous.points.length > 0
-                    ? "Training and held-out loss per step, with the previous run behind them."
+                metrics?.comparable?.length
+                    ? "Training and held-out loss per step, with another trained version's run behind them in grey."
                     : "Training loss per step, held-out loss at each evaluation."
             }
         >
@@ -183,19 +269,57 @@ export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetr
     );
 }
 
+function useComparison(job: JobDetail, fallback: Previous | null | undefined) {
+    const [choice, setChoice] = useState<Choice>(null);
+    const compared = useComparedRun(job.id, typeof choice === "number" ? choice : null);
+    if (choice === NONE) {
+        return { previous: null, value: NONE, setChoice, compared } as const;
+    }
+    if (choice === null) {
+        return {
+            previous: fallback,
+            value: fallback?.version ?? NONE,
+            setChoice,
+            compared,
+        } as const;
+    }
+    return { previous: compared.data, value: choice, setChoice, compared } as const;
+}
+
 function LossChart({
     job,
     training,
-    previous,
-}: { job: JobDetail; training: TrainingMetrics; previous: Previous | null | undefined }) {
+    fallback,
+    comparable,
+}: {
+    job: JobDetail;
+    training: TrainingMetrics;
+    fallback: Previous | null | undefined;
+    comparable: Comparable[];
+}) {
+    const { previous, value, setChoice, compared } = useComparison(job, fallback);
     const series = lossSeries(training, previous);
-    const rows = lossRows(training, previous);
+    const end = domainEnd(training, previous);
+    const rows = lossRows(training, previous, end);
     return (
         <div className="flex flex-col gap-3">
             {training.rising_from !== null && training.rising_from !== undefined && (
                 <OverfitHint step={training.rising_from} />
             )}
-            <ChartLegend series={legendOrder(series)} />
+            <div className="flex flex-col gap-1.5">
+                <div className="flex min-h-7 flex-wrap items-center gap-x-5 gap-y-2">
+                    <ChartLegend series={legendOrder(series)} />
+                    {comparable.length > 0 && (
+                        <CompareWith value={value} comparable={comparable} onChange={setChoice} />
+                    )}
+                </div>
+                {previous && !previous.same_data && (
+                    <p className="text-sm text-muted-foreground">
+                        {`v${previous.version} trained on different data, so losses aren't directly comparable.`}
+                    </p>
+                )}
+            </div>
+            <ErrorLine error={compared.error} onRetry={compared.refetch} />
             <StepChart
                 rows={rows}
                 series={series}
@@ -203,7 +327,7 @@ function LossChart({
                 axisFormat={LOSS_AXIS}
                 label={`Loss by step for job ${job.id}: training loss ${lossText(latest(rows.map((row) => row.loss)))} at step ${training.step ?? 0}`}
                 marker={training.rising_from}
-                domain={domainOf(training, rows)}
+                domain={[0, end]}
             />
         </div>
     );

@@ -4243,6 +4243,13 @@ export interface components {
             /** Max */
             max: string | null;
         };
+        /** ComparableRun */
+        ComparableRun: {
+            /** Version */
+            version: number;
+            /** Live */
+            live: boolean;
+        };
         /** CompletionChoice */
         CompletionChoice: {
             /** Index */
@@ -6217,6 +6224,11 @@ export interface components {
         JobMetrics: {
             training?: components["schemas"]["TrainingMetrics"] | null;
             previous?: components["schemas"]["PreviousTraining"] | null;
+            /**
+             * Comparable
+             * @default []
+             */
+            comparable?: components["schemas"]["ComparableRun"][];
             transfer?: components["schemas"]["TransferMetrics"] | null;
             counted?: components["schemas"]["CountedMetrics"] | null;
         };
@@ -7597,7 +7609,9 @@ export interface components {
             /** Job Id */
             job_id: number;
             /** Version */
-            version: number | null;
+            version: number;
+            /** Same Data */
+            same_data: boolean;
         };
         /** PromoteRequest */
         PromoteRequest: {
@@ -15208,7 +15222,10 @@ export interface operations {
     };
     job_metrics_api_jobs__job_id__metrics_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Version number whose training run to compare with */
+                versus?: number | null;
+            };
             header?: never;
             path: {
                 job_id: number;

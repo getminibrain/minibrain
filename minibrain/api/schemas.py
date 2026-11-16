@@ -645,7 +645,13 @@ class TrainingMetrics(TrainingCurve):
 
 class PreviousTraining(TrainingCurve):
     job_id: int
-    version: int | None
+    version: int
+    same_data: bool
+
+
+class ComparableRun(BaseModel):
+    version: int
+    live: bool
 
 
 class TransferMetrics(BaseModel):
@@ -663,6 +669,7 @@ class CountedMetrics(BaseModel):
 class JobMetrics(BaseModel):
     training: TrainingMetrics | None = None
     previous: PreviousTraining | None = None
+    comparable: list[ComparableRun] = []
     transfer: TransferMetrics | None = None
     counted: CountedMetrics | None = None
 

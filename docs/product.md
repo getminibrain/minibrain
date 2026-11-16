@@ -260,6 +260,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **LoRA training** · shipped · product, ml
   Train a LoRA version, then watch it train on its version page.
   UI: Models › model › Train, Versions › Train again · API: POST /api/models/{name}/versions
+- **Compare loss curves** · shipped · product, ml
+  Draw any trained version's loss behind a run; live by default.
+  UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
 - **Training list** · shipped · product, ml
   Every training run across models, filtered by model, status and method.
   UI: Training · API: GET /api/jobs, GET /api/jobs/facets

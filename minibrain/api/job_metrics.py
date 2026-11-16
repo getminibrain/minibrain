@@ -1,12 +1,13 @@
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.jobs import get_job
 from minibrain.api.schemas import (
+    ComparableRun,
     CountedMetrics,
     EvalPoint,
     JobMetrics,
@@ -21,13 +22,15 @@ from minibrain.jobs.metrics import (
     PREVIOUS_POINTS,
     STEP,
     TRANSFER,
+    comparable_runs,
+    default_comparison,
     latest_data,
-    previous_training,
     rising_from,
     thinned,
     training_run,
 )
 from minibrain.registry.models import Job, JobKind
+from minibrain.registry.service import NotFoundError
 
 router = APIRouter(prefix="/api")
 
@@ -81,18 +84,35 @@ def training(session: Session, job: Job) -> TrainingMetrics | None:
     )
 
 
-def previous(session: Session, job: Job) -> PreviousTraining | None:
-    earlier = previous_training(session, job)
-    if earlier is None:
+def compared(session: Session, job: Job, other: Job) -> PreviousTraining | None:
+    run = training_run(session, other.id)
+    if not run.points or other.version is None:
         return None
-    run = training_run(session, earlier.id)
-    if not run.points:
-        return None
+    own = job.version.dataset_version_id if job.version is not None else None
     return PreviousTraining(
-        job_id=earlier.id,
-        version=earlier.version.number if earlier.version else None,
+        job_id=other.id,
+        version=other.version.number,
+        same_data=other.version.dataset_version_id == own,
         points=[train_point(point) for point in thinned(run.points, PREVIOUS_POINTS)],
         evals=[EvalPoint.model_validate(point) for point in run.evals],
+    )
+
+
+def train_metrics(session: Session, job: Job, versus: int | None) -> JobMetrics:
+    if job.model is None:
+        return JobMetrics(training=training(session, job))
+    live = job.model.current_version
+    runs = comparable_runs(session, job)
+    if versus is None:
+        chosen = default_comparison(job, runs, live)
+    elif versus in runs:
+        chosen = runs[versus]
+    else:
+        raise NotFoundError(f"v{versus} of {job.model.slug} has no training run to compare with")
+    return JobMetrics(
+        training=training(session, job),
+        previous=compared(session, job, chosen) if chosen is not None else None,
+        comparable=[ComparableRun(version=number, live=number == live) for number in sorted(runs)],
     )
 
 
@@ -116,10 +136,14 @@ def counted(session: Session, job: Job) -> CountedMetrics | None:
 
 
 @router.get("/jobs/{job_id}/metrics", dependencies=[Depends(viewer)], summary="Read a job's training metrics")
-def job_metrics(job_id: int, session: SessionDep) -> JobMetrics:
+def job_metrics(
+    job_id: int,
+    session: SessionDep,
+    versus: Annotated[int | None, Query(description="Version number whose training run to compare with")] = None,
+) -> JobMetrics:
     job = get_job(session, job_id)
     if job.kind == JobKind.TRAIN:
-        return JobMetrics(training=training(session, job), previous=previous(session, job))
+        return train_metrics(session, job, versus)
     if job.kind in (JobKind.EVAL, JobKind.JUDGE):
         return JobMetrics(counted=counted(session, job))
     return JobMetrics(transfer=transfer(session, job))
