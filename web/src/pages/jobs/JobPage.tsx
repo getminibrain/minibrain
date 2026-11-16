@@ -51,6 +51,7 @@ const STRATEGIES: Record<string, string> = { lora: "LoRA", qlora: "QLoRA" };
 const SETTING_NAMES: Record<string, string> = {
     rank: "rank",
     learning_rate: "learning rate",
+    warmup: "warmup",
     epochs: "epochs",
     max_rows: "rows per run",
     seq_len: "sequence length",

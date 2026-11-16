@@ -18,7 +18,7 @@ from minibrain.data.splits import read_split
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
-from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE
+from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE, train_steps, warmup_steps
 from minibrain.ml.runtime import load_tokenizer
 from minibrain.ml.strategies import (
     fitted_recipe,
@@ -190,9 +190,10 @@ def eval_steps(recipe: dict[str, Any], evaluate: bool) -> float | int | None:
     return int(every) if every else EVAL_SHARE
 
 
-def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, evaluate: bool = False) -> SFTConfig:
+def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, rows: int, evaluate: bool = False) -> SFTConfig:
     batch, accumulate = micro_batches(recipe, device)
     settings = trainer_settings(recipe)
+    steps = train_steps(rows, settings.epochs, settings.micro_batch, settings.grad_accum)
     return SFTConfig(
         output_dir=str(checkpoints),
         num_train_epochs=settings.epochs,
@@ -204,7 +205,7 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, evaluate:
         gradient_checkpointing_kwargs={"use_reentrant": False} if settings.checkpointing else None,
         optim=settings.optimizer,
         lr_scheduler_type="cosine",
-        warmup_steps=10,
+        warmup_steps=warmup_steps(settings.warmup, steps),
         logging_steps=1,
         eval_strategy="steps" if evaluate else "no",
         eval_steps=eval_steps(recipe, evaluate),
@@ -273,7 +274,7 @@ def main(spec: JobSpec) -> None:
     stall = StallWatch() if kind_of(device) == "mps" and not forced_training_device() else None
     trainer = SFTTrainer(
         model=load_training_model(spec.base, device, recipe),
-        args=sft_config(checkpoints, recipe, device, evaluate=held_out is not None),
+        args=sft_config(checkpoints, recipe, device, len(rows), evaluate=held_out is not None),
         train_dataset=rows,
         eval_dataset=held_out,
         processing_class=tokenizer,

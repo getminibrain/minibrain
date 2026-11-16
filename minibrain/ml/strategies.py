@@ -69,6 +69,7 @@ def settings_of(recipe: dict[str, Any], keep: tuple[str, ...]) -> Settings:
         seq_len=int(recipe["seq_len"]) if "seq_len" in overrides else None,
         rank=int(recipe["rank"]),
         learning_rate=float(recipe["learning_rate"]),
+        warmup=float(recipe.get("warmup", Settings.warmup)),
         epochs=float(recipe["epochs"]),
         max_rows=int(recipe["max_rows"]),
         alpha=int(recipe["alpha"]) if "alpha" in overrides else None,
@@ -138,6 +139,7 @@ class TrainerSettings:
     micro_batch: int
     grad_accum: int
     learning_rate: float
+    warmup: float
     max_length: int
     checkpointing: bool
     optimizer: str
@@ -156,6 +158,7 @@ def trainer_settings(recipe: dict[str, Any]) -> TrainerSettings:
         micro_batch=int(recipe["micro_batch"]),
         grad_accum=int(recipe["grad_accum"]),
         learning_rate=float(recipe["learning_rate"]),
+        warmup=float(recipe.get("warmup", Settings.warmup)),
         max_length=int(recipe["seq_len"]),
         checkpointing=bool(recipe.get("checkpointing")),
         optimizer=str(recipe.get("optimizer") or "adamw_torch"),

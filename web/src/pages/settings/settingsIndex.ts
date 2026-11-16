@@ -230,6 +230,7 @@ export const GENERAL = {
             keywords: [
                 "epochs",
                 "learning rate",
+                "warmup",
                 "lora",
                 "rank",
                 "alpha",

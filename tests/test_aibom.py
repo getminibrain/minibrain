@@ -71,6 +71,7 @@ def test_trained_version_is_a_valid_cyclonedx_ml_bom(harness: Harness) -> None:
     assert facts["minibrain:training:method"] == "lora"
     assert facts["minibrain:recipe:epochs"] == "2"
     assert facts["minibrain:recipe:learning_rate"] == "0.0002"
+    assert facts["minibrain:recipe:warmup"] == "0.05"
     assert facts["minibrain:recipe:rank"] == "16"
     assert facts["minibrain:training:train_loss"] == "0.4322"
     assert model["externalReferences"][0]["type"] == "model-card"

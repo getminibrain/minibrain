@@ -112,6 +112,7 @@ class CardRecipe(BaseModel):
     rank: int | None
     alpha: int | None
     learning_rate: float | None
+    warmup: float | None = None
 
 
 class CardOrigin(BaseModel):

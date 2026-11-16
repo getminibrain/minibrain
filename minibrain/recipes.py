@@ -9,6 +9,7 @@ DEFAULT_RECIPE: dict[str, Any] = {
     "rank": DEFAULTS.rank,
     "alpha": 2 * DEFAULTS.rank,
     "learning_rate": DEFAULTS.learning_rate,
+    "warmup": DEFAULTS.warmup,
     "dropout": LORA_DROPOUT,
     "batch": EFFECTIVE_BATCH,
 }

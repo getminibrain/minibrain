@@ -197,6 +197,7 @@ class Settings:
     seq_len: int | None = None
     rank: int = 16
     learning_rate: float = 2e-4
+    warmup: float = 0.05
     epochs: float = 1.0
     max_rows: int = 3000
     alpha: int | None = None
@@ -274,6 +275,11 @@ class Plan:
             return None
         return train_steps(self.rows, self.settings.epochs, self.chosen.micro_batch, self.chosen.grad_accum)
 
+    @property
+    def warmup_steps(self) -> int | None:
+        steps = self.steps
+        return None if steps is None else warmup_steps(self.settings.warmup, steps)
+
     def minutes(self, held_out_rows: int) -> float | None:
         if self.chosen is None:
             return None
@@ -307,6 +313,7 @@ class Plan:
             "rank": settings.rank,
             "alpha": settings.lora_alpha,
             "learning_rate": settings.learning_rate,
+            "warmup": settings.warmup,
             "dropout": LORA_DROPOUT,
             "seq_len": self.seq_len,
             "seed": settings.seed,
@@ -353,6 +360,10 @@ def grad_accum_for(micro_batch: int) -> int:
 
 def train_steps(rows: int, epochs: float, micro_batch: int, grad_accum: int) -> int:
     return max(1, math.ceil(rows * epochs / (micro_batch * grad_accum)))
+
+
+def warmup_steps(ratio: float, steps: int) -> int:
+    return max(1, math.floor(ratio * steps + 0.5)) if ratio > 0 else 0
 
 
 def eval_checks(steps: int, eval_every: int | None) -> int:

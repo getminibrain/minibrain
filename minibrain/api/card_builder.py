@@ -301,6 +301,7 @@ def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
         rank=ints["rank"],
         alpha=ints["alpha"],
         learning_rate=None if recipe.get("learning_rate") is None else float(recipe["learning_rate"]),
+        warmup=None if recipe.get("warmup") is None else float(recipe["warmup"]),
     )
 
 

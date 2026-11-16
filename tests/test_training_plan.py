@@ -21,6 +21,7 @@ from minibrain.ml.planner import (
     plan,
     train_minutes,
     train_steps,
+    warmup_steps,
 )
 from minibrain.models.hardware import Gpu, NodeReport
 from minibrain.tasks.contracts import label_set
@@ -221,7 +222,16 @@ def test_training_plan_reads_the_data_and_the_worker(harness: Harness) -> None:
 def test_overrides_are_validated(harness: Harness) -> None:
     create_with_dataset(harness)
     url = f"/api/models/{SLUG}/versions"
-    for body in ({"micro_batch": 0}, {"learning_rate": 1}, {"strategy": "dora"}, {"rank": 512}, {"seq_len": 8}):
+    invalid = (
+        {"micro_batch": 0},
+        {"learning_rate": 1},
+        {"strategy": "dora"},
+        {"rank": 512},
+        {"seq_len": 8},
+        {"warmup": -0.01},
+        {"warmup": 0.51},
+    )
+    for body in invalid:
         assert harness.client.post(url, json={"kind": "lora", **body}).status_code == 422, body
     response = harness.client.post(url, json={"kind": "lora", "seq_len": 50_000})
     assert response.status_code == 409
@@ -304,7 +314,7 @@ def test_the_chosen_settings_reach_the_trainer_config(tmp_path: Path) -> None:
     from minibrain.ml.strategies import quantization_config
 
     recipe = plan(base("qwen3-14b"), [RTX_4090], Settings(), 160, 3000).recipe()
-    config = train.sft_config(tmp_path, recipe, "cpu")
+    config = train.sft_config(tmp_path, recipe, "cpu", 3000)
     assert (config.num_train_epochs, config.learning_rate, config.max_length) == (1.0, 2e-4, 160)
     assert (config.per_device_train_batch_size, config.gradient_accumulation_steps) == (8, 2)
     assert (config.gradient_checkpointing, config.gradient_checkpointing_kwargs) == (True, {"use_reentrant": False})
@@ -425,11 +435,11 @@ def test_seed_and_scoring_steps_reach_the_trainer_config(tmp_path: Path) -> None
     from minibrain.ml import train
 
     recipe = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000).recipe()
-    plain = train.sft_config(tmp_path, recipe, "cpu", evaluate=True)
+    plain = train.sft_config(tmp_path, recipe, "cpu", 3000, evaluate=True)
     assert (plain.seed, plain.eval_steps) == (7, 0.1)
-    chosen = train.sft_config(tmp_path, recipe | {"seed": 11, "eval_every": 25}, "cpu", evaluate=True)
+    chosen = train.sft_config(tmp_path, recipe | {"seed": 11, "eval_every": 25}, "cpu", 3000, evaluate=True)
     assert (chosen.seed, chosen.eval_steps) == (11, 25)
-    assert train.sft_config(tmp_path, recipe | {"eval_every": 25}, "cpu").eval_steps is None
+    assert train.sft_config(tmp_path, recipe | {"eval_every": 25}, "cpu", 3000).eval_steps is None
 
 
 def test_training_plan_lists_every_machine_the_time_and_the_queue(harness: Harness) -> None:
@@ -507,3 +517,62 @@ def test_a_pinned_machine_holds_the_job_to_its_pool(harness: Harness) -> None:
     assert version.status_code == 201, version.text
     assert harness.claim(["train"]) is None
     assert harness.claim(["train"], worker_id="worker-gpu-a10-1", pool="gpu-pool") is not None
+
+
+def test_warmup_steps_are_a_rounded_share_of_the_steps_and_zero_turns_it_off() -> None:
+    assert warmup_steps(0.05, 300) == 15
+    assert warmup_steps(0.05, 50) == 3
+    assert warmup_steps(0.1, 25) == 3
+    assert warmup_steps(0.05, 10) == 1
+    assert warmup_steps(0.01, 1) == 1
+    assert warmup_steps(0.5, 7) == 4
+    assert warmup_steps(0, 300) == 0
+
+
+def test_warmup_defaults_to_five_percent_and_reaches_the_recipe() -> None:
+    plain = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000)
+    assert plain.recipe()["warmup"] == 0.05
+    assert plain.steps == 188
+    assert plain.warmup_steps == 9
+    assert "warmup" not in plain.recipe()["overrides"]
+    off = plan(base("qwen3-0.6b"), [RTX_4090], Settings(warmup=0), 160, 3000)
+    assert (off.recipe()["warmup"], off.warmup_steps, off.recipe()["overrides"]) == (0, 0, ["warmup"])
+
+
+def test_the_worker_keeps_the_warmup_when_it_replans() -> None:
+    from minibrain.ml.strategies import fit_here
+
+    stored = plan(base("qwen3-8b"), [A100], Settings(warmup=0.2), 160, 3000).recipe()
+    moved, replanned = fit_here(base("qwen3-8b"), RTX_4090, stored, encoded([100, 150]))
+    assert replanned
+    assert moved.recipe()["warmup"] == 0.2
+
+
+def test_warmup_steps_reach_the_trainer_config(tmp_path: Path) -> None:
+    from minibrain.ml import train
+
+    recipe = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000).recipe()
+    assert (recipe["micro_batch"], recipe["grad_accum"]) == (8, 2)
+    config = train.sft_config(tmp_path, recipe, "cpu", 3000)
+    assert (config.lr_scheduler_type, config.warmup_steps) == ("cosine", 9)
+    assert train.sft_config(tmp_path, recipe | {"warmup": 0.1}, "cpu", 3000).warmup_steps == 19
+    assert train.sft_config(tmp_path, recipe | {"warmup": 0}, "cpu", 3000).warmup_steps == 0
+    assert train.sft_config(tmp_path, recipe | {"warmup": 0.05}, "cpu", 40).warmup_steps == 1
+
+
+def test_warmup_is_planned_validated_and_stored_on_the_version(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    url = f"/api/models/{SLUG}/training-plan"
+    plain = harness.client.get(url).json()
+    assert (plain["defaults"]["warmup"], plain["overrides"]) == (0.05, [])
+    assert plain["warmup_steps"] == warmup_steps(0.05, plain["steps"])
+    off = harness.client.get(f"{url}?warmup=0").json()
+    assert (off["warmup_steps"], off["overrides"]) == (0, ["warmup"])
+    assert harness.client.get(f"{url}?warmup=0.6").status_code == 422
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora", "warmup": 0.2})
+    assert version.status_code == 201, version.text
+    assert version.json()["recipe"]["warmup"] == 0.2
+    claim = harness.claim(["train"])
+    assert claim is not None
+    assert claim["params"]["recipe"]["warmup"] == 0.2

@@ -3702,6 +3702,8 @@ export interface components {
             alpha: number | null;
             /** Learning Rate */
             learning_rate: number | null;
+            /** Warmup */
+            warmup?: number | null;
         };
         /** CardRun */
         CardRun: {
@@ -9037,6 +9039,8 @@ export interface components {
             rank: number;
             /** Learning Rate */
             learning_rate: number;
+            /** Warmup */
+            warmup: number;
             /** Epochs */
             epochs: number;
             /** Max Rows */
@@ -9140,6 +9144,8 @@ export interface components {
             minutes: number | null;
             /** Steps */
             steps: number | null;
+            /** Warmup Steps */
+            warmup_steps: number | null;
             /** Grad Accum */
             grad_accum: number | null;
             /** Held Out Rows */
@@ -9279,6 +9285,11 @@ export interface components {
             rank?: number | null;
             /** Learning Rate */
             learning_rate?: number | null;
+            /**
+             * Warmup
+             * @description Share of the optimiser steps that ramp the learning rate up from 0.
+             */
+            warmup?: number | null;
             /** Epochs */
             epochs?: number | null;
             /** Max Rows */
@@ -14147,6 +14158,8 @@ export interface operations {
                 seq_len?: number | null;
                 rank?: number | null;
                 learning_rate?: number | null;
+                /** @description Share of the optimiser steps that ramp the learning rate up from 0. */
+                warmup?: number | null;
                 epochs?: number | null;
                 max_rows?: number | null;
                 alpha?: number | null;

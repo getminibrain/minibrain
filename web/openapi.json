@@ -6751,6 +6751,26 @@
             }
           },
           {
+            "name": "warmup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 0.5,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Share of the optimiser steps that ramp the learning rate up from 0.",
+              "title": "Warmup"
+            },
+            "description": "Share of the optimiser steps that ramp the learning rate up from 0."
+          },
+          {
             "name": "epochs",
             "in": "query",
             "required": false,
@@ -12864,6 +12884,17 @@
               }
             ],
             "title": "Learning Rate"
+          },
+          "warmup": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warmup"
           }
         },
         "type": "object",
@@ -28786,6 +28817,10 @@
             "type": "number",
             "title": "Learning Rate"
           },
+          "warmup": {
+            "type": "number",
+            "title": "Warmup"
+          },
           "epochs": {
             "type": "number",
             "title": "Epochs"
@@ -28833,6 +28868,7 @@
           "seq_len",
           "rank",
           "learning_rate",
+          "warmup",
           "epochs",
           "max_rows",
           "alpha",
@@ -29166,6 +29202,17 @@
             ],
             "title": "Steps"
           },
+          "warmup_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warmup Steps"
+          },
           "grad_accum": {
             "anyOf": [
               {
@@ -29209,6 +29256,7 @@
           "defaults",
           "minutes",
           "steps",
+          "warmup_steps",
           "grad_accum",
           "held_out_rows",
           "machines",
@@ -29693,6 +29741,20 @@
               }
             ],
             "title": "Learning Rate"
+          },
+          "warmup": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.5,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warmup",
+            "description": "Share of the optimiser steps that ramp the learning rate up from 0."
           },
           "epochs": {
             "anyOf": [

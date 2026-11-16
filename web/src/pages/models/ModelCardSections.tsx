@@ -82,6 +82,13 @@ const EVENT_BADGES: Record<string, { variant: Variant; label: string }> = {
 
 const NONE = "–";
 
+function warmupText(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+        return NONE;
+    }
+    return value === 0 ? "Off" : `${percent(value)} of steps`;
+}
+
 function when(value: string | null | undefined): string {
     return value ? exactTime(value) : NONE;
 }
@@ -489,6 +496,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
                         />,
                     ],
                     ["Learning rate", value(recipe.learning_rate)],
+                    ["Warmup", warmupText(recipe.warmup)],
                     ["Sequence length", value(recipe.seq_len)],
                     [
                         "Batch size",

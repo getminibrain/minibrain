@@ -129,6 +129,7 @@ function settingRows(a: VersionInfo, b: VersionInfo, base: (key: string) => stri
         { label: "LoRA rank", values: pair("rank") },
         { label: "Epochs", values: pair("epochs") },
         { label: "Learning rate", values: pair("learning_rate") },
+        { label: "Warmup", values: pair("warmup", (value) => percent(Number(value))) },
         { label: "Rows at most", values: pair("max_rows", (value) => count(Number(value))) },
         { label: "Batch", values: pair("micro_batch") },
         { label: "Sequence length", values: pair("seq_len", (value) => count(Number(value))) },

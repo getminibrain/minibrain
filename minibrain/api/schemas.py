@@ -952,6 +952,9 @@ class TrainingSettings(BaseModel):
     seq_len: int | None = Field(default=None, ge=32, le=1_048_576)
     rank: int | None = Field(default=None, ge=1, le=MAX_RANK)
     learning_rate: float | None = Field(default=None, gt=0, le=0.01)
+    warmup: float | None = Field(
+        default=None, ge=0, le=0.5, description="Share of the optimiser steps that ramp the learning rate up from 0."
+    )
     epochs: float | None = Field(default=None, gt=0, le=10)
     max_rows: int | None = Field(default=None, ge=10)
     alpha: int | None = Field(default=None, ge=1, le=512)
@@ -1003,6 +1006,7 @@ class TrainingDefaults(BaseModel):
     seq_len: int
     rank: int
     learning_rate: float
+    warmup: float
     epochs: float
     max_rows: int
     alpha: int
@@ -1058,6 +1062,7 @@ class TrainingPlanInfo(BaseModel):
     defaults: TrainingDefaults
     minutes: float | None = Field(description="Estimated minutes for the chosen plan, setup and scoring included.")
     steps: int | None
+    warmup_steps: int | None
     grad_accum: int | None
     held_out_rows: int
     machines: list[MachinePlanInfo]

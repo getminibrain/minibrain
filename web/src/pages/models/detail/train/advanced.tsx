@@ -18,6 +18,7 @@ import {
     type Issue,
     LEARNING_RATES,
     MAX_RANK,
+    MAX_WARMUP,
     MICRO_CHOICES,
     type MachinePlan,
     type PlanInfo,
@@ -29,6 +30,19 @@ import {
 type Change = (patch: Partial<Recipe>) => void;
 
 const WHOLE = { maximumFractionDigits: 0 };
+const PERCENT = { style: "percent", maximumFractionDigits: 1 } as const;
+const WARMUP_TIP =
+    "Steps at the start where the learning rate ramps up from 0 to its set value, so early, noisy updates stay small. 0% turns it off.";
+
+function warmupDetail(warmup: number, plan: PlanInfo | undefined): string | undefined {
+    if (warmup === 0) {
+        return "Off";
+    }
+    if (plan?.steps == null || plan.warmup_steps == null) {
+        return undefined;
+    }
+    return `≈ ${count(plan.warmup_steps)} of ${count(plan.steps)} steps`;
+}
 
 function Warn({ children }: { children: ReactNode }) {
     return <span className="text-warning">{children}</span>;
@@ -48,20 +62,29 @@ function Group({ id, label, children }: { id: string; label: string; children: R
 function Field({
     id,
     label,
+    detail,
     error,
     children,
 }: {
     id: string;
     label: ReactNode;
+    detail?: ReactNode;
     error?: string;
     children: ReactNode;
 }) {
     return (
         <div className="flex flex-col gap-1">
             <div className="grid gap-label @sm:grid-cols-[minmax(0,1fr)_10.5rem] @sm:items-center @sm:gap-3">
-                <Label htmlFor={id} className="min-w-0 font-normal">
-                    {label}
-                </Label>
+                <div className="flex min-w-0 flex-col">
+                    <Label htmlFor={id} className="font-normal">
+                        {label}
+                    </Label>
+                    {detail && (
+                        <span className="truncate text-sm text-muted-foreground tabular-nums">
+                            {detail}
+                        </span>
+                    )}
+                </div>
                 <div className="min-w-0">{children}</div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
@@ -248,6 +271,27 @@ export function Advanced({
                                 onChange={(value) =>
                                     onChange({ learningRate: value === "auto" ? 2e-4 : value })
                                 }
+                            />
+                        </Field>
+                        <Field
+                            id="train-warmup"
+                            label={<Tipped label="Warmup" tip={WARMUP_TIP} />}
+                            detail={warmupDetail(recipe.warmup, plan)}
+                        >
+                            <NumberField
+                                disabled={disabled}
+                                className="w-full"
+                                groupClassName="w-full"
+                                id="train-warmup"
+                                value={recipe.warmup}
+                                onValueChange={(value) =>
+                                    onChange({ warmup: value ?? recipe.warmup })
+                                }
+                                min={0}
+                                max={MAX_WARMUP}
+                                step={0.01}
+                                largeStep={0.05}
+                                format={PERCENT}
                             />
                         </Field>
                         <Field

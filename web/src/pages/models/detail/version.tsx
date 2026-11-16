@@ -479,6 +479,8 @@ const SETTING_NAMES: Record<string, (recipe: Record<string, unknown>) => string>
     rank: (recipe) => `rank ${recipe.rank}`,
     epochs: (recipe) => `${recipe.epochs} ${recipe.epochs === 1 ? "epoch" : "epochs"}`,
     learning_rate: (recipe) => `learning rate ${recipe.learning_rate}`,
+    warmup: (recipe) =>
+        Number(recipe.warmup) === 0 ? "no warmup" : `warmup ${percent(Number(recipe.warmup))}`,
     max_rows: (recipe) => `${count(Number(recipe.max_rows))} rows at most`,
     strategy: (recipe) => (recipe.strategy === "qlora" ? "QLoRA" : "LoRA"),
     checkpointing: (recipe) => `checkpointing ${recipe.checkpointing ? "on" : "off"}`,

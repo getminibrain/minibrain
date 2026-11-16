@@ -82,6 +82,12 @@ def percent(value: float | None) -> str:
     return NONE if value is None else percent_text(value)
 
 
+def warmup_text(value: float | None) -> str:
+    if value is None:
+        return NONE
+    return "Off" if value == 0 else f"{percent_text(value)} of steps"
+
+
 def decimal(value: float | None) -> str:
     return NONE if value is None else f"{value:.3f}"
 
@@ -293,6 +299,7 @@ def training_section(card: ModelCard) -> list[str]:
         ("Epochs", recipe.epochs),
         ("LoRA rank and alpha", f"{recipe.rank} and {recipe.alpha}" if recipe.rank is not None else None),
         ("Learning rate", recipe.learning_rate),
+        ("Warmup", warmup_text(recipe.warmup)),
         ("Sequence length", recipe.seq_len),
         ("Micro-batch", recipe.micro_batch),
         ("Gradient accumulation", recipe.grad_accum),

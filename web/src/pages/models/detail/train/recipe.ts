@@ -13,6 +13,7 @@ export type Recipe = {
     rank: number;
     alpha: Auto<number>;
     learningRate: number;
+    warmup: number;
     epochs: number;
     maxRows: number | "all";
     microBatch: Auto<number>;
@@ -37,6 +38,8 @@ export const QUALITIES: { id: Quality; label: string }[] = [
 export const MAX_RANK = 64;
 export const MIN_HELD_OUT = 50;
 export const HEADROOM = 0.85;
+export const WARMUP = 0.05;
+export const MAX_WARMUP = 0.5;
 export const LEARNING_RATES = [2e-5, 5e-5, 1e-4, 2e-4, 3e-4, 5e-4, 1e-3];
 export const MICRO_CHOICES = [1, 2, 4, 8];
 export const ACCUM_CHOICES = [1, 2, 4, 8, 16, 32];
@@ -50,6 +53,7 @@ const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs"> = {
     strategy: "auto",
     checkpointing: "auto",
     evalEvery: "auto",
+    warmup: WARMUP,
     seed: 7,
     machine: "auto",
 };
@@ -95,6 +99,7 @@ export type PlanQuery = {
     rank: number;
     alpha?: number;
     learning_rate: number;
+    warmup: number;
     epochs: number;
     max_rows: number;
     micro_batch?: number;
@@ -119,6 +124,7 @@ export function planQuery(
         rank: recipe.rank,
         alpha: auto(recipe.alpha),
         learning_rate: recipe.learningRate,
+        warmup: recipe.warmup,
         epochs: recipe.epochs,
         max_rows: Math.max(10, recipe.maxRows === "all" ? available : recipe.maxRows),
         micro_batch: auto(recipe.microBatch),
@@ -212,6 +218,10 @@ function nearestRate(value: number): number {
     );
 }
 
+function storedWarmup(value: unknown): number {
+    return typeof value === "number" && value >= 0 && value <= MAX_WARMUP ? value : WARMUP;
+}
+
 function positive(value: unknown): number | null {
     const found = Number(value);
     return Number.isFinite(found) && found > 0 ? found : null;
@@ -229,6 +239,7 @@ export function startFrom(stored: Record<string, unknown> | null | undefined): S
         rank: Math.round(rank),
         epochs: Math.max(1, Math.round(epochs)),
         learningRate: nearestRate(learningRate),
+        warmup: storedWarmup(stored?.warmup),
     };
     const matched = qualityOf(recipe);
     return matched
