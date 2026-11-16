@@ -410,9 +410,6 @@ function Progress({
                 <>
                     <CancelRun job={job} />
                     <Button variant="outline" asChild>
-                        <Link href={jobLogsHref(job)}>Logs</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
                         <Link href={jobHref(job)}>{`Job #${job.id}`}</Link>
                     </Button>
                 </>
