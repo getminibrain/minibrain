@@ -23,6 +23,7 @@ from minibrain.api.schemas import (
     DataSettingsUpdate,
     DatasetVersionDiff,
     DatasetVersionInfo,
+    DatasetVersionRequest,
     DeltaSourceCreate,
     DemoDataInfo,
     DiffRow,
@@ -34,6 +35,7 @@ from minibrain.api.schemas import (
     MappingUpdate,
     NameTakenInfo,
     OutputSuggestion,
+    OverLimitInfo,
     PreviewResponse,
     PreviewRow,
     QualityInfo,
@@ -46,7 +48,14 @@ from minibrain.api.schemas import (
     SourceStats,
     SourceSummary,
 )
-from minibrain.api.views import change_info, contract_info, dataset_delete_lock, dataset_version_info, mapping_info
+from minibrain.api.views import (
+    change_info,
+    contract_info,
+    dataset_delete_lock,
+    dataset_version_info,
+    mapping_info,
+    sample_of,
+)
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
@@ -390,6 +399,9 @@ def list_sources(session: SessionDep, settings: SettingsDep, store: StoreDep) ->
     return [source_summary(settings, store, source) for source in found]
 
 
+OVER_LIMIT: dict[int | str, dict[str, Any]] = {
+    409: {"model": OverLimitInfo, "description": "The query returns more rows than the limit"}
+}
 ADDED_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {"model": SourceAdded, "description": "Already added, so nothing new was stored; or replaced"},
     409: {"model": NameTakenInfo, "description": "The name is taken"},
@@ -580,7 +592,7 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     )
     if mapping.sql is not None or requested_template(mapping) is not None:
         apply_mapping(session, settings, store, dataset, mapping)
-    version_if_mapped(session, settings, dataset)
+    version_if_mapped(session, settings, dataset, sample_of(body.sample))
     session.commit()
     return dataset_summary(settings, store, dataset)
 
@@ -613,7 +625,7 @@ def update_dataset_mapping(
 ) -> DatasetSummary:
     dataset = get_dataset(session, slug)
     apply_mapping(session, settings, store, dataset, body)
-    take_version(session, settings, dataset)
+    take_version(session, settings, dataset, sample_of(body.sample))
     cleanup(session, settings)
     session.commit()
     return dataset_summary(settings, store, dataset)
@@ -693,10 +705,19 @@ def list_dataset_versions(slug: str, session: SessionDep) -> list[DatasetVersion
 
 
 @router.post(
-    "/datasets/{slug}/versions", status_code=201, dependencies=[Depends(builder)], summary="Save a dataset version"
+    "/datasets/{slug}/versions",
+    status_code=201,
+    responses=OVER_LIMIT,
+    dependencies=[Depends(builder)],
+    summary="Save a dataset version",
+    description="Refused with 409 and the row counts when the query returns more rows than the limit; send a sample "
+    "to save a random sample instead. A sample is audited as dataset.sample.",
 )
-def save_dataset_version(slug: str, session: SessionDep, settings: SettingsDep) -> DatasetVersionInfo:
-    dataset_version = take_version(session, settings, get_dataset(session, slug))
+def save_dataset_version(
+    slug: str, session: SessionDep, settings: SettingsDep, body: DatasetVersionRequest | None = None
+) -> DatasetVersionInfo:
+    request = body or DatasetVersionRequest()
+    dataset_version = take_version(session, settings, get_dataset(session, slug), sample_of(request.sample))
     cleanup(session, settings)
     session.commit()
     return dataset_version_info(dataset_version)

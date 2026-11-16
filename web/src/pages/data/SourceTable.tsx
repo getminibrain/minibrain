@@ -28,6 +28,7 @@ import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { fileSize, relativeTime } from "~/lib/time";
+import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
 import {
     type ItemRef,
     datasetNameProblem,
@@ -192,7 +193,7 @@ export function MakeDatasetDialog({
     const [input, setInput] = useState("");
     const [label, setLabel] = useState("");
     const create = useMutation({
-        mutationFn: () =>
+        mutationFn: (sample?: SampleRequest) =>
             unwrap(
                 api.POST("/api/datasets", {
                     body: {
@@ -200,6 +201,7 @@ export function MakeDatasetDialog({
                             name.trim() ||
                             freeDatasetName(siblings, defaultName(chosen) || "New dataset"),
                         sql: stackedSql(chosen, input, label),
+                        sample: sample ?? null,
                     },
                 }),
             ),
@@ -208,6 +210,7 @@ export function MakeDatasetDialog({
             onOpenChange(false);
         },
     });
+    const over = useOverLimit(create.error, create.isPending && Boolean(create.variables));
     const reset = create.reset;
     useEffect(() => {
         if (opened === null) {
@@ -286,7 +289,16 @@ export function MakeDatasetDialog({
                 {input && input === label && (
                     <StatusText tone="warning">Pick different input and label columns.</StatusText>
                 )}
-                <ErrorLine error={create.error} />
+                {over ? (
+                    <SampleOffer
+                        total={over.total_rows}
+                        limit={over.row_limit}
+                        pending={create.isPending}
+                        onTake={(sample) => create.mutate(sample)}
+                    />
+                ) : (
+                    <ErrorLine error={create.error} />
+                )}
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cancel
@@ -295,7 +307,7 @@ export function MakeDatasetDialog({
                         disabled={
                             !ready || columns.length < 2 || problem !== null || create.isPending
                         }
-                        onClick={() => create.mutate()}
+                        onClick={() => create.mutate(undefined)}
                     >
                         {create.isPending ? "Making…" : "Make dataset"}
                     </Button>

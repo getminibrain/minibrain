@@ -38,9 +38,11 @@ import {
     FirstVersionNotice,
     RowLimitNotice,
     VersionsSection,
+    needsSample,
     useVersionRefresh,
 } from "./DatasetVersions";
 import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
+import { SampleNote } from "./SampleOffer";
 import {
     type FolderIndex,
     type ItemRef,
@@ -387,14 +389,19 @@ export function DatasetDetail({
             {dataset.error && (
                 <p className="text-destructive">{`The query fails: ${dataset.error}`}</p>
             )}
-            <RowLimitNotice rows={dataset.rows} limit={dataset.row_limit ?? 0} />
+            <RowLimitNotice dataset={dataset} />
             <FirstVersionNotice dataset={dataset} />
             <ChangeNotice
                 changed={dataset.changed}
                 datasetVersion={dataset.dataset_version}
-                dataset={dataset.slug}
-                after="Models keep training on it until you update."
+                dataset={needsSample(dataset) ? null : dataset.slug}
+                after={
+                    needsSample(dataset)
+                        ? "Take a sample to save the next version."
+                        : "Models keep training on it until you update."
+                }
             />
+            <SampleNote sample={dataset.dataset_version?.sample} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
                 <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />

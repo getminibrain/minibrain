@@ -172,9 +172,9 @@ def test_the_row_limit_refuses_large_versions_with_a_way_out(harness: Harness) -
     assert harness.client.get("/api/datasets/tickets").json()["row_limit"] == 150
     refused = harness.client.post("/api/datasets/tickets/versions")
     assert refused.status_code == 409
-    assert "more than 150 rows" in refused.json()["detail"] and "USING SAMPLE" in refused.json()["detail"]
+    assert "the limit is 150" in refused.json()["detail"] and refused.json()["total_rows"] == 200
     created = harness.client.post("/api/datasets", json={"name": "Too big", "source_id": source["id"]})
-    assert created.status_code == 409 and "more than 150 rows" in created.json()["detail"]
+    assert created.status_code == 409 and "the limit is 150" in created.json()["detail"]
     assert harness.client.get("/api/datasets/too-big").status_code == 404
     remapped = harness.client.put(
         "/api/datasets/tickets/mapping",

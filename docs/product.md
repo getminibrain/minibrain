@@ -55,6 +55,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked.
   UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
+- **Sampled versions** · shipped · product, ml
+  Save a seeded random sample when a query exceeds the row limit.
+  UI: Data › dataset, Data › dataset › Query, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping · Config: data.row_limit
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
   UI: Data › dataset › Versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}

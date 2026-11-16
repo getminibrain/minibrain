@@ -289,6 +289,10 @@ def wrapped(sql: str, limit: int | None = None) -> str:
     return query if limit is None else f"{query} LIMIT {int(limit)}"
 
 
+def sampled(sql: str, rows: int, seed: int) -> str:
+    return f"{wrapped(sql)} USING SAMPLE reservoir({int(rows)} ROWS) REPEATABLE ({int(seed)})"
+
+
 def describe(table: Table) -> tuple[list[Column], int]:
     with sandbox([table]) as connection:
         name = quote_identifier(table.name)

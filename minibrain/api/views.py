@@ -32,6 +32,8 @@ from minibrain.api.schemas import (
     ModelSafety,
     PromotionInfo,
     RequestBodiesInfo,
+    SampleInfo,
+    SampleRequest,
     ScoreInfo,
     ServeOnlyInfo,
     SourceInfo,
@@ -42,7 +44,7 @@ from minibrain.api.schemas import (
     VersionInfo,
     VersionOrigin,
 )
-from minibrain.data.dataset_versions import Changes, changes_since, version_number
+from minibrain.data.dataset_versions import Changes, Sample, changes_since, version_number
 from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import plain_columns
@@ -192,7 +194,12 @@ def dataset_version_info(dataset_version: DatasetVersion) -> DatasetVersionInfo:
         taken_at=dataset_version.taken_at,
         checks=check_infos(dataset_version),
         feedback_rows=dataset_version.feedback_rows,
+        sample=SampleInfo.model_validate(dataset_version.sample) if dataset_version.sample else None,
     )
+
+
+def sample_of(request: SampleRequest | None) -> Sample | None:
+    return Sample(rows=request.rows, seed=request.seed) if request is not None else None
 
 
 def check_infos(dataset_version: DatasetVersion) -> list[CheckInfo]:

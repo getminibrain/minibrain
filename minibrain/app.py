@@ -64,6 +64,7 @@ from minibrain.auth.throttle import TooManyAttempts
 from minibrain.base_models import BaseModelSpec
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
+from minibrain.data.dataset_versions import OverLimitError
 from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.feedback import FeedbackError, database_feedback
 from minibrain.data.sources import SourceError
@@ -116,6 +117,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     NotFoundError: 404,
     ConflictError: 409,
     NameTakenError: 409,
+    OverLimitError: 409,
     JobsRunningError: 409,
     LeaseError: 409,
     JobStateError: 409,
@@ -148,6 +150,8 @@ log = logging.getLogger("minibrain")
 def error_body(error: Exception) -> dict[str, Any]:
     if isinstance(error, NameTakenError):
         return {"detail": str(error), "name": error.name, "suggestion": error.suggestion, "taken": error.taken}
+    if isinstance(error, OverLimitError):
+        return {"detail": str(error), "total_rows": error.total, "row_limit": error.limit}
     if isinstance(error, JobsRunningError):
         return {"detail": str(error), "jobs": error.jobs}
     return {"detail": str(error)}

@@ -25,12 +25,14 @@ import type {
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { asCode, count } from "~/lib/format";
 import { sqlProblem } from "~/lib/sqlError";
+import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
 
 export type MappingBody = {
     source_id?: number;
     input_column?: string;
     label_column?: string;
     sql?: string;
+    sample?: SampleRequest;
 };
 
 type Mode = "columns" | "sql";
@@ -215,6 +217,16 @@ export function QueryEditor({
     }, [sourceId]);
     const save = useMutation({ mutationFn: onSave });
     const run = useMutation({ mutationFn: onRun });
+    const over = useOverLimit(save.error, save.isPending && Boolean(save.variables?.sample));
+    const offer = over && save.variables && (
+        <SampleOffer
+            total={over.total_rows}
+            limit={over.row_limit}
+            seed={save.variables.sample?.seed}
+            pending={save.isPending}
+            onTake={(sample) => save.variables && save.mutate({ ...save.variables, sample })}
+        />
+    );
     const chosen = sources.find((item) => String(item.id) === source);
     const columns = (chosen?.columns ?? []).map((column) => ({
         value: column.name,
@@ -226,7 +238,9 @@ export function QueryEditor({
     );
     const problem = run.error
         ? sqlProblem(run.error, run.variables, sql)
-        : sqlProblem(save.error, save.variables?.sql, sql);
+        : over
+          ? null
+          : sqlProblem(save.error, save.variables?.sql, sql);
     const runSql = (text: string) => {
         if (text.trim() && !run.isPending) {
             run.mutate(text);
@@ -294,6 +308,7 @@ export function QueryEditor({
                         </Button>
                     </div>
                     <ErrorLine error={problem?.message} />
+                    {offer}
                     {run.data && !run.error && <QueryResult result={run.data} />}
                 </div>
             ) : (
@@ -346,7 +361,7 @@ export function QueryEditor({
                             {saveLabel ?? "Save columns"}
                         </Button>
                     </div>
-                    <ErrorLine error={save.error} />
+                    {offer || <ErrorLine error={save.error} />}
                 </div>
             )}
         </Section>

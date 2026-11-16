@@ -32,6 +32,7 @@ import { useSearchParam } from "~/lib/listSearch";
 import { modelsHref } from "~/lib/modelsSearch";
 import { sqlProblem } from "~/lib/sqlError";
 import { DataExplorer } from "./data/Explorer";
+import { SampleNote, SampleOffer, type SampleRequest, useOverLimit } from "./data/SampleOffer";
 import { itemHref } from "./data/catalogue";
 
 type Row = { input: string | null; label: string | null };
@@ -324,14 +325,16 @@ const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
 function DatasetSection({ detail }: { detail: ModelDetail }) {
     const refresh = useRefresh(detail.slug);
     const build = useMutation({
-        mutationFn: () =>
+        mutationFn: (sample?: SampleRequest) =>
             unwrap(
                 api.POST("/api/models/{name}/dataset-versions", {
                     params: { path: { name: detail.slug } },
+                    body: sample ? { sample } : null,
                 }),
             ),
         onSuccess: () => refresh(),
     });
+    const over = useOverLimit(build.error, build.isPending && Boolean(build.variables));
     const golden = useGolden(detail.slug, Boolean(detail.dataset_version));
     const [showGolden, setShowGolden] = useState(false);
     if (!detail.mapping.sql) {
@@ -343,12 +346,26 @@ function DatasetSection({ detail }: { detail: ModelDetail }) {
             title="Dataset version"
             caption="The saved copy of the dataset's rows that new versions train on, split into a test set, a held-out set, few-shot examples and training rows."
             actions={
-                <Button size="sm" onClick={() => build.mutate()} disabled={build.isPending}>
+                <Button
+                    size="sm"
+                    onClick={() => build.mutate(undefined)}
+                    disabled={build.isPending}
+                >
                     {build.isPending ? "Saving…" : datasetVersion ? "Update" : "Save version 1"}
                 </Button>
             }
         >
-            <ErrorLine error={build.error} />
+            {over ? (
+                <SampleOffer
+                    total={over.total_rows}
+                    limit={over.row_limit}
+                    seed={datasetVersion?.sample?.seed}
+                    pending={build.isPending}
+                    onTake={(sample) => build.mutate(sample)}
+                />
+            ) : (
+                <ErrorLine error={build.error} />
+            )}
             {datasetVersion ? (
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap gap-6">
@@ -372,6 +389,7 @@ function DatasetSection({ detail }: { detail: ModelDetail }) {
                             }
                         />
                     </div>
+                    <SampleNote sample={datasetVersion.sample} />
                     <p className="text-sm text-muted-foreground">
                         Saved {dateTime(datasetVersion.taken_at ?? datasetVersion.created_at)}
                     </p>

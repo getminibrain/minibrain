@@ -1,3 +1,4 @@
+import secrets
 import shutil
 import tempfile
 from collections import defaultdict
@@ -8,11 +9,12 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from minibrain.auth.identity import current_actor
 from minibrain.data.checks import Finding, blocking, run_checks
 from minibrain.data.feedback import FeedbackRow, training_rows
 from minibrain.data.limits import load_limits
 from minibrain.data.shared import dataset_sql, dataset_tables, fingerprint
-from minibrain.data.sources import FeedbackTuple, copy_rows, count_feedback_changes, merge_rows
+from minibrain.data.sources import FeedbackTuple, copy_rows, count_feedback_changes, count_rows, merge_rows, sampled
 from minibrain.data.splits import (
     MIN_ROWS,
     SPLITS,
@@ -26,7 +28,7 @@ from minibrain.data.splits import (
     split,
 )
 from minibrain.registry.files import ArtifactKind, dataset_version_location, store_file, store_for
-from minibrain.registry.models import Artifact, Dataset, DatasetVersion, Model, Version, now
+from minibrain.registry.models import Artifact, AuditEvent, Dataset, DatasetVersion, Model, Version, now
 from minibrain.registry.service import ConflictError, latest_dataset_version, latest_version
 from minibrain.settings import Settings
 from minibrain.tasks.examples import Example, encode_turns
@@ -41,12 +43,29 @@ class Changes:
     dataset: bool = False
 
 
-def over_limit(limit: int) -> str:
-    return (
-        f"The query returns more than {limit:,} rows, the most one dataset version holds. Filter or sample in the "
-        f"query, for example USING SAMPLE reservoir({limit} ROWS) REPEATABLE (7), or raise the limit under Settings, "
-        "Data."
-    )
+SEEDS = 10_000
+
+
+class OverLimitError(ConflictError):
+    def __init__(self, total: int, limit: int) -> None:
+        super().__init__(
+            f"The query returns {total:,} rows; the limit is {limit:,}. Take a random sample of at most {limit:,} "
+            "rows, filter the query, or raise the limit under Settings, Data."
+        )
+        self.total = total
+        self.limit = limit
+
+
+@dataclass(frozen=True)
+class Sample:
+    rows: int
+    seed: int | None = None
+
+
+def sampling(sample: Sample | None, total: int) -> tuple[int, int] | None:
+    if sample is None or total <= sample.rows:
+        return None
+    return sample.rows, sample.seed if sample.seed is not None else secrets.randbelow(SEEDS - 1) + 1
 
 
 def split_summary(
@@ -98,17 +117,41 @@ def next_number(dataset: Dataset) -> int:
     return max((dataset_version.number or 0 for dataset_version in dataset.versions), default=0) + 1
 
 
-def take_version(session: Session, settings: Settings, dataset: Dataset) -> DatasetVersion:
+def require_sample_fits(sample: Sample | None, limit: int) -> None:
+    if sample is not None and sample.rows > limit:
+        raise ConflictError(f"A sample holds at most {limit:,} rows, the most one dataset version holds.")
+
+
+def audit_sample(session: Session, dataset: Dataset, found: DatasetVersion) -> None:
+    if found.sample is None:
+        return
+    session.add(
+        AuditEvent(
+            actor=current_actor(),
+            action="dataset.sample",
+            target=f"dataset:{dataset.slug}",
+            detail={"name": dataset.name, "version": found.number} | found.sample,
+        )
+    )
+
+
+def take_version(
+    session: Session, settings: Settings, dataset: Dataset, sample: Sample | None = None
+) -> DatasetVersion:
     limit = load_limits(session).row_limit
+    require_sample_fits(sample, limit)
     sql = dataset_sql(dataset)
     tables, aliases = dataset_tables(settings, store_for(settings), dataset)
     prints = {table.name: table.fingerprint for table in tables}
+    total = count_rows(tables, sql, aliases) if sample is not None else 0
+    taken = sampling(sample, total)
+    query = sampled(sql, *taken) if taken is not None else sql
     settings.work_dir().mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=settings.work_dir()) as scratch:
         target = Path(scratch) / DATASET_VERSION_FILE
-        rows = copy_rows(tables, sql, target, limit, aliases)
+        rows = copy_rows(tables, query, target, limit, aliases)
         if rows > limit:
-            raise ConflictError(over_limit(limit))
+            raise OverLimitError(count_rows(tables, sql, aliases), limit)
         if rows == 0:
             raise ConflictError("The query returns no rows, so there is no version to save.")
         result = checked(session, settings, target)
@@ -122,15 +165,19 @@ def take_version(session: Session, settings: Settings, dataset: Dataset) -> Data
     found.fingerprints = prints
     found.checks = [finding.as_dict() for finding in result.findings]
     found.sql = sql
+    found.sample = {"rows": rows, "seed": taken[1], "total": total} if taken is not None else None
     found.taken_at = moment
     session.flush()
+    audit_sample(session, dataset, found)
     return found
 
 
-def version_if_mapped(session: Session, settings: Settings, dataset: Dataset | None) -> DatasetVersion | None:
+def version_if_mapped(
+    session: Session, settings: Settings, dataset: Dataset | None, sample: Sample | None = None
+) -> DatasetVersion | None:
     if dataset is None or not dataset.sql or not dataset.sources:
         return None
-    return take_version(session, settings, dataset)
+    return take_version(session, settings, dataset, sample)
 
 
 def plain_copy(settings: Settings, dataset_version: DatasetVersion, target: Path) -> None:
@@ -171,6 +218,7 @@ def with_feedback(session: Session, settings: Settings, model: Model, version: D
     found.fingerprints = version.fingerprints
     found.checks = [finding.as_dict() for finding in result.findings]
     found.sql = version.sql
+    found.sample = version.sample
     found.feedback_rows = added
     found.taken_at = moment
     session.flush()

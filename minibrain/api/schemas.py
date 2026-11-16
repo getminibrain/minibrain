@@ -303,6 +303,27 @@ class CheckInfo(BaseModel):
     dismissed: bool
 
 
+class SampleInfo(BaseModel):
+    rows: int
+    seed: int
+    total: int
+
+
+class SampleRequest(BaseModel):
+    rows: int = Field(ge=1, le=50_000_000)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
+
+
+class DatasetVersionRequest(BaseModel):
+    sample: SampleRequest | None = None
+
+
+class OverLimitInfo(BaseModel):
+    detail: str
+    total_rows: int
+    row_limit: int
+
+
 class DatasetVersionInfo(BaseModel):
     id: int
     hash: str
@@ -319,6 +340,7 @@ class DatasetVersionInfo(BaseModel):
     taken_at: datetime | None
     checks: list[CheckInfo] = Field(default_factory=list)
     feedback_rows: int = 0
+    sample: SampleInfo | None = None
 
 
 class DismissRequest(BaseModel):
@@ -398,6 +420,7 @@ class DatasetCreate(BaseModel):
     template: dict[str, str] | None = None
     sql: str | None = None
     folder_id: int | None = None
+    sample: SampleRequest | None = None
 
 
 FolderName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
@@ -458,6 +481,7 @@ class MappingUpdate(BaseModel):
     label_column: str | None = None
     template: dict[str, str] | None = None
     sql: str | None = None
+    sample: SampleRequest | None = None
 
 
 CheckName = Literal["duplicates", "conflicts", "balance", "leakage", "length", "personal_data"]

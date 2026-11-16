@@ -156,11 +156,13 @@ const GATEWAY_ERRORS = new Set([502, 503, 504]);
 
 export class ApiError extends Error {
     readonly status: number | null;
+    readonly body: unknown;
 
-    constructor(message: string, status: number | null) {
+    constructor(message: string, status: number | null, body: unknown = null) {
         super(message);
         this.name = "ApiError";
         this.status = status;
+        this.body = body;
     }
 
     get unreachable(): boolean {
@@ -182,7 +184,7 @@ export function retryable(failures: number, error: unknown): boolean {
 }
 
 function failed(error: unknown, response: Response): ApiError {
-    return new ApiError(describeError(error, response), response.status);
+    return new ApiError(describeError(error, response), response.status, error ?? null);
 }
 
 function describeError(error: unknown, response: Response): string {

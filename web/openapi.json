@@ -973,6 +973,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DatasetVersionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -980,6 +997,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The query returns more rows than the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverLimitInfo"
                 }
               }
             }
@@ -2795,6 +2822,7 @@
           "Data"
         ],
         "summary": "Save a dataset version",
+        "description": "Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample.",
         "operationId": "save_dataset_version_api_datasets__slug__versions_post",
         "parameters": [
           {
@@ -2807,6 +2835,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DatasetVersionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -2814,6 +2859,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DatasetVersionInfo"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The query returns more rows than the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverLimitInfo"
                 }
               }
             }
@@ -15541,6 +15596,16 @@
               }
             ],
             "title": "Folder Id"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -16027,6 +16092,16 @@
             "type": "integer",
             "title": "Feedback Rows",
             "default": 0
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -16044,6 +16119,22 @@
           "taken_at"
         ],
         "title": "DatasetVersionInfo"
+      },
+      "DatasetVersionRequest": {
+        "properties": {
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "DatasetVersionRequest"
       },
       "DatasetVersionUsage": {
         "properties": {
@@ -21565,6 +21656,16 @@
               }
             ],
             "title": "Sql"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -23677,6 +23778,29 @@
           "basis"
         ],
         "title": "OutputSuggestion"
+      },
+      "OverLimitInfo": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows"
+          },
+          "row_limit": {
+            "type": "integer",
+            "title": "Row Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "total_rows",
+          "row_limit"
+        ],
+        "title": "OverLimitInfo"
       },
       "OverviewBucket": {
         "properties": {
@@ -26335,6 +26459,57 @@
           "categories"
         ],
         "title": "SafetyVerdict"
+      },
+      "SampleInfo": {
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "seed",
+          "total"
+        ],
+        "title": "SampleInfo"
+      },
+      "SampleRequest": {
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "maximum": 50000000.0,
+            "minimum": 1.0,
+            "title": "Rows"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "SampleRequest"
       },
       "SaveExampleBody": {
         "properties": {

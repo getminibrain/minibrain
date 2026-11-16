@@ -16,6 +16,13 @@ import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import {
+    SampleOffer,
+    type SampleRequest,
+    overLimitOf,
+    sampleText,
+    useOverLimit,
+} from "./SampleOffer";
 import { VersionDiffDialog, compareParam, parseCompare, versionName } from "./VersionDiff";
 import { modelHref, useModelNames } from "./parts";
 
@@ -65,28 +72,50 @@ export function useVersionRefresh(slug: string) {
         ]);
 }
 
-export function UpdateVersion({ dataset, label = "Update" }: { dataset: string; label?: string }) {
+export function useSaveVersion(dataset: string) {
     const refresh = useVersionRefresh(dataset);
-    const update = useMutation({
-        mutationFn: () =>
+    return useMutation({
+        mutationFn: (sample?: SampleRequest) =>
             unwrap(
                 api.POST("/api/datasets/{slug}/versions", {
                     params: { path: { slug: dataset } },
+                    body: sample ? { sample } : null,
                 }),
             ),
         onSuccess: refresh,
     });
+}
+
+export function UpdateVersion({
+    dataset,
+    label = "Update",
+    seed,
+}: { dataset: string; label?: string; seed?: number | null }) {
+    const update = useSaveVersion(dataset);
+    const over = useOverLimit(update.error, update.isPending && Boolean(update.variables));
     return (
         <>
             <Button
                 variant="outline"
                 size="sm"
-                onClick={() => update.mutate()}
+                onClick={() => update.mutate(undefined)}
                 disabled={update.isPending}
             >
                 {update.isPending ? "Saving…" : label}
             </Button>
-            <ErrorLine error={update.error} />
+            {over ? (
+                <div className="basis-full">
+                    <SampleOffer
+                        total={over.total_rows}
+                        limit={over.row_limit}
+                        seed={seed}
+                        pending={update.isPending}
+                        onTake={(sample) => update.mutate(sample)}
+                    />
+                </div>
+            ) : (
+                <ErrorLine error={update.error} />
+            )}
         </>
     );
 }
@@ -115,13 +144,15 @@ export function ChangeNotice({
                     {` · ${shortName(datasetVersion)} saved ${relativeTime(takenAt(datasetVersion))}. ${after ?? "Update to save the next version."}`}
                 </span>
             </p>
-            {dataset && can.build && <UpdateVersion dataset={dataset} />}
+            {dataset && can.build && (
+                <UpdateVersion dataset={dataset} seed={datasetVersion.sample?.seed} />
+            )}
         </div>
     );
 }
 
 export function FirstVersionNotice({ dataset }: { dataset: DatasetSummary }) {
-    if (dataset.dataset_version || !dataset.mapping.sql) {
+    if (dataset.dataset_version || !dataset.mapping.sql || needsSample(dataset)) {
         return null;
     }
     return (
@@ -137,20 +168,48 @@ export function FirstVersionNotice({ dataset }: { dataset: DatasetSummary }) {
     );
 }
 
-export function RowLimitNotice({ rows, limit }: { rows: number | null; limit: number }) {
+export function needsSample(dataset: DatasetSummary): boolean {
+    const rows = dataset.rows ?? null;
+    const limit = dataset.row_limit ?? 0;
     if (rows === null || limit <= 0 || rows <= limit) {
+        return false;
+    }
+    const sampled = dataset.dataset_version?.sample;
+    const current = sampled && !dataset.changed?.data && !dataset.changed?.query;
+    return !current;
+}
+
+export function RowLimitNotice({ dataset }: { dataset: DatasetSummary }) {
+    const can = useCan();
+    const save = useSaveVersion(dataset.slug);
+    const sampled = dataset.dataset_version?.sample;
+    if (!needsSample(dataset) || !can.build) {
         return null;
     }
     return (
-        <p className="text-destructive">
-            {`${count(rows)} rows: more than the ${count(limit)} one version holds, so no new version can be saved. Filter or sample in the query, for example `}
-            <span className="font-mono">{`USING SAMPLE reservoir(${limit} ROWS) REPEATABLE (7)`}</span>
-            {", or raise the limit under "}
-            <Link href="/settings/data" className="text-primary hover:underline">
-                Settings, Data
-            </Link>
-            .
-        </p>
+        <SampleOffer
+            total={dataset.rows ?? 0}
+            limit={dataset.row_limit ?? 0}
+            seed={sampled?.seed}
+            pending={save.isPending}
+            error={overLimitOf(save.error) ? null : save.error}
+            onTake={(sample) => save.mutate(sample)}
+        />
+    );
+}
+
+function VersionRows({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
+    const { sample } = datasetVersion;
+    if (!sample) {
+        return <span className="tabular-nums">{count(datasetVersion.rows)}</span>;
+    }
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="tabular-nums">{`${count(datasetVersion.rows)} sampled`}</span>
+            </TooltipTrigger>
+            <TooltipContent>{sampleText(sample)}</TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -214,7 +273,7 @@ const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
         id: "rows",
         header: "Rows",
         accessorFn: (datasetVersion) => datasetVersion.rows,
-        cell: ({ row }) => <span className="tabular-nums">{count(row.original.rows)}</span>,
+        cell: ({ row }) => <VersionRows datasetVersion={row.original} />,
     },
     {
         id: "labels",

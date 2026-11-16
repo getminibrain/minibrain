@@ -265,6 +265,7 @@ class DatasetVersion(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     taken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     feedback_rows: Mapped[int] = mapped_column(default=0)
+    sample: Mapped[dict[str, int] | None] = mapped_column(JSON, default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="versions")
     model_versions: Mapped[list["Version"]] = relationship(back_populates="dataset_version")

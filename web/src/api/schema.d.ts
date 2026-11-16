@@ -933,7 +933,10 @@ export interface paths {
         /** List a dataset's versions */
         get: operations["list_dataset_versions_api_datasets__slug__versions_get"];
         put?: never;
-        /** Save a dataset version */
+        /**
+         * Save a dataset version
+         * @description Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample.
+         */
         post: operations["save_dataset_version_api_datasets__slug__versions_post"];
         delete?: never;
         options?: never;
@@ -4592,6 +4595,7 @@ export interface components {
             sql?: string | null;
             /** Folder Id */
             folder_id?: number | null;
+            sample?: components["schemas"]["SampleRequest"] | null;
         };
         /** DatasetFolderChoice */
         DatasetFolderChoice: {
@@ -4754,6 +4758,11 @@ export interface components {
              * @default 0
              */
             feedback_rows?: number;
+            sample?: components["schemas"]["SampleInfo"] | null;
+        };
+        /** DatasetVersionRequest */
+        DatasetVersionRequest: {
+            sample?: components["schemas"]["SampleRequest"] | null;
         };
         /** DatasetVersionUsage */
         DatasetVersionUsage: {
@@ -6551,6 +6560,7 @@ export interface components {
             } | null;
             /** Sql */
             sql?: string | null;
+            sample?: components["schemas"]["SampleRequest"] | null;
         };
         /** Message */
         Message: {
@@ -7232,6 +7242,15 @@ export interface components {
              * @description Why this output fits the dataset's answers.
              */
             basis: string;
+        };
+        /** OverLimitInfo */
+        OverLimitInfo: {
+            /** Detail */
+            detail: string;
+            /** Total Rows */
+            total_rows: number;
+            /** Row Limit */
+            row_limit: number;
         };
         /** OverviewBucket */
         OverviewBucket: {
@@ -8165,6 +8184,22 @@ export interface components {
              * @description The categories it found, in the safety model's own words.
              */
             categories: string[];
+        };
+        /** SampleInfo */
+        SampleInfo: {
+            /** Rows */
+            rows: number;
+            /** Seed */
+            seed: number;
+            /** Total */
+            total: number;
+        };
+        /** SampleRequest */
+        SampleRequest: {
+            /** Rows */
+            rows: number;
+            /** Seed */
+            seed?: number | null;
         };
         /** SaveExampleBody */
         SaveExampleBody: {
@@ -10310,7 +10345,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DatasetVersionRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -10319,6 +10358,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description The query returns more rows than the limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverLimitInfo"];
                 };
             };
             /** @description Validation Error */
@@ -11640,7 +11688,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DatasetVersionRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -11649,6 +11701,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DatasetVersionInfo"];
+                };
+            };
+            /** @description The query returns more rows than the limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverLimitInfo"];
                 };
             };
             /** @description Validation Error */

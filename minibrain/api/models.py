@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.catalog import ensure_reachable
-from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
+from minibrain.api.data import OVER_LIMIT, apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.jobs import cancel
 from minibrain.api.placing import audit_deploy, place_custom
@@ -16,6 +16,7 @@ from minibrain.api.schemas import (
     ContractInfo,
     ContractUpdate,
     DatasetChoice,
+    DatasetVersionRequest,
     DemoModelDetail,
     ExampleInfo,
     GraderConfig,
@@ -38,7 +39,7 @@ from minibrain.api.schemas import (
     RescoreResult,
 )
 from minibrain.api.versions import audit_version, start_version
-from minibrain.api.views import dataset_lock, detail
+from minibrain.api.views import dataset_lock, detail, sample_of
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import Role, allows
@@ -388,7 +389,7 @@ def update_mapping(
     model = get_model(session, name)
     dataset = dataset_of(model)
     apply_mapping(session, settings, store, dataset, body)
-    take_version(session, settings, dataset)
+    take_version(session, settings, dataset, sample_of(body.sample))
     cleanup(session, settings)
     session.commit()
     return detail(settings, model)
@@ -409,12 +410,16 @@ def preview(name: str, session: SessionDep, settings: SettingsDep, store: StoreD
 @router.post(
     "/{name}/dataset-versions",
     status_code=201,
+    responses=OVER_LIMIT,
     dependencies=[Depends(builder)],
     summary="Build a dataset version for a custom model",
 )
-def build_dataset_version(name: str, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+def build_dataset_version(
+    name: str, session: SessionDep, settings: SettingsDep, body: DatasetVersionRequest | None = None
+) -> ModelDetail:
     model = get_model(session, name)
-    take_version(session, settings, dataset_of(model))
+    request = body or DatasetVersionRequest()
+    take_version(session, settings, dataset_of(model), sample_of(request.sample))
     cleanup(session, settings)
     session.commit()
     return detail(settings, model)
