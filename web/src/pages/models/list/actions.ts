@@ -44,6 +44,40 @@ function cascading(whole: ModelRow[], rows: ModelRow[], cascade: boolean): Set<s
     );
 }
 
+export type DeleteFailure = { name: string; error: string };
+
+export class PartialDeleteError extends Error {
+    deleted: string[];
+    failed: DeleteFailure[];
+
+    constructor(deleted: string[], failed: DeleteFailure[]) {
+        super(`${failed.length} of ${deleted.length + failed.length} could not be deleted`);
+        this.deleted = deleted;
+        this.failed = failed;
+    }
+}
+
+type Step = { name: string; run: () => Promise<unknown> };
+
+async function runAll(steps: Step[]): Promise<void> {
+    const deleted: string[] = [];
+    const failed: DeleteFailure[] = [];
+    for (const step of steps) {
+        try {
+            await step.run();
+            deleted.push(step.name);
+        } catch (error) {
+            failed.push({
+                name: step.name,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+    if (failed.length > 0) {
+        throw new PartialDeleteError(deleted, failed);
+    }
+}
+
 export async function deleteEntries(
     chosen: Entry[],
     rows: ModelRow[],
@@ -59,13 +93,19 @@ export async function deleteEntries(
             !wholeKeys.has(rowId(entry.model)) &&
             !dropped.has(entry.model.base_model ?? ""),
     );
-    for (const entry of versions) {
-        await deleteVersion(entry.model, entry.version?.number ?? 0, cancelJobs);
-    }
+    const steps: Step[] = versions.map((entry) => ({
+        name: `${entry.model.name} v${entry.version?.number ?? 0}`,
+        run: () => deleteVersion(entry.model, entry.version?.number ?? 0, cancelJobs),
+    }));
     for (const row of whole) {
         if (row.kind === "custom" && dropped.has(row.base_model ?? "")) {
             continue;
         }
-        await deleteModel(row, { undeploy: true, cascade: dropped.has(row.key), cancelJobs });
+        steps.push({
+            name: row.name,
+            run: () =>
+                deleteModel(row, { undeploy: true, cascade: dropped.has(row.key), cancelJobs }),
+        });
     }
+    await runAll(steps);
 }

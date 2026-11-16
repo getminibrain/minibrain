@@ -608,8 +608,11 @@ export function ModelsList() {
                 rows={rows}
                 onOpenChange={(open) => !open && setDeleting(null)}
                 onDelete={async (cascade, cancelJobs) => {
-                    await deleteEntries(deleting ?? [], rows, cascade, cancelJobs);
-                    await done();
+                    try {
+                        await deleteEntries(deleting ?? [], rows, cascade, cancelJobs);
+                    } finally {
+                        await done();
+                    }
                 }}
             />
             <DeployRowsDialog

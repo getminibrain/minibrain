@@ -23,6 +23,7 @@ import { jobHref } from "~/lib/modelLinks";
 import { builtOn, isLiveRow, rowId } from "~/lib/teardown";
 import { bytes } from "~/lib/time";
 import type { Entry } from "./entries";
+import { PartialDeleteError } from "./list/actions";
 
 export type DeleteItem = {
     id: string;
@@ -145,6 +146,38 @@ export function DeleteList({ items }: { items: DeleteItem[] }) {
     );
 }
 
+function PartialOutcome({ outcome }: { outcome: PartialDeleteError }) {
+    return (
+        <div className="flex flex-col gap-3">
+            {outcome.deleted.length > 0 && (
+                <div className="flex flex-col gap-2">
+                    <span className="font-medium">{`Deleted ${outcome.deleted.length}`}</span>
+                    <ul className="flex max-h-32 flex-col divide-y overflow-y-auto rounded-lg border">
+                        {outcome.deleted.map((name) => (
+                            <li key={name} className="truncate px-3 py-2">
+                                {name}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            <div className="flex flex-col gap-2">
+                <StatusText tone="destructive" className="font-medium">
+                    {`Could not delete ${outcome.failed.length}`}
+                </StatusText>
+                <ul className="flex max-h-48 flex-col divide-y overflow-y-auto rounded-lg border">
+                    {outcome.failed.map((item) => (
+                        <li key={item.name} className="flex flex-col px-3 py-2">
+                            <span className="truncate font-medium">{item.name}</span>
+                            <span className="text-sm text-muted-foreground">{item.error}</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+}
+
 export function DeleteModelsDialog({
     chosen,
     rows,
@@ -205,6 +238,34 @@ export function DeleteModelsDialog({
         mutationFn: () => onDelete(cascade, cancelling),
         onSuccess: () => onOpenChange(false),
     });
+    const { reset } = start;
+    useEffect(() => {
+        if (chosen) {
+            reset();
+        }
+    }, [chosen, reset]);
+    const outcome = start.error instanceof PartialDeleteError ? start.error : null;
+    if (outcome) {
+        return (
+            <Dialog open={chosen !== null} onOpenChange={onOpenChange}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Some could not be deleted</DialogTitle>
+                        <DialogDescription>
+                            The list shows what is left. Fix the reasons below, then delete them
+                            again.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <PartialOutcome outcome={outcome} />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
     return (
         <Dialog open={chosen !== null} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
