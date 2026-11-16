@@ -273,7 +273,7 @@ function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefi
             {replicas.length > 0 && (
                 <>
                     {" in "}
-                    <PoolPlaces places={replicas} />
+                    <PoolPlaces places={replicas} machines={false} />
                 </>
             )}
         </>
