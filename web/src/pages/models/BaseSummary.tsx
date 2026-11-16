@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { NewTabIcon, useNewTab } from "~/components/NewTab";
 import { PoolLink } from "~/components/PoolLink";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -51,6 +52,7 @@ export function DiskLine({
     onPickAnother: () => void;
 }) {
     const state = option?.added?.availability.state;
+    const newTab = useNewTab();
     if (option && !need) {
         if (state === "missing") {
             return (
@@ -60,7 +62,10 @@ export function DiskLine({
                     </StatusText>
                     {option.baseKey && (
                         <Button asChild variant="outline" size="sm">
-                            <Link href={modelPageHref(option.baseKey)}>Repair it</Link>
+                            <Link href={modelPageHref(option.baseKey)} {...newTab}>
+                                Repair it
+                                <NewTabIcon />
+                            </Link>
                         </Button>
                     )}
                     <Button type="button" variant="ghost" size="sm" onClick={onPickAnother}>
@@ -132,6 +137,7 @@ function RunElsewhere({
     onOpenChange: (open: boolean) => void;
 }) {
     const { entry, variant } = option;
+    const newTab = useNewTab();
     if (!entry || !variant) {
         return null;
     }
@@ -180,8 +186,10 @@ function RunElsewhere({
                         <Link
                             href="/infrastructure/machines"
                             className="w-fit text-primary hover:underline"
+                            {...newTab}
                         >
                             See machines and pools in Infrastructure
+                            <NewTabIcon />
                         </Link>
                     </section>
                 </div>
