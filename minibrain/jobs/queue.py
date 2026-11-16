@@ -419,7 +419,7 @@ class SqlJobQueue:
             running = list(session.scalars(select(Job).where(Job.status == JobStatus.RUNNING)))
             expired = 0
             for job in running:
-                over_time = job.started_at is not None and moment - job.started_at > policy(job.kind).max_runtime
+                over_time = moment - self.current_attempt(job).started_at > policy(job.kind).max_runtime
                 lost = job.lease_expires_at is not None and job.lease_expires_at < moment
                 if not (lost or over_time):
                     continue

@@ -205,6 +205,30 @@ def test_time_limit_fails_without_retry(harness: Harness) -> None:
     assert (detail["status"], detail["error"]) == ("failed", "ran past its time limit")
 
 
+def test_time_limit_counts_from_the_current_attempt(harness: Harness) -> None:
+    clock = lora_job(harness)
+    first = harness.claim(["train"])
+    assert first is not None
+    for _ in range(20):
+        clock.advance(hours=1)
+        harness.internal(f"/jobs/{first['job_id']}/heartbeat", {"token": first["token"]})
+    assert fail(harness, first, "network blip") == 204
+    clock.advance(minutes=20)
+    second = harness.claim(["train"])
+    assert second is not None and second["attempt"] == 2
+    for _ in range(10):
+        clock.advance(hours=1)
+        harness.internal(f"/jobs/{second['job_id']}/heartbeat", {"token": second["token"]})
+    assert harness.queue.expire() == 0
+    assert job(harness, second["job_id"])["status"] == "running"
+    for _ in range(15):
+        clock.advance(hours=1)
+        harness.internal(f"/jobs/{second['job_id']}/heartbeat", {"token": second["token"]})
+    harness.queue.expire()
+    detail = job(harness, second["job_id"])
+    assert (detail["status"], detail["error"]) == ("failed", "ran past its time limit")
+
+
 def test_restart_grace_keeps_running_jobs(harness: Harness) -> None:
     clock = lora_job(harness)
     claim = harness.claim(["train"])
