@@ -74,6 +74,17 @@ import {
 import { ScoredBy } from "./scoredBy";
 import { labelOf, startFrom } from "./train/recipe";
 
+export function isCancelled(version: VersionInfo): boolean {
+    return version.status === "failed" && version.job?.status === "cancelled";
+}
+
+export function failureReason(version: VersionInfo): string {
+    if (isCancelled(version)) {
+        return "Cancelled before it finished.";
+    }
+    return version.job?.error ?? "No reason was recorded.";
+}
+
 export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
     if (version.current && isDeployed(row)) {
         return { tone: "success", label: "Deployed" };
@@ -87,6 +98,9 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
     }
     if (version.status === "queued") {
         return { tone: "neutral", label: "Queued" };
+    }
+    if (isCancelled(version)) {
+        return { tone: "neutral", label: "Cancelled" };
     }
     if (version.status === "failed") {
         return { tone: "destructive", label: "Failed" };
@@ -130,9 +144,11 @@ function RunStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     }
     if (version.status === "failed" && job) {
         return (
-            <Tip tip={job.error ?? "No reason was recorded."}>
+            <Tip tip={failureReason(version)}>
                 <Link href={jobHref(job)} className="hover:underline">
-                    <StatusText tone="destructive">{`Failed · job #${job.id}`}</StatusText>
+                    <StatusText tone={isCancelled(version) ? "neutral" : "destructive"}>
+                        {`${isCancelled(version) ? "Cancelled" : "Failed"} · job #${job.id}`}
+                    </StatusText>
                 </Link>
             </Tip>
         );

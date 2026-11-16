@@ -92,7 +92,7 @@ import {
     points,
     versionLabel,
 } from "./makeLive";
-import { VersionStatus, runJob, trainingText } from "./versions";
+import { VersionStatus, failureReason, isCancelled, runJob, trainingText } from "./versions";
 
 export function useAnswers(slug: string, number: number, against: number | null, enabled: boolean) {
     return useQuery({
@@ -447,6 +447,7 @@ function Progress({
 
 function Failure({ version }: { version: VersionInfo }) {
     const job = version.job;
+    const cancelled = isCancelled(version);
     return (
         <PanelSection
             icon={Gauge}
@@ -459,11 +460,16 @@ function Failure({ version }: { version: VersionInfo }) {
                 )
             }
         >
-            <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
+            <div
+                className={cn(
+                    "flex flex-col gap-1 rounded-md border px-3 py-2.5",
+                    cancelled ? "bg-muted" : "border-destructive/40 bg-destructive-soft",
+                )}
+            >
                 <span className="font-medium">
-                    {version.job?.kind === "train" ? "Training failed" : "Scoring failed"}
+                    {`${job?.kind === "train" ? "Training" : "Scoring"} ${cancelled ? "cancelled" : "failed"}`}
                 </span>
-                <span className="text-sm">{version.job?.error ?? "No reason was recorded."}</span>
+                <span className="text-sm">{failureReason(version)}</span>
             </div>
         </PanelSection>
     );
