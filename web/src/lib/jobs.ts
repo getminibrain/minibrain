@@ -161,6 +161,10 @@ export function useJobEvents(jobId: number): LogEntry[] {
             flush();
             source.close();
         });
+        source.addEventListener("signed_out", () => {
+            flush();
+            source.close();
+        });
         const timer = window.setInterval(flush, FLUSH_MS);
         return () => {
             window.clearInterval(timer);

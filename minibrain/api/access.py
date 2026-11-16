@@ -91,6 +91,12 @@ def resolve(state: Any, facts: RequestFacts) -> Identity:
     return found
 
 
+def still_allowed(state: Any, facts: RequestFacts, level: Role) -> bool:
+    with state.sessions() as session:
+        person = identify(session, facts, state.auth).person
+    return person is not None and person.role is not None and allows(person.role, level)
+
+
 def refusal(found: Identity, facts: RequestFacts, key: bytes) -> tuple[int, str] | None:
     if found.refused is not None:
         return 403, found.refused

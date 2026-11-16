@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,7 +12,7 @@ from sqlalchemy import ColumnElement, false, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from starlette.concurrency import run_in_threadpool
 
-from minibrain.api.access import builder, sees_rows, viewer
+from minibrain.api.access import builder, facts_of, sees_rows, still_allowed, viewer
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
 from minibrain.api.owners import custom_owned, custom_token, split_token
@@ -27,6 +28,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import job_detail, job_info
 from minibrain.auth.identity import current_actor
+from minibrain.auth.roles import Role
 from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
 from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state
@@ -51,6 +53,7 @@ from minibrain.settings import Settings
 router = APIRouter(prefix="/api")
 
 EVENT_POLL_SECONDS = 0.5
+RECHECK_SECONDS = 10.0
 EVENT_BATCH = 500
 JOB_PAGE = 50
 JOB_PAGE_MAX = 200
@@ -252,9 +255,17 @@ def events_after(request: Request, job_id: int, after: int) -> tuple[list[JobEve
 async def stream_events(job_id: int, request: Request, session: SessionDep, after: int = 0) -> StreamingResponse:
     get_job(session, job_id)
 
+    facts = facts_of(request.scope)
+
     async def stream() -> AsyncIterator[str]:
         cursor = after
+        checked = time.monotonic()
         while not await request.is_disconnected():
+            if time.monotonic() - checked >= RECHECK_SECONDS:
+                if not await run_in_threadpool(still_allowed, request.app.state, facts, Role.VIEWER):
+                    yield f"event: signed_out\ndata: {json.dumps({'job': job_id})}\n\n"
+                    return
+                checked = time.monotonic()
             events, finished = await run_in_threadpool(events_after, request, job_id, cursor)
             for event in events:
                 cursor = event.id

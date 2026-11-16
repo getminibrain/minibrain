@@ -4,11 +4,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import Executable, delete, update
 from transformers import TrainerControl, TrainerState, TrainingArguments
 
+from minibrain.api import jobs
 from minibrain.jobs.output import OutputParser, guess_level, structured
 from minibrain.ml import train
 from minibrain.ml.context import emit
+from minibrain.registry.models import LoginSession, User
 from tests.conftest import Harness, fake_adapter
 from tests.test_flow import SLUG, add_version, create_with_dataset
 from tests.test_worker import FAKE, queued_training
@@ -286,3 +289,30 @@ def test_the_event_stream_carries_level_source_and_name(harness: Harness, monkey
     step_event = next(event for event in events if event["name"] == "train.step")
     assert step_event["data"]["loss"] == 1.5
     assert harness.client.get(f"/api/jobs/{job_id}/metrics").json()["training"]["points"][0]["loss"] == 1.5
+
+
+@pytest.mark.parametrize(
+    "ending",
+    [delete(LoginSession), update(User).values(disabled=True)],
+    ids=["signed out", "turned off"],
+)
+def test_the_event_stream_stops_once_its_reader_may_no_longer_see_it(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, ending: Executable
+) -> None:
+    queued_training(harness)
+    job_id = harness.client.get(f"/api/jobs?model={SLUG}&kind=train").json()["items"][0]["id"]
+    reads = jobs.events_after
+
+    def then_end(*args: Any) -> tuple[Any, bool]:
+        found = reads(*args)
+        with harness.sessions() as session:
+            session.execute(ending)
+            session.commit()
+        return found
+
+    monkeypatch.setattr(jobs, "events_after", then_end)
+    monkeypatch.setattr(jobs, "RECHECK_SECONDS", 0.0)
+    monkeypatch.setattr(jobs, "EVENT_POLL_SECONDS", 0.01)
+    stream = harness.client.get(f"/api/jobs/{job_id}/events").text
+    assert '"message":"queued"' in stream
+    assert stream.rstrip().splitlines()[-2:] == ["event: signed_out", f'data: {{"job": {job_id}}}']
