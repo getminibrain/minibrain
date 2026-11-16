@@ -176,3 +176,13 @@ def test_an_empty_text_policy_is_blank_not_none(harness: Harness) -> None:
     assert set_policy(harness, "vault_namespace", None) == 200
     found = policies(harness)
     assert (found["siem_host"]["value"], found["vault_namespace"]["value"]) == ("", "")
+
+
+def test_policy_descriptions_fit_one_short_line_and_detail_goes_in_its_own_field(harness: Harness) -> None:
+    found = policies(harness)
+    assert all(len(item["description"]) <= 64 for item in found.values()), [
+        name for name, item in found.items() if len(item["description"]) > 64
+    ]
+    assert found["network"]["description"] == "Offline blocks every outbound call."
+    assert "Allowlist only reaches the hosts listed below" in found["network"]["detail"]
+    assert found["siem_port"]["detail"] == "6514 for TLS, 514 for TCP and UDP."

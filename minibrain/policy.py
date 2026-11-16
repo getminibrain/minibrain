@@ -41,23 +41,26 @@ class Field:
     editable: bool = True
     maximum: int | None = None
     minimum: int = 0
+    detail: str = ""
 
 
 FIELDS: tuple[Field, ...] = (
     Field(
         "network",
         "Network",
-        "Offline blocks every outbound call. Allowlist only reaches the hosts listed below.",
+        "Offline blocks every outbound call.",
         "choice",
         "open",
         ("open", "allowlist", "offline"),
+        detail="Allowlist only reaches the hosts listed below; Open reaches any.",
     ),
     Field(
         "allowed_hosts",
         "Allowed hosts",
-        "Hosts minibrain may reach when Network is Allowlist, such as your Hugging Face mirror or bucket.",
+        "Reached when Network is Allowlist.",
         "list",
         [],
+        detail="Such as your Hugging Face mirror or bucket.",
     ),
     Field(
         "model_sources",
@@ -70,7 +73,7 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "licence_mode",
         "Allowed licences",
-        "Downloads are refused for models under licences that are not allowed here.",
+        "Downloads under other licences are refused.",
         "choice",
         "selected",
         ("selected", "all"),
@@ -78,77 +81,84 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "licences",
         "Selected licences",
-        "Licences we have reviewed for commercial use. Non-commercial licences are not offered.",
+        "Licences reviewed for commercial use.",
         "list",
         sorted(LICENCES),
         tuple(sorted(LICENCES)),
+        detail="Non-commercial licences are not offered.",
     ),
     Field(
         "safetensors_only",
         "Safetensors weights only",
-        "Pickle weights can run code when loaded, so minibrain never loads them.",
+        "minibrain never loads pickle weights.",
         "bool",
         True,
         editable=False,
+        detail="Pickle weights can run code when loaded.",
     ),
     Field(
         "request_bodies",
         "Request inputs and answers",
-        "The default for new models: keep each request's input (the last user message) and the model's answer with "
-        "its request log, for feedback by response ID, distillation and the Requests tab. Builders change it per model "
-        "on its deployment page. Deleted with the request logs.",
+        "The default for new models: keep each input and answer.",
         "bool",
         False,
+        detail=(
+            "The input is the request's last user message. Both are kept with the request log, for feedback by "
+            "response ID, distillation and the Requests tab, and deleted with it. Builders change it per model on "
+            "its deployment page."
+        ),
     ),
     Field(
         "request_bodies_locked",
         "Lock for every model",
-        "Every model, existing and new, follows Request inputs and answers above, and Builders cannot change it per "
-        "model.",
+        "Every model follows the setting above.",
         "bool",
         False,
+        detail="Existing and new models alike; Builders cannot change it per model.",
     ),
     Field(
         "data_folders",
         "Folder sources",
-        "Folders on this server that folder sources and Delta Lake tables may read, with everything under them. Leave "
-        "empty to allow none.",
+        "Leave empty to allow none.",
         "list",
         [],
+        detail="Folder sources and Delta Lake tables may read these folders and everything under them.",
     ),
     Field(
         "log_retention_days",
         "Log retention (days)",
-        "Request logs, and Playground chats with no new message for this long, are deleted.",
+        "Request logs and idle Playground chats are deleted after this.",
         "int",
         30,
+        detail="A Playground chat is idle when it has had no new message for this long.",
     ),
     Field(
         "key_expiry_days",
         "API key expiry (days)",
-        "New API keys expire after this many days; existing keys keep theirs. 0 means never.",
+        "New API keys expire after this. 0 means never.",
         "int",
         0,
+        detail="Existing keys keep their expiry.",
     ),
     Field(
         "audit_retention_days",
         "Audit log retention (days)",
-        "Audit events older than this are deleted for good. 0 keeps every event.",
+        "Older audit events are deleted for good. 0 keeps all.",
         "int",
         0,
     ),
     Field(
         "session_idle_minutes",
         "Sign-in idle timeout (minutes)",
-        "People are signed out after this long without using minibrain. 0 keeps them signed in until the session "
-        "lifetime ends.",
+        "Sign people out after this long without use.",
         "int",
         8 * 60,
+        detail="0 keeps them signed in until the session lifetime ends.",
     ),
     Field(
         "session_hours",
         "Session lifetime (hours)",
-        "People sign in again after this long, however active they are.",
+        "People sign in again after this, however active.",
         "int",
         7 * 24,
         maximum=24 * 90,
@@ -157,107 +167,129 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "default_role",
         "Role for new people",
-        "The role of people who sign in through single sign-on or a proxy without a group mapped in "
-        "minibrain.yaml. With No role they see Ask an admin for access until an admin gives them one.",
+        "For single sign-on or proxy sign-ins with no mapped group.",
         "choice",
         "none",
         ("none", "viewer", "builder", "admin"),
+        detail=(
+            "Groups are mapped in minibrain.yaml. With No role, people see Ask an admin for access until an admin "
+            "gives them one."
+        ),
     ),
     Field(
         "siem_protocol",
         "SIEM export",
-        "Send every audit event, in order, to your SIEM as RFC 5424 syslog. TLS checks the SIEM's certificate; "
-        "UDP can lose events without notice. Off sends nothing.",
+        "Send every audit event to your SIEM as syslog.",
         "choice",
         "off",
         ("off", "tls", "tcp", "udp"),
+        detail=(
+            "RFC 5424 syslog, in order. TLS checks the SIEM's certificate; UDP can lose events without notice. "
+            "Off sends nothing."
+        ),
     ),
     Field(
         "siem_host",
         "SIEM host",
-        "Name or address of the syslog receiver. Audit events go there and nowhere else.",
+        "Name or address of the syslog receiver.",
         "host",
         "",
+        detail="Audit events go there and nowhere else.",
     ),
     Field(
         "siem_port",
         "SIEM port",
-        "0 uses the standard port: 6514 for TLS, 514 for TCP and UDP.",
+        "0 uses the standard port for the protocol.",
         "int",
         0,
         maximum=65535,
+        detail="6514 for TLS, 514 for TCP and UDP.",
     ),
     Field(
         "siem_ca_bundle",
         "SIEM CA bundle",
-        "PEM file on this server with the CA certificates that sign the SIEM's TLS certificate. Empty trusts the "
-        "system's CAs.",
+        "PEM file of the CAs that sign the SIEM's certificate.",
         "text",
         "",
+        detail="A file on this server. Empty trusts the system's CAs.",
     ),
     Field(
         "otel_protocol",
         "OpenTelemetry export",
-        "Send traces and metrics of /v1 requests, jobs and workers to your own OpenTelemetry collector over OTLP. They "
-        "go there and nowhere else, whatever the network policy, and never carry prompts or answers. Off sends "
-        "nothing.",
+        "Send traces and metrics to your OpenTelemetry collector.",
         "choice",
         "off",
         ("off", OTLP_HTTP),
+        detail=(
+            "Covers /v1 requests, jobs and workers, over OTLP. They go there and nowhere else, whatever the "
+            "network policy, and never carry prompts or answers. Off sends nothing."
+        ),
     ),
     Field(
         "otel_endpoint",
         "Collector endpoint",
-        "Base URL of the collector's OTLP/HTTP receiver, such as https://otel-collector.internal:4318. Traces go to "
-        "/v1/traces under it and metrics to /v1/metrics.",
+        "Base URL of the collector's OTLP/HTTP receiver.",
         "url",
         "",
+        detail=(
+            "Such as https://otel-collector.internal:4318. Traces go to /v1/traces under it and metrics to /v1/metrics."
+        ),
     ),
     Field(
         "otel_headers",
         "Collector headers",
-        "Headers sent with every export, as name=value pairs separated by commas, such as "
-        "Authorization=Bearer <token>. The values are stored encrypted and never shown again; only the names are.",
+        "Sent with every export, as name=value pairs.",
         "headers",
         "",
+        detail=(
+            "Separate pairs with commas, such as Authorization=Bearer <token>. The values are stored encrypted "
+            "and never shown again; only the names are."
+        ),
     ),
     Field(
         "otel_service_name",
         "Service name",
-        "The service.name on every span and metric, so the collector can tell installs apart.",
+        "The service.name on every span and metric.",
         "text",
         "minibrain",
+        detail="So the collector can tell installs apart.",
     ),
     Field(
         "otel_ca_bundle",
         "Collector CA bundle",
-        "PEM file on this server with the CA certificates that sign the collector's TLS certificate. Empty trusts the "
-        "system's CAs.",
+        "PEM file of the CAs that sign the collector's certificate.",
         "text",
         "",
+        detail="A file on this server. Empty trusts the system's CAs.",
     ),
     Field(
         "encryption",
         "Master key",
-        "Where the master key lives that wraps each stored file's own data key. Files written before a change stay "
-        "readable; Rotate master key re-wraps them under the new one. Off writes new files unencrypted.",
+        "Where the master key that wraps each file's data key lives.",
         "choice",
         "local",
         ("local", "vault", "hsm", "kms", "off"),
+        detail=(
+            "Files written before a change stay readable; Rotate master key re-wraps them under the new one. Off "
+            "writes new files unencrypted."
+        ),
     ),
     Field(
         "vault_address",
         "Vault address",
-        "Vault's URL, such as https://vault.internal:8200, for HashiCorp Vault Transit. minibrain calls it whatever "
-        "the network policy says, as it does artifact storage.",
+        "Vault's URL, for HashiCorp Vault Transit.",
         "text",
         "",
+        detail=(
+            "Such as https://vault.internal:8200. minibrain calls it whatever the network policy says, as it does "
+            "artifact storage."
+        ),
     ),
     Field("vault_mount", "Transit mount", "Path the Transit secrets engine is mounted at.", "text", "transit"),
     Field(
         "vault_key",
         "Transit key",
-        "Name of the aes256-gcm96 Transit key that wraps the data keys.",
+        "The aes256-gcm96 Transit key that wraps the data keys.",
         "text",
         "minibrain",
     ),
@@ -265,60 +297,72 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "vault_auth",
         "Vault sign-in",
-        "Token reads MINIBRAIN_VAULT_TOKEN, or the file MINIBRAIN_VAULT_TOKEN_FILE names. AppRole signs in with the "
-        "role ID below and the secret ID from MINIBRAIN_VAULT_SECRET_ID or MINIBRAIN_VAULT_SECRET_ID_FILE.",
+        "How minibrain signs in to Vault.",
         "choice",
         "token",
         ("token", "approle"),
+        detail=(
+            "Token reads MINIBRAIN_VAULT_TOKEN, or the file MINIBRAIN_VAULT_TOKEN_FILE names. AppRole signs in "
+            "with the role ID below and the secret ID from MINIBRAIN_VAULT_SECRET_ID or "
+            "MINIBRAIN_VAULT_SECRET_ID_FILE."
+        ),
     ),
     Field("vault_role_id", "AppRole role ID", "Not a secret: the secret ID stays in the environment.", "text", ""),
     Field("vault_auth_mount", "AppRole mount", "Path the AppRole auth method is mounted at.", "text", "approle"),
     Field(
         "vault_ca_bundle",
         "Vault CA bundle",
-        "PEM file on this server with the CA certificates that sign Vault's TLS certificate. Empty trusts the "
-        "system's CAs.",
+        "PEM file of the CAs that sign Vault's certificate.",
         "text",
         "",
+        detail="A file on this server. Empty trusts the system's CAs.",
     ),
     Field(
         "hsm_library",
         "PKCS#11 library",
-        "Path of the HSM vendor's PKCS#11 module on this server, such as /usr/lib/softhsm/libsofthsm2.so. The user "
-        "PIN comes from MINIBRAIN_HSM_PIN or the file MINIBRAIN_HSM_PIN_FILE names.",
+        "Path of the HSM vendor's PKCS#11 module on this server.",
         "text",
         "",
+        detail=(
+            "Such as /usr/lib/softhsm/libsofthsm2.so. The user PIN comes from MINIBRAIN_HSM_PIN or the file "
+            "MINIBRAIN_HSM_PIN_FILE names."
+        ),
     ),
     Field("hsm_token", "HSM token", "Label of the token (partition) that holds the key.", "text", ""),
     Field(
         "hsm_key",
         "HSM key label",
-        "Label of the AES-256 keys that wrap the data keys; each version has its number as CKA_ID.",
+        "Label of the AES-256 keys that wrap the data keys.",
         "text",
         "minibrain-master",
+        detail="Each key version has its number as CKA_ID.",
     ),
     Field(
         "kms_key",
         "AWS KMS key",
-        "ARN of the symmetric KMS key (or an alias ARN) that wraps the data keys. Credentials come from the server's "
-        "AWS environment: variables, profile, web identity or instance role.",
+        "ARN of the symmetric KMS key, or an alias, that wraps data keys.",
         "text",
         "",
+        detail=(
+            "Credentials come from the server's AWS environment: variables, profile, web identity or instance role."
+        ),
     ),
     Field("kms_region", "AWS region", "Region of the key. Empty takes it from the key ARN.", "text", ""),
     Field(
         "kms_endpoint",
         "AWS KMS endpoint",
-        "https:// URL of a VPC endpoint for KMS. Empty uses AWS's endpoint for the region.",
+        "https:// URL of a VPC endpoint for KMS.",
         "text",
         "",
+        detail="Empty uses AWS's endpoint for the region.",
     ),
     Field(
         "kms_fips",
         "FIPS endpoints",
-        "Call KMS through its FIPS 140 validated endpoint (kms-fips.<region>.amazonaws.com).",
+        "Call KMS through its FIPS 140 validated endpoint.",
         "bool",
         False,
+        detail="kms-fips.<region>.amazonaws.com",
     ),
 )
 
@@ -654,6 +698,7 @@ def describe(session: Session) -> list[dict[str, Any]]:
             "name": field.name,
             "label": field.label,
             "description": field.description,
+            "detail": field.detail,
             "kind": field.kind,
             "choices": [choice_of(field, choice) for choice in field.choices],
             "maximum": field.maximum,

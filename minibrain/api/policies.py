@@ -24,6 +24,7 @@ class PolicyInfo(BaseModel):
     name: str
     label: str
     description: str
+    detail: str = ""
     kind: str
     choices: list[PolicyChoice]
     maximum: int | None = None

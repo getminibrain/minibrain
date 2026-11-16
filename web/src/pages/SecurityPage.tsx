@@ -30,6 +30,7 @@ import { type FormEvent, Fragment, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
+import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
@@ -206,7 +207,7 @@ function TextRow({ policy }: { policy: PolicyInfo }) {
                 id={id}
                 anchor={policyAnchor(policy.name)}
                 wide
-                label={policy.label}
+                label={<PolicyLabel policy={policy} />}
                 description={policy.description}
                 error={errorMessage(change.error)}
                 control={
@@ -244,7 +245,7 @@ function HeadersRow({ policy }: { policy: PolicyInfo }) {
             <SettingsRow
                 id={id}
                 anchor={policyAnchor(policy.name)}
-                label={policy.label}
+                label={<PolicyLabel policy={policy} />}
                 description={
                     <>
                         {policy.description}
@@ -277,7 +278,7 @@ function HeadersRow({ policy }: { policy: PolicyInfo }) {
                 id={id}
                 anchor={policyAnchor(policy.name)}
                 wide
-                label={policy.label}
+                label={<PolicyLabel policy={policy} />}
                 description={policy.description}
                 error={errorMessage(change.error)}
                 control={
@@ -314,7 +315,7 @@ function NumberRow({ policy }: { policy: PolicyInfo }) {
         <NumberSettingRow
             id={policyId(policy)}
             anchor={policyAnchor(policy.name)}
-            label={policy.label}
+            label={<PolicyLabel policy={policy} />}
             description={policy.description}
             value={typeof policy.value === "number" ? policy.value : undefined}
             min={0}
@@ -335,7 +336,7 @@ function SwitchRow({ policy }: { policy: PolicyInfo }) {
             id={id}
             anchor={policyAnchor(policy.name)}
             toggle
-            label={policy.label}
+            label={<PolicyLabel policy={policy} />}
             description={policy.description}
             error={errorMessage(change.error)}
             control={
@@ -357,7 +358,7 @@ function ChoiceRow({ policy }: { policy: PolicyInfo }) {
         <SettingsRow
             id={id}
             anchor={policyAnchor(policy.name)}
-            label={policy.label}
+            label={<PolicyLabel policy={policy} />}
             description={policy.description}
             error={errorMessage(change.error)}
             control={
@@ -393,7 +394,7 @@ function ChoiceListRow({ policy }: { policy: PolicyInfo }) {
     return (
         <SettingsRow
             anchor={policyAnchor(policy.name)}
-            label={policy.label}
+            label={<PolicyLabel policy={policy} />}
             description={policy.description}
             error={errorMessage(change.error)}
             control={null}
@@ -418,7 +419,7 @@ function LockedRow({ policy }: { policy: PolicyInfo }) {
     return (
         <SettingsRow
             anchor={policyAnchor(policy.name)}
-            label={policy.label}
+            label={<PolicyLabel policy={policy} />}
             description={policy.description}
             disabled
             control={

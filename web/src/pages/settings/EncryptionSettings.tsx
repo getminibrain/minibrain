@@ -17,6 +17,7 @@ import {
 import { type FormEvent, useEffect, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
+import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine } from "~/components/Section";
 import { SettingsSection } from "~/components/SettingsSection";
 import { StatusText } from "~/components/models/StatusText";
@@ -107,7 +108,7 @@ function FieldRow({
         return (
             <SettingsRow
                 anchor={anchor}
-                label={field.label}
+                label={<PolicyLabel policy={field} />}
                 description={field.description}
                 disabled
                 control={
@@ -127,7 +128,7 @@ function FieldRow({
                 id={id}
                 anchor={anchor}
                 toggle
-                label={field.label}
+                label={<PolicyLabel policy={field} />}
                 description={field.description}
                 control={
                     <Switch
@@ -144,7 +145,7 @@ function FieldRow({
             <SettingsRow
                 id={id}
                 anchor={anchor}
-                label={field.label}
+                label={<PolicyLabel policy={field} />}
                 description={field.description}
                 control={
                     <Select value={String(value)} onValueChange={(next) => onChange(String(next))}>
@@ -172,7 +173,7 @@ function FieldRow({
             id={id}
             anchor={anchor}
             wide
-            label={field.label}
+            label={<PolicyLabel policy={field} />}
             description={field.description}
             control={
                 <Input
