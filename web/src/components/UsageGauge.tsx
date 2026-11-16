@@ -191,7 +191,18 @@ export function UsageGauge({
     const shown = segments.filter((segment) => segment.bytes > 0);
     return (
         <div className={cn("flex min-w-0 flex-col gap-2", className)}>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
+                {size === "md" && free && (
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "self-end text-sm font-medium tabular-nums",
+                            STATE_TEXT[state],
+                        )}
+                    >
+                        {`${capacity > 0 ? Math.round((total / capacity) * 100) : 0}% used`}
+                    </span>
+                )}
                 <div
                     role="meter"
                     aria-label={basis ? `${label}, ${BASIS_LABELS[basis].toLowerCase()}` : label}
@@ -200,7 +211,7 @@ export function UsageGauge({
                     aria-valuenow={Math.min(total, capacity)}
                     aria-valuetext={gaugeSummary(segments, capacity)}
                     className={cn(
-                        "relative min-w-0 flex-1 rounded-sm bg-secondary",
+                        "relative w-full rounded-sm bg-secondary",
                         size === "md" ? "h-5" : "h-2",
                     )}
                 >
@@ -235,17 +246,6 @@ export function UsageGauge({
                         />
                     )}
                 </div>
-                {size === "md" && free && (
-                    <span
-                        aria-hidden
-                        className={cn(
-                            "w-12 shrink-0 text-right font-medium tabular-nums",
-                            STATE_TEXT[state],
-                        )}
-                    >
-                        {`${capacity > 0 ? Math.round((total / capacity) * 100) : 0}%`}
-                    </span>
-                )}
             </div>
             {legend && (
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
