@@ -10,7 +10,11 @@ const MESSAGES: Record<CopyState, string | null> = {
     failed: "This browser blocks copying here",
 };
 
-export function CopyButton({ value, label }: { value: string; label: string }) {
+export function CopyButton({
+    value,
+    label,
+    labelled = false,
+}: { value: string; label: string; labelled?: boolean }) {
     const [state, setState] = useState<CopyState>("idle");
     const copy = () => {
         if (!navigator.clipboard) {
@@ -27,14 +31,19 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
             <TooltipTrigger asChild>
                 <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={label}
+                    variant={labelled ? "outline" : "ghost"}
+                    size={labelled ? "default" : "icon"}
+                    aria-label={labelled ? undefined : label}
                     onClick={copy}
                     onPointerLeave={() => setState("idle")}
                     onBlur={() => setState("idle")}
                 >
-                    {state === "copied" ? <Check /> : <Copy />}
+                    {state === "copied" ? (
+                        <Check aria-hidden="true" />
+                    ) : (
+                        <Copy aria-hidden="true" />
+                    )}
+                    {labelled && label}
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{MESSAGES[state] ?? label}</TooltipContent>

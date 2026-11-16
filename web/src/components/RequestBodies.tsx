@@ -14,7 +14,8 @@ import {
 import { useEffect } from "react";
 import { type ModelDetail, api, unwrap } from "~/api/client";
 import { keys } from "~/api/queries";
-import { PanelSection, errorMessage } from "~/components/Section";
+import { errorMessage } from "~/components/Section";
+import { SettingsSection } from "~/components/SettingsSection";
 import { useCan } from "~/lib/access";
 import { REQUEST_BODIES_ID } from "~/lib/modelLinks";
 import { REQUESTS_PATH } from "~/lib/requests";
@@ -84,17 +85,19 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
     const reason = bodies.locked ? LOCKS[bodies.source] : can.build ? undefined : BUILDERS;
     const requests = `${REQUESTS_PATH}?model=${encodeURIComponent(detail.slug)}`;
     return (
-        <PanelSection
+        <SettingsSection
             icon={Logs}
             anchor="request-content"
             title="Request content"
-            tip={
+            description={
                 <>
-                    {"Every call is logged without its content; see them in "}
+                    {
+                        "Keeps each request's last user message and the model's answer with its log, so you can read real conversations, apps can send feedback by response ID and training can learn from real traffic. Calls are always logged without content in "
+                    }
                     <Link href={requests} className="text-primary hover:underline">
                         Monitoring, Requests
                     </Link>
-                    {". This decides whether the content is kept too."}
+                    {"."}
                 </>
             }
         >
@@ -104,7 +107,7 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
                     toggle={reason === undefined}
                     disabled={reason !== undefined}
                     label="Keep request inputs and answers"
-                    description="Stores each request's last user message and the model's answer with its log, so you can read real conversations, apps can send feedback with the response ID alone, and training can learn from real traffic. Deleted with the request logs."
+                    description="Deleted with the request logs."
                     error={errorMessage(change.error)}
                     control={
                         <>
@@ -120,6 +123,6 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
                     }
                 />
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }

@@ -49,8 +49,9 @@ import {
     useSession,
 } from "~/api/authQueries";
 import { api, unwrap } from "~/api/client";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
 import { relativeTime } from "~/lib/time";
 import { ACCOUNTS } from "~/pages/settings/settingsIndex";
@@ -474,7 +475,7 @@ function People() {
         onSuccess: refresh,
     });
     return (
-        <PanelSection
+        <SettingsSection
             icon={Users}
             anchor={PEOPLE.anchor}
             title={PEOPLE.title}
@@ -485,31 +486,33 @@ function People() {
                     {PEOPLE.settings.invite.label}
                 </Button>
             }
-            bare
+            flush
         >
-            <div className="flex flex-col gap-3">
-                {link && <LinkNotice link={link} onDismiss={() => setLink(null)} />}
-                <ErrorLine error={list.error ?? newLink.error ?? toggle.error} />
-                <DataGrid
-                    columns={columns()}
-                    rows={list.data?.people ?? []}
-                    getRowId={(row) => String(row.id)}
-                    loading={list.isPending}
-                    empty="No accounts yet."
-                    rowActions={(row) => (
-                        <PersonMenu
-                            person={row}
-                            me={row.id === me?.id}
-                            onEdit={() => setEditing(row)}
-                            onLink={() => newLink.mutate(row)}
-                            onToggle={() => toggle.mutate(row)}
-                        />
-                    )}
-                />
-            </div>
+            {(link || list.error || newLink.error || toggle.error) && (
+                <div className="flex flex-col gap-3 border-b p-4">
+                    {link && <LinkNotice link={link} onDismiss={() => setLink(null)} />}
+                    <ErrorLine error={list.error ?? newLink.error ?? toggle.error} />
+                </div>
+            )}
+            <DataGrid
+                columns={columns()}
+                rows={list.data?.people ?? []}
+                getRowId={(row) => String(row.id)}
+                loading={list.isPending}
+                empty="No accounts yet."
+                rowActions={(row) => (
+                    <PersonMenu
+                        person={row}
+                        me={row.id === me?.id}
+                        onEdit={() => setEditing(row)}
+                        onLink={() => newLink.mutate(row)}
+                        onToggle={() => toggle.mutate(row)}
+                    />
+                )}
+            />
             <AddPersonDialog open={adding} onOpenChange={setAdding} onLink={setLink} />
             <EditPersonDialog person={editing} onOpenChange={(open) => !open && setEditing(null)} />
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -521,7 +524,7 @@ function SignInSources() {
     const defaultRole =
         info && info.default_role !== "none" ? ROLE_LABELS[info.default_role] : "No role";
     return (
-        <PanelSection
+        <SettingsSection
             icon={KeyRound}
             anchor={ACCOUNTS.signIn.anchor}
             title={ACCOUNTS.signIn.title}
@@ -598,7 +601,7 @@ function SignInSources() {
                     to roles.
                 </p>
             )}
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -608,10 +611,10 @@ export function AccountsSettingsPage() {
             title="Accounts"
             caption="People who can sign in, their roles and the sources they sign in with."
         >
-            <PanelSections>
+            <SettingsSections>
                 <People />
                 <SignInSources />
-            </PanelSections>
+            </SettingsSections>
         </SettingsLayout>
     );
 }

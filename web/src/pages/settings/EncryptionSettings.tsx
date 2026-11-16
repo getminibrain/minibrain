@@ -17,7 +17,8 @@ import {
 import { type FormEvent, useEffect, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { ErrorLine, PanelSection } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
+import { SettingsSection } from "~/components/SettingsSection";
 import { StatusText } from "~/components/models/StatusText";
 import { exactTime, relativeTime } from "~/lib/time";
 import { SECURITY, policyAnchor } from "~/pages/settings/settingsIndex";
@@ -431,7 +432,7 @@ function Keys({ status }: { status: EncryptionStatus }) {
 export function EncryptionSettings() {
     const status = useEncryption();
     return (
-        <PanelSection
+        <SettingsSection
             icon={Lock}
             anchor={SECURITY.encryption.anchor}
             title={SECURITY.encryption.title}
@@ -446,6 +447,6 @@ export function EncryptionSettings() {
                     <Keys status={status.data} />
                 </div>
             )}
-        </PanelSection>
+        </SettingsSection>
     );
 }

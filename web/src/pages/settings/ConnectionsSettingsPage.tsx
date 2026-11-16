@@ -32,8 +32,9 @@ import {
     useConnections,
     useExtensions,
 } from "~/api/connectionQueries";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { StatusText } from "~/components/models/StatusText";
 import { CONNECTIONS } from "~/pages/settings/settingsIndex";
 
@@ -532,7 +533,7 @@ function Extensions() {
     const data = extensions.data;
     const missing = data?.extensions.filter((item) => !item.installed) ?? [];
     return (
-        <PanelSection
+        <SettingsSection
             icon={Puzzle}
             anchor={CONNECTIONS.extensions.anchor}
             title={CONNECTIONS.extensions.title}
@@ -585,7 +586,7 @@ function Extensions() {
                     )}
                 </div>
             )}
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -610,8 +611,8 @@ export function ConnectionsSettingsPage() {
             }
         >
             <ErrorLine error={connections.error} onRetry={connections.refetch} />
-            <PanelSections>
-                <PanelSection
+            <SettingsSections>
+                <SettingsSection
                     icon={Cable}
                     anchor={CONNECTIONS.connections.anchor}
                     title={CONNECTIONS.connections.title}
@@ -623,10 +624,10 @@ export function ConnectionsSettingsPage() {
                             </Button>
                         )
                     }
-                    bare
+                    flush
                 >
                     {formOpen && (
-                        <div className="rounded-xl border bg-card p-4">
+                        <div className="p-panel not-last:border-b">
                             <h3 className="mb-4 text-base font-semibold">
                                 {editing === "new" ? "New connection" : `Edit ${editing.name}`}
                             </h3>
@@ -641,7 +642,7 @@ export function ConnectionsSettingsPage() {
                         <EmptyState
                             variant="panel"
                             title="No connections yet"
-                            className="mx-0 mt-0"
+                            className="mx-0 mt-0 max-w-none rounded-none border-0"
                         >
                             Add an S3-compatible bucket, a PostgreSQL or a MySQL database to read
                             data in place or import models from a bucket. Locked-down installs can
@@ -649,7 +650,7 @@ export function ConnectionsSettingsPage() {
                         </EmptyState>
                     ) : (
                         list.length > 0 && (
-                            <ul className="flex flex-col divide-y rounded-xl border bg-card">
+                            <ul className="flex flex-col divide-y">
                                 {list.map((connection) => (
                                     <ConnectionRow
                                         key={connection.id}
@@ -660,9 +661,9 @@ export function ConnectionsSettingsPage() {
                             </ul>
                         )
                     )}
-                </PanelSection>
+                </SettingsSection>
                 <Extensions />
-            </PanelSections>
+            </SettingsSections>
         </SettingsLayout>
     );
 }

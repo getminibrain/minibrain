@@ -13,8 +13,9 @@ import {
 import { type FormEvent, useEffect, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SourceBadge } from "~/components/SourceBadge";
 import { StatusText } from "~/components/models/StatusText";
 import { STORAGE, type Setting } from "~/pages/settings/settingsIndex";
@@ -259,8 +260,8 @@ export function StorageSettingsPage() {
             caption="Where minibrain keeps uploads, dataset versions, adapters, logs and base model files."
         >
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
-            <PanelSections>
-                <PanelSection
+            <SettingsSections>
+                <SettingsSection
                     icon={HardDrive}
                     anchor={STORAGE.location.anchor}
                     title={STORAGE.location.title}
@@ -287,16 +288,16 @@ export function StorageSettingsPage() {
                             </p>
                         </div>
                     )}
-                </PanelSection>
-                <PanelSection
+                </SettingsSection>
+                <SettingsSection
                     icon={Boxes}
                     anchor={STORAGE.models.anchor}
                     title={STORAGE.models.title}
                     description="Downloads, imports and repairs write base model files to the place chosen above."
                 >
                     {settings.data && <ModelFiles settings={settings.data} />}
-                </PanelSection>
-            </PanelSections>
+                </SettingsSection>
+            </SettingsSections>
         </SettingsLayout>
     );
 }

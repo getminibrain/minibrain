@@ -18,8 +18,8 @@ import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
 import { QueryError } from "~/components/ErrorState";
 import { PoolLink } from "~/components/PoolLink";
-import { PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SoftwareMark } from "~/components/SoftwareMark";
 import { count } from "~/lib/format";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
@@ -145,11 +145,12 @@ function versionsText(info: InstallInfo): string {
 function Software({ info }: { info: InstallInfo }) {
     const software = info.software;
     return (
-        <PanelSection
+        <SettingsSection
             icon={Package}
             anchor={INSTALL.software.anchor}
             title={INSTALL.software.title}
-            actions={<CopyButton value={versionsText(info)} label="Copy versions" />}
+            description="Versions of minibrain and the libraries it runs on."
+            actions={<CopyButton value={versionsText(info)} label="Copy versions" labelled />}
         >
             <SettingsGroup>
                 <SoftwareRow text={SOFTWARE.minibrain} mark="minibrain">
@@ -194,7 +195,7 @@ function Software({ info }: { info: InstallInfo }) {
                     <Text>{software.arch}</Text>
                 </SoftwareRow>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -214,10 +215,11 @@ function Locations({ info }: { info: InstallInfo }) {
     const sqlite = places.database_kind === "sqlite";
     const s3 = places.storage_kind === "s3";
     return (
-        <PanelSection
+        <SettingsSection
             icon={FolderTree}
             anchor={INSTALL.locations.anchor}
             title={INSTALL.locations.title}
+            description="Where this install keeps its settings, database and files."
         >
             <SettingsGroup>
                 <Row text={LOCATIONS.server}>
@@ -259,7 +261,7 @@ function Locations({ info }: { info: InstallInfo }) {
                     <Path value={places.web_path} label="Web UI folder" />
                 </Row>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -271,10 +273,11 @@ function Catalogue({ info }: { info: InstallInfo }) {
     const catalogue = info.catalogue;
     const current = catalogue.snapshot ?? catalogue.bundled_snapshot;
     return (
-        <PanelSection
+        <SettingsSection
             icon={BookMarked}
             anchor={INSTALL.catalogue.anchor}
             title={INSTALL.catalogue.title}
+            description="The model information Discover shows, and when it was last checked."
         >
             <SettingsGroup>
                 <Row
@@ -311,7 +314,7 @@ function Catalogue({ info }: { info: InstallInfo }) {
                     )}
                 </Row>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -331,10 +334,11 @@ function TimeText({ value }: { value: string }) {
 function Compute({ info }: { info: InstallInfo }) {
     const compute = info.compute;
     return (
-        <PanelSection
+        <SettingsSection
             icon={Server}
             anchor={INSTALL.compute.anchor}
             title={INSTALL.compute.title}
+            description="Pools, machines, workers and model servers this install sees."
             actions={
                 <Button variant="outline" asChild>
                     <Link href="/infrastructure">Open Infrastructure</Link>
@@ -361,7 +365,7 @@ function Compute({ info }: { info: InstallInfo }) {
                     <Text>{count(compute.engines_online)}</Text>
                 </Row>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -370,7 +374,7 @@ function NetworkSection({ info }: { info: InstallInfo }) {
     const [mode, explanation] = NETWORK_MODES[network.mode];
     const lock = LOCK_SOURCES[network.source];
     return (
-        <PanelSection
+        <SettingsSection
             icon={Globe}
             anchor={INSTALL.network.anchor}
             title={INSTALL.network.title}
@@ -430,7 +434,7 @@ function NetworkSection({ info }: { info: InstallInfo }) {
                     <Text>None</Text>
                 </Row>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -447,7 +451,7 @@ function scrapeAccess(observability: InstallInfo["observability"]): string {
 function Observability({ info }: { info: InstallInfo }) {
     const observability = info.observability;
     return (
-        <PanelSection
+        <SettingsSection
             icon={Radar}
             anchor={INSTALL.observability.anchor}
             title={INSTALL.observability.title}
@@ -482,7 +486,7 @@ function Observability({ info }: { info: InstallInfo }) {
                     <Text>{observability.log_format === "json" ? "JSON" : "Text"}</Text>
                 </Row>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -512,14 +516,14 @@ export function InstallSettingsPage() {
         >
             {!info && <QueryError heading="h2" error={install.error} retry={install.refetch} />}
             {info && (
-                <PanelSections>
+                <SettingsSections>
                     <Software info={info} />
                     <Locations info={info} />
                     <Catalogue info={info} />
                     <Compute info={info} />
                     <NetworkSection info={info} />
                     <Observability info={info} />
-                </PanelSections>
+                </SettingsSections>
             )}
         </SettingsLayout>
     );

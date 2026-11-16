@@ -16,8 +16,9 @@ import { api, unwrap } from "~/api/client";
 import { keys, useAllModels, useCatalog, useInstallSettings, useJudgeSetting } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
-import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
+import { ErrorLine, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SourceBadge } from "~/components/SourceBadge";
 import { ThemeChoice } from "~/components/ThemeChoice";
 import { useCan } from "~/lib/access";
@@ -36,13 +37,14 @@ const SPLIT_LABELS: Record<string, string> = {
 
 function Appearance() {
     return (
-        <PanelSection
+        <SettingsSection
             icon={Palette}
             anchor={GENERAL.appearance.anchor}
             title={GENERAL.appearance.title}
+            description="Light, dark or your device's setting, for this browser."
         >
             <ThemeChoice />
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -74,7 +76,12 @@ function ModelCatalogue() {
         ? `Checked for updates ${relativeTime(data.synced_at)}`
         : "Using the catalogue bundled with this release";
     return (
-        <PanelSection icon={BookMarked} anchor={CATALOGUE.anchor} title={CATALOGUE.title}>
+        <SettingsSection
+            icon={BookMarked}
+            anchor={CATALOGUE.anchor}
+            title={CATALOGUE.title}
+            description="The models Discover lists, with their sizes, licences and tasks."
+        >
             <SettingsGroup>
                 <SettingsRow
                     anchor={CATALOGUE.settings.catalogueUpdates.anchor}
@@ -120,7 +127,7 @@ function ModelCatalogue() {
                     }
                 />
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -225,7 +232,7 @@ function ComputePrices() {
     });
     const data = prices.data;
     return (
-        <PanelSection
+        <SettingsSection
             icon={Coins}
             anchor={PRICES.anchor}
             title={PRICES.title}
@@ -238,7 +245,7 @@ function ComputePrices() {
                     <PoolPriceRow key={pool.pool} pool={pool} currency={data?.currency ?? "USD"} />
                 ))}
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -261,7 +268,7 @@ function JudgeModel() {
     );
     const value = save.isPending ? (save.variables ?? OWN_BASE) : (setting.data?.model ?? OWN_BASE);
     return (
-        <PanelSection
+        <SettingsSection
             icon={Scale}
             anchor={JUDGE.anchor}
             title={JUDGE.title}
@@ -301,7 +308,7 @@ function JudgeModel() {
                     }
                 />
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -314,15 +321,16 @@ export function SettingsPage() {
             caption="Appearance, the model catalogue, compute prices and the defaults new models start from."
         >
             <ErrorLine error={error} />
-            <PanelSections>
+            <SettingsSections>
                 <Appearance />
                 {can.admin && <ModelCatalogue />}
                 {can.admin && <ComputePrices />}
                 {can.admin && <JudgeModel />}
-                <PanelSection
+                <SettingsSection
                     icon={GraduationCap}
                     anchor={GENERAL.recipe.anchor}
                     title={GENERAL.recipe.title}
+                    description={GENERAL.recipe.description}
                 >
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (
@@ -333,19 +341,20 @@ export function SettingsPage() {
                             />
                         ))}
                     </div>
-                </PanelSection>
-                <PanelSection
+                </SettingsSection>
+                <SettingsSection
                     icon={Split}
                     anchor={GENERAL.splits.anchor}
                     title={GENERAL.splits.title}
+                    description={GENERAL.splits.description}
                 >
                     <div className="flex flex-wrap gap-8">
                         {Object.entries(data?.splits ?? {}).map(([key, value]) => (
                             <Stat key={key} label={SPLIT_LABELS[key] ?? key} value={count(value)} />
                         ))}
                     </div>
-                </PanelSection>
-            </PanelSections>
+                </SettingsSection>
+            </SettingsSections>
         </SettingsLayout>
     );
 }

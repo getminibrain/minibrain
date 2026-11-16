@@ -7,7 +7,8 @@ import { type ModelDetail, type ModelRow, api, unwrap } from "~/api/client";
 import { useAllModels, usePlacement } from "~/api/queries";
 import { FormRow, FormRows } from "~/components/FormRows";
 import { RequestBodies } from "~/components/RequestBodies";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { ModelAvatar as AvatarImage } from "~/components/avatar/ModelAvatar";
 import { useCan } from "~/lib/access";
@@ -65,10 +66,11 @@ function General({ row }: { row: ModelRow }) {
         },
     });
     return (
-        <PanelSection
+        <SettingsSection
             icon={Settings2}
             anchor="general"
             title="General"
+            description="How this model is named and described across minibrain."
             actions={
                 <Button
                     variant="outline"
@@ -128,7 +130,7 @@ function General({ row }: { row: ModelRow }) {
             </FormRows>
             <ErrorLine error={save.error} />
             {custom && <ChangeAvatarDialog row={row} open={picking} onOpenChange={setPicking} />}
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -181,7 +183,12 @@ function Deployment({ row }: { row: ModelRow }) {
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const busy = busyTearingDown(row) ? (row.teardown?.label ?? "Busy") : null;
     return (
-        <PanelSection icon={Power} anchor="deployment" title="Deployment">
+        <SettingsSection
+            icon={Power}
+            anchor="deployment"
+            title="Deployment"
+            description="How many replicas serve it, and taking it off its pool."
+        >
             <FormRows>
                 <ReplicasSetting row={row} busy={busy} />
                 <FormRow label="Undeploy" detail={<DeploymentStatus row={row} brief />}>
@@ -200,7 +207,7 @@ function Deployment({ row }: { row: ModelRow }) {
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}
             />
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -220,7 +227,12 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
     return (
         <>
             {custom && (
-                <PanelSection icon={Layers} anchor="base" title="Base and copies">
+                <SettingsSection
+                    icon={Layers}
+                    anchor="base"
+                    title="Base and copies"
+                    description="Move it to another base model, or start a copy with the same settings."
+                >
                     <FormRows>
                         {custom && (
                             <FormRow
@@ -252,9 +264,14 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
                             </FormRow>
                         )}
                     </FormRows>
-                </PanelSection>
+                </SettingsSection>
             )}
-            <PanelSection icon={TriangleAlert} anchor="danger" title="Danger zone">
+            <SettingsSection
+                icon={TriangleAlert}
+                anchor="danger"
+                title="Danger zone"
+                description="Deleting a model cannot be undone."
+            >
                 <FormRows>
                     <FormRow
                         label="Delete"
@@ -296,7 +313,7 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
                         router.history.push(modelsHref());
                     }}
                 />
-            </PanelSection>
+            </SettingsSection>
         </>
     );
 }
@@ -305,13 +322,11 @@ export function SettingsTab({ row, detail }: { row: ModelRow; detail: ModelDetai
     const can = useCan();
     const custom = row.kind === "custom";
     return (
-        <div className="max-w-3xl">
-            <PanelSections>
-                {(custom || can.admin) && <General key={row.updated_at} row={row} />}
-                {isDeployed(row) && <Deployment row={row} />}
-                {detail && <RequestBodies detail={detail} />}
-                <Danger row={row} detail={detail} />
-            </PanelSections>
-        </div>
+        <SettingsSections>
+            {(custom || can.admin) && <General key={row.updated_at} row={row} />}
+            {isDeployed(row) && <Deployment row={row} />}
+            {detail && <RequestBodies detail={detail} />}
+            <Danger row={row} detail={detail} />
+        </SettingsSections>
     );
 }

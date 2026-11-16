@@ -15,7 +15,8 @@ import {
 import { type ComponentProps, Fragment, useMemo } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { PanelSection, errorMessage } from "~/components/Section";
+import { errorMessage } from "~/components/Section";
+import { SettingsSection } from "~/components/SettingsSection";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
@@ -162,7 +163,7 @@ function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
 export function AuditIntegrity() {
     const chain = useChain();
     return (
-        <PanelSection
+        <SettingsSection
             icon={ShieldCheck}
             anchor={SECURITY.auditIntegrity.anchor}
             title={SECURITY.auditIntegrity.title}
@@ -187,7 +188,7 @@ export function AuditIntegrity() {
                 />
                 <SiemRow siem={chain.data?.siem} />
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -254,10 +255,11 @@ export function AuditRetention({ policy }: { policy: PolicyInfo }) {
         </Select>
     );
     return (
-        <PanelSection
+        <SettingsSection
             icon={Timer}
             anchor={SECURITY.auditRetention.anchor}
             title={SECURITY.auditRetention.title}
+            description="How long the audit log keeps events."
         >
             <SettingsGroup>
                 <SettingsRow
@@ -282,7 +284,7 @@ export function AuditRetention({ policy }: { policy: PolicyInfo }) {
                     )}
                 </SettingsRow>
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 

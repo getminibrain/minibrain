@@ -30,14 +30,19 @@ import { type FormEvent, Fragment, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
-import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
+import { ErrorLine, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SourceBadge } from "~/components/SourceBadge";
 import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
 import { AuditIntegrity, AuditRetention, RETENTION } from "~/pages/settings/AuditSettings";
 import { EncryptionSettings } from "~/pages/settings/EncryptionSettings";
-import { SECURITY, type SettingsSection, policyAnchor } from "~/pages/settings/settingsIndex";
+import {
+    type SettingsSection as IndexedSection,
+    SECURITY,
+    policyAnchor,
+} from "~/pages/settings/settingsIndex";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 
@@ -50,7 +55,7 @@ type Policies = Map<string, PolicyInfo>;
 
 type Group = {
     icon: LucideIcon;
-    section: SettingsSection;
+    section: IndexedSection;
     description?: ReactNode;
     own?: (policies: Policies) => ReactNode;
 };
@@ -58,9 +63,22 @@ type Group = {
 const NESTED = new Set(["licences"]);
 
 const GROUPS: Group[] = [
-    { icon: Globe, section: SECURITY.network },
-    { icon: Box, section: SECURITY.models },
-    { icon: FolderLock, section: SECURITY.data },
+    {
+        icon: Globe,
+        section: SECURITY.network,
+        description: "Which outside hosts this install may reach.",
+    },
+    {
+        icon: Box,
+        section: SECURITY.models,
+        description:
+            "Which models may be downloaded or imported, by source, licence and file format.",
+    },
+    {
+        icon: FolderLock,
+        section: SECURITY.data,
+        description: "Server folders that data sources may read.",
+    },
     { icon: LogIn, section: SECURITY.signIn, description: "Applies when accounts are on." },
     {
         icon: KeyRound,
@@ -105,7 +123,7 @@ const GROUPS: Group[] = [
     },
 ];
 
-function policyNames(section: SettingsSection): string[] {
+function policyNames(section: IndexedSection): string[] {
     return Object.values(section.settings).flatMap((item) =>
         item.policy && !NESTED.has(item.policy) ? [item.policy] : [],
     );
@@ -535,13 +553,13 @@ export function SecurityPage() {
             caption="Install-wide policies: network, sign-in, request logs, the audit log, exports and encryption."
         >
             <ErrorLine error={policies.error} onRetry={policies.refetch} />
-            <PanelSections>
+            <SettingsSections>
                 {policies.data &&
                     GROUPS.map((group) =>
                         group.own ? (
                             <Fragment key={group.section.anchor}>{group.own(byName)}</Fragment>
                         ) : (
-                            <PanelSection
+                            <SettingsSection
                                 key={group.section.anchor}
                                 icon={group.icon}
                                 anchor={group.section.anchor}
@@ -565,7 +583,7 @@ export function SecurityPage() {
                                         );
                                     })}
                                 </SettingsGroup>
-                            </PanelSection>
+                            </SettingsSection>
                         ),
                     )}
                 {policies.data && <EncryptionSettings />}
@@ -576,7 +594,7 @@ export function SecurityPage() {
                     </Link>
                     {", with who made it and when."}
                 </p>
-            </PanelSections>
+            </SettingsSections>
         </SettingsLayout>
     );
 }

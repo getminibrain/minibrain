@@ -5,8 +5,9 @@ import { type ComponentProps, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { type DataSettings, dataKeys, useDataSettings } from "~/api/dataQueries";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
-import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
+import { ErrorLine, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
+import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SourceBadge } from "~/components/SourceBadge";
 import { count } from "~/lib/format";
 import { DATA, type Setting } from "~/pages/settings/settingsIndex";
@@ -107,7 +108,7 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
         save.mutate({ checks_off: [...next] });
     };
     return (
-        <PanelSection
+        <SettingsSection
             icon={ListChecks}
             anchor={DATA.checks.anchor}
             title={DATA.checks.title}
@@ -151,7 +152,7 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
                     max={100_000}
                 />
             </SettingsGroup>
-        </PanelSection>
+        </SettingsSection>
     );
 }
 
@@ -164,8 +165,8 @@ export function DataSettingsPage() {
             caption="How large dataset versions may be, how long they are kept and the checks they pass."
         >
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
-            <PanelSections>
-                <PanelSection
+            <SettingsSections>
+                <SettingsSection
                     icon={Rows3}
                     anchor={DATA.versionSize.anchor}
                     title={DATA.versionSize.title}
@@ -187,8 +188,8 @@ export function DataSettingsPage() {
                             groupClassName="w-36"
                         />
                     </SettingsGroup>
-                </PanelSection>
-                <PanelSection
+                </SettingsSection>
+                <SettingsSection
                     icon={Archive}
                     anchor={DATA.versionRetention.anchor}
                     title={DATA.versionRetention.title}
@@ -207,9 +208,9 @@ export function DataSettingsPage() {
                             max={1000}
                         />
                     </SettingsGroup>
-                </PanelSection>
+                </SettingsSection>
                 <ChecksSettings data={data} />
-            </PanelSections>
+            </SettingsSections>
         </SettingsLayout>
     );
 }
