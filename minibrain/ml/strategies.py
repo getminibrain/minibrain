@@ -70,6 +70,9 @@ def settings_of(recipe: dict[str, Any], keep: tuple[str, ...]) -> Settings:
         rank=int(recipe["rank"]),
         learning_rate=float(recipe["learning_rate"]),
         warmup=float(recipe.get("warmup", Settings.warmup)),
+        scheduler=str(recipe.get("scheduler", Settings.scheduler)),
+        dropout=float(recipe.get("dropout", Settings.dropout)),
+        weight_decay=float(recipe.get("weight_decay", Settings.weight_decay)),
         epochs=float(recipe["epochs"]),
         max_rows=int(recipe["max_rows"]),
         alpha=int(recipe["alpha"]) if "alpha" in overrides else None,
@@ -140,6 +143,8 @@ class TrainerSettings:
     grad_accum: int
     learning_rate: float
     warmup: float
+    scheduler: str
+    weight_decay: float
     max_length: int
     checkpointing: bool
     optimizer: str
@@ -159,6 +164,8 @@ def trainer_settings(recipe: dict[str, Any]) -> TrainerSettings:
         grad_accum=int(recipe["grad_accum"]),
         learning_rate=float(recipe["learning_rate"]),
         warmup=float(recipe.get("warmup", Settings.warmup)),
+        scheduler=str(recipe.get("scheduler", Settings.scheduler)),
+        weight_decay=float(recipe.get("weight_decay", Settings.weight_decay)),
         max_length=int(recipe["seq_len"]),
         checkpointing=bool(recipe.get("checkpointing")),
         optimizer=str(recipe.get("optimizer") or "adamw_torch"),
@@ -166,7 +173,9 @@ def trainer_settings(recipe: dict[str, Any]) -> TrainerSettings:
 
 
 def lora_settings(recipe: dict[str, Any]) -> LoraSettings:
-    return LoraSettings(rank=int(recipe["rank"]), alpha=int(recipe["alpha"]), dropout=float(recipe["dropout"]))
+    return LoraSettings(
+        rank=int(recipe["rank"]), alpha=int(recipe["alpha"]), dropout=float(recipe.get("dropout", Settings.dropout))
+    )
 
 
 def peak_memory(device: str) -> int | None:

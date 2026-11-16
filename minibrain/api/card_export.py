@@ -25,6 +25,7 @@ USE_GROUPS = {
     "unknown": "Not known",
 }
 STATUSES = {"ok": "Passed", "warning": "Warning", "blocked": "Blocked", "off": "Off", "skipped": "Skipped"}
+SCHEDULES = {"cosine": "Cosine", "linear": "Linear", "constant": "Constant"}
 NONE = "\N{EN DASH}"
 VERIFY = (
     'python3 -c \'import hashlib,json,sys; c=json.load(open(sys.argv[1]))["card"]; '
@@ -298,8 +299,11 @@ def training_section(card: ModelCard) -> list[str]:
         ("Row limit", recipe.max_rows),
         ("Epochs", recipe.epochs),
         ("LoRA rank and alpha", f"{recipe.rank} and {recipe.alpha}" if recipe.rank is not None else None),
+        ("LoRA dropout", recipe.dropout),
         ("Learning rate", recipe.learning_rate),
         ("Warmup", warmup_text(recipe.warmup)),
+        ("Schedule", SCHEDULES.get(recipe.scheduler or "", recipe.scheduler)),
+        ("Weight decay", recipe.weight_decay),
         ("Sequence length", recipe.seq_len),
         ("Micro-batch", recipe.micro_batch),
         ("Gradient accumulation", recipe.grad_accum),

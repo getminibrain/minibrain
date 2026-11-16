@@ -110,6 +110,9 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
         "alpha": 32,
         "learning_rate": 0.0002,
         "warmup": 0.05,
+        "scheduler": "cosine",
+        "dropout": 0.05,
+        "weight_decay": 0.0,
     }
     assert (training["examples"], training["train_loss"]) == (120, 0.4322)
     assert (training["run"]["machine"], training["run"]["device"]) == ("test", "cpu")
@@ -178,6 +181,9 @@ def test_markdown_export_renders_every_section_and_the_hash(harness: Harness) ->
     assert "| Held-out accuracy | 83.3% | 80.0% |" in text
     assert "| Change | \N{EN DASH} | +3.3 pts |" in text
     assert "| Warmup | 5.0% of steps |" in text
+    assert "| Schedule | Cosine |" in text
+    assert "| LoRA dropout | 0.05 |" in text
+    assert "| Weight decay | 0.0 |" in text
     assert f"`{exported['sha256']}`" in text
     assert text == harness.client.get(f"{CARD}/1/card.md").text
 

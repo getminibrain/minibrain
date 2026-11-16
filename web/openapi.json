@@ -6771,6 +6771,69 @@
             "description": "Share of the optimiser steps that ramp the learning rate up from 0."
           },
           {
+            "name": "scheduler",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cosine",
+                    "linear",
+                    "constant"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "How the learning rate changes after warmup.",
+              "title": "Scheduler"
+            },
+            "description": "How the learning rate changes after warmup."
+          },
+          {
+            "name": "dropout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 0.3,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "LoRA dropout on the adapter's input.",
+              "title": "Dropout"
+            },
+            "description": "LoRA dropout on the adapter's input."
+          },
+          {
+            "name": "weight_decay",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 0.2,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Pulls the adapter's weights toward zero each optimiser step.",
+              "title": "Weight Decay"
+            },
+            "description": "Pulls the adapter's weights toward zero each optimiser step."
+          },
+          {
             "name": "epochs",
             "in": "query",
             "required": false,
@@ -12895,6 +12958,39 @@
               }
             ],
             "title": "Warmup"
+          },
+          "scheduler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduler"
+          },
+          "dropout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropout"
+          },
+          "weight_decay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Decay"
           }
         },
         "type": "object",
@@ -28821,6 +28917,18 @@
             "type": "number",
             "title": "Warmup"
           },
+          "scheduler": {
+            "type": "string",
+            "title": "Scheduler"
+          },
+          "dropout": {
+            "type": "number",
+            "title": "Dropout"
+          },
+          "weight_decay": {
+            "type": "number",
+            "title": "Weight Decay"
+          },
           "epochs": {
             "type": "number",
             "title": "Epochs"
@@ -28869,6 +28977,9 @@
           "rank",
           "learning_rate",
           "warmup",
+          "scheduler",
+          "dropout",
+          "weight_decay",
           "epochs",
           "max_rows",
           "alpha",
@@ -29228,6 +29339,11 @@
             "type": "integer",
             "title": "Held Out Rows"
           },
+          "loss_rows": {
+            "type": "integer",
+            "title": "Loss Rows",
+            "description": "Held-out rows the held-out loss is measured on during training."
+          },
           "machines": {
             "items": {
               "$ref": "#/components/schemas/MachinePlanInfo"
@@ -29259,6 +29375,7 @@
           "warmup_steps",
           "grad_accum",
           "held_out_rows",
+          "loss_rows",
           "machines",
           "queue"
         ],
@@ -29356,6 +29473,28 @@
             ],
             "title": "Learning Rate"
           },
+          "warmup": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warmup"
+          },
+          "scheduler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduler"
+          },
           "batch": {
             "anyOf": [
               {
@@ -29411,6 +29550,18 @@
             ],
             "title": "Held Out"
           },
+          "loss_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss Rows",
+            "description": "Held-out rows the held-out loss is measured on; the final score uses every one."
+          },
           "changed": {
             "items": {
               "type": "string"
@@ -29428,11 +29579,14 @@
           "rank",
           "epochs",
           "learning_rate",
+          "warmup",
+          "scheduler",
           "batch",
           "seq_len",
           "max_rows",
           "examples",
           "held_out",
+          "loss_rows",
           "changed"
         ],
         "title": "TrainingSetup"
@@ -29755,6 +29909,51 @@
             ],
             "title": "Warmup",
             "description": "Share of the optimiser steps that ramp the learning rate up from 0."
+          },
+          "scheduler": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cosine",
+                  "linear",
+                  "constant"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduler",
+            "description": "How the learning rate changes after warmup."
+          },
+          "dropout": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.3,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropout",
+            "description": "LoRA dropout on the adapter's input."
+          },
+          "weight_decay": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 0.2,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Decay",
+            "description": "Pulls the adapter's weights toward zero each optimiser step."
           },
           "epochs": {
             "anyOf": [

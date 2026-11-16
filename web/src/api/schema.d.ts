@@ -3704,6 +3704,12 @@ export interface components {
             learning_rate: number | null;
             /** Warmup */
             warmup?: number | null;
+            /** Scheduler */
+            scheduler?: string | null;
+            /** Dropout */
+            dropout?: number | null;
+            /** Weight Decay */
+            weight_decay?: number | null;
         };
         /** CardRun */
         CardRun: {
@@ -9041,6 +9047,12 @@ export interface components {
             learning_rate: number;
             /** Warmup */
             warmup: number;
+            /** Scheduler */
+            scheduler: string;
+            /** Dropout */
+            dropout: number;
+            /** Weight Decay */
+            weight_decay: number;
             /** Epochs */
             epochs: number;
             /** Max Rows */
@@ -9150,6 +9162,11 @@ export interface components {
             grad_accum: number | null;
             /** Held Out Rows */
             held_out_rows: number;
+            /**
+             * Loss Rows
+             * @description Held-out rows the held-out loss is measured on during training.
+             */
+            loss_rows: number;
             /** Machines */
             machines: components["schemas"]["MachinePlanInfo"][];
             queue: components["schemas"]["TrainingQueueInfo"];
@@ -9182,6 +9199,10 @@ export interface components {
             epochs: number | null;
             /** Learning Rate */
             learning_rate: number | null;
+            /** Warmup */
+            warmup: number | null;
+            /** Scheduler */
+            scheduler: string | null;
             /** Batch */
             batch: number | null;
             /** Seq Len */
@@ -9192,6 +9213,11 @@ export interface components {
             examples: number | null;
             /** Held Out */
             held_out: number | null;
+            /**
+             * Loss Rows
+             * @description Held-out rows the held-out loss is measured on; the final score uses every one.
+             */
+            loss_rows: number | null;
             /** Changed */
             changed: string[];
         };
@@ -9290,6 +9316,21 @@ export interface components {
              * @description Share of the optimiser steps that ramp the learning rate up from 0.
              */
             warmup?: number | null;
+            /**
+             * Scheduler
+             * @description How the learning rate changes after warmup.
+             */
+            scheduler?: ("cosine" | "linear" | "constant") | null;
+            /**
+             * Dropout
+             * @description LoRA dropout on the adapter's input.
+             */
+            dropout?: number | null;
+            /**
+             * Weight Decay
+             * @description Pulls the adapter's weights toward zero each optimiser step.
+             */
+            weight_decay?: number | null;
             /** Epochs */
             epochs?: number | null;
             /** Max Rows */
@@ -14160,6 +14201,12 @@ export interface operations {
                 learning_rate?: number | null;
                 /** @description Share of the optimiser steps that ramp the learning rate up from 0. */
                 warmup?: number | null;
+                /** @description How the learning rate changes after warmup. */
+                scheduler?: ("cosine" | "linear" | "constant") | null;
+                /** @description LoRA dropout on the adapter's input. */
+                dropout?: number | null;
+                /** @description Pulls the adapter's weights toward zero each optimiser step. */
+                weight_decay?: number | null;
                 epochs?: number | null;
                 max_rows?: number | null;
                 alpha?: number | null;

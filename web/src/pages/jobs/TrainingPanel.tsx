@@ -24,6 +24,14 @@ type Previous = NonNullable<JobMetrics["previous"]>;
 type Comparable = NonNullable<JobMetrics["comparable"]>[number];
 type Choice = number | typeof NONE | null;
 type Fact = [string, ReactNode];
+type Training = NonNullable<NonNullable<JobDetail["setup"]>["training"]>;
+
+const SHARE = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
+const SCHEDULES: Record<string, string> = {
+    cosine: "eases down to near 0 on a cosine schedule",
+    linear: "falls in a straight line to 0 on a linear schedule",
+    constant: "stays at its set value on a constant schedule",
+};
 
 function lastStep(points: { step: number }[]): number {
     return points.at(-1)?.step ?? 0;
@@ -253,17 +261,36 @@ export function LossBody({ job, metrics }: { job: JobDetail; metrics: JobMetrics
     );
 }
 
+function heldOutText(training: Training | null | undefined): string {
+    const rows = training?.loss_rows;
+    if (rows === null || rows === undefined) {
+        return "";
+    }
+    return ` Held-out loss is measured on the first ${count(rows)} held-out ${rows === 1 ? "row" : "rows"}; the final score uses every held-out row.`;
+}
+
+function lossTip(job: JobDetail, metrics: JobMetrics | undefined): string {
+    const curves = metrics?.comparable?.length
+        ? "Training and held-out loss per step, with another trained version's run behind them in grey."
+        : "Training loss per step, held-out loss at each evaluation.";
+    return `${curves}${heldOutText(job.setup?.training)}`;
+}
+
+function rateTip(training: Training | null | undefined): string {
+    const schedule = SCHEDULES[training?.scheduler ?? "cosine"] ?? SCHEDULES.cosine;
+    const warmup = training?.warmup;
+    if (warmup === null || warmup === undefined) {
+        return `How far each step moves the weights: it warms up, then ${schedule}.`;
+    }
+    if (warmup === 0) {
+        return `How far each step moves the weights: no warmup, it starts at its set value and ${schedule}.`;
+    }
+    return `How far each step moves the weights: it ramps up from 0 over the first ${SHARE.format(warmup)} of steps, then ${schedule}.`;
+}
+
 export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
     return (
-        <PanelSection
-            icon={ChartLine}
-            title="Loss"
-            tip={
-                metrics?.comparable?.length
-                    ? "Training and held-out loss per step, with another trained version's run behind them in grey."
-                    : "Training loss per step, held-out loss at each evaluation."
-            }
-        >
+        <PanelSection icon={ChartLine} title="Loss" tip={lossTip(job, metrics)}>
             <LossBody job={job} metrics={metrics} />
         </PanelSection>
     );
@@ -333,7 +360,13 @@ function LossChart({
     );
 }
 
-export function RateSection({ metrics }: { metrics: JobMetrics | undefined }) {
+export function RateSection({
+    job,
+    metrics,
+}: {
+    job: JobDetail;
+    metrics: JobMetrics | undefined;
+}) {
     const training = metrics?.training;
     if (!training || !training.points.some((point) => typeof point.learning_rate === "number")) {
         return null;
@@ -341,11 +374,7 @@ export function RateSection({ metrics }: { metrics: JobMetrics | undefined }) {
     const rows = rateRows(training);
     const peak = Math.max(...rows.map((row) => row.rate ?? 0));
     return (
-        <PanelSection
-            icon={TrendingDown}
-            title="Learning rate"
-            tip="How far each step moves the weights: it warms up, then decays."
-        >
+        <PanelSection icon={TrendingDown} title="Learning rate" tip={rateTip(job.setup?.training)}>
             <StepChart
                 rows={rows}
                 series={[{ key: "rate", label: "Learning rate", color: TRAIN }]}

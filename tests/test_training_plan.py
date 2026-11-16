@@ -7,6 +7,7 @@ import pytest
 
 from minibrain.ml.examples import Encoded
 from minibrain.ml.planner import (
+    EVAL_ROWS,
     GIB,
     HEADROOM,
     LORA,
@@ -18,7 +19,9 @@ from minibrain.ml.planner import (
     estimate,
     estimated_tokens,
     eval_checks,
+    loss_rows,
     plan,
+    scheduler_type,
     train_minutes,
     train_steps,
     warmup_steps,
@@ -230,6 +233,11 @@ def test_overrides_are_validated(harness: Harness) -> None:
         {"seq_len": 8},
         {"warmup": -0.01},
         {"warmup": 0.51},
+        {"scheduler": "step"},
+        {"dropout": -0.01},
+        {"dropout": 0.31},
+        {"weight_decay": -0.01},
+        {"weight_decay": 0.21},
     )
     for body in invalid:
         assert harness.client.post(url, json={"kind": "lora", **body}).status_code == 422, body
@@ -576,3 +584,88 @@ def test_warmup_is_planned_validated_and_stored_on_the_version(harness: Harness)
     claim = harness.claim(["train"])
     assert claim is not None
     assert claim["params"]["recipe"]["warmup"] == 0.2
+
+
+def test_schedule_dropout_and_weight_decay_default_to_todays_run_and_reach_the_recipe() -> None:
+    plain = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000).recipe()
+    assert (plain["scheduler"], plain["dropout"], plain["weight_decay"], plain["overrides"]) == (
+        "cosine",
+        0.05,
+        0.0,
+        [],
+    )
+    tuned = Settings(scheduler="linear", dropout=0.1, weight_decay=0.01)
+    found = plan(base("qwen3-0.6b"), [RTX_4090], tuned, 160, 3000).recipe()
+    assert (found["scheduler"], found["dropout"], found["weight_decay"]) == ("linear", 0.1, 0.01)
+    assert found["overrides"] == ["scheduler", "dropout", "weight_decay"]
+
+
+def test_the_worker_keeps_schedule_dropout_and_weight_decay_when_it_replans() -> None:
+    from minibrain.ml.strategies import fit_here
+
+    tuned = Settings(scheduler="constant", dropout=0.2, weight_decay=0.05)
+    stored = plan(base("qwen3-8b"), [A100], tuned, 160, 3000).recipe()
+    moved, replanned = fit_here(base("qwen3-8b"), RTX_4090, stored, encoded([100, 150]))
+    assert replanned
+    found = moved.recipe()
+    assert (found["scheduler"], found["dropout"], found["weight_decay"]) == ("constant", 0.2, 0.05)
+
+
+def test_a_constant_schedule_still_warms_up() -> None:
+    assert scheduler_type("cosine", 9) == "cosine"
+    assert scheduler_type("linear", 0) == "linear"
+    assert scheduler_type("constant", 9) == "constant_with_warmup"
+    assert scheduler_type("constant", 0) == "constant"
+
+
+def test_schedule_dropout_and_weight_decay_reach_the_trainer_config(tmp_path: Path) -> None:
+    from minibrain.ml import train
+
+    recipe = plan(base("qwen3-0.6b"), [RTX_4090], Settings(), 160, 3000).recipe()
+    plain = train.sft_config(tmp_path, recipe, "cpu", 3000)
+    assert (plain.lr_scheduler_type, plain.weight_decay) == ("cosine", 0.0)
+    linear = train.sft_config(tmp_path, recipe | {"scheduler": "linear", "weight_decay": 0.01}, "cpu", 3000)
+    assert (linear.lr_scheduler_type, linear.weight_decay) == ("linear", 0.01)
+    constant = train.sft_config(tmp_path, recipe | {"scheduler": "constant"}, "cpu", 3000)
+    assert (constant.lr_scheduler_type, constant.warmup_steps) == ("constant_with_warmup", 9)
+    flat = train.sft_config(tmp_path, recipe | {"scheduler": "constant", "warmup": 0}, "cpu", 3000)
+    assert (flat.lr_scheduler_type, flat.warmup_steps) == ("constant", 0)
+    assert train.lora_config(recipe | {"dropout": 0.15}).lora_dropout == 0.15
+    old = {key: value for key, value in recipe.items() if key not in ("scheduler", "weight_decay")}
+    legacy = train.sft_config(tmp_path, old, "cpu", 3000)
+    assert (legacy.lr_scheduler_type, legacy.weight_decay) == ("cosine", 0.0)
+
+
+def test_schedule_dropout_and_weight_decay_are_planned_and_stored_on_the_version(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    url = f"/api/models/{SLUG}/training-plan"
+    defaults = harness.client.get(url).json()["defaults"]
+    assert (defaults["scheduler"], defaults["dropout"], defaults["weight_decay"]) == ("cosine", 0.05, 0.0)
+    tuned = harness.client.get(url, params={"scheduler": "linear", "dropout": 0.1, "weight_decay": 0.01}).json()
+    assert tuned["overrides"] == ["scheduler", "dropout", "weight_decay"]
+    body = {"kind": "lora", "scheduler": "constant", "dropout": 0.2, "weight_decay": 0.05}
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json=body)
+    assert version.status_code == 201, version.text
+    recipe = version.json()["recipe"]
+    assert (recipe["scheduler"], recipe["dropout"], recipe["weight_decay"]) == ("constant", 0.2, 0.05)
+    claim = harness.claim(["train"])
+    assert claim is not None
+    sent = claim["params"]["recipe"]
+    assert (sent["scheduler"], sent["dropout"], sent["weight_decay"]) == ("constant", 0.2, 0.05)
+    training = harness.client.get(f"/api/jobs/{claim['job_id']}").json()["setup"]["training"]
+    assert (training["scheduler"], training["warmup"]) == ("constant", 0.05)
+
+
+def test_held_out_loss_is_measured_on_the_first_rows_of_the_split(harness: Harness) -> None:
+    assert (loss_rows(500), loss_rows(EVAL_ROWS), loss_rows(20), loss_rows(0)) == (EVAL_ROWS, EVAL_ROWS, 20, 0)
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    found = harness.client.get(f"/api/models/{SLUG}/training-plan").json()
+    assert found["loss_rows"] == loss_rows(found["held_out_rows"])
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora"})
+    assert version.status_code == 201, version.text
+    claim = harness.claim(["train"])
+    assert claim is not None
+    training = harness.client.get(f"/api/jobs/{claim['job_id']}").json()["setup"]["training"]
+    assert training["loss_rows"] == found["loss_rows"]

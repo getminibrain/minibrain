@@ -302,6 +302,9 @@ def recipe_card(recipe: dict[str, Any]) -> CardRecipe:
         alpha=ints["alpha"],
         learning_rate=None if recipe.get("learning_rate") is None else float(recipe["learning_rate"]),
         warmup=None if recipe.get("warmup") is None else float(recipe["warmup"]),
+        scheduler=str(recipe["scheduler"]) if recipe.get("scheduler") else None,
+        dropout=None if recipe.get("dropout") is None else float(recipe["dropout"]),
+        weight_decay=None if recipe.get("weight_decay") is None else float(recipe["weight_decay"]),
     )
 
 

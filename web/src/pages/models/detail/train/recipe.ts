@@ -8,12 +8,16 @@ export type MachinePlan = Schemas["MachinePlanInfo"];
 
 export type Auto<T> = T | "auto";
 export type Strategy = "lora" | "qlora";
+export type Scheduler = "cosine" | "linear" | "constant";
 
 export type Recipe = {
     rank: number;
     alpha: Auto<number>;
     learningRate: number;
     warmup: number;
+    scheduler: Scheduler;
+    dropout: number;
+    weightDecay: number;
     epochs: number;
     maxRows: number | "all";
     microBatch: Auto<number>;
@@ -40,6 +44,14 @@ export const MIN_HELD_OUT = 50;
 export const HEADROOM = 0.85;
 export const WARMUP = 0.05;
 export const MAX_WARMUP = 0.5;
+export const DROPOUT = 0.05;
+export const MAX_DROPOUT = 0.3;
+export const MAX_WEIGHT_DECAY = 0.2;
+export const SCHEDULERS: { value: Scheduler; label: string }[] = [
+    { value: "cosine", label: "Cosine" },
+    { value: "linear", label: "Linear" },
+    { value: "constant", label: "Constant" },
+];
 export const LEARNING_RATES = [2e-5, 5e-5, 1e-4, 2e-4, 3e-4, 5e-4, 1e-3];
 export const MICRO_CHOICES = [1, 2, 4, 8];
 export const ACCUM_CHOICES = [1, 2, 4, 8, 16, 32];
@@ -54,6 +66,9 @@ const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs"> = {
     checkpointing: "auto",
     evalEvery: "auto",
     warmup: WARMUP,
+    scheduler: "cosine",
+    dropout: DROPOUT,
+    weightDecay: 0,
     seed: 7,
     machine: "auto",
 };
@@ -100,6 +115,9 @@ export type PlanQuery = {
     alpha?: number;
     learning_rate: number;
     warmup: number;
+    scheduler: Scheduler;
+    dropout: number;
+    weight_decay: number;
     epochs: number;
     max_rows: number;
     micro_batch?: number;
@@ -125,6 +143,9 @@ export function planQuery(
         alpha: auto(recipe.alpha),
         learning_rate: recipe.learningRate,
         warmup: recipe.warmup,
+        scheduler: recipe.scheduler,
+        dropout: recipe.dropout,
+        weight_decay: recipe.weightDecay,
         epochs: recipe.epochs,
         max_rows: Math.max(10, recipe.maxRows === "all" ? available : recipe.maxRows),
         micro_batch: auto(recipe.microBatch),
@@ -218,8 +239,12 @@ function nearestRate(value: number): number {
     );
 }
 
-function storedWarmup(value: unknown): number {
-    return typeof value === "number" && value >= 0 && value <= MAX_WARMUP ? value : WARMUP;
+function storedShare(value: unknown, max: number, fallback: number): number {
+    return typeof value === "number" && value >= 0 && value <= max ? value : fallback;
+}
+
+function storedScheduler(value: unknown): Scheduler {
+    return SCHEDULERS.find((item) => item.value === value)?.value ?? "cosine";
 }
 
 function positive(value: unknown): number | null {
@@ -239,7 +264,10 @@ export function startFrom(stored: Record<string, unknown> | null | undefined): S
         rank: Math.round(rank),
         epochs: Math.max(1, Math.round(epochs)),
         learningRate: nearestRate(learningRate),
-        warmup: storedWarmup(stored?.warmup),
+        warmup: storedShare(stored?.warmup, MAX_WARMUP, WARMUP),
+        scheduler: storedScheduler(stored?.scheduler),
+        dropout: storedShare(stored?.dropout, MAX_DROPOUT, DROPOUT),
+        weightDecay: storedShare(stored?.weight_decay, MAX_WEIGHT_DECAY, 0),
     };
     const matched = qualityOf(recipe);
     return matched

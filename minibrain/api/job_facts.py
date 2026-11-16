@@ -3,8 +3,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from minibrain.api.schemas import JobSetup, TrainingSetup
+from minibrain.api.training_plan import held_out_rows
 from minibrain.data.dataset_versions import version_number
 from minibrain.jobs.metrics import latest_data
+from minibrain.ml.planner import Settings, loss_rows
 from minibrain.models.registry import base_publisher
 from minibrain.registry.models import BaseModel, DatasetVersion, Job, JobKind
 from minibrain.tasks.service import held_out_score
@@ -77,6 +79,11 @@ def dataset_rows(dataset_version: DatasetVersion) -> int:
     return dataset_version.rows or sum(dataset_version.counts.values())
 
 
+def scored_rows(job: Job) -> int | None:
+    dataset_version = job.version.dataset_version if job.version is not None else None
+    return None if dataset_version is None else loss_rows(held_out_rows(dataset_version))
+
+
 def training_setup(session: Session, job: Job) -> TrainingSetup:
     started = mapping(latest_data(session, job.id, (TRAIN_START,)))
     finished = finished_recipe(job)
@@ -92,11 +99,14 @@ def training_setup(session: Session, job: Job) -> TrainingSetup:
         rank=whole(recipe, "rank"),
         epochs=number(recipe, "epochs"),
         learning_rate=number(recipe, "learning_rate"),
+        warmup=number(recipe, "warmup"),
+        scheduler=text(recipe, "scheduler") or Settings.scheduler,
         batch=whole(recipe, "batch"),
         seq_len=whole(recipe, "seq_len"),
         max_rows=whole(recipe, "max_rows"),
         examples=whole(finished, "examples") or whole(started, "examples"),
         held_out=whole(started, "held_out"),
+        loss_rows=scored_rows(job),
         changed=[str(name) for name in changed] if isinstance(changed, list) else [],
     )
 

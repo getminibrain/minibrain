@@ -478,6 +478,9 @@ const SETTING_NAMES: Record<string, (recipe: Record<string, unknown>) => string>
     learning_rate: (recipe) => `learning rate ${recipe.learning_rate}`,
     warmup: (recipe) =>
         Number(recipe.warmup) === 0 ? "no warmup" : `warmup ${percent(Number(recipe.warmup))}`,
+    scheduler: (recipe) => `${recipe.scheduler} schedule`,
+    dropout: (recipe) => `dropout ${recipe.dropout}`,
+    weight_decay: (recipe) => `weight decay ${recipe.weight_decay}`,
     max_rows: (recipe) => `${count(Number(recipe.max_rows))} rows at most`,
     strategy: (recipe) => (recipe.strategy === "qlora" ? "QLoRA" : "LoRA"),
     checkpointing: (recipe) => `checkpointing ${recipe.checkpointing ? "on" : "off"}`,
@@ -982,7 +985,7 @@ function Curves({ job, loss }: { job: JobDetail; loss: boolean }) {
         <>
             {loss && <ErrorLine error={metrics.error} onRetry={metrics.refetch} />}
             {loss && <LossSection job={job} metrics={metrics.data} />}
-            <RateSection metrics={metrics.data} />
+            <RateSection job={job} metrics={metrics.data} />
         </>
     );
 }

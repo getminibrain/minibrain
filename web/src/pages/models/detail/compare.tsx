@@ -31,6 +31,7 @@ import {
     points,
     versionLabel,
 } from "./makeLive";
+import { SCHEDULERS } from "./train/recipe";
 import { ExampleList, useAnswers, verdictOf } from "./version";
 import { recipeText } from "./versions";
 
@@ -109,6 +110,10 @@ function recipeValue(
         : format(recipe[key]);
 }
 
+function scheduleName(value: unknown): string {
+    return SCHEDULERS.find((item) => item.value === value)?.label ?? String(value);
+}
+
 function settingRows(a: VersionInfo, b: VersionInfo, base: (key: string) => string): CompareRow[] {
     const pair = (key: string, format?: (value: unknown) => string): [string, string] => [
         recipeValue(a, key, format),
@@ -130,6 +135,9 @@ function settingRows(a: VersionInfo, b: VersionInfo, base: (key: string) => stri
         { label: "Epochs", values: pair("epochs") },
         { label: "Learning rate", values: pair("learning_rate") },
         { label: "Warmup", values: pair("warmup", (value) => percent(Number(value))) },
+        { label: "Schedule", values: pair("scheduler", scheduleName) },
+        { label: "LoRA dropout", values: pair("dropout") },
+        { label: "Weight decay", values: pair("weight_decay") },
         { label: "Rows at most", values: pair("max_rows", (value) => count(Number(value))) },
         { label: "Batch", values: pair("micro_batch") },
         { label: "Sequence length", values: pair("seq_len", (value) => count(Number(value))) },

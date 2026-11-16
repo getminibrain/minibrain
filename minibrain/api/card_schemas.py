@@ -113,6 +113,9 @@ class CardRecipe(BaseModel):
     alpha: int | None
     learning_rate: float | None
     warmup: float | None = None
+    scheduler: str | None = None
+    dropout: float | None = None
+    weight_decay: float | None = None
 
 
 class CardOrigin(BaseModel):

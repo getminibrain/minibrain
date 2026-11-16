@@ -1,6 +1,6 @@
 from typing import Any
 
-from minibrain.ml.planner import EFFECTIVE_BATCH, LORA_DROPOUT, Settings
+from minibrain.ml.planner import EFFECTIVE_BATCH, Settings
 
 DEFAULTS = Settings()
 DEFAULT_RECIPE: dict[str, Any] = {
@@ -10,6 +10,8 @@ DEFAULT_RECIPE: dict[str, Any] = {
     "alpha": 2 * DEFAULTS.rank,
     "learning_rate": DEFAULTS.learning_rate,
     "warmup": DEFAULTS.warmup,
-    "dropout": LORA_DROPOUT,
+    "scheduler": DEFAULTS.scheduler,
+    "dropout": DEFAULTS.dropout,
+    "weight_decay": DEFAULTS.weight_decay,
     "batch": EFFECTIVE_BATCH,
 }

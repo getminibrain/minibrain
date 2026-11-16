@@ -52,6 +52,9 @@ const SETTING_NAMES: Record<string, string> = {
     rank: "rank",
     learning_rate: "learning rate",
     warmup: "warmup",
+    scheduler: "schedule",
+    dropout: "dropout",
+    weight_decay: "weight decay",
     epochs: "epochs",
     max_rows: "rows per run",
     seq_len: "sequence length",
@@ -510,7 +513,7 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
                     <SettingsSection job={job} />
                 </div>
                 {training && <LossSection job={job} metrics={metrics.data} />}
-                {training && <RateSection metrics={metrics.data} />}
+                {training && <RateSection job={job} metrics={metrics.data} />}
                 {job.kind === "eval" && <ScoresSection job={job} />}
                 <JobLogsSection key={job.id} job={job} anchor={JOB_LOGS_ID} />
             </PanelSections>

@@ -35,6 +35,7 @@ import { metricName } from "~/lib/metrics";
 import { modelPageHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 import { itemHref } from "../data/catalogue";
+import { SCHEDULERS } from "./detail/train/recipe";
 
 type Schemas = components["schemas"];
 export type ModelCard = Schemas["ModelCard"];
@@ -87,6 +88,10 @@ function warmupText(value: number | null | undefined): string {
         return NONE;
     }
     return value === 0 ? "Off" : `${percent(value)} of steps`;
+}
+
+function scheduleText(value: string | null | undefined): string {
+    return value ? (SCHEDULERS.find((item) => item.value === value)?.label ?? value) : NONE;
 }
 
 function when(value: string | null | undefined): string {
@@ -495,8 +500,11 @@ export function TrainingSection({ card }: { card: ModelCard }) {
                             value={`${recipe.rank ?? NONE} and ${recipe.alpha ?? NONE}`}
                         />,
                     ],
+                    ["LoRA dropout", value(recipe.dropout)],
                     ["Learning rate", value(recipe.learning_rate)],
                     ["Warmup", warmupText(recipe.warmup)],
+                    ["Schedule", scheduleText(recipe.scheduler)],
+                    ["Weight decay", value(recipe.weight_decay)],
                     ["Sequence length", value(recipe.seq_len)],
                     [
                         "Batch size",

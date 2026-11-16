@@ -8,6 +8,7 @@ EFFECTIVE_BATCH = 16
 MICRO_BATCHES = (8, 4, 2, 1)
 MPS_MICRO_BATCHES = (1,)
 LORA_DROPOUT = 0.05
+SCHEDULERS = ("cosine", "linear", "constant")
 PROMPT_TOKENS = 48
 CHARS_PER_TOKEN = 4
 SEQ_STEP = 16
@@ -198,6 +199,9 @@ class Settings:
     rank: int = 16
     learning_rate: float = 2e-4
     warmup: float = 0.05
+    scheduler: str = "cosine"
+    dropout: float = LORA_DROPOUT
+    weight_decay: float = 0.0
     epochs: float = 1.0
     max_rows: int = 3000
     alpha: int | None = None
@@ -314,7 +318,9 @@ class Plan:
             "alpha": settings.lora_alpha,
             "learning_rate": settings.learning_rate,
             "warmup": settings.warmup,
-            "dropout": LORA_DROPOUT,
+            "scheduler": settings.scheduler,
+            "dropout": settings.dropout,
+            "weight_decay": settings.weight_decay,
             "seq_len": self.seq_len,
             "seed": settings.seed,
             "overrides": settings.overrides(),
@@ -366,6 +372,14 @@ def warmup_steps(ratio: float, steps: int) -> int:
     return max(1, math.floor(ratio * steps + 0.5)) if ratio > 0 else 0
 
 
+def scheduler_type(scheduler: str, warmup: int) -> str:
+    return "constant_with_warmup" if scheduler == "constant" and warmup > 0 else scheduler
+
+
+def loss_rows(held_out_rows: int) -> int:
+    return min(held_out_rows, EVAL_ROWS)
+
+
 def eval_checks(steps: int, eval_every: int | None) -> int:
     if eval_every is not None:
         return (steps - 1) // eval_every + 1
@@ -384,7 +398,7 @@ def train_minutes(
 ) -> float:
     billions = base.params / 1e9
     work = rows * epochs * billions * (seq / REFERENCE_SEQ) * (1 + rank / 32) * WORK_MINUTES
-    scored = min(held_out_rows, EVAL_ROWS)
+    scored = loss_rows(held_out_rows)
     if scored <= 0:
         return SETUP_MINUTES + work / option.speed
     device = DEVICE_SPEED.get(option.device, 0.05)

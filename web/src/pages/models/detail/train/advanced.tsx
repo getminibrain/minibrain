@@ -17,12 +17,16 @@ import {
     type Auto,
     type Issue,
     LEARNING_RATES,
+    MAX_DROPOUT,
     MAX_RANK,
     MAX_WARMUP,
+    MAX_WEIGHT_DECAY,
     MICRO_CHOICES,
     type MachinePlan,
     type PlanInfo,
     type Recipe,
+    SCHEDULERS,
+    type Scheduler,
     type Strategy,
     strategyName,
 } from "./recipe";
@@ -30,9 +34,16 @@ import {
 type Change = (patch: Partial<Recipe>) => void;
 
 const WHOLE = { maximumFractionDigits: 0 };
+const FRACTION = { maximumFractionDigits: 3 };
 const PERCENT = { style: "percent", maximumFractionDigits: 1 } as const;
 const WARMUP_TIP =
     "Steps at the start where the learning rate ramps up from 0 to its set value, so early, noisy updates stay small. 0% turns it off.";
+const SCHEDULER_TIP =
+    "How the learning rate changes after warmup: cosine eases it down to near 0, linear lowers it in a straight line, constant keeps it fixed.";
+const DROPOUT_TIP =
+    "Randomly drops part of the adapter's input during training so it can't lean on single features; higher helps against overfitting on small datasets.";
+const WEIGHT_DECAY_TIP =
+    "Pulls the adapter's weights slightly toward zero each step; a small value such as 0.01 can reduce overfitting.";
 
 function warmupDetail(warmup: number, plan: PlanInfo | undefined): string | undefined {
     if (warmup === 0) {
@@ -42,6 +53,18 @@ function warmupDetail(warmup: number, plan: PlanInfo | undefined): string | unde
         return undefined;
     }
     return `≈ ${count(plan.warmup_steps)} of ${count(plan.steps)} steps`;
+}
+
+function evalTip(checks: number | null, rows: number, heldOut: number): string {
+    const measured =
+        rows < heldOut
+            ? `the first ${count(rows)} of ${count(heldOut)} held-out rows`
+            : `${count(heldOut)} held-out rows`;
+    const when =
+        checks === null
+            ? `Automatic measures held-out loss on ${measured} a few times during the run and at the end.`
+            : `${count(checks)} ${checks === 1 ? "check" : "checks"} of held-out loss on ${measured}, the last at the end. Each costs a little time.`;
+    return rows < heldOut ? `${when} The final score uses every held-out row.` : when;
 }
 
 function Warn({ children }: { children: ReactNode }) {
@@ -177,6 +200,7 @@ export function Advanced({
     const seq = plan?.seq_len ?? (recipe.seqLen === "auto" ? longest : recipe.seqLen);
     const steps = plan?.steps ?? 0;
     const evalEvery = recipe.evalEvery === "auto" ? null : recipe.evalEvery;
+    const lossRows = plan?.loss_rows ?? heldOut;
     const checks = evalEvery ? Math.floor(Math.max(steps - 1, 0) / evalEvery) + 1 : null;
     return (
         <div className="@container">
@@ -241,6 +265,26 @@ export function Advanced({
                                 format={WHOLE}
                             />
                         </Field>
+                        <Field
+                            id="train-dropout"
+                            label={<Tipped label="Dropout" tip={DROPOUT_TIP} />}
+                        >
+                            <NumberField
+                                disabled={disabled}
+                                className="w-full"
+                                groupClassName="w-full"
+                                id="train-dropout"
+                                value={recipe.dropout}
+                                onValueChange={(value) =>
+                                    onChange({ dropout: value ?? recipe.dropout })
+                                }
+                                min={0}
+                                max={MAX_DROPOUT}
+                                step={0.01}
+                                largeStep={0.05}
+                                format={FRACTION}
+                            />
+                        </Field>
                     </Group>
                     <Group id="train-group-optimisation" label="Optimisation">
                         <Field
@@ -292,6 +336,40 @@ export function Advanced({
                                 step={0.01}
                                 largeStep={0.05}
                                 format={PERCENT}
+                            />
+                        </Field>
+                        <Field
+                            id="train-scheduler"
+                            label={<Tipped label="Schedule" tip={SCHEDULER_TIP} />}
+                        >
+                            <ChoiceSelect<Scheduler>
+                                disabled={disabled}
+                                id="train-scheduler"
+                                value={recipe.scheduler}
+                                choices={SCHEDULERS}
+                                onChange={(value) =>
+                                    onChange({ scheduler: value === "auto" ? "cosine" : value })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            id="train-weight-decay"
+                            label={<Tipped label="Weight decay" tip={WEIGHT_DECAY_TIP} />}
+                        >
+                            <NumberField
+                                disabled={disabled}
+                                className="w-full"
+                                groupClassName="w-full"
+                                id="train-weight-decay"
+                                value={recipe.weightDecay}
+                                onValueChange={(value) =>
+                                    onChange({ weightDecay: value ?? recipe.weightDecay })
+                                }
+                                min={0}
+                                max={MAX_WEIGHT_DECAY}
+                                step={0.01}
+                                largeStep={0.05}
+                                format={FRACTION}
                             />
                         </Field>
                         <Field
@@ -542,11 +620,7 @@ export function Advanced({
                             label={
                                 <Tipped
                                     label="Score every (steps)"
-                                    tip={
-                                        checks === null
-                                            ? `Automatic scores ${count(heldOut)} held-out rows a few times during the run and at the end.`
-                                            : `${count(checks)} ${checks === 1 ? "check" : "checks"} on ${count(heldOut)} rows, the last at the end. Each costs a little time.`
-                                    }
+                                    tip={evalTip(checks, lossRows, heldOut)}
                                 />
                             }
                         >

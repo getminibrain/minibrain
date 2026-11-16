@@ -282,7 +282,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
   UI: Models › model › Train · Roadmap: Training memory
 - **Training settings** · partial · ml
-  Pick Fast, Balanced, Best or Custom; tune every setting, warmup included.
+  Fast, Balanced, Best or Custom; tune warmup, schedule, dropout, weight decay.
   UI: Models › model › Train › Training, Settings › General › Default training recipe · API: POST /api/models/{name}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.

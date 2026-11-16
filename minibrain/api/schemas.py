@@ -569,11 +569,16 @@ class TrainingSetup(BaseModel):
     rank: int | None
     epochs: float | None
     learning_rate: float | None
+    warmup: float | None
+    scheduler: str | None
     batch: int | None
     seq_len: int | None
     max_rows: int | None
     examples: int | None
     held_out: int | None
+    loss_rows: int | None = Field(
+        description="Held-out rows the held-out loss is measured on; the final score uses every one."
+    )
     changed: list[str]
 
 
@@ -955,6 +960,13 @@ class TrainingSettings(BaseModel):
     warmup: float | None = Field(
         default=None, ge=0, le=0.5, description="Share of the optimiser steps that ramp the learning rate up from 0."
     )
+    scheduler: Literal["cosine", "linear", "constant"] | None = Field(
+        default=None, description="How the learning rate changes after warmup."
+    )
+    dropout: float | None = Field(default=None, ge=0, le=0.3, description="LoRA dropout on the adapter's input.")
+    weight_decay: float | None = Field(
+        default=None, ge=0, le=0.2, description="Pulls the adapter's weights toward zero each optimiser step."
+    )
     epochs: float | None = Field(default=None, gt=0, le=10)
     max_rows: int | None = Field(default=None, ge=10)
     alpha: int | None = Field(default=None, ge=1, le=512)
@@ -1007,6 +1019,9 @@ class TrainingDefaults(BaseModel):
     rank: int
     learning_rate: float
     warmup: float
+    scheduler: str
+    dropout: float
+    weight_decay: float
     epochs: float
     max_rows: int
     alpha: int
@@ -1065,6 +1080,7 @@ class TrainingPlanInfo(BaseModel):
     warmup_steps: int | None
     grad_accum: int | None
     held_out_rows: int
+    loss_rows: int = Field(description="Held-out rows the held-out loss is measured on during training.")
     machines: list[MachinePlanInfo]
     queue: TrainingQueueInfo
 

@@ -18,7 +18,7 @@ from minibrain.data.splits import read_split
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
 from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
-from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE, train_steps, warmup_steps
+from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE, scheduler_type, train_steps, warmup_steps
 from minibrain.ml.runtime import load_tokenizer
 from minibrain.ml.strategies import (
     fitted_recipe,
@@ -194,6 +194,7 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, rows: int
     batch, accumulate = micro_batches(recipe, device)
     settings = trainer_settings(recipe)
     steps = train_steps(rows, settings.epochs, settings.micro_batch, settings.grad_accum)
+    warmup = warmup_steps(settings.warmup, steps)
     return SFTConfig(
         output_dir=str(checkpoints),
         num_train_epochs=settings.epochs,
@@ -204,8 +205,9 @@ def sft_config(checkpoints: Path, recipe: dict[str, Any], device: str, rows: int
         gradient_checkpointing=settings.checkpointing,
         gradient_checkpointing_kwargs={"use_reentrant": False} if settings.checkpointing else None,
         optim=settings.optimizer,
-        lr_scheduler_type="cosine",
-        warmup_steps=warmup_steps(settings.warmup, steps),
+        lr_scheduler_type=scheduler_type(settings.scheduler, warmup),
+        warmup_steps=warmup,
+        weight_decay=settings.weight_decay,
         logging_steps=1,
         eval_strategy="steps" if evaluate else "no",
         eval_steps=eval_steps(recipe, evaluate),
