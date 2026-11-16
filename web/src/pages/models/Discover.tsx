@@ -109,8 +109,16 @@ export type Actions = {
     open: (path: string) => void;
     refresh: () => Promise<unknown>;
     online: boolean;
+    offline: string;
     tokenConfigured: boolean;
 };
+
+export function offlineReason(data: CatalogResponse | undefined): string {
+    const why = data?.offline_forced
+        ? "Offline mode"
+        : `No connection to ${data?.endpoint ?? "the hub"}`;
+    return `${why}: downloads need a connection. Import model works offline.`;
+}
 
 export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
     const available = entry.added.find((added) => added.availability.state === "available");
@@ -167,7 +175,29 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     if (!can.admin) {
         return null;
     }
-    if (failed && on.online) {
+    const label = (
+        <>
+            <CubePlus />
+            Add model
+        </>
+    );
+    if (!on.online) {
+        return (
+            <div className="flex justify-end gap-1">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span>
+                            <Button disabled>{label}</Button>
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs whitespace-normal">
+                        {on.offline}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+        );
+    }
+    if (failed) {
         return (
             <div className="flex flex-col items-end gap-1">
                 <Button
@@ -195,28 +225,9 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
             </div>
         );
     }
-    const label = (
-        <>
-            <CubePlus />
-            Add model
-        </>
-    );
     return (
         <div className="flex justify-end gap-1">
-            {on.online ? (
-                <Button onClick={() => on.download(entry)}>{label}</Button>
-            ) : (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <span>
-                            <Button disabled>{label}</Button>
-                        </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        Downloads need a connection. Import model works offline.
-                    </TooltipContent>
-                </Tooltip>
-            )}
+            <Button onClick={() => on.download(entry)}>{label}</Button>
         </div>
     );
 }
@@ -720,9 +731,10 @@ export function Discover({
             open: (path) => router.history.push(path),
             refresh,
             online: data?.online !== false,
+            offline: offlineReason(data),
             tokenConfigured: Boolean(data?.token_configured),
         }),
-        [router, refresh, data?.online, data?.token_configured, search.pool],
+        [router, refresh, data, search.pool],
     );
     const names = useMemo(
         () => new Map((data?.entries ?? []).map((entry) => [entry.id, entry.name])),

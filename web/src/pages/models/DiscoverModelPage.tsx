@@ -23,9 +23,11 @@ import {
     addModelHref,
     discoverHref,
     memoryNeeded,
+    offlineReason,
     parameters,
     releasedText,
 } from "./Discover";
+import { Tip } from "./detail/header";
 import { useModelsRefresh } from "./dialogs";
 import { FormatHelp, formatName, formatUse } from "./formats";
 import { TRAIN_MEMORY_INFO, runnable, trainMemory } from "./runsHere";
@@ -99,6 +101,7 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
 
 function variantColumns(
     allowed: boolean,
+    reason: string | null,
     pool: string,
     onDownload: (variant: CatalogVariantInfo) => void,
 ): ColumnDef<CatalogVariantInfo, unknown>[] {
@@ -169,14 +172,16 @@ function variantColumns(
             enableSorting: false,
             cell: ({ row }) => (
                 <div className="flex justify-end">
-                    <Button
-                        variant="secondary"
-                        disabled={!allowed}
-                        onClick={() => onDownload(row.original)}
-                    >
-                        <CubePlus />
-                        Add model
-                    </Button>
+                    <Tip tip={reason}>
+                        <Button
+                            variant="secondary"
+                            disabled={!allowed}
+                            onClick={() => onDownload(row.original)}
+                        >
+                            <CubePlus />
+                            Add model
+                        </Button>
+                    </Tip>
                 </div>
             ),
         },
@@ -212,20 +217,26 @@ export function DiscoverModelPage() {
             open: (path) => router.history.push(path),
             refresh,
             online: data?.online !== false,
+            offline: offlineReason(data),
             tokenConfigured: Boolean(data?.token_configured),
         }),
-        [router, refresh, data?.online, data?.token_configured],
+        [router, refresh, data],
     );
     const can = useCan();
     const blocked = !can.admin || !on.online || Boolean(entry?.gated && !on.tokenConfigured);
     const table = useMemo(
         () =>
-            variantColumns(!blocked, data?.pool ?? "local", (variant) => {
-                if (entry) {
-                    router.history.push(addModelHref(entry, variant.id));
-                }
-            }),
-        [blocked, entry, router, data?.pool],
+            variantColumns(
+                !blocked,
+                on.online ? null : on.offline,
+                data?.pool ?? "local",
+                (variant) => {
+                    if (entry) {
+                        router.history.push(addModelHref(entry, variant.id));
+                    }
+                },
+            ),
+        [blocked, on.online, on.offline, entry, router, data?.pool],
     );
     const crumbs = [
         { label: "Discover", href: discoverListHref() },

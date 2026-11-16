@@ -36,6 +36,7 @@ import {
     compareHref,
     contextText,
     discoverHref,
+    offlineReason,
     parameters,
     releasedText,
 } from "./Discover";
@@ -697,9 +698,10 @@ export function DiscoverComparePage() {
             open: (path) => router.history.push(path),
             refresh,
             online: data?.online !== false,
+            offline: offlineReason(data),
             tokenConfigured: Boolean(data?.token_configured),
         }),
-        [router, refresh, data?.online, data?.token_configured, pool],
+        [router, refresh, data, pool],
     );
     const byId = new Map((data?.entries ?? []).map((entry) => [entry.id, entry]));
     const missing = data ? ids.filter((id) => !byId.has(id)) : [];
