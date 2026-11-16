@@ -10,7 +10,7 @@ export function TeardownToasts() {
     const person = usePerson();
     const toast = useRef(useToast());
     const tracked = useRef(new Map<string, ModelRow>());
-    const me = person ? (person.email ?? person.name) : null;
+    const me = person?.role ? (person.email ?? person.name) : null;
     const models = useQuery({
         queryKey: keys.allModels,
         queryFn: loadAllModels,
