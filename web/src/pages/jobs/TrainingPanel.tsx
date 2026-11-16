@@ -40,7 +40,9 @@ import {
 
 const TRAIN = "var(--primary)";
 const HELD_OUT = "var(--file-sql)";
-const PREVIOUS = "var(--faint)";
+const PREVIOUS = "color-mix(in srgb, var(--primary) 45%, var(--muted-foreground))";
+const PREVIOUS_HELD_OUT = "color-mix(in srgb, var(--file-sql) 45%, var(--muted-foreground))";
+const PREVIOUS_DASH = "5 4";
 const LOSS = (value: number) => value.toFixed(3);
 const RATE = (value: number) => (value === 0 ? "0" : value.toExponential(1));
 const RATE_LINE = "var(--muted-foreground)";
@@ -100,13 +102,15 @@ function lossSeries(
             key: "previous",
             label: `v${previous.version} training loss`,
             color: PREVIOUS,
+            dash: PREVIOUS_DASH,
         });
     }
     if (previous && previous.evals.length > 0) {
         series.push({
             key: "previous_eval",
             label: `v${previous.version} held-out loss`,
-            color: PREVIOUS,
+            color: PREVIOUS_HELD_OUT,
+            dash: PREVIOUS_DASH,
             dots: true,
         });
     }
@@ -428,7 +432,7 @@ function readoutSpecs(
             items: withValue(previous?.evals ?? [], (point) => point.eval_loss),
             label: `${version} held-out loss`,
             until: theirs,
-            color: PREVIOUS,
+            color: PREVIOUS_HELD_OUT,
             dot: true,
         },
         {

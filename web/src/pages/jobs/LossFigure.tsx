@@ -20,6 +20,7 @@ export type LaneSeries = {
     dots?: boolean;
     width?: number;
     opacity?: number;
+    dash?: string;
 };
 
 export type ReadoutLine = {
@@ -115,6 +116,7 @@ function Lines({ series }: { series: LaneSeries[] }) {
             stroke={item.color}
             strokeOpacity={item.opacity ?? 1}
             strokeWidth={item.width ?? 2}
+            strokeDasharray={item.dash}
             strokeLinecap="round"
             strokeLinejoin="round"
             dot={item.dots ? { r: 3, strokeWidth: 2, stroke: SURFACE, fill: item.color } : false}
