@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session, sessionmaker
@@ -55,6 +55,7 @@ from minibrain.api import (
 from minibrain.api.access import Identify, SecurityHeaders, TrustedProxy
 from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
+from minibrain.api.path_ids import ids_in_range
 from minibrain.api.sections import tag_sections
 from minibrain.artifacts import ArtifactError
 from minibrain.auth.accounts import AccountError, SignInError, WrongPassword, ensure_csrf_key
@@ -268,6 +269,7 @@ def create_app(
         redoc_url=None,
         openapi_url=None,
         lifespan=lifespan,
+        dependencies=[Depends(ids_in_range)],
     )
     app.state.settings = settings
     app.state.sessions = sessions
