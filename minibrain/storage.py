@@ -1,3 +1,4 @@
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,13 +14,24 @@ class Space:
     free: int
     total: int
     device: int | None = None
+    mount: str | None = None
+
+
+def mount_of(path: Path) -> Path:
+    for candidate in (path, *path.parents):
+        if os.path.ismount(candidate):
+            return candidate
+    return Path(path.anchor or "/")
 
 
 def disk_space(path: Path) -> Space | None:
     for candidate in (path, *path.parents):
         if candidate.exists():
             usage = shutil.disk_usage(candidate)
-            return Space(free=usage.free, total=usage.total, device=candidate.stat().st_dev)
+            resolved = candidate.resolve()
+            return Space(
+                free=usage.free, total=usage.total, device=candidate.stat().st_dev, mount=str(mount_of(resolved))
+            )
     return None
 
 

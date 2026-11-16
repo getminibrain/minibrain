@@ -9,6 +9,7 @@ export type GaugeKind =
     | "database"
     | "datasets"
     | "uploads"
+    | "minibrain"
     | "other";
 
 type KindStyle = { label: string; color: string; danger: string };
@@ -42,6 +43,11 @@ export const GAUGE_KINDS: Record<GaugeKind, KindStyle> = {
     uploads: {
         label: "Uploads, adapters and results",
         color: "var(--chart-series-2)",
+        danger: "var(--destructive)",
+    },
+    minibrain: {
+        label: "minibrain",
+        color: "var(--chart-series-5)",
         danger: "var(--destructive)",
     },
     other: { label: "Other files", color: "var(--faint)", danger: "var(--faint)" },
@@ -112,6 +118,7 @@ export function UsageGauge({
     low = false,
     over = false,
     legend = true,
+    free = true,
     className,
 }: {
     label: string;
@@ -120,6 +127,7 @@ export function UsageGauge({
     low?: boolean;
     over?: boolean;
     legend?: boolean;
+    free?: boolean;
     className?: string;
 }) {
     const total = used(segments);
@@ -172,7 +180,7 @@ export function UsageGauge({
             </div>
             {legend && (
                 <GaugeLegend
-                    items={legendItems(segments, capacity, state, anyPlanned)}
+                    items={legendItems(segments, capacity, state, anyPlanned, free)}
                     short={total > capacity ? total - capacity : null}
                 />
             )}
@@ -187,6 +195,7 @@ function legendItems(
     capacity: number,
     state: State,
     anyPlanned: boolean,
+    withFree: boolean,
 ): LegendItem[] {
     const groups = new Map<string, { segment: GaugeSegment; bytes: number }>();
     for (const segment of segments) {
@@ -208,7 +217,7 @@ function legendItems(
         value: bytes(value),
     }));
     const free = capacity - used(segments);
-    if (free >= 0) {
+    if (withFree && free >= 0) {
         items.push({ key: "free", label: "Free", swatch: null, value: bytes(free) });
     }
     return items;

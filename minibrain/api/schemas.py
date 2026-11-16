@@ -1321,13 +1321,29 @@ class StoreInfo(BaseModel):
     free_bytes: int | None
     total_bytes: int | None
     disk: str | None = Field(default=None, description="Stores on the same physical disk share this id.")
+    mount: str | None = Field(default=None, description="Mount point of the disk that holds the store.")
 
 
 class StoredItem(BaseModel):
-    kind: Literal["model", "dataset"]
+    kind: Literal["model", "dataset", "adapter", "upload", "log"]
     key: str
     name: str
     size_bytes: int
+    version: int | None = Field(default=None, description="Model version that owns an adapter.")
+
+
+class UnusedModel(BaseModel):
+    key: str
+    name: str
+    size_bytes: int
+
+
+class Reclaimable(BaseModel):
+    dataset_versions: int = Field(description="Dataset versions past retention, removed by the next cleanup.")
+    dataset_versions_bytes: int
+    unused_models: list[UnusedModel] = Field(description="Base models on main that no model is built on or serves.")
+    orphan_uploads: int = Field(description="Uploaded files no source refers to.")
+    orphan_uploads_bytes: int
 
 
 class InfrastructureInfo(BaseModel):
@@ -1338,6 +1354,7 @@ class InfrastructureInfo(BaseModel):
     stores: list[StoreInfo]
     dataset_versions: DatasetVersionUsage | None = None
     largest: list[StoredItem]
+    reclaimable: Reclaimable | None = None
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]

@@ -5808,6 +5808,7 @@ export interface components {
             dataset_versions?: components["schemas"]["DatasetVersionUsage"] | null;
             /** Largest */
             largest: components["schemas"]["StoredItem"][];
+            reclaimable?: components["schemas"]["Reclaimable"] | null;
         };
         /** InspectRequest */
         InspectRequest: {
@@ -7731,6 +7732,28 @@ export interface components {
             /** Progress */
             progress: number;
         };
+        /** Reclaimable */
+        Reclaimable: {
+            /**
+             * Dataset Versions
+             * @description Dataset versions past retention, removed by the next cleanup.
+             */
+            dataset_versions: number;
+            /** Dataset Versions Bytes */
+            dataset_versions_bytes: number;
+            /**
+             * Unused Models
+             * @description Base models on main that no model is built on or serves.
+             */
+            unused_models: components["schemas"]["UnusedModel"][];
+            /**
+             * Orphan Uploads
+             * @description Uploaded files no source refers to.
+             */
+            orphan_uploads: number;
+            /** Orphan Uploads Bytes */
+            orphan_uploads_bytes: number;
+        };
         /** RelabelInfo */
         RelabelInfo: {
             /** Input */
@@ -8649,6 +8672,11 @@ export interface components {
              * @description Stores on the same physical disk share this id.
              */
             disk?: string | null;
+            /**
+             * Mount
+             * @description Mount point of the disk that holds the store.
+             */
+            mount?: string | null;
         };
         /** StoredItem */
         StoredItem: {
@@ -8656,13 +8684,18 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "model" | "dataset";
+            kind: "model" | "dataset" | "adapter" | "upload" | "log";
             /** Key */
             key: string;
             /** Name */
             name: string;
             /** Size Bytes */
             size_bytes: number;
+            /**
+             * Version
+             * @description Model version that owns an adapter.
+             */
+            version?: number | null;
         };
         /** SystemInfo */
         SystemInfo: {
@@ -9336,6 +9369,15 @@ export interface components {
             role: string;
             /** Content */
             content: string;
+        };
+        /** UnusedModel */
+        UnusedModel: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
         };
         /** Usage */
         Usage: {

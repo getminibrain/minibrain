@@ -499,7 +499,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep base weights in the bucket; machines fetch them by signed links.
   UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
-  See each disk's use by category and the largest stored items.
+  See disk use, minibrain's share, the largest items and what to free.
   UI: Infrastructure › Storage · API: GET /api/system/infrastructure
 - **Highly available main** · shipped · admin
   Run several mains on Postgres, with a leader for background work.

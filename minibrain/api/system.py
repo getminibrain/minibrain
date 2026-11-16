@@ -15,15 +15,18 @@ from minibrain.api.schemas import (
     InfrastructureInfo,
     InstallSettings,
     LoadedModel,
+    Reclaimable,
     StorageCheck,
     StorageSettings,
     StorageUpdate,
     StoredItem,
     StoreInfo,
     SystemInfo,
+    UnusedModel,
 )
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
+from minibrain.data.dataset_versions import doomed_dataset_versions
 from minibrain.data.limits import load_limits
 from minibrain.data.splits import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
 from minibrain.models.bucket import WEIGHTS, writes_bucket
@@ -38,7 +41,18 @@ from minibrain.object_store import save as save_storage
 from minibrain.recipes import DEFAULT_RECIPE
 from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact, BaseModel, BaseModelStatus, Dataset, DatasetVersion, Job, Version
+from minibrain.registry.models import (
+    Artifact,
+    BaseModel,
+    BaseModelStatus,
+    Dataset,
+    DatasetVersion,
+    Job,
+    JobAttempt,
+    Model,
+    Source,
+    Version,
+)
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
@@ -102,6 +116,7 @@ def folder_store(name: str, path: Path, used: int | None) -> StoreInfo:
         free_bytes=space.free if space else None,
         total_bytes=space.total if space else None,
         disk=str(space.device) if space and space.device is not None else None,
+        mount=space.mount if space else None,
     )
 
 
@@ -243,6 +258,7 @@ def infrastructure(
         ],
         dataset_versions=usage,
         largest=largest_items(session),
+        reclaimable=reclaimable(session),
     )
 
 
@@ -263,7 +279,77 @@ def largest_items(session: Session) -> list[StoredItem]:
         for dataset in named
         if sum(stored[dataset.id].values()) > 0
     ]
-    return sorted(models + datasets, key=lambda item: item.size_bytes, reverse=True)[:LARGEST]
+    items = models + datasets + adapter_items(session) + upload_items(session) + log_items(session)
+    return sorted(items, key=lambda item: item.size_bytes, reverse=True)[:LARGEST]
+
+
+def adapter_items(session: Session) -> list[StoredItem]:
+    found = session.execute(
+        select(Model.slug, Model.name, Version.number, Artifact.size)
+        .join(Version, Version.model_id == Model.id)
+        .join(Artifact, Artifact.id == Version.adapter_artifact_id)
+        .where(Artifact.size > 0)
+        .order_by(Artifact.size.desc())
+        .limit(LARGEST)
+    )
+    return [
+        StoredItem(kind="adapter", key=slug, name=f"{name} v{number}", size_bytes=size, version=number)
+        for slug, name, number, size in found
+    ]
+
+
+def upload_items(session: Session) -> list[StoredItem]:
+    found = session.execute(
+        select(Source.id, Source.name, Artifact.size)
+        .join(Artifact, Artifact.id == Source.artifact_id)
+        .where(Artifact.size > 0)
+        .order_by(Artifact.size.desc())
+        .limit(LARGEST)
+    )
+    return [StoredItem(kind="upload", key=str(source), name=name, size_bytes=size) for source, name, size in found]
+
+
+def log_items(session: Session) -> list[StoredItem]:
+    found = session.execute(
+        select(JobAttempt.job_id, func.sum(Artifact.size))
+        .join(Artifact, Artifact.id == JobAttempt.log_artifact_id)
+        .group_by(JobAttempt.job_id)
+        .order_by(func.sum(Artifact.size).desc())
+        .limit(LARGEST)
+    )
+    return [
+        StoredItem(kind="log", key=str(job), name=f"Job {job} log", size_bytes=int(size)) for job, size in found if size
+    ]
+
+
+def reclaimable(session: Session) -> Reclaimable:
+    doomed = doomed_dataset_versions(session)
+    doomed_ids = {item.id for item in doomed}
+    kept = set(session.scalars(select(DatasetVersion.artifact_id).where(DatasetVersion.id.not_in(doomed_ids))))
+    freed = {item.artifact_id: item.size for item in doomed if item.artifact_id not in kept}
+    built_on = set(session.scalars(select(Model.base_model))) | set(session.scalars(select(Version.base_model)))
+    unused = [
+        UnusedModel(key=base.id, name=base.name, size_bytes=base.size_bytes)
+        for base in session.scalars(
+            select(BaseModel)
+            .where(*on_main(), BaseModel.size_bytes > 0, BaseModel.deployed.is_(False))
+            .order_by(BaseModel.size_bytes.desc())
+        )
+        if base.id not in built_on
+    ]
+    referenced = select(Source.artifact_id).where(Source.artifact_id.is_not(None))
+    orphans = session.execute(
+        select(func.count(Artifact.id), func.sum(Artifact.size)).where(
+            Artifact.kind == ArtifactKind.SOURCE, Artifact.id.not_in(referenced)
+        )
+    ).one()
+    return Reclaimable(
+        dataset_versions=len(doomed),
+        dataset_versions_bytes=sum(freed.values()),
+        unused_models=unused,
+        orphan_uploads=int(orphans[0] or 0),
+        orphan_uploads_bytes=int(orphans[1] or 0),
+    )
 
 
 def dataset_version_usage(session: Session) -> DatasetVersionUsage:

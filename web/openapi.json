@@ -19295,6 +19295,16 @@
             },
             "type": "array",
             "title": "Largest"
+          },
+          "reclaimable": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reclaimable"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -25182,6 +25192,45 @@
         ],
         "title": "QueuedJobInfo"
       },
+      "Reclaimable": {
+        "properties": {
+          "dataset_versions": {
+            "type": "integer",
+            "title": "Dataset Versions",
+            "description": "Dataset versions past retention, removed by the next cleanup."
+          },
+          "dataset_versions_bytes": {
+            "type": "integer",
+            "title": "Dataset Versions Bytes"
+          },
+          "unused_models": {
+            "items": {
+              "$ref": "#/components/schemas/UnusedModel"
+            },
+            "type": "array",
+            "title": "Unused Models",
+            "description": "Base models on main that no model is built on or serves."
+          },
+          "orphan_uploads": {
+            "type": "integer",
+            "title": "Orphan Uploads",
+            "description": "Uploaded files no source refers to."
+          },
+          "orphan_uploads_bytes": {
+            "type": "integer",
+            "title": "Orphan Uploads Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_versions",
+          "dataset_versions_bytes",
+          "unused_models",
+          "orphan_uploads",
+          "orphan_uploads_bytes"
+        ],
+        "title": "Reclaimable"
+      },
       "RelabelInfo": {
         "properties": {
           "input": {
@@ -27867,6 +27916,18 @@
             ],
             "title": "Disk",
             "description": "Stores on the same physical disk share this id."
+          },
+          "mount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mount",
+            "description": "Mount point of the disk that holds the store."
           }
         },
         "type": "object",
@@ -27886,7 +27947,10 @@
             "type": "string",
             "enum": [
               "model",
-              "dataset"
+              "dataset",
+              "adapter",
+              "upload",
+              "log"
             ],
             "title": "Kind"
           },
@@ -27901,6 +27965,18 @@
           "size_bytes": {
             "type": "integer",
             "title": "Size Bytes"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Model version that owns an adapter."
           }
         },
         "type": "object",
@@ -30030,6 +30106,29 @@
           "content"
         ],
         "title": "TurnInfo"
+      },
+      "UnusedModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "size_bytes"
+        ],
+        "title": "UnusedModel"
       },
       "Usage": {
         "properties": {
