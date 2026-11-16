@@ -99,7 +99,7 @@ def staging_key(artifact_id: str, filename: str) -> str:
 
 def staged_utf8(store: ArtifactStore, artifact_id: str, filename: str, target: Path) -> None:
     suffix = Path(filename).suffix.lower()
-    plain = target.parent / f"utf8{suffix}"
+    plain = target.parent / Path(filename).name
     with store.open(artifact_id) as stream, plain.open("wb") as out:
         transcode(stream, out)
     stage_files([str(plain)], READERS[suffix], filename, target)

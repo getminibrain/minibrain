@@ -13,14 +13,19 @@ import duckdb
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
 from minibrain.encryption.duck import register
 
+MAX_ROW_BYTES = 64 * 1024 * 1024
+CSV_LIMIT = f"max_line_size = {MAX_ROW_BYTES}"
+JSON_LIMIT = f"maximum_object_size = {MAX_ROW_BYTES}"
 READERS = {
-    ".csv": "read_csv_auto({})",
-    ".tsv": "read_csv_auto({}, delim = '\\t')",
-    ".json": "read_json_auto({})",
-    ".jsonl": "read_json_auto({})",
-    ".ndjson": "read_json_auto({})",
+    ".csv": f"read_csv_auto({{}}, {CSV_LIMIT})",
+    ".tsv": f"read_csv_auto({{}}, delim = '\\t', {CSV_LIMIT})",
+    ".json": f"read_json_auto({{}}, {JSON_LIMIT})",
+    ".jsonl": f"read_json_auto({{}}, {JSON_LIMIT})",
+    ".ndjson": f"read_json_auto({{}}, {JSON_LIMIT})",
     ".parquet": "read_parquet({})",
 }
+LONG_ROW = re.compile(r"Maximum line size of \d+ bytes exceeded")
+ERROR_FILE = re.compile(r"^\s*file = (.+)$", re.MULTILINE)
 SOURCE_TABLE = "source"
 QUERY_TIMEOUT_SECONDS = 30
 TABLE_NAME_LENGTH = 48
@@ -30,6 +35,16 @@ BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "delta_", "sqlite_", "duc
 
 class SourceError(Exception):
     pass
+
+
+def readable_error(error: duckdb.Error) -> str:
+    text = str(error)
+    if not LONG_ROW.search(text):
+        return text
+    file = ERROR_FILE.search(text)
+    where = f" in {Path(file.group(1).strip()).name}" if file else ""
+    limit = MAX_ROW_BYTES // (1024 * 1024)
+    return f"a row{where} is longer than {limit} MB, the most minibrain reads in one row; split or shorten it"
 
 
 @dataclass(frozen=True)
@@ -130,7 +145,7 @@ def create_staged(query: str, label: str, staging_path: Path) -> None:
             connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS {query}")
     except duckdb.Error as error:
         staging_path.unlink(missing_ok=True)
-        raise SourceError(f"could not read {label}: {error}") from error
+        raise SourceError(f"could not read {label}: {readable_error(error)}") from error
 
 
 def stage(source: str | Path, staging_path: Path) -> None:
@@ -195,7 +210,7 @@ def connect(
         raise SourceError(str(error)) from error
     except duckdb.Error as error:
         connection.close()
-        raise SourceError(str(error)) from error
+        raise SourceError(readable_error(error)) from error
     return connection
 
 
@@ -211,7 +226,7 @@ def sandbox(
     except duckdb.InterruptException as error:
         raise SourceError(f"the query ran for more than {QUERY_TIMEOUT_SECONDS} seconds and was stopped") from error
     except duckdb.Error as error:
-        raise SourceError(str(error)) from error
+        raise SourceError(readable_error(error)) from error
     finally:
         timer.cancel()
         connection.close()
