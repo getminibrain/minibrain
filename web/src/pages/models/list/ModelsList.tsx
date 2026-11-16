@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Button, SearchInput, cn, useToast } from "obp-ui";
+import { Button, SearchInput, cn } from "obp-ui";
 import {
     type KeyboardEvent,
     type ReactNode,
@@ -30,9 +30,10 @@ import {
 import type { Entry } from "../entries";
 import { useHealthActions } from "../healthActions";
 import { DeployRowsDialog } from "./DeployRowsDialog";
+import { DeployVersionFromList, type VersionToDeploy } from "./DeployVersionFromList";
 import { QuickLook } from "./QuickLook";
 import { FilterChips, ViewOptions } from "./ViewOptions";
-import { deleteEntries, deployRows, promoteVersion, retryDownload } from "./actions";
+import { deleteEntries, deployRows, retryDownload } from "./actions";
 import {
     COLUMNS,
     type Column,
@@ -206,7 +207,6 @@ function Toolbar({ search, chips }: { search: ReactNode; chips: ReactNode }) {
 
 export function ModelsList() {
     const router = useRouter();
-    const toast = useToast();
     const can = useCan();
     const refresh = useModelsRefresh();
     const all = useAllModels();
@@ -227,6 +227,7 @@ export function ModelsList() {
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
     const [deploying, setDeploying] = useState<ModelRow[] | null>(null);
+    const [deployingVersion, setDeployingVersion] = useState<VersionToDeploy | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
     const [switching, setSwitching] = useState<{ row: ModelRow; preferred: string | null } | null>(
@@ -280,27 +281,8 @@ export function ModelsList() {
             setPeek(model.id);
             focusLine(model.id);
         },
-        makeLive: (model, version) => {
-            const live = model.versions.find((item) => item.live);
-            const notes = [
-                `Requests to ${model.key} are answered by v${version.number} from now on.`,
-                live
-                    ? `v${live.number} stays callable as ${model.key}@${live.number}, and you can deploy it again at any time.`
-                    : `${model.name} is not deployed yet: this deploys it.`,
-            ];
-            confirm({
-                title: `Deploy v${version.number} of ${model.name}?`,
-                description: <p>{notes.join(" ")}</p>,
-                confirmLabel: `Deploy v${version.number}`,
-                run: async () => {
-                    await promoteVersion(model.key, version.number);
-                    toast({
-                        title: `v${version.number} of ${model.name} is deployed`,
-                        tone: "success",
-                    });
-                },
-            });
-        },
+        makeLive: (model, version) =>
+            setDeployingVersion({ row: model.row, number: version.number }),
         compare: (model, numbers) => setCompared({ model, numbers }),
         edit: setEditing,
         duplicate: setDuplicating,
@@ -634,6 +616,10 @@ export function ModelsList() {
                 rows={deploying}
                 onOpenChange={(open) => !open && setDeploying(null)}
                 after={done}
+            />
+            <DeployVersionFromList
+                chosen={deployingVersion}
+                onClose={() => setDeployingVersion(null)}
             />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
             <DuplicateModelDialog

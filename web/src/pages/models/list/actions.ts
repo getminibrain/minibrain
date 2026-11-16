@@ -2,14 +2,6 @@ import { type ModelRow, api, removed, unwrap } from "~/api/client";
 import { builtOn, deleteModel, rowId, setDeployed } from "~/lib/teardown";
 import type { Entry } from "../entries";
 
-export function promoteVersion(slug: string, number: number) {
-    return unwrap(
-        api.POST("/api/models/{name}/versions/{number}/promote", {
-            params: { path: { name: slug, number } },
-        }),
-    );
-}
-
 function deleteVersion(row: ModelRow, number: number, cancelJobs: boolean) {
     return removed(
         api.DELETE("/api/models/{name}/versions/{number}", {
