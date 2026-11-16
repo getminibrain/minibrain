@@ -70,6 +70,7 @@ import {
     MoreLine,
     ROW_GRID,
     type RowProps,
+    SkeletonLines,
     VariantLine,
     VersionLine,
 } from "./rows";
@@ -528,7 +529,10 @@ export function ModelsList() {
         />
     );
     const body = all.isLoading ? (
-        <p className="col-span-full px-4 py-6 text-muted-foreground">Loading models…</p>
+        <>
+            <output className="sr-only">Loading models</output>
+            <SkeletonLines columns={shownColumns} nested={nested} />
+        </>
     ) : all.error ? (
         <div className="col-span-full flex items-center gap-2 px-4 py-6">
             <ErrorLine error={all.error} />
@@ -569,6 +573,7 @@ export function ModelsList() {
             {toolbar}
             <div
                 ref={table}
+                aria-busy={all.isLoading}
                 className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card lg:overflow-x-clip"
                 style={{ gridTemplateColumns: tableLayout.template }}
             >

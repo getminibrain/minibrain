@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Link,
+    Skeleton,
     StatusDot,
     Tooltip,
     TooltipContent,
@@ -615,6 +616,45 @@ function baseFacts(model: ListModel): string {
     }
     const live = model.variants.filter(isDeployed).length;
     return `${plural(model.variants.length, "variant")} · ${live} deployed`;
+}
+
+const SKELETON_NAMES = ["w-40", "w-28", "w-48", "w-32", "w-36", "w-24", "w-44"];
+const SKELETON_FACTS = ["w-24", "w-32", "w-20", "w-28", "w-24", "w-36", "w-20"];
+
+export function SkeletonLines({ columns, nested }: { columns: Column[]; nested: boolean }) {
+    return (
+        <div aria-hidden="true" className="col-span-full grid grid-cols-subgrid">
+            <div className="col-span-full -mt-px flex h-8 items-center gap-1.5 border-y px-4">
+                <Skeleton className="h-3 w-20" />
+            </div>
+            <ul className="col-span-full grid grid-cols-subgrid divide-y">
+                {SKELETON_NAMES.map((name, index) => (
+                    <li
+                        key={name + SKELETON_FACTS[index]}
+                        className={cn(ROW_GRID, "py-3")}
+                        style={{ opacity: 1 - index * 0.12 }}
+                    >
+                        <div className="flex min-w-0 items-center gap-2">
+                            {nested && <span className="size-6 shrink-0" />}
+                            <Skeleton className="size-8 shrink-0 rounded-lg" />
+                            <div className="ml-1 flex min-w-0 flex-col gap-1.5">
+                                <Skeleton className={cn("h-3.5", name)} />
+                                <Skeleton className={cn("h-3", SKELETON_FACTS[index])} />
+                            </div>
+                        </div>
+                        {COLUMNS.filter((column) => columns.includes(column.id)).map((column) => (
+                            <Skeleton key={column.id} className="h-3 w-12" />
+                        ))}
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="size-2.5 shrink-0 rounded-full" />
+                            <Skeleton className="h-3 w-16" />
+                        </div>
+                        <span className="size-8" />
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 }
 
 export function ModelLine({
