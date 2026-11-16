@@ -23860,6 +23860,15 @@
             },
             "type": "array",
             "title": "Jobs"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/RecentJob"
+            },
+            "type": "array",
+            "title": "Recent",
+            "description": "The last jobs this machine finished, newest first.",
+            "default": []
           }
         },
         "type": "object",
@@ -25491,6 +25500,72 @@
           "progress"
         ],
         "title": "QueuedJobInfo"
+      },
+      "RecentJob": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome",
+            "description": "How this machine's attempt ended: succeeded, failed, lost or cancelled."
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "model",
+          "model_name",
+          "version",
+          "outcome",
+          "finished_at"
+        ],
+        "title": "RecentJob"
       },
       "Reclaimable": {
         "properties": {

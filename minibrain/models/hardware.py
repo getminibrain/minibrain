@@ -1,7 +1,9 @@
 import os
 import platform
+import re
 import sys
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 GIB = 1024**3
@@ -121,6 +123,33 @@ def gpu_report() -> tuple[str, str, list[Gpu], int | None]:
     return "cpu", f"{cpu}, {os.cpu_count() or 1} cores", [], ram_bytes()
 
 
+NVIDIA_DRIVER = Path("/proc/driver/nvidia/version")
+DRIVER_LINE = re.compile(r"Kernel Module.*?\s(\d+\.\d+(?:\.\d+)*)\s")
+
+
+def nvidia_driver(path: Path) -> str | None:
+    try:
+        found = DRIVER_LINE.search(path.read_text())
+    except OSError:
+        return None
+    return found.group(1) if found else None
+
+
+def runtime_versions(kind: str) -> dict[str, str]:
+    import torch
+
+    found: dict[str, str] = {}
+    if kind == "cuda" and torch.version.cuda:
+        found["cuda"] = str(torch.version.cuda)
+        driver = nvidia_driver(NVIDIA_DRIVER)
+        if driver:
+            found["nvidia-driver"] = driver
+    hip = getattr(torch.version, "hip", None)
+    if kind == "rocm" and hip:
+        found["rocm"] = str(hip)
+    return found
+
+
 def report() -> NodeReport:
     from minibrain.serve.select import installed_engines
     from minibrain.versions import installed_versions
@@ -138,7 +167,7 @@ def report() -> NodeReport:
         usable_bytes=usable,
         gpus=gpus,
         engines=installed_engines(system, arch, kind),
-        versions=installed_versions(),
+        versions=installed_versions() | runtime_versions(kind),
     )
 
 

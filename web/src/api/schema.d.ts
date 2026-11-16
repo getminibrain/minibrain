@@ -7285,6 +7285,12 @@ export interface components {
             };
             /** Jobs */
             jobs: components["schemas"]["NodeJob"][];
+            /**
+             * Recent
+             * @description The last jobs this machine finished, newest first.
+             * @default []
+             */
+            recent?: components["schemas"]["RecentJob"][];
         };
         /** NodeJob */
         NodeJob: {
@@ -7838,6 +7844,29 @@ export interface components {
             status: string;
             /** Progress */
             progress: number;
+        };
+        /** RecentJob */
+        RecentJob: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string | null;
+            /** Model Name */
+            model_name: string | null;
+            /** Version */
+            version: number | null;
+            /**
+             * Outcome
+             * @description How this machine's attempt ended: succeeded, failed, lost or cancelled.
+             */
+            outcome: string;
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
         };
         /** Reclaimable */
         Reclaimable: {

@@ -1,7 +1,11 @@
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
+import pytest
+
+from minibrain.models import hardware
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
 from minibrain.registry.models import (
     Artifact,
@@ -266,3 +270,44 @@ def test_storage_lists_adapters_uploads_and_logs_and_what_could_be_freed(harness
     assert [item["key"] for item in freed["unused_models"]] == ["spare-1b"]
     assert (freed["orphan_uploads"], freed["orphan_uploads_bytes"]) == (1, 70)
     assert (freed["dataset_versions"], freed["dataset_versions_bytes"]) == (1, 123)
+
+
+def finish_on_rack(harness: Harness, count: int) -> list[int]:
+    ids: list[int] = []
+    with harness.sessions() as session:
+        for index in range(count):
+            job = Job(kind=JobKind.EVAL, status=JobStatus.SUCCEEDED, model_slug="support", model_name="Support triage")
+            session.add(job)
+            session.flush()
+            finished = now() - timedelta(minutes=count - index)
+            session.add(JobAttempt(job_id=job.id, number=1, worker="w-rack", outcome="failed", finished_at=finished))
+            ids.append(job.id)
+        session.commit()
+    return ids
+
+
+def test_machines_list_the_jobs_they_finished_last(harness: Harness) -> None:
+    join_rack(harness)
+    ids = finish_on_rack(harness, 7)
+    recent = by_name(harness)["rack"]["nodes"][0]["recent"]
+    assert [job["id"] for job in recent] == list(reversed(ids))[:5]
+    assert {job["outcome"] for job in recent} == {"failed"}
+    assert by_name(harness)["local"]["nodes"][0]["recent"] == []
+
+
+NVIDIA_PROC = (
+    "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  560.35.03  Release Build  (dvs-builder@U16)\n"
+    "GCC version:  gcc version 12.2.0\n"
+)
+
+
+def test_cuda_machines_report_cuda_and_the_nvidia_driver(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import torch
+
+    proc = tmp_path / "version"
+    proc.write_text(NVIDIA_PROC)
+    monkeypatch.setattr(hardware, "NVIDIA_DRIVER", proc)
+    monkeypatch.setattr(torch.version, "cuda", "12.4")
+    assert hardware.runtime_versions("cuda") == {"cuda": "12.4", "nvidia-driver": "560.35.03"}
+    assert hardware.runtime_versions("mps") == {}
+    assert hardware.nvidia_driver(tmp_path / "missing") is None

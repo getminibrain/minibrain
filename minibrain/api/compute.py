@@ -19,6 +19,7 @@ from minibrain.registry.models import (
     AuditEvent,
     EngineReplica,
     Job,
+    JobAttempt,
     JobKind,
     JobStatus,
     Model,
@@ -32,6 +33,8 @@ from minibrain.tasks.service import live_version, serving_base
 router = APIRouter(prefix="/api/compute")
 
 MAX_HOURLY_PRICE = 1_000_000
+RECENT_PER_NODE = 5
+RECENT_SCAN = 500
 PoolName = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 HourlyPrice = Annotated[float, Field(ge=0, le=MAX_HOURLY_PRICE)]
 
@@ -51,6 +54,16 @@ class NodeJob(BaseModel):
     memory_bytes: int | None = Field(default=None, description="The training plan's peak memory, once planned.")
 
 
+class RecentJob(BaseModel):
+    id: int
+    kind: str
+    model: str | None
+    model_name: str | None
+    version: int | None
+    outcome: str = Field(description="How this machine's attempt ended: succeeded, failed, lost or cancelled.")
+    finished_at: datetime
+
+
 class NodeInfo(BaseModel):
     id: str
     host: str
@@ -68,6 +81,7 @@ class NodeInfo(BaseModel):
     engines: list[str]
     versions: dict[str, str] = {}
     jobs: list[NodeJob]
+    recent: list[RecentJob] = Field(default=[], description="The last jobs this machine finished, newest first.")
 
 
 class ServedModel(BaseModel):
@@ -122,6 +136,33 @@ def running_jobs(session: Session) -> dict[str, list[NodeJob]]:
     return found
 
 
+def recent_jobs(session: Session) -> dict[str, list[RecentJob]]:
+    found: dict[str, list[RecentJob]] = {}
+    query = (
+        select(JobAttempt, Job, Worker)
+        .join(Job, Job.id == JobAttempt.job_id)
+        .join(Worker, Worker.id == JobAttempt.worker)
+        .where(JobAttempt.finished_at.is_not(None))
+        .order_by(JobAttempt.finished_at.desc(), JobAttempt.id.desc())
+        .limit(RECENT_SCAN)
+    )
+    for attempt, job, worker in session.execute(query):
+        listed = found.setdefault(node_id(worker.pool, worker.host), [])
+        if len(listed) < RECENT_PER_NODE and attempt.finished_at is not None:
+            listed.append(
+                RecentJob(
+                    id=job.id,
+                    kind=job.kind,
+                    model=job.model_slug,
+                    model_name=job.model_name,
+                    version=job.version_number,
+                    outcome=attempt.outcome,
+                    finished_at=attempt.finished_at,
+                )
+            )
+    return found
+
+
 def adapter_bytes(session: Session, version: Version | None) -> int | None:
     if version is None or version.adapter_artifact_id is None:
         return None
@@ -169,6 +210,7 @@ def replica_info(
 def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
     found: list[PoolInfo] = []
     jobs = running_jobs(session)
+    recent = recent_jobs(session)
     served = served_models(session)
     for pool in pools(session, node):
         nodes = [
@@ -179,6 +221,7 @@ def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
                 online=item.online,
                 seen_at=item.seen_at,
                 jobs=jobs.get(item.id, []),
+                recent=recent.get(item.id, []),
                 **{key: value for key, value in item.report.as_dict().items() if key != "host"},
             )
             for item in pool.nodes
