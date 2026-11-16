@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 from jsonschema import Draft7Validator
 from referencing import Registry, Resource
 
@@ -81,8 +82,8 @@ def test_trained_version_is_a_valid_cyclonedx_ml_bom(harness: Harness) -> None:
     assert sorted(entry["value"] for entry in model["modelCard"]["properties"]) == sorted(LABELS)
     measured = model["modelCard"]["quantitativeAnalysis"]["performanceMetrics"]
     metrics = {(m["type"], m["slice"]): m["value"] for m in measured}
-    assert metrics[("accuracy", "held-out")] == "0.8333"
-    assert metrics[("macro-f1", "held-out")] == "0.8469"
+    assert float(metrics[("accuracy", "held-out")]) == pytest.approx(25 / 30)
+    assert float(metrics[("macro-f1", "held-out")]) == pytest.approx(0.84688995215311)
     assert metrics[("examples", "test")] == "20"
     assert metrics[("recall", "held-out, label billing")] == "0.375"
     assert metrics[("latency-p50-ms", "held-out")] == "41.3"

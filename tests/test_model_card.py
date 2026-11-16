@@ -2,6 +2,8 @@ import hashlib
 import json
 from typing import Any
 
+import pytest
+
 from minibrain.tasks.contracts import label_set
 from minibrain.tasks.examples import Example, single
 from minibrain.tasks.graders import LabelAccuracy, grade
@@ -111,15 +113,21 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
     assert (training["examples"], training["train_loss"]) == (120, 0.4322)
     assert (training["run"]["machine"], training["run"]["device"]) == ("test", "cpu")
     evaluation = card["evaluation"]
-    assert evaluation["held_out"] == {"examples": 30, "accuracy": 0.8333, "macro_f1": 0.8469, "invalid_rate": 0.0667}
+    assert evaluation["held_out"] == pytest.approx(
+        {"examples": 30, "accuracy": 25 / 30, "macro_f1": 0.84688995215311, "invalid_rate": 2 / 30}
+    )
     bug = next(item for item in evaluation["per_label"] if item["label"] == "bug")
-    assert (bug["support"], bug["predicted"], bug["correct"], bug["precision"]) == (8, 11, 8, 0.7273)
+    assert (bug["support"], bug["predicted"], bug["correct"], bug["precision"]) == (8, 11, 8, pytest.approx(8 / 11))
     assert evaluation["confusion"] == [
         {"expected": "billing", "predicted": "bug", "count": 3},
         {"expected": "billing", "predicted": None, "count": 2},
     ]
     prompt_only = evaluation["prompt_only"]
-    assert (prompt_only["number"], prompt_only["same_data"], prompt_only["accuracy_change"]) == (0, True, 0.0333)
+    assert (prompt_only["number"], prompt_only["same_data"], prompt_only["accuracy_change"]) == (
+        0,
+        True,
+        pytest.approx(1 / 30),
+    )
     assert evaluation["previous"]["number"] == 0
     kinds = [limit["kind"] for limit in card["limits"]["derived"]]
     assert kinds == ["low_recall", "invalid_outputs", "small_held_out"]

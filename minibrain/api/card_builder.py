@@ -80,6 +80,10 @@ def rounded(value: Any, digits: int = DIGITS) -> float | None:
     return None if value is None else float(half_up(float(value), digits))
 
 
+def exact(value: Any) -> float | None:
+    return None if value is None else float(value)
+
+
 def whole(value: Any) -> int | None:
     return None if value is None else int(value)
 
@@ -352,9 +356,9 @@ def score_card(split: dict[str, Any] | None, metric: str | None) -> CardScore | 
     values = metric_values(split)
     return CardScore(
         examples=int(split.get("examples", 0)),
-        accuracy=rounded(main_of(split, metric)) or 0.0,
-        macro_f1=rounded(values.get("macro_f1")),
-        invalid_rate=rounded(split.get("invalid_rate", 0.0)) or 0.0,
+        accuracy=exact(main_of(split, metric)) or 0.0,
+        macro_f1=exact(values.get("macro_f1")),
+        invalid_rate=exact(split.get("invalid_rate", 0.0)) or 0.0,
     )
 
 
@@ -368,9 +372,9 @@ def label_score(item: dict[str, Any]) -> CardLabelScore:
         support=int(item.get("support", 0)),
         predicted=int(item.get("predicted", 0)),
         correct=int(item.get("correct", 0)),
-        precision=rounded(item.get("precision")),
-        recall=rounded(item.get("recall")),
-        f1=rounded(item.get("f1")),
+        precision=exact(item.get("precision")),
+        recall=exact(item.get("recall")),
+        f1=exact(item.get("f1")),
     )
 
 
@@ -418,14 +422,14 @@ def cost_card(metrics: dict[str, Any] | None, prices: DevicePrices) -> CardCost 
 def comparison(version: Version, other: Version, prices: DevicePrices) -> CardComparison:
     metrics = other.metrics or {}
     mine, theirs = accuracy_of(version), accuracy_of(other)
-    change = None if mine is None or theirs is None else rounded(mine - theirs)
+    change = None if mine is None or theirs is None else exact(mine - theirs)
     return CardComparison(
         number=other.number,
         kind=other.kind,
         same_data=other.dataset_version_id == version.dataset_version_id,
-        held_out_accuracy=rounded(theirs),
-        held_out_macro_f1=rounded(metric_values(held_out(other)).get("macro_f1")),
-        test_accuracy=rounded(main_of(metrics.get("golden"), version_metric(other))),
+        held_out_accuracy=exact(theirs),
+        held_out_macro_f1=exact(metric_values(held_out(other)).get("macro_f1")),
+        test_accuracy=exact(main_of(metrics.get("golden"), version_metric(other))),
         latency_p50_ms=rounded((metrics.get("latency") or {}).get("p50_ms"), 1),
         accuracy_change=change,
         latency_p95_ms=rounded((metrics.get("latency") or {}).get("p95_ms"), 1),
