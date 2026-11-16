@@ -19,14 +19,7 @@ import {
     succeed,
     unwrap,
 } from "~/api/client";
-import {
-    keys,
-    useAllModels,
-    useDataset,
-    useDatasetPreview,
-    useDatasets,
-    useSources,
-} from "~/api/queries";
+import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { count } from "~/lib/format";
@@ -108,28 +101,6 @@ export function DatasetQuery({
                 unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
             }
         />
-    );
-}
-
-export function DatasetMapping({ slug }: { slug: string }) {
-    const dataset = useDataset(slug);
-    const sources = useSources();
-    const mapped = Boolean(dataset.data?.mapping.sql);
-    const preview = useDatasetPreview(slug, mapped);
-    if (!dataset.data) {
-        return <ErrorLine error={dataset.error} onRetry={dataset.refetch} />;
-    }
-    return (
-        <>
-            <DatasetQuery dataset={dataset.data} sources={sources.data ?? []} />
-            {mapped && (
-                <PreviewSection
-                    data={preview.data}
-                    error={preview.error}
-                    loading={preview.isLoading}
-                />
-            )}
-        </>
     );
 }
 

@@ -148,13 +148,6 @@ export function useSourceStats(id: number) {
     });
 }
 
-export function useDataset(slug: string) {
-    return useQuery({
-        queryKey: keys.dataset(slug),
-        queryFn: () => unwrap(api.GET("/api/datasets/{slug}", path(slug))),
-    });
-}
-
 export function useDatasetPreview(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.datasetPreview(slug),
