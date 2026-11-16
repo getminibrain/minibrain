@@ -43,7 +43,7 @@ export function PageHeader({
         <div className="ml-auto flex min-h-8 shrink-0 items-center gap-2">{actions}</div>
     );
     return (
-        <header className="flex flex-col gap-4 pb-3">
+        <header className="flex flex-col gap-8 pb-3">
             <PageCrumbs items={crumbs ?? [{ label: title }]} />
             {icon ? (
                 <div className="flex flex-wrap items-start justify-between gap-3">
