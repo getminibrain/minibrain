@@ -21,7 +21,7 @@ import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref } from "~/lib/modelLinks";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
-import { Command, rejoinCommand, rejoinHint } from "./NeedsALook";
+import { Command, lowDiskText, rejoinCommand, rejoinHint } from "./NeedsALook";
 import {
     MEMORY_LABELS,
     engineLabel,
@@ -397,7 +397,7 @@ function ProblemsBlock({
         ...lowDiskOf(row.node, info).map((store) => ({
             key: `disk-${store.name}`,
             tone: "warning" as const,
-            text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,
+            text: lowDiskText(store),
             fix: (
                 <span>
                     {"See what takes the space and remove what you no longer need: "}

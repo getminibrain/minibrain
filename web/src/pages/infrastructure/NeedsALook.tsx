@@ -112,22 +112,36 @@ function failedIssue(engine: ReplicaInfo, pool: string): Issue {
     };
 }
 
+export function lowSpace(free: number, total: number): boolean {
+    return free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE;
+}
+
+export function lowDiskText(store: StoreInfo): string {
+    const where = store.mount ? `Disk ${store.mount}` : store.name;
+    return `${where}: only ${bytes(store.free_bytes)} free`;
+}
+
 export function lowStores(info: InfrastructureInfo | undefined): StoreInfo[] {
-    return (info?.stores ?? []).filter(
-        (store) =>
+    const disks = new Map<string, StoreInfo>();
+    for (const store of info?.stores ?? []) {
+        if (
             store.free_bytes !== null &&
             store.free_bytes !== undefined &&
             store.total_bytes &&
-            (store.free_bytes < LOW_FREE_BYTES ||
-                store.free_bytes / store.total_bytes < LOW_FREE_SHARE),
-    );
+            lowSpace(store.free_bytes, store.total_bytes)
+        ) {
+            const key = store.disk ?? store.name;
+            disks.set(key, disks.get(key) ?? store);
+        }
+    }
+    return [...disks.values()];
 }
 
 function lowDisk(info: InfrastructureInfo | undefined): Issue[] {
     return lowStores(info).map((store) => ({
         key: `disk-${store.name}`,
         tone: "warning",
-        text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,
+        text: lowDiskText(store),
         fix: (
             <span>
                 {"See what takes the space and remove what you no longer need: "}

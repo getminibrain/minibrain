@@ -1,5 +1,5 @@
 import { bytes } from "~/lib/time";
-import { differences, lowStores } from "./NeedsALook";
+import { differences, lowDiskText, lowStores } from "./NeedsALook";
 import type { InfrastructureInfo, NodeInfo, PoolInfo, ReplicaInfo, StoreInfo } from "./parts";
 
 export type MachineRow = {
@@ -134,7 +134,7 @@ export function problemsOf(
             kind: "disk" as const,
             tone: "warning" as const,
             label: "Low disk",
-            reason: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,
+            reason: lowDiskText(store),
         })),
     ];
 }

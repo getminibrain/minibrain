@@ -11,12 +11,11 @@ import { count } from "~/lib/format";
 import { JOBS_PATH, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { datasetHref } from "~/pages/models/list/cells";
+import { lowSpace } from "./NeedsALook";
 import { type InfrastructureInfo, type StoreInfo, plural } from "./parts";
 
 type StoredItem = InfrastructureInfo["largest"][number];
 type Reclaimable = NonNullable<InfrastructureInfo["reclaimable"]>;
-
-const LOW_FREE_SHARE = 0.1;
 
 const CATEGORY_KIND: Record<string, GaugeKind> = {
     Database: "database",
@@ -99,7 +98,7 @@ function commonFolder(paths: string[]): string {
 function DiskCard({ disk }: { disk: Disk }) {
     const share = shareSegments(disk);
     const ours = share.reduce((sum, segment) => sum + segment.bytes, 0);
-    const low = disk.free / disk.total < LOW_FREE_SHARE;
+    const low = lowSpace(disk.free, disk.total);
     const where = commonFolder(disk.stores.map((store) => store.location));
     const mount = disk.stores[0]?.mount ?? where;
     const free = `${bytes(disk.free)} free of ${bytes(disk.total)}`;
