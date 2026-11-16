@@ -62,6 +62,11 @@ def test_an_undeployed_model_says_so_and_names_a_version_to_call(harness: Harnes
     own = add_key(harness, CUSTOM)
     other = add_key(harness, BASE, name="base only")
     assert harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False}).status_code == 202
+    stopping = send(harness, own["secret"], f"{SLUG}@0")
+    assert stopping.status_code == 404
+    assert shown(stopping) == f"{SLUG} is being undeployed, so its versions do not answer until it has stopped"
+    assert shown(send(harness, other["secret"], f"{SLUG}@0")) == f"model {SLUG}@0 not found"
+    harness.settle()
     harness.app.state.gateway_config.rebuild()
     refused = send(harness, own["secret"])
     assert refused.status_code == 404

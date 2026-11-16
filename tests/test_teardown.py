@@ -221,18 +221,40 @@ def test_undeploy_shows_stopping_until_every_gateway_and_engine_confirms(harness
     found = shown(harness, SLUG)
     assert found["deployment"]["state"] == "stopping"
     assert found["teardown"]["waiting"] == [
-        f"the gateway on edge-1 to stop routing {SLUG}",
+        f"the gateway on edge-1 to stop routing {SLUG} and {SLUG}@1",
         "the engine in pool local (gpu-1) to finish 2 requests in flight",
     ]
-    report_gateway(harness, [f"{SLUG}@1"])
+    report_gateway(harness, [])
     harness.app.state.teardowns.run_once()
     assert shown(harness, SLUG)["teardown"]["waiting"] == [f"the engine in pool local (gpu-1) to unload {SLUG}-v1"]
     harness.app.state.teardowns.run_once()
     found = shown(harness, SLUG)
     assert found["teardown"] is None and found["deployment"]["state"] == "not_deployed"
-    assert engines.calls[0] == ("http://gpu-1:8300/drain", {"routes": [SLUG], "adapters": [f"{SLUG}-v1"]})
+    routes = [SLUG, f"{SLUG}@0", f"{SLUG}@1"]
+    assert engines.calls[0] == ("http://gpu-1:8300/drain", {"routes": routes, "adapters": [f"{SLUG}-v1"]})
     [done] = events(harness, "model.undeploy_finished")
     assert done.detail["outcome"] == "done" and done.detail["stopped"]["adapters"] == [f"{SLUG}-v1"]
+
+
+def test_versions_do_not_answer_while_their_model_is_being_undeployed(harness: Harness) -> None:
+    trained_and_live(harness)
+    headers = bearer(harness)
+    pinned = CHAT | {"model": f"{SLUG}@1"}
+    assert harness.client.post("/v1/chat/completions", headers=headers, json=pinned).status_code == 200
+    report_gateway(harness, [SLUG])
+    assert harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False}).status_code == 202
+    refused = harness.client.post("/v1/chat/completions", headers=headers, json=pinned)
+    message = f"{SLUG} is being undeployed, so its versions do not answer until it has stopped"
+    assert refused.status_code == 404 and refused.json()["error"]["message"] == message
+    listed = harness.client.get("/v1/models", headers=headers).json()["data"]
+    assert [item["id"] for item in listed] == []
+    tried = harness.client.post("/api/playground/chat/completions", json=pinned)
+    assert tried.status_code == 409 and tried.json()["detail"] == message
+    targets = harness.client.get("/api/playground/models").json()["targets"]
+    assert not any(item["key"] == SLUG for item in targets)
+    report_gateway(harness, [])
+    harness.settle()
+    assert harness.client.post("/v1/chat/completions", headers=headers, json=pinned).status_code == 200
 
 
 def test_a_stop_that_is_never_confirmed_fails_with_the_reason_and_retries(harness: Harness) -> None:

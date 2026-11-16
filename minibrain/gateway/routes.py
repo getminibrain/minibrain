@@ -25,7 +25,7 @@ from minibrain.gateway.chat import (
     served_model,
     sse,
 )
-from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route
+from minibrain.gateway.config import ConfigSource, GatewayConfig, Grant, Route, being_undeployed
 from minibrain.gateway.errors import OpenAIError
 from minibrain.gateway.logs import CHAT_KIND, COMPLETION_KIND, LogBuffer, LogEntry
 from minibrain.gateway.safety import Verdict
@@ -175,8 +175,14 @@ def undeployed(config: GatewayConfig, grant: Grant, name: str) -> str | None:
     return f"{name} is not deployed; deploy it, or call one of its versions such as {name}@{max(numbers)}"
 
 
+def stopping(config: GatewayConfig, grant: Grant, slug: str) -> str | None:
+    owner = config.stopping.get(slug)
+    return being_undeployed(slug) if owner is not None and grant.owns(owner) else None
+
+
 def missing(config: GatewayConfig, grant: Grant, name: str) -> OpenAIError:
-    message = config.deleted.get(name.partition("@")[0]) or undeployed(config, grant, name)
+    slug = name.partition("@")[0]
+    message = config.deleted.get(slug) or stopping(config, grant, slug) or undeployed(config, grant, name)
     return OpenAIError(404, message or f"model {name} not found", "model", "model_not_found")
 
 

@@ -112,27 +112,20 @@ def host_of(node_id: str) -> str:
     return node_id.split("/", 1)[-1]
 
 
-def lora_adapters(model: Model, numbers: set[int] | None = None) -> list[str]:
+def lora_adapters(model: Model) -> list[str]:
     return [
         adapter_name(model.slug, version.number)
         for version in model.versions
-        if version.kind == VersionKind.LORA
-        and version.adapter_artifact_id is not None
-        and (numbers is None or version.number in numbers)
+        if version.kind == VersionKind.LORA and version.adapter_artifact_id is not None
     ]
 
 
-def custom_targets(model: Model, everything: bool) -> dict[str, Any]:
+def custom_targets(model: Model) -> dict[str, Any]:
     current = model.current_version
     serving = serving_base(model)
-    if everything:
-        routes = [model.slug, *(f"{model.slug}@{version.number}" for version in model.versions)]
-        adapters = lora_adapters(model)
-        bases = sorted({serving, *(version.base_model for version in model.versions)})
-    else:
-        routes = [model.slug]
-        adapters = lora_adapters(model, {current}) if current is not None else []
-        bases = [serving]
+    routes = [model.slug, *(f"{model.slug}@{version.number}" for version in model.versions)]
+    adapters = lora_adapters(model)
+    bases = sorted({serving, *(version.base_model for version in model.versions)})
     return {
         "custom": True,
         "slug": model.slug,
@@ -305,7 +298,7 @@ def undeploy_custom(session: Session, model: Model, actor: str) -> Teardown | No
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
     if not model.deployed:
         return None
-    detail = custom_targets(model, everything=False)
+    detail = custom_targets(model)
     model.deployed = False
     model.updated_at = now()
     facts = {"name": model.name, "version": model.current_version}
@@ -364,7 +357,7 @@ def delete_custom(
     live = model.deployed or stopping
     if existing is not None:
         drop(session, existing)
-    detail = custom_targets(model, everything=True) | {"live": live, "jobs": still_active(jobs)}
+    detail = custom_targets(model) | {"live": live, "jobs": still_active(jobs)}
     model.deployed = False
     model.updated_at = now()
     facts: dict[str, Any] = {"name": model.name, "kind": "custom", "versions": len(model.versions), "undeploy": live}

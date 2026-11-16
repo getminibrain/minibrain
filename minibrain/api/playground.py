@@ -25,7 +25,7 @@ from minibrain.gateway.chat import (
     served_model,
     sse,
 )
-from minibrain.gateway.config import GatewayConfig, Route, base_route_for
+from minibrain.gateway.config import GatewayConfig, Route, base_route_for, being_undeployed
 from minibrain.gateway.safety import Verdict
 from minibrain.gateway.schema import CHAT_RESPONSES, ChatCompletionRequest
 from minibrain.ml.completion import Completion
@@ -203,6 +203,9 @@ def playground_route(
     if route is not None:
         base, adapter = checked_base(config, route)
         return route, base, adapter
+    slug = name.partition("@")[0]
+    if slug in config.stopping:
+        raise HTTPException(status_code=409, detail=being_undeployed(slug))
     row = session.get(BaseRow, name)
     if row is None or row.status != BaseModelStatus.AVAILABLE or detect_guard(row.repo, row.name):
         raise HTTPException(status_code=404, detail=str(no_model(session, name)))

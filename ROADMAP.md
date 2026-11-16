@@ -861,6 +861,11 @@ once it matches; only deleting a base removes its files.
   routing the model's names and every engine of its base has drained its requests in flight through those names and
   unloaded its adapters. A base no route needs any more is released: main stops its local engines once they are idle.
   Ten minutes without that is Stop failed, naming what did not confirm.
+- While a custom model stops (Stopping or Stop failed), its versions do not answer either: `/v1` gives 404
+  `model_not_found` "support-triage is being undeployed, so its versions do not answer until it has stopped" to keys
+  that cover it, and the Playground 409 with the same words, so no open client reloads an adapter and stalls the stop.
+  The stop drains every version route and unloads every adapter of the model; once it has stopped, `name@N` answers
+  again like any undeployed model's versions (2026-11-16).
 - Deleting a deployed model needs `undeploy=true`; it stops first, then removes versions, adapters, dataset versions only it
   uses, feedback and API key scopes. A base with models built on it answers 409 with their names unless
   the call says `cascade=true`; the cascade deletes them first, then the base.

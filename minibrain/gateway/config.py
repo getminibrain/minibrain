@@ -72,7 +72,10 @@ class Grant:
         return self.expires_at is not None and datetime.fromisoformat(self.expires_at) <= moment
 
     def covers(self, route: "Route") -> bool:
-        return self.all_models or route.owner in self.owners
+        return self.owns(route.owner)
+
+    def owns(self, owner: str) -> bool:
+        return self.all_models or owner in self.owners
 
     def reachable(self, models: dict[str, list[str]]) -> list[str]:
         owners = sorted(models) if self.all_models else self.owners
@@ -104,6 +107,7 @@ class GatewayConfig:
     guards: dict[str, dict[str, Any]] = field(default_factory=dict)
     deleted: dict[str, str] = field(default_factory=dict)
     placements: dict[str, dict[str, int]] = field(default_factory=dict)
+    stopping: dict[str, str] = field(default_factory=dict)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -122,6 +126,7 @@ class GatewayConfig:
             guards=dict(data.get("guards", {})),
             deleted=dict(data.get("deleted", {})),
             placements={base: dict(found) for base, found in data.get("placements", {}).items()},
+            stopping=dict(data.get("stopping", {})),
         )
 
 
@@ -185,6 +190,10 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
     return routes
 
 
+def being_undeployed(slug: str) -> str:
+    return f"{slug} is being undeployed, so its versions do not answer until it has stopped"
+
+
 def base_route_for(base_model_id: str) -> Route:
     return Route(
         name=base_model_id,
@@ -208,9 +217,14 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     teardowns = list(session.scalars(select(Teardown)))
     deleting = {item.model_id for item in teardowns if item.kind == TeardownKind.DELETE}
     dropped = {item.base_model_id for item in teardowns if item.kind == TeardownKind.DELETE}
+    undeploying = {item.model_id for item in teardowns if item.kind == TeardownKind.UNDEPLOY}
     routes: dict[str, Route] = {}
+    stopping: dict[str, str] = {}
     for model in session.scalars(select(Model).order_by(Model.id)):
         if model.id in deleting:
+            continue
+        if model.id in undeploying:
+            stopping[model.slug] = owner_of(model.id, None)
             continue
         bodies = policy.keeps_bodies(model.request_bodies)
         routes |= {route.name: route for route in routes_for(session, model, bodies)}
@@ -269,6 +283,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         guards=guard_specs(session, settings),
         deleted={reserved.name: deleted_on(reserved) for reserved in session.scalars(select(ReservedName))},
         placements=placements,
+        stopping=stopping,
     )
     return replace(config, version=hash_of(config.to_json()))
 
