@@ -4,7 +4,7 @@ import { failingShare } from "~/components/models/ModelMetrics";
 import type { Tone } from "~/components/models/StatusText";
 import { costText } from "~/lib/cost";
 import { percent, pointsSize } from "~/lib/format";
-import { modelPageHref } from "~/lib/modelLinks";
+import { modelPageHref, trainHref } from "~/lib/modelLinks";
 import { gpu } from "~/lib/traffic";
 
 export type Replica = components["schemas"]["ServingReplica"];
@@ -43,11 +43,14 @@ export function jobOf(id: number | null | undefined, kind: string): JobLink | nu
     return id === null || id === undefined ? null : { id, kind };
 }
 
+export type StatusHint = { text: string; href: string };
+
 export type StatusLine = {
     kind: StatusKind;
     text: string;
     tone: Tone | null;
     row: ModelRow;
+    hint?: StatusHint;
     detail?: string;
     version?: number;
     progress?: number | null;
@@ -371,6 +374,9 @@ function customLine(model: ListModel): StatusLine {
         };
     }
     if (row.activity.state === "needs_examples") {
+        if (isDeployed(row)) {
+            return { ...deployedLine(row), hint: { text: "Needs data", href: trainHref(row.key) } };
+        }
         return { kind: "setup", text: "Needs data", tone: null, row };
     }
     const ready = liveOf(model) ? undefined : trainedReady(model);

@@ -62,6 +62,7 @@ import {
 import { COLUMNS, type Column } from "./filters";
 import {
     type ListModel,
+    type StatusHint,
     baselineOf,
     bestOf,
     canMakeLive,
@@ -291,6 +292,22 @@ function MakeLiveLink({
     );
 }
 
+function StatusHintLink({ hint }: { hint: StatusHint }) {
+    return (
+        <>
+            <span aria-hidden="true" className="text-faint">
+                ·
+            </span>
+            <Link
+                href={hint.href}
+                className="relative z-10 rounded-sm text-sm text-muted-foreground hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+                {hint.text}
+            </Link>
+        </>
+    );
+}
+
 function ModelStatus({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
     const line = statusLine(model);
     const prefix =
@@ -303,6 +320,7 @@ function ModelStatus({ model, on, can }: { model: ListModel; on: Handlers; can: 
                 <span className="text-sm text-muted-foreground">{prefix}</span>
             )}
             <StatusLineText line={line} name={model.name} replicas={replicasOf(model)} />
+            {line.hint && <StatusHintLink hint={line.hint} />}
             {can.build &&
                 (line.kind === "candidate" || line.kind === "ready") &&
                 line.version !== undefined && (
