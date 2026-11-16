@@ -27,7 +27,7 @@ const MARKER: Record<Tone, string> = {
 
 function hrefOf(row: ModelRow, event: ModelActivityEvent): string | null {
     const link = event.link;
-    if (!link) {
+    if (!link || link.deleted) {
         return null;
     }
     switch (link.kind) {
@@ -143,15 +143,17 @@ function Actor({ event }: { event: ModelActivityEvent }) {
 }
 
 function Sentence({ row, event }: { row: ModelRow; event: ModelActivityEvent }) {
+    const gone = event.link?.deleted === true;
     const href = hrefOf(row, event);
     const label = event.link?.label ?? "";
-    const at = label && href ? event.text.lastIndexOf(label) : -1;
+    const at = label && (href || gone) ? event.text.lastIndexOf(label) : -1;
     const before = at >= 0 ? event.text.slice(0, at) : event.text;
     const after = at >= 0 ? event.text.slice(at + label.length) : "";
     return (
         <span className="min-w-0 break-words">
             <Actor event={event} />
             {before}
+            {at >= 0 && gone && <Deleted label={label} />}
             {at >= 0 && href && (
                 <Link
                     href={href}
@@ -212,6 +214,10 @@ function runText(head: ModelActivityEvent, count: number): string {
     return `${head.text} and ${count - 1} more`;
 }
 
+function Deleted({ label }: { label: string }) {
+    return <span className="whitespace-nowrap text-muted-foreground">{`${label} (deleted)`}</span>;
+}
+
 function RunSentence({ row, run }: { row: ModelRow; run: ModelActivityEvent[] }) {
     const head = run[0];
     const top = best(run);
@@ -220,12 +226,16 @@ function RunSentence({ row, run }: { row: ModelRow; run: ModelActivityEvent[] })
         <span className="min-w-0 break-words">
             <Actor event={head} />
             {runText(head, run.length)}
-            {top && topHref && (
+            {top && (topHref || top.link?.deleted) && (
                 <span className="text-muted-foreground">
                     {" · "}
-                    <Link href={topHref} className="font-medium text-primary hover:underline">
-                        {top.link?.label}
-                    </Link>
+                    {topHref ? (
+                        <Link href={topHref} className="font-medium text-primary hover:underline">
+                            {top.link?.label}
+                        </Link>
+                    ) : (
+                        <Deleted label={top.link?.label ?? ""} />
+                    )}
                     <span className="tabular-nums">{` best ${percent(top.score)}`}</span>
                 </span>
             )}

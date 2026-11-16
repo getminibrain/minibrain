@@ -3033,6 +3033,11 @@ export interface components {
             job_kind?: string | null;
             /** Key */
             key?: string | null;
+            /**
+             * Deleted
+             * @default false
+             */
+            deleted?: boolean;
         };
         /** AddedInfo */
         AddedInfo: {

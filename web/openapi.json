@@ -10497,6 +10497,11 @@
               }
             ],
             "title": "Key"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
           }
         },
         "type": "object",

@@ -12,7 +12,7 @@ from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
 from minibrain.auth.accounts import users_by_handle
-from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model
+from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model, VersionStatus
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
 from minibrain.tasks.service import held_out_score
@@ -33,6 +33,7 @@ class ActivityLink(BaseModel):
     job_id: int | None = None
     job_kind: str | None = None
     key: str | None = None
+    deleted: bool = False
 
 
 class ModelActivityEvent(BaseModel):
@@ -60,6 +61,7 @@ class Owner:
     created_at: datetime
     made: int | None = None
     model_id: int | None = None
+    numbers: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -78,7 +80,8 @@ def owner_of(session: Session, name: str) -> Owner:
     custom = session.scalar(select(Model).where(Model.slug == name))
     if custom is not None:
         made = creation_event(session, custom.slug)
-        return Owner(custom.slug, custom.name, True, custom.created_at, made, custom.id)
+        numbers = frozenset(item.number for item in custom.versions if item.status != VersionStatus.DELETING)
+        return Owner(custom.slug, custom.name, True, custom.created_at, made, custom.id, numbers)
     base = session.get(BaseRow, name)
     if base is None:
         raise no_model(session, name)
@@ -105,10 +108,15 @@ def humanised(action: str) -> str:
     return action.replace(".", " ").replace("_", " ")
 
 
-def version_said(event: AuditEvent) -> Said:
+def version_link(owner: Owner, number: int | None) -> ActivityLink:
+    name = f"v{number}"
+    return ActivityLink(kind="version", label=name, version=number, deleted=number not in owner.numbers)
+
+
+def version_said(owner: Owner, event: AuditEvent) -> Said:
     number = number_of(event.target)
     name = f"v{number}"
-    link = ActivityLink(kind="version", label=name, version=number)
+    link = version_link(owner, number)
     if event.action == "version.create":
         if (event.detail or {}).get("duplicated_from"):
             return Said(f"copied {name} from another model", link)
@@ -265,7 +273,7 @@ SENTENCES: dict[str, Callable[[Owner, AuditEvent], Said]] = {
 
 def said(session: Session, owner: Owner, event: AuditEvent) -> Said:
     if event.action.startswith("version."):
-        return version_said(event)
+        return version_said(owner, event)
     if event.action.startswith("key."):
         return key_said(event)
     if event.action.startswith("job."):
@@ -314,7 +322,7 @@ def failure_reason(job: Job) -> str:
     return ": out of memory" if "memory" in (job.error or "").lower() else ""
 
 
-def outcome_of(job: Job, started: AuditEvent | None, names: dict[str, str]) -> ModelActivityEvent:
+def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: dict[str, str]) -> ModelActivityEvent:
     number = job.version_number
     name = f"v{number}"
     failed = job.status == JobStatus.FAILED
@@ -330,7 +338,7 @@ def outcome_of(job: Job, started: AuditEvent | None, names: dict[str, str]) -> M
         actor_name=name_of(actor, names),
         action="version.failed" if failed else "version.trained",
         text=text,
-        link=ActivityLink(kind="version", label=name, version=number),
+        link=version_link(owner, number),
         tone="failed" if failed else "neutral",
         score=None if failed or job.version is None else held_out_score(job.version),
     )
@@ -395,7 +403,7 @@ def activity_of(session: Session, name: str, limit: int) -> ModelActivity:
     events = [
         event_of(session, owner, item, names)
         if isinstance(item, AuditEvent)
-        else outcome_of(item, starts.get(item.id), names)
+        else outcome_of(owner, item, starts.get(item.id), names)
         for _, _, item in moments
     ]
     return ModelActivity(events=events, total=len(kept) + len(jobs))
