@@ -21,6 +21,8 @@ import { beingDeleted } from "~/lib/teardown";
 import { relativeTime } from "~/lib/time";
 import { ModelDataNotice } from "../../../data/versionData";
 import { baseNameOf, isDeployed, modelCrumbs, nextVersion, trainBlock } from "../header";
+import { liveOf } from "../makeLive";
+import { scored } from "../versionState";
 import { AUTO, HeldOutWarning, fitText } from "./parts";
 import { MIN_HELD_OUT, duration, startFrom } from "./recipe";
 import { RunSummary, problemsOf, statusOf } from "./summary";
@@ -300,16 +302,12 @@ function ComputeRow({ run, error }: { run: TrainRun; error: string | undefined }
 }
 
 function againstOf(row: ModelRow, versions: VersionInfo[]): string | null {
-    if (isDeployed(row) && row.current_version !== null && row.current_version !== undefined) {
-        return `deployed v${row.current_version}`;
+    const live = isDeployed(row) ? liveOf(versions) : undefined;
+    if (scored(live)) {
+        return `live v${live.number}`;
     }
-    const scored = versions
-        .filter((version) => version.score !== null && version.score !== undefined)
-        .reduce<number | null>(
-            (best, version) => (best === null || version.number > best ? version.number : best),
-            null,
-        );
-    return scored === null ? null : `v${scored}`;
+    const zero = versions.find((version) => version.number === 0);
+    return scored(zero) ? "v0" : null;
 }
 
 function captionOf(
