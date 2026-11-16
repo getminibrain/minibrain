@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
+import { useParams, useRouter } from "@tanstack/react-router";
 import { TabNav } from "obp-ui";
 import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
@@ -11,6 +11,7 @@ import { ModelNotFound } from "~/components/models/ModelNotFound";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
+import { useScrollToHash } from "~/lib/scrollToHash";
 import { deleteModel, rowId } from "~/lib/teardown";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
 import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
@@ -51,22 +52,6 @@ function useRow(): Lookup {
         retry: models.refetch,
         name,
     };
-}
-
-function useScrollToHash(ready: boolean) {
-    const hash = useRouterState({ select: (state) => state.location.hash });
-    useEffect(() => {
-        if (!ready || !hash) {
-            return;
-        }
-        const target = document.getElementById(hash.replace(/^#/, ""));
-        if (target) {
-            target.scrollIntoView({ block: "start" });
-            target.setAttribute("data-flash", "");
-            const timer = window.setTimeout(() => target.removeAttribute("data-flash"), 1500);
-            return () => window.clearTimeout(timer);
-        }
-    }, [ready, hash]);
 }
 
 function Missing({ lookup }: { lookup: Lookup }) {

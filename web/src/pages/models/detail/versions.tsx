@@ -51,7 +51,13 @@ import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { durationText, jobSeconds } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
-import { jobHref, modelCompareHref, modelVersionHref, trainHref } from "~/lib/modelLinks";
+import {
+    jobHref,
+    jobLogsHref,
+    modelCompareHref,
+    modelVersionHref,
+    trainHref,
+} from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed } from "./header";
@@ -309,7 +315,7 @@ function RowMenu({
                 )}
                 <DropdownMenuItem
                     disabled={!job}
-                    onSelect={() => job && router.history.push(jobHref(job))}
+                    onSelect={() => job && router.history.push(jobLogsHref(job))}
                 >
                     <Logs />
                     {job ? `Logs · job #${job.id}` : "Logs"}

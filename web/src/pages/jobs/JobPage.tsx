@@ -30,11 +30,13 @@ import { count } from "~/lib/format";
 import { MODEL_JOB_KINDS, TRAIN_KIND, jobDuration, kindNoun, kindVerb } from "~/lib/jobs";
 import {
     JOBS_PATH,
+    JOB_LOGS_ID,
     TRAINING_PATH,
     jobHref,
     modelPageHref,
     modelVersionHref,
 } from "~/lib/modelLinks";
+import { useScrollToHash } from "~/lib/scrollToHash";
 import { bytes, relativeTime } from "~/lib/time";
 import { ProgressSection, ScoresSection } from "./ProgressPanels";
 import { LossSection, RateSection } from "./TrainingPanel";
@@ -508,7 +510,7 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
                 {training && <LossSection job={job} metrics={metrics.data} />}
                 {training && <RateSection metrics={metrics.data} />}
                 {job.kind === "eval" && <ScoresSection job={job} />}
-                <JobLogsSection key={job.id} job={job} />
+                <JobLogsSection key={job.id} job={job} anchor={JOB_LOGS_ID} />
             </PanelSections>
         </>
     );
@@ -543,6 +545,7 @@ export function JobPage() {
     const jobId = idOf(id);
     const job = useJob(jobId);
     useCanonical(job.data, pathname);
+    useScrollToHash(Boolean(job.data));
     const section = sectionOf(job.data?.kind, pathname);
     const crumbs = [section, { label: `Job #${id ?? ""}` }];
     if (job.data) {

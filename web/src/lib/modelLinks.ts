@@ -60,6 +60,12 @@ export function jobHref(job: { id: number; kind: string }): string {
     return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
+export const JOB_LOGS_ID = "logs";
+
+export function jobLogsHref(job: { id: number; kind: string }): string {
+    return `${jobHref(job)}#${JOB_LOGS_ID}`;
+}
+
 export type ModelTab =
     | "overview"
     | "versions"

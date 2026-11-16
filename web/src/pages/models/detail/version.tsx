@@ -60,7 +60,6 @@ import {
 import { CopyButton } from "~/components/CopyButton";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
-import { JobLogsSection } from "~/components/JobLogs";
 import { canCancel } from "~/components/JobSelection";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
@@ -73,6 +72,7 @@ import { durationText, jobDuration } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
 import {
     jobHref,
+    jobLogsHref,
     modelCardHref,
     modelCompareHref,
     modelPageHref,
@@ -410,6 +410,9 @@ function Progress({
                 <>
                     <CancelRun job={job} />
                     <Button variant="outline" asChild>
+                        <Link href={jobLogsHref(job)}>Logs</Link>
+                    </Button>
+                    <Button variant="outline" asChild>
                         <Link href={jobHref(job)}>{`Job #${job.id}`}</Link>
                     </Button>
                 </>
@@ -443,8 +446,19 @@ function Progress({
 }
 
 function Failure({ version }: { version: VersionInfo }) {
+    const job = version.job;
     return (
-        <PanelSection icon={Gauge} title="Score">
+        <PanelSection
+            icon={Gauge}
+            title="Score"
+            actions={
+                job && (
+                    <Button variant="outline" asChild>
+                        <Link href={jobLogsHref(job)}>View logs</Link>
+                    </Button>
+                )
+            }
+        >
             <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
                 <span className="font-medium">
                     {version.job?.kind === "train" ? "Training failed" : "Scoring failed"}
@@ -1061,7 +1075,6 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                 <MadeFrom row={row} versions={list} version={version} job={run} detail={job} />
                 <Identifiers row={row} version={version} />
                 <Exports row={row} version={version} />
-                {run && <JobLogsSection key={`logs-${run.id}`} job={job ?? run} anchor="logs" />}
             </PanelSections>
         </Page>
     );
