@@ -329,3 +329,28 @@ def test_cuda_machines_report_cuda_and_the_nvidia_driver(monkeypatch: pytest.Mon
     assert hardware.runtime_versions("cuda") == {"cuda": "12.4", "nvidia-driver": "560.35.03"}
     assert hardware.runtime_versions("mps") == {}
     assert hardware.nvidia_driver(tmp_path / "missing") is None
+
+
+def test_jobs_stay_with_the_machine_they_ran_on_when_its_worker_joins_another_pool(harness: Harness) -> None:
+    join_rack(harness)
+    ran_on = f"rack/{RACK.host}"
+    with harness.sessions() as session:
+        done = Job(kind=JobKind.EVAL, status=JobStatus.SUCCEEDED, model_slug="support", model_name="Support triage")
+        running = Job(
+            kind=JobKind.TRAIN, status=JobStatus.RUNNING, lease_owner="w-rack", attempt=1, model_slug="support"
+        )
+        session.add_all([done, running])
+        session.flush()
+        finished = JobAttempt(
+            job_id=done.id, number=1, worker="w-rack", node_id=ran_on, outcome="succeeded", finished_at=now()
+        )
+        session.add_all([finished, JobAttempt(job_id=running.id, number=1, worker="w-rack", node_id=ran_on)])
+        session.commit()
+        done_id, running_id = done.id, running.id
+    moved = {"id": "w-rack", "host": RACK.host, "kinds": ["train"], "pool": "edge", "hardware": RACK.as_dict()}
+    assert harness.internal("/register", moved).status_code == 204
+    pools = by_name(harness)
+    rack = pools["rack"]["nodes"][0]
+    assert [job["id"] for job in rack["recent"]] == [done_id]
+    assert [job["id"] for job in rack["jobs"]] == [running_id]
+    assert pools["edge"]["nodes"][0]["jobs"] == [] and pools["edge"]["nodes"][0]["recent"] == []

@@ -176,11 +176,20 @@ def planned_peak(session: Session, job: Job) -> int | None:
     return int(peak) if isinstance(peak, int | float) and not isinstance(peak, bool) else None
 
 
+def machine_of_attempt(attempt: JobAttempt | None, worker: Worker) -> str:
+    return attempt.node_id if attempt is not None and attempt.node_id else node_id(worker.pool, worker.host)
+
+
 def running_jobs(session: Session) -> dict[str, list[NodeJob]]:
     found: dict[str, list[NodeJob]] = {}
-    query = select(Job, Worker).join(Worker, Worker.id == Job.lease_owner).where(Job.status == JobStatus.RUNNING)
-    for job, worker in session.execute(query.order_by(Job.id)):
-        found.setdefault(node_id(worker.pool, worker.host), []).append(
+    query = (
+        select(Job, Worker, JobAttempt)
+        .join(Worker, Worker.id == Job.lease_owner)
+        .outerjoin(JobAttempt, (JobAttempt.job_id == Job.id) & (JobAttempt.number == Job.attempt))
+        .where(Job.status == JobStatus.RUNNING)
+    )
+    for job, worker, attempt in session.execute(query.order_by(Job.id)):
+        found.setdefault(machine_of_attempt(attempt, worker), []).append(
             NodeJob(
                 id=job.id,
                 kind=job.kind,
@@ -205,7 +214,7 @@ def recent_jobs(session: Session) -> dict[str, list[RecentJob]]:
         .limit(RECENT_SCAN)
     )
     for attempt, job, worker in session.execute(query):
-        listed = found.setdefault(node_id(worker.pool, worker.host), [])
+        listed = found.setdefault(machine_of_attempt(attempt, worker), [])
         if len(listed) < RECENT_PER_NODE and attempt.finished_at is not None:
             listed.append(
                 RecentJob(

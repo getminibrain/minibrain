@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from minibrain.jobs.output import EVENT, STATE
 from minibrain.jobs.policy import LEASE, backoff, policy
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.registry.compute import node_id
 from minibrain.registry.models import (
     FINAL_JOB_STATUSES,
     AttemptOutcome,
@@ -282,7 +283,10 @@ class SqlJobQueue:
             if job is None:
                 raise JobStateError(f"job {claimed} vanished during claim")
             session.refresh(job)
-            session.add(JobAttempt(job_id=job.id, number=job.attempt, worker=worker.id, started_at=moment))
+            machine = node_id(worker.pool, worker.host)
+            session.add(
+                JobAttempt(job_id=job.id, number=job.attempt, worker=worker.id, node_id=machine, started_at=moment)
+            )
             add_state(session, job, f"attempt {job.attempt} started in pool {worker.pool} ({worker.host})")
             session.commit()
             return Claim(

@@ -398,6 +398,7 @@ class JobAttempt(Base):
     log_artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    node_id: Mapped[str | None] = mapped_column(default=None)
 
     job: Mapped[Job] = relationship(back_populates="attempts")
 
