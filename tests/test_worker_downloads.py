@@ -65,7 +65,7 @@ def test_a_joined_worker_fetches_its_job_inputs_with_the_lease(harness: Harness)
     create_with_dataset(harness)
     add_version(harness, "lora")
     config = harness.worker_config(["train"])
-    config.token, config.pool = harness.join_token("gpu", "worker"), "gpu"
+    config.token, config.pool = harness.join_token("gpu"), "gpu"
     client = MainClient(config, http=harness.client)
     assert Worker(config, client=client, modules=FAKE).run_once()
     assert train_job(harness)["status"] == "succeeded"

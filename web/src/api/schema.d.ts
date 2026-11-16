@@ -1730,23 +1730,43 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List join tokens
-         * @description Tokens not revoked, newest first.
+         * List pool join tokens
+         * @description Each pool's live token, by its prefix.
          */
         get: operations["list_join_tokens_api_compute_join_tokens_get"];
         put?: never;
         /**
-         * Create a join token
-         * @description A token a worker or engine presents to join one pool. The answer is the only time it is shown.
+         * Make or rotate a pool's join token
+         * @description A pool has one join token. This makes it, or replaces it and revokes the old one at once: machines and engines that joined with the old token are cut off. The answer is the only time the token is shown.
          */
-        post: operations["create_join_token_api_compute_join_tokens_post"];
+        post: operations["issue_join_token_api_compute_join_tokens_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/compute/join-tokens/{token_id}": {
+    "/api/compute/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List machines waiting for approval
+         * @description Requests not yet decided or expired.
+         */
+        get: operations["list_join_requests_api_compute_join_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/join-requests/{request_id}/approve": {
         parameters: {
             query?: never;
             header?: never;
@@ -1755,9 +1775,29 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        /** Revoke a join token */
-        delete: operations["revoke_join_token_api_compute_join_tokens__token_id__delete"];
+        /**
+         * Approve a machine
+         * @description The machine joins this pool with a credential bound to it; removing the machine revokes it.
+         */
+        post: operations["approve_join_request_api_compute_join_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/join-requests/{request_id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deny a machine */
+        post: operations["deny_join_request_api_compute_join_requests__request_id__deny_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6508,98 +6548,84 @@ export interface components {
             size_bytes?: number | null;
             training?: components["schemas"]["TrainingSetup"] | null;
         };
-        /** JoinTokenCreate */
-        JoinTokenCreate: {
+        /** JoinApproval */
+        JoinApproval: {
             /** Pool */
             pool: string;
-            /**
-             * Role
-             * @enum {string}
-             */
-            role: "worker" | "engine" | "both";
-            /** Expires In Days */
-            expires_in_days?: number | null;
         };
-        /** JoinTokenCreated */
-        JoinTokenCreated: {
+        /** JoinGpu */
+        JoinGpu: {
+            /** Name */
+            name: string;
+            /** Memory Bytes */
+            memory_bytes: number;
+        };
+        /** JoinHardware */
+        JoinHardware: {
+            /**
+             * System
+             * @default
+             */
+            system?: string;
+            /**
+             * Arch
+             * @default
+             */
+            arch?: string;
+            /**
+             * Cpu Count
+             * @default 0
+             */
+            cpu_count?: number;
+            /** Ram Bytes */
+            ram_bytes?: number | null;
+            /**
+             * Accelerator
+             * @default cpu
+             */
+            accelerator?: string;
+            /**
+             * Accelerator Name
+             * @default
+             */
+            accelerator_name?: string;
+            /** Gpus */
+            gpus?: components["schemas"]["JoinGpu"][];
+        };
+        /** JoinRequestInfo */
+        JoinRequestInfo: {
             /** Id */
             id: number;
-            /** Pool */
-            pool: string;
             /**
-             * Role
-             * @description worker, engine or both.
+             * Code
+             * @description The short code the machine printed, to tell requests apart.
              */
-            role: string;
+            code: string;
+            /** Host */
+            host: string;
+            hardware: components["schemas"]["JoinHardware"];
             /**
-             * Prefix
-             * @description The token's first characters, to tell tokens apart.
+             * Pool
+             * @description The pool the machine asked for, if any.
              */
-            prefix: string;
+            pool: string | null;
+            /** Address */
+            address: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Created By */
-            created_by: string;
-            /** Expires At */
-            expires_at: string | null;
-            /** Expired */
-            expired: boolean;
-            /** Last Used At */
-            last_used_at: string | null;
             /**
-             * Last Host
-             * @description The machine that last joined with this token.
-             */
-            last_host: string | null;
-            /**
-             * Secret
-             * @description The token itself; shown only in this answer.
-             */
-            secret: string;
-            /**
-             * Env
-             * @description The environment variable workers and engines read it from.
-             * @default MINIBRAIN_JOIN_TOKEN
-             */
-            env?: string;
-        };
-        /** JoinTokenInfo */
-        JoinTokenInfo: {
-            /** Id */
-            id: number;
-            /** Pool */
-            pool: string;
-            /**
-             * Role
-             * @description worker, engine or both.
-             */
-            role: string;
-            /**
-             * Prefix
-             * @description The token's first characters, to tell tokens apart.
-             */
-            prefix: string;
-            /**
-             * Created At
+             * Expires At
              * Format: date-time
              */
-            created_at: string;
-            /** Created By */
-            created_by: string;
-            /** Expires At */
-            expires_at: string | null;
-            /** Expired */
-            expired: boolean;
-            /** Last Used At */
-            last_used_at: string | null;
-            /**
-             * Last Host
-             * @description The machine that last joined with this token.
-             */
-            last_host: string | null;
+            expires_at: string;
+        };
+        /** JoinTokenIssue */
+        JoinTokenIssue: {
+            /** Pool */
+            pool: string;
         };
         /** JudgeInfo */
         JudgeInfo: {
@@ -8033,6 +8059,70 @@ export interface components {
             measured: boolean;
             /** Basis */
             basis: string;
+        };
+        /** PoolToken */
+        PoolToken: {
+            /** Pool */
+            pool: string;
+            /**
+             * Prefix
+             * @description The token's first characters; the rest is shown only when it is made.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Last Host
+             * @description The machine that last joined with this token.
+             */
+            last_host: string | null;
+        };
+        /** PoolTokenIssued */
+        PoolTokenIssued: {
+            /** Pool */
+            pool: string;
+            /**
+             * Prefix
+             * @description The token's first characters; the rest is shown only when it is made.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Last Host
+             * @description The machine that last joined with this token.
+             */
+            last_host: string | null;
+            /**
+             * Secret
+             * @description The token itself; shown only in this answer.
+             */
+            secret: string;
+            /**
+             * Env
+             * @description The environment variable workers and engines read it from.
+             * @default MINIBRAIN_JOIN_TOKEN
+             */
+            env?: string;
+            /**
+             * Replaced
+             * @description The prefix of the token this one revoked, if the pool had one.
+             */
+            replaced: string | null;
         };
         /** PresetInfo */
         PresetInfo: {
@@ -14067,9 +14157,7 @@ export interface operations {
     };
     list_join_tokens_api_compute_join_tokens_get: {
         parameters: {
-            query?: {
-                pool?: string | null;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -14082,21 +14170,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinTokenInfo"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PoolToken"][];
                 };
             };
         };
     };
-    create_join_token_api_compute_join_tokens_post: {
+    issue_join_token_api_compute_join_tokens_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -14105,7 +14184,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JoinTokenCreate"];
+                "application/json": components["schemas"]["JoinTokenIssue"];
             };
         };
         responses: {
@@ -14115,7 +14194,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinTokenCreated"];
+                    "application/json": components["schemas"]["PoolTokenIssued"];
                 };
             };
             /** @description Validation Error */
@@ -14129,12 +14208,65 @@ export interface operations {
             };
         };
     };
-    revoke_join_token_api_compute_join_tokens__token_id__delete: {
+    list_join_requests_api_compute_join_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinRequestInfo"][];
+                };
+            };
+        };
+    };
+    approve_join_request_api_compute_join_requests__request_id__approve_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                token_id: number;
+                request_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinApproval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deny_join_request_api_compute_join_requests__request_id__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: number;
             };
             cookie?: never;
         };

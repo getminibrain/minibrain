@@ -322,6 +322,12 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
 - Compute pools: workers and engines join a named pool and report GPUs, memory, CPU, platform and installed engines.
   Discover judges fit against the selected pool; the Compute page lists pools, machines and engines.
+- [x] Simple joining (2026-11-16): a pool has one join token (no roles or expiry), shown once when made or rotated;
+  rotating cuts off the old one and the engine tokens minted from it. Add machine is pick a pool, copy one command
+  (`minibrain worker --main URL --pool NAME`). Without a token the worker asks to join and prints a code; an admin
+  approves it under Machines › Waiting for approval, and the machine gets a credential bound to its pool and host,
+  kept across restarts and revoked by removing the machine. Never a token-free join. Details: `docs/serving.md`, A
+  machine joins; `docs/security.md`.
 - [x] Deploy to a pool (2026-11-14): Deploy and Promote take a pool (or auto: this machine when it fits, else the
   pool with most memory left) and a replica count; a pool where the model does not fit is refused. Workers in that pool
   start and stop the engines to match, gateways route the deployed name only to that pool, and the model says where

@@ -517,11 +517,14 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Join GPU machines that run training and scoring jobs.
   CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_JOIN_TOKEN
 - **Add machine** · shipped · admin
-  Create a pool's join token, copy the command, watch it join.
+  Pick a pool, copy the one command, watch it join.
   UI: Infrastructure › Overview, Infrastructure › Machines · API: POST /api/compute/join-tokens, GET /api/compute/join-tokens
-- **Join tokens** · shipped · admin
-  Per-pool tokens for workers and their engines; revoke or expire ends both.
-  UI: Infrastructure › Machines › Join tokens · API: GET /api/compute/join-tokens, DELETE /api/compute/join-tokens/{token_id} · Config: MINIBRAIN_JOIN_TOKEN
+- **Pool join tokens** · shipped · admin
+  One token per pool; rotating it cuts off the old one.
+  UI: Infrastructure › Machines · API: GET /api/compute/join-tokens, POST /api/compute/join-tokens · Config: MINIBRAIN_JOIN_TOKEN
+- **Approve machines** · shipped · admin
+  Machines without a token wait until an admin approves them.
+  UI: Infrastructure › Machines › Waiting for approval · API: GET /api/compute/join-requests, POST /api/compute/join-requests/{request_id}/approve, POST /api/compute/join-requests/{request_id}/deny · CLI: minibrain worker --main
 - **Artifact storage** · shipped · admin
   Keep artifacts in a local folder or an S3-compatible bucket.
   UI: Settings › Storage · API: GET /api/settings/storage, PUT /api/settings/storage, POST /api/settings/storage/test · Config: storage, MINIBRAIN_STORAGE_S3_SECRET

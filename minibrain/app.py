@@ -29,6 +29,7 @@ from minibrain.api import (
     internal_gateway,
     job_metrics,
     jobs,
+    join_requests,
     join_tokens,
     keys,
     me,
@@ -331,6 +332,7 @@ def create_app(
         catalog,
         compute,
         join_tokens,
+        join_requests,
         policies,
         encryption,
         audit,
@@ -357,6 +359,7 @@ def create_app(
         ops,
     ):
         app.include_router(module.router)
+    app.include_router(join_requests.machines)
     tag_sections(app.routes)
     mount_web(app, settings.web_dist, settings.ui_url)
     return app

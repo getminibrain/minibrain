@@ -18,7 +18,8 @@ from minibrain.api.deps import MetricsDep, QueueDep, SessionDep, SettingsDep, St
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.auth.engine_tokens import engine_token
-from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_of, admit, bearer, checked, refuse
+from minibrain.auth.join_requests import credential_caller
+from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_of, admit, bearer, refuse
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
@@ -45,10 +46,10 @@ def worker_caller(request: Request, session: SessionDep, authorization: Annotate
     token = bearer(authorization)
     if token and hmac.compare_digest(token, request.app.state.settings.secret(LOCAL_KEY_FILE)):
         return Caller(LOCAL_POOL)
-    found = checked(session, token, WORKER, address_of(request))
+    found = credential_caller(session, token, address_of(request))
     if found is None:
         raise HTTPException(status_code=401, detail="invalid worker token")
-    return Caller(found.pool, found)
+    return found
 
 
 WorkerCaller = Annotated[Caller, Depends(worker_caller)]
@@ -76,7 +77,7 @@ def leased_needs(session: Session, pool: str, lease: str) -> set[str]:
 
 
 def needed(request: Request, session: Session, caller: Caller, wanted: str) -> None:
-    if caller.token is None or wanted in leased_needs(session, caller.pool, request.headers.get(LEASE_HEADER, "")):
+    if not caller.remote or wanted in leased_needs(session, caller.pool, request.headers.get(LEASE_HEADER, "")):
         return
     detail = {"pool": caller.pool, "reason": NOT_LEASED, "address": address_of(request)}
     refuse(session, caller.target, detail, {"asked": wanted})
@@ -282,8 +283,8 @@ def hosted_engines(
     config = request.app.state.gateway_config.current()
     placements = {key: found for key, found in config.placements.items() if key not in config.problems}
     wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)
-    token = engine_token(settings, caller.token) if caller.token is not None else None
-    return EnginesResponse(engines=[HostedEngine(model=key) for key in wanted], engine_token=token)
+    engines = [HostedEngine(model=key) for key in wanted]
+    return EnginesResponse(engines=engines, engine_token=engine_token(settings, caller))
 
 
 @router.post("/jobs/{job_id}/heartbeat")

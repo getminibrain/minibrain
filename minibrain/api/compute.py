@@ -11,6 +11,7 @@ from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, MetricsDep, SessionDep
 from minibrain.api.job_facts import TRAIN_START
 from minibrain.auth.identity import current_actor
+from minibrain.auth.join_requests import revoke_machine
 from minibrain.jobs.metrics import latest_data
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, needed_bytes
 from minibrain.models.machine_metrics import (
@@ -463,6 +464,7 @@ def remove_machine(pool: str, host: str, session: SessionDep, node: LocalNodeDep
     machine = machine_of(session, node.host, pool, host)
     remove(session, machine)
     audit_machine(session, "machine.remove", machine)
+    revoke_machine(session, machine.pool, machine.host, current_actor())
     session.commit()
     metrics.forget(machine.id)
     return Response(status_code=204)

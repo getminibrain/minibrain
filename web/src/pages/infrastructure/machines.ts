@@ -75,7 +75,9 @@ export function acceleratorOf(node: NodeInfo): string {
     return node.accelerator === "cpu" ? "CPU only" : node.accelerator_name || node.accelerator;
 }
 
-export function hardwareParts(node: NodeInfo): { device: string; memory: string | null } {
+export type HardwareFacts = Pick<NodeInfo, "gpus" | "accelerator_name" | "ram_bytes">;
+
+export function hardwareParts(node: HardwareFacts): { device: string; memory: string | null } {
     if (node.gpus.length === 0) {
         return {
             device: node.accelerator_name || "CPU",
@@ -92,7 +94,7 @@ export function hardwareParts(node: NodeInfo): { device: string; memory: string 
     return { device, memory: bytes(node.gpus.reduce((sum, gpu) => sum + gpu.memory_bytes, 0)) };
 }
 
-export function hardwareText(node: NodeInfo): string {
+export function hardwareText(node: HardwareFacts): string {
     const { device, memory } = hardwareParts(node);
     return memory ? `${device} · ${memory}` : device;
 }

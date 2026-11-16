@@ -5274,48 +5274,20 @@
         "tags": [
           "Infrastructure"
         ],
-        "summary": "List join tokens",
-        "description": "Tokens not revoked, newest first.",
+        "summary": "List pool join tokens",
+        "description": "Each pool's live token, by its prefix.",
         "operationId": "list_join_tokens_api_compute_join_tokens_get",
-        "parameters": [
-          {
-            "name": "pool",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Pool"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/JoinTokenInfo"
+                    "$ref": "#/components/schemas/PoolToken"
                   },
+                  "type": "array",
                   "title": "Response List Join Tokens Api Compute Join Tokens Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5326,18 +5298,18 @@
         "tags": [
           "Infrastructure"
         ],
-        "summary": "Create a join token",
-        "description": "A token a worker or engine presents to join one pool. The answer is the only time it is shown.",
-        "operationId": "create_join_token_api_compute_join_tokens_post",
+        "summary": "Make or rotate a pool's join token",
+        "description": "A pool has one join token. This makes it, or replaces it and revokes the old one at once: machines and engines that joined with the old token are cut off. The answer is the only time the token is shown.",
+        "operationId": "issue_join_token_api_compute_join_tokens_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JoinTokenCreate"
+                "$ref": "#/components/schemas/JoinTokenIssue"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {
@@ -5345,7 +5317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JoinTokenCreated"
+                  "$ref": "#/components/schemas/PoolTokenIssued"
                 }
               }
             }
@@ -5363,21 +5335,93 @@
         }
       }
     },
-    "/api/compute/join-tokens/{token_id}": {
-      "delete": {
+    "/api/compute/join-requests": {
+      "get": {
         "tags": [
           "Infrastructure"
         ],
-        "summary": "Revoke a join token",
-        "operationId": "revoke_join_token_api_compute_join_tokens__token_id__delete",
+        "summary": "List machines waiting for approval",
+        "description": "Requests not yet decided or expired.",
+        "operationId": "list_join_requests_api_compute_join_requests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JoinRequestInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Join Requests Api Compute Join Requests Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/join-requests/{request_id}/approve": {
+      "post": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Approve a machine",
+        "description": "The machine joins this pool with a credential bound to it; removing the machine revokes it.",
+        "operationId": "approve_join_request_api_compute_join_requests__request_id__approve_post",
         "parameters": [
           {
-            "name": "token_id",
+            "name": "request_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Token Id"
+              "title": "Request Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinApproval"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/join-requests/{request_id}/deny": {
+      "post": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Deny a machine",
+        "operationId": "deny_join_request_api_compute_join_requests__request_id__deny_post",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Request Id"
             }
           }
         ],
@@ -21385,102 +21429,116 @@
         "type": "object",
         "title": "JobSetup"
       },
-      "JoinTokenCreate": {
+      "JoinApproval": {
         "properties": {
           "pool": {
             "type": "string",
             "maxLength": 63,
             "minLength": 1,
             "title": "Pool"
-          },
-          "role": {
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool"
+        ],
+        "title": "JoinApproval"
+      },
+      "JoinGpu": {
+        "properties": {
+          "name": {
             "type": "string",
-            "enum": [
-              "worker",
-              "engine",
-              "both"
-            ],
-            "title": "Role"
+            "maxLength": 200,
+            "title": "Name"
           },
-          "expires_in_days": {
+          "memory_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Memory Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "memory_bytes"
+        ],
+        "title": "JoinGpu"
+      },
+      "JoinHardware": {
+        "properties": {
+          "system": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "System",
+            "default": ""
+          },
+          "arch": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Arch",
+            "default": ""
+          },
+          "cpu_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Cpu Count",
+            "default": 0
+          },
+          "ram_bytes": {
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 365.0,
-                "minimum": 1.0
+                "minimum": 0.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Expires In Days"
+            "title": "Ram Bytes"
+          },
+          "accelerator": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Accelerator",
+            "default": "cpu"
+          },
+          "accelerator_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Accelerator Name",
+            "default": ""
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/JoinGpu"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Gpus"
           }
         },
         "type": "object",
-        "required": [
-          "pool",
-          "role"
-        ],
-        "title": "JoinTokenCreate"
+        "title": "JoinHardware"
       },
-      "JoinTokenCreated": {
+      "JoinRequestInfo": {
         "properties": {
           "id": {
             "type": "integer",
             "title": "Id"
           },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "The short code the machine printed, to tell requests apart."
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "hardware": {
+            "$ref": "#/components/schemas/JoinHardware"
+          },
           "pool": {
-            "type": "string",
-            "title": "Pool"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role",
-            "description": "worker, engine or both."
-          },
-          "prefix": {
-            "type": "string",
-            "title": "Prefix",
-            "description": "The token's first characters, to tell tokens apart."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "created_by": {
-            "type": "string",
-            "title": "Created By"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          },
-          "expired": {
-            "type": "boolean",
-            "title": "Expired"
-          },
-          "last_used_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Used At"
-          },
-          "last_host": {
             "anyOf": [
               {
                 "type": "string"
@@ -21489,95 +21547,10 @@
                 "type": "null"
               }
             ],
-            "title": "Last Host",
-            "description": "The machine that last joined with this token."
+            "title": "Pool",
+            "description": "The pool the machine asked for, if any."
           },
-          "secret": {
-            "type": "string",
-            "title": "Secret",
-            "description": "The token itself; shown only in this answer."
-          },
-          "env": {
-            "type": "string",
-            "title": "Env",
-            "description": "The environment variable workers and engines read it from.",
-            "default": "MINIBRAIN_JOIN_TOKEN"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "pool",
-          "role",
-          "prefix",
-          "created_at",
-          "created_by",
-          "expires_at",
-          "expired",
-          "last_used_at",
-          "last_host",
-          "secret"
-        ],
-        "title": "JoinTokenCreated"
-      },
-      "JoinTokenInfo": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "pool": {
-            "type": "string",
-            "title": "Pool"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role",
-            "description": "worker, engine or both."
-          },
-          "prefix": {
-            "type": "string",
-            "title": "Prefix",
-            "description": "The token's first characters, to tell tokens apart."
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "created_by": {
-            "type": "string",
-            "title": "Created By"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          },
-          "expired": {
-            "type": "boolean",
-            "title": "Expired"
-          },
-          "last_used_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Used At"
-          },
-          "last_host": {
+          "address": {
             "anyOf": [
               {
                 "type": "string"
@@ -21586,24 +21559,46 @@
                 "type": "null"
               }
             ],
-            "title": "Last Host",
-            "description": "The machine that last joined with this token."
+            "title": "Address"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
           }
         },
         "type": "object",
         "required": [
           "id",
+          "code",
+          "host",
+          "hardware",
           "pool",
-          "role",
-          "prefix",
+          "address",
           "created_at",
-          "created_by",
-          "expires_at",
-          "expired",
-          "last_used_at",
-          "last_host"
+          "expires_at"
         ],
-        "title": "JoinTokenInfo"
+        "title": "JoinRequestInfo"
+      },
+      "JoinTokenIssue": {
+        "properties": {
+          "pool": {
+            "type": "string",
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Pool"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool"
+        ],
+        "title": "JoinTokenIssue"
       },
       "JudgeInfo": {
         "properties": {
@@ -25980,6 +25975,143 @@
           "basis"
         ],
         "title": "PoolRoom"
+      },
+      "PoolToken": {
+        "properties": {
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "The token's first characters; the rest is shown only when it is made."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "last_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Host",
+            "description": "The machine that last joined with this token."
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool",
+          "prefix",
+          "created_at",
+          "created_by",
+          "last_used_at",
+          "last_host"
+        ],
+        "title": "PoolToken"
+      },
+      "PoolTokenIssued": {
+        "properties": {
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix",
+            "description": "The token's first characters; the rest is shown only when it is made."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "last_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Host",
+            "description": "The machine that last joined with this token."
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret",
+            "description": "The token itself; shown only in this answer."
+          },
+          "env": {
+            "type": "string",
+            "title": "Env",
+            "description": "The environment variable workers and engines read it from.",
+            "default": "MINIBRAIN_JOIN_TOKEN"
+          },
+          "replaced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced",
+            "description": "The prefix of the token this one revoked, if the pool had one."
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool",
+          "prefix",
+          "created_at",
+          "created_by",
+          "last_used_at",
+          "last_host",
+          "secret",
+          "replaced"
+        ],
+        "title": "PoolTokenIssued"
       },
       "PresetInfo": {
         "properties": {

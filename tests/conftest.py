@@ -81,7 +81,7 @@ class Harness:
     backend: FakeBackend
     sessions: sessionmaker[Session]
     store_kind: str = FOLDER
-    joins: dict[tuple[str, str], str] = field(default_factory=dict)
+    joins: dict[str, str] = field(default_factory=dict)
 
     @property
     def queue(self) -> SqlJobQueue:
@@ -117,15 +117,15 @@ class Harness:
         config = self.worker_config(kinds)
         return Worker(config, client=MainClient(config, http=self.client), modules=modules)
 
-    def join_token(self, pool: str, role: str = join_tokens.BOTH) -> str:
+    def join_token(self, pool: str) -> str:
         if pool == "local":
             return self.token
-        if (pool, role) not in self.joins:
+        if pool not in self.joins:
             with self.sessions() as session:
-                _, raw = join_tokens.create(session, pool, role, None, "pytest")
+                _, raw, _ = join_tokens.issue(session, pool, "pytest")
                 session.commit()
-            self.joins[pool, role] = raw
-        return self.joins[pool, role]
+            self.joins[pool] = raw
+        return self.joins[pool]
 
     def internal(self, path: str, body: dict[str, Any]) -> Any:
         worker = body.get("worker", body)

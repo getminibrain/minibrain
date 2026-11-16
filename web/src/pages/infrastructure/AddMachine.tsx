@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { KeyRound, LoaderCircle, Plus } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -8,196 +8,149 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Field,
-    FieldGroup,
-    Input,
-    Label,
     Link,
-    RadioGroup,
-    RadioGroupItem,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import {
-    type JoinRole,
-    type JoinTokenCreated,
-    useCreateJoinToken,
-    useJoinTokens,
-} from "~/api/joinTokenQueries";
+    type JoinRequestInfo,
+    useApproveJoinRequest,
+    useJoinRequests,
+} from "~/api/joinRequestQueries";
+import { type PoolTokenIssued, useIssueJoinToken, useJoinTokens } from "~/api/joinTokenQueries";
+import { FormRows } from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
-import { Command, JOIN_ENV, joinCommands, machineHref } from "./NeedsALook";
-import type { NodeInfo, PoolInfo } from "./parts";
+import { Command, JOIN_ENV, machineHref, workerCommand } from "./NeedsALook";
+import {
+    IssuedCommand,
+    type PoolChoice,
+    PoolRows,
+    RotateToken,
+    choiceProblem,
+    chosenPool,
+    firstChoice,
+    poolNames,
+} from "./PoolJoin";
+import type { PoolInfo } from "./parts";
 
-const LOCAL_POOL = "local";
-const NEW_POOL = "__new__";
-const NEVER = "never";
-const POOL_PATTERN = /^[a-z0-9][a-z0-9._-]{0,62}$/;
-const EXPIRY_DAYS = ["1", "7", "30", "90", "365"];
+const WATCH_MS = 3000;
 
-const ROLE_CHOICES: { value: JoinRole; label: string; hint: string }[] = [
-    {
-        value: "worker",
-        label: "Worker",
-        hint: "Runs training and evaluation jobs, and serves the models deployed to the pool.",
-    },
-    {
-        value: "engine",
-        label: "Engine",
-        hint: "Serves one model with minibrain engine, without running jobs.",
-    },
-    { value: "both", label: "Both", hint: "Runs a worker and a separate engine on the machine." },
-];
+type Target = { pool: string; nodes: Set<string>; requests: Set<number> };
 
-export function roleOf(value: string): JoinRole {
-    return ROLE_CHOICES.find((choice) => choice.value === value)?.value ?? "worker";
-}
-
-export function roleLabel(value: string): string {
-    return ROLE_CHOICES.find((choice) => choice.value === value)?.label ?? value;
-}
-
-function expiryLabel(value: string): string {
-    if (value === NEVER) {
-        return "Never";
-    }
-    if (value === "365") {
-        return "1 year";
-    }
-    return value === "1" ? "1 day" : `${value} days`;
-}
-
-function poolProblem(name: string, taken: string[]): string | null {
-    if (!name) {
-        return "Name the new pool.";
-    }
-    if (name === LOCAL_POOL) {
-        return "The local pool is this machine; it needs no join token.";
-    }
-    if (!POOL_PATTERN.test(name)) {
-        return "Up to 63 lowercase letters, digits, dots, dashes or underscores.";
-    }
-    return taken.includes(name) ? `Pool ${name} already exists; pick it above.` : null;
-}
-
-function joinedNode(pools: PoolInfo[], pool: string, host: string): NodeInfo | undefined {
-    return pools.find((item) => item.name === pool)?.nodes.find((node) => node.host === host);
-}
-
-function Waiting({ created, pools }: { created: JoinTokenCreated; pools: PoolInfo[] }) {
+function useWatchPools(on: boolean) {
     const client = useQueryClient();
-    const tokens = useJoinTokens({ waiting: true });
-    const host = tokens.data?.find((token) => token.id === created.id)?.last_host;
     useEffect(() => {
-        if (host) {
-            void client.invalidateQueries({ queryKey: ["compute", "pools"] });
+        if (!on) {
+            return;
         }
-    }, [client, host]);
-    if (!host) {
+        const timer = window.setInterval(
+            () => void client.invalidateQueries({ queryKey: ["compute", "pools"] }),
+            WATCH_MS,
+        );
+        return () => window.clearInterval(timer);
+    }, [client, on]);
+}
+
+function Asking({ request, pool }: { request: JoinRequestInfo; pool: string }) {
+    const approve = useApproveJoinRequest();
+    return (
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <StatusText tone="neutral" waiting>
+                <span>
+                    <span className="font-mono">{request.host}</span>
+                    {" waits for approval · code "}
+                    <span className="font-mono">{request.code}</span>
+                </span>
+            </StatusText>
+            <Button
+                type="button"
+                variant="outline"
+                disabled={approve.isPending}
+                onClick={() => approve.mutate({ id: request.id, pool })}
+            >
+                {`Approve into ${pool}`}
+            </Button>
+            <ErrorLine error={approve.error} />
+        </span>
+    );
+}
+
+function Watch({ target, pools }: { target: Target; pools: PoolInfo[] }) {
+    const requests = useJoinRequests();
+    useWatchPools(true);
+    const joined = pools
+        .find((pool) => pool.name === target.pool)
+        ?.nodes.find((node) => !target.nodes.has(node.id));
+    if (joined) {
         return (
-            <output className="inline-flex items-center gap-2 text-muted-foreground">
-                <LoaderCircle
-                    aria-hidden="true"
-                    className="size-4 animate-spin motion-reduce:animate-none"
-                />
-                Waiting for the machine to join…
+            <output className="inline-flex flex-wrap items-baseline gap-x-3">
+                <StatusText tone="success">
+                    <span>
+                        <span className="font-mono">{joined.host}</span>
+                        {` joined pool ${target.pool}`}
+                    </span>
+                </StatusText>
+                <Link href={machineHref(joined)} className="text-primary hover:underline">
+                    Open
+                </Link>
             </output>
         );
     }
-    const node = joinedNode(pools, created.pool, host);
+    const asking = (requests.data ?? []).find((request) => !target.requests.has(request.id));
+    if (asking) {
+        return <Asking request={asking} pool={target.pool} />;
+    }
     return (
-        <output className="inline-flex flex-wrap items-baseline gap-x-3">
-            <StatusText tone="success">
-                <span>
-                    <span className="font-mono">{host}</span>
-                    {` joined pool ${created.pool}`}
-                </span>
-            </StatusText>
-            {node && (
-                <Link href={machineHref(node)} className="text-primary hover:underline">
-                    Open
-                </Link>
-            )}
+        <output className="inline-flex items-center gap-2 text-muted-foreground">
+            <LoaderCircle
+                aria-hidden="true"
+                className="size-4 animate-spin motion-reduce:animate-none"
+            />
+            Waiting for the machine…
         </output>
     );
 }
 
-function Created({ created, pools }: { created: JoinTokenCreated; pools: PoolInfo[] }) {
-    const origin = window.location.origin;
-    const commands = [
-        `export ${JOIN_ENV}=${created.secret}`,
-        ...joinCommands(roleOf(created.role), created.pool, origin),
-    ];
-    return (
-        <div className="flex min-w-0 flex-col gap-field">
-            <div className="flex min-w-0 flex-col gap-label">
-                <span className="font-medium">Run this on the machine</span>
-                <span className="text-sm text-muted-foreground">
-                    {`The token is shown once. It joins pool ${created.pool} only; minibrain must be installed on the machine.`}
-                </span>
-                <div className="flex min-w-0 flex-col items-start gap-1.5">
-                    {commands.map((command, index) => (
-                        <Command
-                            key={command}
-                            value={command}
-                            label={index === 0 ? "Copy the token line" : "Copy the command"}
-                        />
-                    ))}
-                </div>
-            </div>
-            <Waiting created={created} pools={pools} />
-        </div>
-    );
-}
-
-function PoolChoice({
-    names,
-    value,
-    onChange,
+function Commands({
+    target,
+    issued,
+    prefix,
+    onIssued,
 }: {
-    names: string[];
-    value: string;
-    onChange: (value: string) => void;
+    target: Target;
+    issued: PoolTokenIssued | null;
+    prefix: string | undefined;
+    onIssued: (issued: PoolTokenIssued) => void;
 }) {
-    return (
-        <Select value={value} onValueChange={(next) => onChange(String(next ?? NEW_POOL))}>
-            <SelectTrigger id="join-pool" className="w-64">
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                {names.map((name) => (
-                    <SelectItem key={name} value={name}>
-                        {name}
-                    </SelectItem>
-                ))}
-                <SelectItem value={NEW_POOL}>A new pool</SelectItem>
-            </SelectContent>
-        </Select>
-    );
-}
-
-function RoleChoice({ value, onChange }: { value: JoinRole; onChange: (role: JoinRole) => void }) {
-    return (
-        <RadioGroup
-            value={value}
-            onValueChange={(next) => onChange(roleOf(String(next)))}
-            className="flex flex-col gap-3"
-            aria-label="Role"
-        >
-            {ROLE_CHOICES.map((choice) => (
-                <Label key={choice.value} className="flex items-start gap-2 font-normal">
-                    <RadioGroupItem value={choice.value} className="mt-0.5" />
-                    <span className="flex flex-col">
-                        <span>{choice.label}</span>
-                        <span className="text-sm text-muted-foreground">{choice.hint}</span>
+    const origin = window.location.origin;
+    const bare = workerCommand(target.pool, origin);
+    if (issued) {
+        return (
+            <>
+                <IssuedCommand issued={issued} origin={origin} />
+                <div className="flex min-w-0 flex-col gap-label">
+                    <span className="font-medium">Or run it without the token</span>
+                    <span className="text-sm text-muted-foreground">
+                        The machine prints a code and waits until an admin approves it.
                     </span>
-                </Label>
-            ))}
-        </RadioGroup>
+                    <Command value={bare} label="Copy the command without the token" />
+                </div>
+            </>
+        );
+    }
+    return (
+        <div className="flex min-w-0 flex-col gap-label">
+            <span className="font-medium">Run this on the machine</span>
+            <span className="text-sm text-muted-foreground">
+                {prefix
+                    ? `With pool ${target.pool}'s join token (${prefix}…) in ${JOIN_ENV} it joins at once. Without it, the machine prints a code and waits until an admin approves it.`
+                    : "The machine prints a code and waits until an admin approves it."}
+            </span>
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+                <Command value={bare} label="Copy the command" />
+                {prefix && <RotateToken pool={target.pool} exists onIssued={onIssued} />}
+            </span>
+        </div>
     );
 }
 
@@ -211,32 +164,42 @@ function AddMachineDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const tokens = useJoinTokens({ enabled: open });
-    const names = [
-        ...new Set([
-            ...pools.map((pool) => pool.name),
-            ...(tokens.data ?? []).map((token) => token.pool),
-        ]),
-    ].filter((name) => name !== LOCAL_POOL);
-    const [picked, setPicked] = useState<string | null>(null);
-    const [typed, setTyped] = useState("");
-    const [role, setRole] = useState<JoinRole>("worker");
-    const [expiry, setExpiry] = useState(NEVER);
+    const requests = useJoinRequests({ enabled: open });
+    const names = poolNames(pools, tokens.data ?? []);
+    const [picked, setPicked] = useState<PoolChoice | null>(null);
     const [touched, setTouched] = useState(false);
-    const create = useCreateJoinToken();
-    const choice = picked ?? names[0] ?? NEW_POOL;
-    const isNew = choice === NEW_POOL;
-    const pool = isNew ? typed.trim() : choice;
-    const problem = isNew ? poolProblem(pool, names) : null;
-    const created = create.data ?? null;
+    const [target, setTarget] = useState<Target | null>(null);
+    const [issued, setIssued] = useState<PoolTokenIssued | null>(null);
+    const issue = useIssueJoinToken();
+    const value = picked ?? firstChoice(names);
+    const problem = choiceProblem(value, names);
+    const prefix = target
+        ? tokens.data?.find((token) => token.pool === target.pool)?.prefix
+        : undefined;
     const close = (next: boolean) => {
         onOpenChange(next);
         if (!next) {
-            create.reset();
+            issue.reset();
             setPicked(null);
-            setTyped("");
-            setRole("worker");
-            setExpiry(NEVER);
             setTouched(false);
+            setTarget(null);
+            setIssued(null);
+        }
+    };
+    const start = () => {
+        setTouched(true);
+        if (problem) {
+            return;
+        }
+        const pool = chosenPool(value);
+        const nodes = pools.find((item) => item.name === pool)?.nodes ?? [];
+        setTarget({
+            pool,
+            nodes: new Set(nodes.map((node) => node.id)),
+            requests: new Set((requests.data ?? []).map((request) => request.id)),
+        });
+        if (!tokens.data?.some((token) => token.pool === pool)) {
+            issue.mutate(pool, { onSuccess: setIssued });
         }
     };
     return (
@@ -245,88 +208,47 @@ function AddMachineDialog({
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
-                        setTouched(true);
-                        if (!problem && !created) {
-                            create.mutate({
-                                pool,
-                                role,
-                                expires_in_days: expiry === NEVER ? null : Number(expiry),
-                            });
-                        }
+                        start();
                     }}
                     noValidate
                     className="contents"
                 >
                     <DialogHeader>
                         <DialogTitle>
-                            {created ? `Join a machine to pool ${created.pool}` : "Add machine"}
+                            {target ? `Add a machine to pool ${target.pool}` : "Add machine"}
                         </DialogTitle>
                         <DialogDescription>
-                            {created
-                                ? "Copy the token now: it is not shown again. Revoke it under Machines, Join tokens."
-                                : "A join token lets one machine join one pool. Create one, then run the command it gives on the machine."}
+                            {target
+                                ? "minibrain must be installed on the machine. It shows up below once it joins."
+                                : "Pick the pool the machine joins. Machines in a pool share placement and prices."}
                         </DialogDescription>
                     </DialogHeader>
-                    {created ? (
-                        <Created created={created} pools={pools} />
-                    ) : (
-                        <FieldGroup>
-                            <Field
-                                id="join-pool"
-                                label="Pool"
-                                hint="Machines in a pool share placement, prices and where models are served."
-                            >
-                                <PoolChoice names={names} value={choice} onChange={setPicked} />
-                            </Field>
-                            {isNew && (
-                                <Field
-                                    id="join-pool-name"
-                                    label="New pool name"
-                                    error={touched || typed ? (problem ?? undefined) : undefined}
-                                >
-                                    <Input
-                                        id="join-pool-name"
-                                        value={typed}
-                                        onChange={(event) => setTyped(event.target.value)}
-                                        onBlur={() => setTouched(true)}
-                                        placeholder="gpu-a10"
-                                        maxLength={63}
-                                        className="w-64 font-mono"
-                                        autoFocus
-                                        aria-invalid={Boolean((touched || typed) && problem)}
-                                    />
-                                </Field>
+                    {target ? (
+                        <div className="flex min-w-0 flex-col gap-field">
+                            {!issue.isPending && (
+                                <Commands
+                                    target={target}
+                                    issued={issued}
+                                    prefix={prefix}
+                                    onIssued={setIssued}
+                                />
                             )}
-                            <div className="flex flex-col gap-label">
-                                <span className="font-medium">Role</span>
-                                <RoleChoice value={role} onChange={setRole} />
-                            </div>
-                            <Field
-                                id="join-expiry"
-                                label="Expires"
-                                hint="The machine keeps using the token; once it expires the machine can no longer reach main."
-                            >
-                                <Select
-                                    value={expiry}
-                                    onValueChange={(next) => setExpiry(String(next ?? NEVER))}
-                                >
-                                    <SelectTrigger id="join-expiry" className="w-64">
-                                        <SelectValue>{expiryLabel(expiry)}</SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[NEVER, ...EXPIRY_DAYS].map((value) => (
-                                            <SelectItem key={value} value={value}>
-                                                {expiryLabel(value)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                        </FieldGroup>
+                            <Watch target={target} pools={pools} />
+                        </div>
+                    ) : (
+                        <FormRows labels="narrow">
+                            <PoolRows
+                                id="join-pool"
+                                names={names}
+                                value={value}
+                                onChange={setPicked}
+                                touched={touched}
+                            />
+                        </FormRows>
                     )}
-                    <ErrorLine error={create.error} />
+                    <ErrorLine error={issue.error} />
                     <DialogFooter>
-                        {created ? (
+                        {target ? (
                             <Button type="button" onClick={() => close(false)}>
                                 Done
                             </Button>
@@ -339,12 +261,8 @@ function AddMachineDialog({
                                 >
                                     Cancel
                                 </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={create.isPending || (touched && Boolean(problem))}
-                                >
-                                    <KeyRound aria-hidden="true" />
-                                    Create token
+                                <Button type="submit" disabled={touched && Boolean(problem)}>
+                                    Continue
                                 </Button>
                             </>
                         )}

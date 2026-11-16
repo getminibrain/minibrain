@@ -16,7 +16,7 @@ import { PoolLink } from "~/components/PoolLink";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
 import { PathResult, type SourcePlan } from "./BaseSource";
-import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
+import { type BaseOption, gigabytes } from "./baseOptions";
 import { runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
@@ -143,8 +143,7 @@ function RunElsewhere({
     }
     const origin = window.location.origin;
     const others = catalog.pools.filter((pool) => pool.name !== catalog.pool);
-    const model = option.baseKey ?? addedKey(entry, variant);
-    const commands = `minibrain worker --api-url ${origin} --pool gpu\nminibrain engine --model ${model} --main-url ${origin} --pool gpu --host 0.0.0.0`;
+    const commands = `minibrain worker --main ${origin} --pool gpu`;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-xl">
@@ -178,11 +177,11 @@ function RunElsewhere({
                     <section className="flex min-w-0 flex-col gap-1.5">
                         <h3 className="font-medium">A GPU machine in a new pool</h3>
                         <p className="text-muted-foreground">
-                            Install minibrain on it, create a join token for the pool under
-                            Infrastructure, Add machine, and set it in MINIBRAIN_JOIN_TOKEN. Then
-                            start a worker for training and an engine for serving:
+                            Install minibrain on it and run this. It waits until an admin approves
+                            it under Infrastructure, Machines, then trains and serves what the pool
+                            is given:
                         </p>
-                        <CodeBlock code={commands} language="bash" copyLabel="Copy the commands" />
+                        <CodeBlock code={commands} language="bash" copyLabel="Copy the command" />
                         <Link
                             href="/infrastructure/machines"
                             className="w-fit text-primary hover:underline"

@@ -20,15 +20,18 @@ import {
     cn,
 } from "obp-ui";
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useState } from "react";
+import { type PoolToken, useJoinTokens } from "~/api/joinTokenQueries";
 import { PoolLink } from "~/components/PoolLink";
 import { BASIS_LABELS, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { relativeTime } from "~/lib/time";
 import { MachineSheet } from "./MachineSheet";
+import { LOCAL_POOL, PoolJoinControls } from "./PoolJoin";
 import { ENGINE_DOING, jobLink, jobSubject, memoryView, servedHref, versioned } from "./activity";
 import {
     type MachineFilters,
@@ -217,14 +220,22 @@ function MemoryCell({ row }: { row: MachineRow }) {
     );
 }
 
-function GroupRow({ pool }: { pool: PoolInfo }) {
+function GroupRow({
+    pool,
+    admin,
+    token,
+}: {
+    pool: PoolInfo;
+    admin: boolean;
+    token: PoolToken | undefined;
+}) {
     return (
         <TableRow
             id={`pool-${pool.name}`}
             className="scroll-mt-24 bg-muted transition-colors duration-150 hover:bg-muted data-flash:bg-highlight motion-reduce:transition-none"
         >
             <TableCell colSpan={COLUMN_COUNT} className="py-1.5">
-                <span className="flex flex-wrap items-baseline gap-x-3 text-sm">
+                <span className="flex flex-wrap items-center gap-x-3 text-sm">
                     <span className="font-medium text-foreground">{pool.name}</span>
                     {pool.label !== pool.name && (
                         <span className="text-muted-foreground">{pool.label}</span>
@@ -234,6 +245,9 @@ function GroupRow({ pool }: { pool: PoolInfo }) {
                         {plural(pool.engines.length, "engine")}
                     </span>
                     <RoomLine room={pool.room} />
+                    {admin && pool.name !== LOCAL_POOL && (
+                        <PoolJoinControls pool={pool.name} token={token} />
+                    )}
                 </span>
             </TableCell>
         </TableRow>
@@ -392,6 +406,8 @@ export function MachinesTab({
 }) {
     const { search, update } = useListSearch(PATH, KEYS);
     const [grouped, setGrouped] = useGrouped();
+    const can = useCan();
+    const tokens = useJoinTokens({ enabled: can.admin });
     useScrollToHash(!loading);
     const filters: MachineFilters = {
         status: splitList(search.status),
@@ -430,7 +446,15 @@ export function MachinesTab({
               if (rows.length === 0) {
                   return [];
               }
-              return [<GroupRow key={`group-${pool.name}`} pool={pool} />, ...rows.map(line)];
+              return [
+                  <GroupRow
+                      key={`group-${pool.name}`}
+                      pool={pool}
+                      admin={can.admin}
+                      token={tokens.data?.find((token) => token.pool === pool.name)}
+                  />,
+                  ...rows.map(line),
+              ];
           })
         : shown.map(line);
     return (

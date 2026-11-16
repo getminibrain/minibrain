@@ -1,7 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
-import type { JoinRole } from "~/api/joinTokenQueries";
 import { CopyButton } from "~/components/CopyButton";
 import { PanelSection } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
@@ -51,21 +50,23 @@ export function machineHref(node: NodeInfo): string {
 
 export const JOIN_ENV = "MINIBRAIN_JOIN_TOKEN";
 
-export function joinCommands(role: JoinRole, pool: string, origin: string): string[] {
-    const worker = `minibrain worker --api-url ${origin} --pool ${pool}`;
-    const engine = `minibrain engine --model <model> --main-url ${origin} --pool ${pool} --host 0.0.0.0`;
-    if (role === "worker") {
-        return [worker];
-    }
-    return role === "engine" ? [engine] : [worker, engine];
+export function workerCommand(pool: string, origin: string): string {
+    return `minibrain worker --main ${origin} --pool ${pool}`;
+}
+
+export function tokenCommand(secret: string, pool: string, origin: string): string {
+    return `${JOIN_ENV}=${secret} ${workerCommand(pool, origin)}`;
 }
 
 export function rejoinCommand(node: NodeInfo, pool: string, origin: string): string {
-    return joinCommands(node.roles.includes("worker") ? "worker" : "engine", pool, origin)[0];
+    if (node.roles.includes("worker")) {
+        return workerCommand(pool, origin);
+    }
+    return `minibrain engine --model <model> --main-url ${origin} --pool ${pool} --host 0.0.0.0`;
 }
 
 export function rejoinHint(node: NodeInfo): string {
-    return `Run this on ${node.host}, with the pool's join token in ${JOIN_ENV}:`;
+    return `Run this on ${node.host}:`;
 }
 
 function offlineIssue(node: NodeInfo, pool: string, origin: string): Issue {

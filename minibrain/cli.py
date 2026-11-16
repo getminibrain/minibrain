@@ -2,6 +2,7 @@ import argparse
 import ipaddress
 import json
 import os
+import platform
 import signal
 import socket
 import sys
@@ -194,13 +195,15 @@ def engine(args: argparse.Namespace) -> None:
     import httpx
 
     from minibrain.base_models import BaseModelSpec
+    from minibrain.joining import saved
     from minibrain.models.machine_metrics import Sampler
     from minibrain.serve.engine import create_engine_app, local_copy, prune_engines, remote_base
     from minibrain.settings import load_settings
 
     settings = load_settings()
+    held = saved(settings.home, args.main_url)
     given = os.environ.get("MINIBRAIN_ENGINE_TOKEN") or os.environ.get(JOIN_KEY_ENV)
-    given = given or os.environ.get("MINIBRAIN_GATEWAY_TOKEN")
+    given = given or (held.credential if held is not None else None) or os.environ.get("MINIBRAIN_GATEWAY_TOKEN")
     token = given or settings.secret("gateway_token")
     client = httpx.Client(base_url=args.main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     if args.spec:
@@ -247,19 +250,55 @@ def refusal(response: "httpx.Response") -> str:
         return response.text
 
 
+def credentials(args: argparse.Namespace, settings: "Settings", stop: threading.Event) -> tuple[str, str, bool]:
+    import httpx
+
+    from minibrain.joining import JoinRefused, approval, save, saved
+    from minibrain.models.hardware import LOCAL_POOL, report
+
+    given = os.environ.get(JOIN_KEY_ENV)
+    if given:
+        return given, args.pool or LOCAL_POOL, False
+    held = saved(settings.home, args.api_url)
+    if held is not None:
+        if args.pool and args.pool != held.pool:
+            print(f"This machine is approved for pool {held.pool}; ignoring --pool {args.pool}.", flush=True)
+        return held.credential, held.pool, True
+    local = (settings.home / "secrets" / "worker_token").exists() or os.environ.get("MINIBRAIN_WORKER_TOKEN")
+    if args.pool in (None, LOCAL_POOL) and local:
+        return settings.secret("worker_token"), LOCAL_POOL, False
+    if args.pool == LOCAL_POOL:
+        raise SystemExit("minibrain worker: the local pool is main's own machine; name another pool with --pool")
+    hardware = report().as_dict()
+    with httpx.Client(base_url=args.api_url, timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+        try:
+            found = approval(client, args.api_url, platform.node(), hardware, args.pool, stop)
+        except (JoinRefused, httpx.HTTPError) as error:
+            raise SystemExit(f"minibrain worker: {error}") from error
+    if found is None:
+        raise SystemExit(0)
+    save(settings.home, found)
+    return found.credential, found.pool, True
+
+
 def worker(args: argparse.Namespace) -> None:
     import httpx
 
+    from minibrain.joining import forget
     from minibrain.models.hardware import LOCAL_POOL, report
     from minibrain.models.machine_metrics import Sampler
     from minibrain.serve.host import AdvertiseError, EngineHost, advertise_address
     from minibrain.settings import load_settings
     from minibrain.worker import REMOTE_KINDS, MainClient, Worker, WorkerConfig
 
-    api_url, kinds, gpus, parent, pool = args.api_url, args.kinds, args.gpus, args.parent, args.pool
+    api_url, kinds, gpus, parent = args.api_url, args.kinds, args.gpus, args.parent
 
     settings = load_settings()
-    token = os.environ.get(JOIN_KEY_ENV) or settings.secret("worker_token")
+    stop = threading.Event()
+    threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
+    signal.signal(signal.SIGTERM, exit_quietly)
+    signal.signal(signal.SIGINT, exit_quietly)
+    token, pool, approved = credentials(args, settings, stop)
     config = WorkerConfig(
         api_url=api_url,
         token=token,
@@ -272,10 +311,6 @@ def worker(args: argparse.Namespace) -> None:
         prune=parent is None,
         sampler=Sampler(settings.home),
     )
-    stop = threading.Event()
-    threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
-    signal.signal(signal.SIGTERM, exit_quietly)
-    signal.signal(signal.SIGINT, exit_quietly)
     host = None
     if pool != LOCAL_POOL and not args.no_serve:
         client = MainClient(config)
@@ -291,6 +326,8 @@ def worker(args: argparse.Namespace) -> None:
     except httpx.HTTPStatusError as error:
         if error.response.status_code not in REFUSED_STATUSES:
             raise
+        if approved and error.response.status_code == 401:
+            forget(settings.home)
         raise SystemExit(f"minibrain worker: main refused this machine: {refusal(error.response)}") from error
     finally:
         stop.set()
@@ -530,10 +567,21 @@ def main() -> None:
         "--no-browser", action="store_true", help="do not open the setup link in a browser on first start"
     )
     worker_command = commands.add_parser("worker", help="run a worker against a main process")
-    worker_command.add_argument("--api-url", default="http://127.0.0.1:8000")
+    worker_command.add_argument(
+        "--main",
+        "--api-url",
+        dest="api_url",
+        metavar="URL",
+        default=DEFAULT_URL,
+        help="address of main (default %(default)s)",
+    )
     worker_command.add_argument("--kinds", nargs="*", default=None)
     worker_command.add_argument("--gpus", type=int, default=1)
-    worker_command.add_argument("--pool", default="local", help="compute pool this machine joins")
+    worker_command.add_argument(
+        "--pool",
+        default=None,
+        help="compute pool this machine joins; with no MINIBRAIN_JOIN_TOKEN an admin approves it and may pick another",
+    )
     worker_command.add_argument(
         "--advertise",
         default=None,

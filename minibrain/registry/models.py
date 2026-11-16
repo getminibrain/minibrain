@@ -858,18 +858,46 @@ class Teardown(Base):
     base_model: Mapped[BaseModel | None] = relationship(viewonly=True)
 
 
+LIVE_TOKEN = text("revoked_at IS NULL")
+
+
 class JoinToken(Base):
     __tablename__ = "join_tokens"
-    __table_args__ = (Index("ix_join_tokens_pool", "pool"), {"sqlite_autoincrement": True})
+    __table_args__ = (
+        Index("ix_join_tokens_pool", "pool"),
+        Index("uq_join_tokens_live_pool", "pool", unique=True, sqlite_where=LIVE_TOKEN, postgresql_where=LIVE_TOKEN),
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pool: Mapped[str]
-    role: Mapped[str]
     prefix: Mapped[str]
     digest: Mapped[str] = mapped_column(unique=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     created_by: Mapped[str]
-    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_host: Mapped[str | None] = mapped_column(default=None)
+
+
+class JoinRequest(Base):
+    __tablename__ = "join_requests"
+    __table_args__ = (Index("ix_join_requests_state", "state"), {"sqlite_autoincrement": True})
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str]
+    digest: Mapped[str] = mapped_column(unique=True)
+    host: Mapped[str]
+    hardware: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    asked_pool: Mapped[str | None] = mapped_column(default=None)
+    address: Mapped[str | None] = mapped_column(default=None)
+    state: Mapped[str] = mapped_column(default="pending")
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    pool: Mapped[str | None] = mapped_column(default=None)
+    decided_by: Mapped[str | None] = mapped_column(default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    credential_digest: Mapped[str | None] = mapped_column(unique=True, default=None)
+    collected_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)

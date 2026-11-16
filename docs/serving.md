@@ -226,9 +226,9 @@ hardware and the model's weight format:
 - `--engine` overrides the choice. An automatic choice that fails to load falls back to `transformers`.
 - Engines of different kinds serve at the same time: a Mac engine on MLX and a rack engine on SGLang can be replicas of
   one model.
-- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0`, with an engine join token
-  for that pool in `MINIBRAIN_JOIN_TOKEN` (Infrastructure › Add machine, role Engine or Both), pulls adapters from `main`
-  and base weights from wherever Storage keeps them, never from Hugging Face, and announces its URL, engine and
+- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0`, with the pool's join
+  token in `MINIBRAIN_JOIN_TOKEN` or on a machine already approved ([joining](#a-machine-joins)), pulls adapters from
+  `main` and base weights from wherever Storage keeps them, never from Hugging Face, and announces its URL, engine and
   hardware every 10 s. With a bucket, `main` hands out a presigned link and the data key per file and the engine reads
   the bucket directly; with the folder, it reads the files from `main`. Either way it keeps a working copy in
   `<home>/engines/<key>/weights`, checks every file's size and SHA-256, and removes copies of models `main` no longer
@@ -300,10 +300,11 @@ on a move, `from_pool`.
 | Any other | A worker in that pool (`minibrain worker --pool NAME`) runs `minibrain engine` as its child |
 
 - Each worker in a pool other than `local` asks `main` every 10 s which engines to run (`POST
-  /internal/worker/engines`, with the pool's join token) and starts or stops children to match. The answer carries an engine
-  token for that pool (`engine.<join token id>.<pool>.<HMAC-SHA256 of both>`, keyed by `<home>/secrets/engine_token` on
-  main), handed to the engines as `MINIBRAIN_ENGINE_TOKEN`, so a worker needs only its own token and never sees the
-  gateway token. The engine token lives as long as the worker's join token: revoked or expired, its engines get 401
+  /internal/worker/engines`, with its pool token or approval) and starts or stops children to match. The answer carries
+  an engine token for that pool (`engine.<t|m><id>.<pool>.<HMAC-SHA256 of both>`, `t` for a pool token and `m` for an
+  approval, keyed by `<home>/secrets/engine_token` on main), handed to the engines as `MINIBRAIN_ENGINE_TOKEN`, so a
+  worker needs only its own credential and never sees the gateway token. The engine token lives as long as that
+  credential: once the pool token is rotated or the approved machine removed, its engines get 401
   ([security](security.md)). An engine token reaches only what an engine needs: announcing engines in its own pool, base
   weights and the adapters of versions on a base model deployed or running in its pool. The gateway config (routes and
   API key digests), request logs, feedback, gateway reports and other adapters answer it with 403, an announcement for
@@ -430,6 +431,33 @@ sequenceDiagram
     GW->>EN: First request with the v2 adapter
     EN->>MA: Pull adapter by artifact ID
 ```
+
+### A machine joins
+
+Add machine (Infrastructure, admins) asks for a pool, then shows the command to run on the machine:
+`MINIBRAIN_JOIN_TOKEN=mbj_… minibrain worker --main URL --pool NAME`. A pool has one join token; the dialog makes it
+the first time, and the pool's row under Machines shows its prefix, copies the command and rotates it. Without a token
+the same command asks for approval:
+
+```mermaid
+sequenceDiagram
+    participant WO as Worker (new machine)
+    participant MA as main
+    participant AD as Admin
+    WO->>MA: POST /internal/join/requests (request key, host, hardware, pool)
+    MA-->>WO: Code K7QM2P
+    Note over WO: Prints the code, polls every 3 s
+    AD->>MA: Machines, Waiting for approval: approve into pool gpu
+    WO->>MA: GET /internal/join/requests/self
+    MA-->>WO: Machine credential for pool gpu and this host
+    WO->>WO: Save it in its home folder
+    WO->>MA: Register, claim jobs, ask for engines
+```
+
+- A request lasts an hour; Deny ends it and the worker stops with the reason. The approval holds across restarts
+  (`<home>/worker/approval.json`) until the machine is removed. `--main` is the address of main (`--api-url` also
+  works).
+- On an approved machine `--pool` is ignored: the pool is the one the admin picked.
 
 ### An engine joins
 

@@ -147,31 +147,43 @@ out everywhere. A password reset clears the account's lockouts.
 
 - GPU boxes need no internet access: engines and workers pull adapters and dataset versions from `main`, and base weights
   from `main` or, when Storage is S3, from the bucket on links `main` signs. They never hold bucket keys.
-- Workers and engines on other machines hold a join token for their pool (`MINIBRAIN_JOIN_TOKEN`), never database
-  credentials. An admin creates one under Infrastructure › Add machine for one pool and one role (worker, engine or
-  both), with an optional expiry. It is 256 random bits after `mbj_`, shown once; the database keeps its SHA-256 and
-  its first 12 characters. A worker token reaches `/internal/worker/*` only, and registering, claiming or asking for
-  engines in another pool answers 403; an engine token reaches only what engines need on `/internal/gateway/*` and
-  announces engines in its pool only. A revoked or expired token answers 401, and the worker stops with the reason.
-  Creating, revoking, a machine first joining with a token and every refusal (wrong pool, wrong role, revoked,
-  expired; one event per token, pool and address in 10 minutes) are audit events (`join_token.*`). Revoke tokens
-  under Infrastructure › Machines › Join tokens.
+- Workers and engines on other machines join a pool in one of two ways, never with database credentials and never
+  with neither; there is no switch that lets machines join unchecked.
+  - Pool token. Each pool has one join token (`MINIBRAIN_JOIN_TOKEN`): 256 random bits after `mbj_`, shown once when
+    an admin makes it (Infrastructure › Add machine) or rotates it (the pool's row under Machines). The database keeps
+    its SHA-256 and its first 12 characters. Rotating revokes the old token at once: workers on it get 401 and stop
+    with the reason, and the engine tokens minted from it end too.
+  - Approval. `minibrain worker --main URL` with no token makes a 256-bit request key (`mbr_…`), sends it with the
+    host name, a hardware summary and the pool asked for, and prints a 6-character code (no 0, O, 1 or I). Main keeps
+    the key's SHA-256; the request waits under Infrastructure › Machines › Waiting for approval for an hour, then
+    expires. An admin checks the code and approves it into a pool, or denies it. On its next poll the worker gets a
+    machine credential (`mbm_…`, stored as SHA-256, handed out once) bound to that pool and host, saves it in
+    `<home>/worker/approval.json` (mode 0600) and uses it on later starts. Removing the machine revokes it (401);
+    rotating the pool's token does not. A request key reaches nothing but its own request's state.
+  - Join requests are limited to 5 waiting per address and 50 in all (429); a new request from the same host and
+    address replaces its older one.
+- Either credential reaches `/internal/worker/*` and what engines need on `/internal/gateway/*`, for its pool only:
+  registering, claiming, asking for engines or announcing an engine in another pool answers 403, as does an approved
+  credential used from another host. Making, rotating, a machine first joining with a token, requests, approvals,
+  denials, revocations and every refusal (wrong pool or host, revoked, too many requests; one event per target, pool
+  and address in 10 minutes) are audit events (`join_token.*`, `join_request.*`).
 - The worker main starts on its own machine uses `<home>/secrets/worker_token`, which joins the `local` pool only;
-  there is no shared token for other pools.
+  the `local` pool takes no other machine.
 - Engines a worker starts in a pool get a narrower engine token for that pool (announce in that pool, base weights,
   adapters of models served in that pool; [serving](serving.md#deployments-on-a-pool)), never the gateway token, whose
   config carries routes and API key digests. An engine token is signed with `<home>/secrets/engine_token` over the pool
-  and the id of the join token that admitted the worker, and main checks that join token on every use: revoking or
-  expiring it ends its engines' tokens at once (401), in that pool only, and each refusal is a `join_token.refused`
-  event on the join token, rate-limited like the others. The `local` pool's engines use the gateway token and are not
-  affected.
-- A worker on a join token downloads only what the jobs it holds need. Each download (`/internal/worker/artifacts/<id>`,
-  `/internal/worker/bases/<key>`, its files and `/stored`) carries the job's lease in `X-Job-Lease`, and main answers
-  only for an artifact or base model named in the params of that running job, leased to a worker of the token's pool:
-  its dataset version, adapter and base model. Anything else, including another pool's dataset or the same job's
-  inputs after its lease ends, answers 403 and writes a `join_token.refused` event (one per token, reason and address in
-  10 minutes; the first asked id is in the event). An engine token gets an adapter only when a version on a base model
-  deployed, or running, in its pool uses it; other artifacts answer 403 the same way. The local worker token is
+  and the pool token or approval that admitted the worker, and main checks that credential on every use: rotating the
+  token or removing the approved machine ends its engines' tokens at once (401), in that pool only, and each refusal
+  is a `join_token.refused` event on the credential, rate-limited like the others. The `local` pool's engines use the
+  gateway token and are not affected.
+- A worker on a pool token or an approval downloads only what the jobs it holds need. Each download
+  (`/internal/worker/artifacts/<id>`, `/internal/worker/bases/<key>`, its files and `/stored`) carries the job's lease
+  in `X-Job-Lease`, and main answers only for an artifact or base model named in the params of that running job,
+  leased to a worker of the credential's pool: its dataset version, adapter and base model. Anything else, including
+  another pool's dataset or the same job's inputs after its lease ends, answers 403 and writes a `join_token.refused`
+  event (one per credential, reason and address in 10 minutes; the first asked id is in the event). An engine token
+  gets an adapter only when a version on a base model deployed, or running, in its pool uses it; other artifacts answer
+  403 the same way. The local worker token is
   unaffected: that worker shares main's machine.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
@@ -323,8 +335,8 @@ wiped at any time. A worker's outputs are encrypted the moment main stores them.
 With Storage on S3, base model files stay sealed in the bucket and machines read them from there, not through main:
 
 1. A worker or engine asks main over its authenticated channel (`GET /internal/worker/bases/<key>` with the worker's
-   token, `/internal/gateway/bases/<key>` with the gateway token, a pool's engine token or an engine join
-   token).
+   token, `/internal/gateway/bases/<key>` with the gateway token, a pool's engine token, a pool token or an
+   approved machine's credential).
 2. Main answers, with `Cache-Control: no-store`, each file's path, size and SHA-256, a presigned GET link (SigV4,
    valid 15 minutes, for the configured endpoint and nothing else) and the file's data key: main reads the object's
    4 KiB header with its own bucket credentials and unwraps the data key with the master key, through the same

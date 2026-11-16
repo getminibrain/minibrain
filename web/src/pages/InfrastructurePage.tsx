@@ -10,7 +10,7 @@ import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { AddMachine } from "./infrastructure/AddMachine";
 import { FleetBoard } from "./infrastructure/FleetBoard";
-import { JoinTokens } from "./infrastructure/JoinTokens";
+import { JoinRequests } from "./infrastructure/JoinRequests";
 import { MachinesTab } from "./infrastructure/MachinesTab";
 import { NeedsALook } from "./infrastructure/NeedsALook";
 import { SetupDiagram } from "./infrastructure/SetupDiagram";
@@ -110,13 +110,13 @@ export function InfrastructurePage() {
             )}
             {active === "/infrastructure/machines" && (
                 <PanelSections>
+                    {can.admin && <JoinRequests pools={pools.data ?? []} />}
                     <MachinesTab
                         pools={pools.data ?? []}
                         main={main}
                         info={infrastructure.data}
                         loading={pools.isLoading}
                     />
-                    {can.admin && <JoinTokens />}
                     <PanelSection
                         icon={Cpu}
                         title="This main process"
