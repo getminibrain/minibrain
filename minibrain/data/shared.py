@@ -277,6 +277,15 @@ def content_facts(stream: BinaryIO, filename: str) -> ContentFacts:
     return ContentFacts(digest.hexdigest(), check.result() if check is not None else None, empty)
 
 
+def read_as(filename: str) -> str | None:
+    return READERS.get(Path(filename).suffix.lower())
+
+
+def same_upload(session: Session, digest: str, filename: str) -> Source | None:
+    found = session.scalars(select(Source).where(Source.artifact_id == digest).order_by(Source.id))
+    return next((source for source in found if read_as(source.filename) == read_as(filename)), None)
+
+
 def store_upload(session: Session, store: ArtifactStore, filename: str, stream: BinaryIO, digest: str) -> Artifact:
     stored = store.put_stream(stream, digest)
     return register(session, stored.id, ArtifactKind.SOURCE, Packing.FILE, filename, stored.size)
@@ -332,7 +341,7 @@ def add_source(
     if facts.empty:
         raise SourceError(f"{filename} is empty: upload a file that has rows of data")
     digest, encoding = facts.digest, facts.encoding
-    same = first_source(session, Source.artifact_id == digest)
+    same = same_upload(session, digest, filename)
     if same is not None:
         return Added(same, Outcome.EXISTING)
     clash = source_named(session, filename)

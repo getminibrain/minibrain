@@ -61,6 +61,21 @@ def test_the_same_content_is_one_source_whatever_its_name(harness: Harness) -> N
     assert artifacts(harness) == 1
 
 
+def test_the_same_bytes_as_another_file_type_are_a_new_source(harness: Harness) -> None:
+    data = b"text,category\nhello,billing\n"
+    as_csv = send(harness, "notes.csv", data)
+    as_tsv = send(harness, "notes.tsv", data)
+    assert (as_csv.status_code, as_tsv.status_code) == (201, 201)
+    assert as_tsv.json()["id"] != as_csv.json()["id"]
+    assert len(as_csv.json()["columns"]) == 2 and len(as_tsv.json()["columns"]) == 1
+    assert artifacts(harness) == 1
+    again = send(harness, "copy.tsv", data)
+    assert (again.status_code, again.json()["id"]) == (200, as_tsv.json()["id"])
+    assert harness.client.delete(f"/api/sources/{as_csv.json()['id']}").status_code == 204
+    assert artifacts(harness) == 1
+    assert harness.client.get(f"/api/sources/{as_tsv.json()['id']}").json()["rows"] == 1
+
+
 def test_a_taken_name_with_new_content_keeps_both_by_default(harness: Harness) -> None:
     send(harness, "tickets.csv", tickets_csv())
     second = send(harness, "Tickets.csv", tickets_csv(40))
