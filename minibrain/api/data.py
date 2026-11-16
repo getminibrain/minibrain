@@ -46,7 +46,7 @@ from minibrain.api.schemas import (
     SourceStats,
     SourceSummary,
 )
-from minibrain.api.views import change_info, contract_info, dataset_version_info, mapping_info
+from minibrain.api.views import change_info, contract_info, dataset_delete_lock, dataset_version_info, mapping_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
@@ -279,6 +279,7 @@ def dataset_summary(settings: Settings, store: ArtifactStore, dataset: Dataset) 
         mapping=mapping_info(dataset),
         models=[model.slug for model in dataset.models],
         model_names=[model.name for model in dataset.models],
+        delete_lock=dataset_delete_lock(dataset),
         test_examples=example_counts(session, list(dataset.models)) if session is not None else {},
         splits=known_splits(latest, changed),
         dataset_version=dataset_version_info(latest) if latest is not None else None,
@@ -641,9 +642,18 @@ def dataset_query(
     return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
 
 
-@router.delete("/datasets/{slug}", status_code=204, dependencies=[Depends(builder)], summary="Delete a dataset")
+@router.delete(
+    "/datasets/{slug}",
+    status_code=204,
+    dependencies=[Depends(builder)],
+    summary="Delete a dataset",
+    description="Refused with 409 while a training or scoring job of a model on it is queued or running.",
+)
 def delete_dataset(slug: str, session: SessionDep, settings: SettingsDep) -> None:
     dataset = get_dataset(session, slug)
+    lock = dataset_delete_lock(dataset)
+    if lock is not None:
+        raise ConflictError(lock)
     released = sorted(model.slug for model in dataset.models)
     for model in list(dataset.models):
         model.dataset_id = None

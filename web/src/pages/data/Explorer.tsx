@@ -638,7 +638,7 @@ export function DataExplorer() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DeleteItem
-                        blocked={null}
+                        blocked={dataset.delete_lock ? "A job uses it" : null}
                         onSelect={() => setAction({ kind: "delete-dataset", dataset })}
                     />
                 </TreeRowMenu>

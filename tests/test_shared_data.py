@@ -2,6 +2,7 @@ from sqlalchemy import select
 
 from minibrain.registry.models import DatasetVersion
 from tests.conftest import Harness, blank_dataset, tickets_csv
+from tests.test_flow import finish
 
 
 def upload(harness: Harness, name: str = "tickets.csv") -> dict:
@@ -57,6 +58,7 @@ def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_dataset_v
     harness.client.put("/api/models/triage/dataset", json={"dataset": "tickets"})
     taken = dataset_version_hash(harness, "triage")
     assert harness.client.post("/api/models/triage/versions", json={"kind": "prompt"}).status_code == 201
+    finish(harness, "eval")
     assert harness.client.get("/api/datasets/tickets").json()["model_names"] == ["Triage"]
     assert "used by Tickets" in harness.client.delete(f"/api/sources/{source['id']}").json()["detail"]
     assert harness.client.delete("/api/datasets/tickets").status_code == 204
@@ -68,6 +70,31 @@ def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_dataset_v
     events = harness.client.get("/api/audit", params={"action": "dataset.delete"}).json()["events"]
     assert events[0]["detail"]["models"] == ["triage"]
     assert harness.client.delete(f"/api/sources/{source['id']}").status_code == 204
+
+
+def test_deleting_a_dataset_is_refused_while_a_job_uses_it(harness: Harness) -> None:
+    source = upload(harness)
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Triage",
+        },
+    )
+    harness.client.put("/api/models/triage/dataset", json={"dataset": "tickets"})
+    assert harness.client.get("/api/datasets/tickets").json()["delete_lock"] is None
+    assert harness.client.post("/api/models/triage/versions", json={"kind": "prompt"}).status_code == 201
+    queued = "Scoring v1 of Triage is queued on this dataset; delete it once that finishes, or cancel the job."
+    assert harness.client.get("/api/datasets/tickets").json()["delete_lock"] == queued
+    refused = harness.client.delete("/api/datasets/tickets")
+    assert refused.status_code == 409 and refused.json()["detail"] == queued
+    assert harness.claim(["eval"]) is not None
+    running = harness.client.delete("/api/datasets/tickets")
+    assert running.status_code == 409 and "is running on this dataset" in running.json()["detail"]
+    assert harness.client.get("/api/models/triage").json()["dataset"] == "tickets"
 
 
 def test_models_sharing_a_dataset_see_its_mapping_change(harness: Harness) -> None:

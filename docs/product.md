@@ -252,8 +252,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   One dataset per model, picked at creation; each run picks its version.
   UI: Models › Add model, Models › model › Train › Data · API: PUT /api/models/{name}/dataset, PUT /api/models/{name}/mapping, POST /api/models/{name}/query, GET /api/models/{name}/preview
 - **Dataset lock during runs** · shipped · product, ml
-  A model's dataset cannot change while a run trains or scores.
-  UI: Models › model › Train › Data, Data › dataset › Used by · API: PUT /api/models/{name}/dataset
+  A dataset in use by a run cannot change or be deleted.
+  UI: Models › model › Train › Data, Data › dataset › Used by, Data › dataset › Delete · API: PUT /api/models/{name}/dataset, DELETE /api/datasets/{slug}
 - **LoRA training** · shipped · product, ml
   Train a LoRA version, fresh or from an earlier version's settings.
   UI: Models › model › Train, Versions › Train again · API: POST /api/models/{name}/versions

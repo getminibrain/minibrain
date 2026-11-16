@@ -2527,6 +2527,7 @@
           "Data"
         ],
         "summary": "Delete a dataset",
+        "description": "Refused with 409 while a training or scoring job of a model on it is queued or running.",
         "operationId": "delete_dataset_api_datasets__slug__delete",
         "parameters": [
           {
@@ -15446,6 +15447,18 @@
             "type": "array",
             "title": "Model Names",
             "default": []
+          },
+          "delete_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete Lock",
+            "description": "Why the dataset cannot be deleted now: a training or scoring job on it is queued or running."
           },
           "test_examples": {
             "additionalProperties": {

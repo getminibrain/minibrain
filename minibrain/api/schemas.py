@@ -371,6 +371,10 @@ class DatasetSummary(BaseModel):
     mapping: MappingInfo
     models: list[str]
     model_names: list[str] = []
+    delete_lock: str | None = Field(
+        default=None,
+        description="Why the dataset cannot be deleted now: a training or scoring job on it is queued or running.",
+    )
     test_examples: dict[str, int] = Field(
         default_factory=dict, description="Test examples from the Playground per model slug, held out for scoring."
     )

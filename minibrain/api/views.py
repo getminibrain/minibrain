@@ -448,16 +448,33 @@ def label_proposal(model: Model, current: DatasetVersion | None) -> LabelProposa
 DATA_JOBS = {JobKind.TRAIN: "Training", JobKind.EVAL: "Scoring"}
 
 
-def dataset_lock(model: Model) -> str | None:
+def busy_data_job(model: Model) -> Job | None:
     busy = [job for job in model.jobs if job.status in ACTIVE_JOB_STATUSES and job.kind in DATA_JOBS]
-    if not busy:
-        return None
-    job = max(busy, key=lambda found: found.id)
+    return max(busy, key=lambda found: found.id) if busy else None
+
+
+def data_job_phrase(model: Model, job: Job, owner: str | None = None) -> str:
     number = next((version.number for version in model.versions if version.id == job.version_id), None)
     verb = DATA_JOBS[JobKind(job.kind)]
     what = f"{verb} v{number}" if number is not None else verb
+    of = f" of {owner}" if owner else ""
     state = "is queued" if job.status == JobStatus.QUEUED else "is running"
-    return f"{what} {state} on this dataset; change it once that finishes, or cancel the job."
+    return f"{what}{of} {state} on this dataset"
+
+
+def dataset_lock(model: Model) -> str | None:
+    job = busy_data_job(model)
+    if job is None:
+        return None
+    return f"{data_job_phrase(model, job)}; change it once that finishes, or cancel the job."
+
+
+def dataset_delete_lock(dataset: Dataset) -> str | None:
+    for model in sorted(dataset.models, key=lambda found: found.name):
+        job = busy_data_job(model)
+        if job is not None:
+            return f"{data_job_phrase(model, job, model.name)}; delete it once that finishes, or cancel the job."
+    return None
 
 
 def detail(settings: Settings, model: Model) -> ModelDetail:

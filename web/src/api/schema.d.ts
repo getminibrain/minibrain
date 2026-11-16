@@ -844,7 +844,10 @@ export interface paths {
         get: operations["read_dataset_api_datasets__slug__get"];
         put?: never;
         post?: never;
-        /** Delete a dataset */
+        /**
+         * Delete a dataset
+         * @description Refused with 409 while a training or scoring job of a model on it is queued or running.
+         */
         delete: operations["delete_dataset_api_datasets__slug__delete"];
         options?: never;
         head?: never;
@@ -4580,6 +4583,11 @@ export interface components {
              * @default []
              */
             model_names?: string[];
+            /**
+             * Delete Lock
+             * @description Why the dataset cannot be deleted now: a training or scoring job on it is queued or running.
+             */
+            delete_lock?: string | null;
             /**
              * Test Examples
              * @description Test examples from the Playground per model slug, held out for scoring.

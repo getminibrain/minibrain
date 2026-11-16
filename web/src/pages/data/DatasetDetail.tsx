@@ -374,7 +374,7 @@ export function DatasetDetail({
                             Move to…
                         </Button>
                         <DeleteAction
-                            blocked={null}
+                            blocked={dataset.delete_lock ?? null}
                             title={`Delete ${dataset.name}?`}
                             description={datasetDeleteNote(dataset.model_names ?? [])}
                             onConfirm={() => remove.mutateAsync().catch(() => undefined)}
