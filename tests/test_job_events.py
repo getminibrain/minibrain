@@ -150,6 +150,7 @@ def test_the_training_callback_emits_step_and_held_out_events(
     }
     assert (first["tokens_per_second"], first["eta_seconds"], first["memory_bytes"]) == (2000.0, 380.0, 2_000_000_000)
     assert (second["tokens_per_second"], second["eta_seconds"]) == (2000.0, 270.0)
+    assert (first["elapsed_seconds"], second["elapsed_seconds"]) == (20.0, 30.0)
     assert (held_out["event"], held_out["step"], held_out["eval_loss"]) == ("train.eval", 20, 1.1)
 
 
@@ -215,7 +216,7 @@ def test_the_job_page_reads_training_curves_from_stored_events(harness: Harness)
     post(harness, claim, [began, step(1, 2.0), step(2, 1.6), step(3, 1.9)])
     post(harness, claim, [step(2, 1.5, eta_seconds=40, tokens_per_second=900.0, memory_bytes=3_000)])
     post(harness, claim, [held_out(2, 1.4), step(3, 1.2), step(4, 1.0), held_out(4, 1.3)])
-    post(harness, claim, [step(5, 0.8), step(6, 0.6, memory_bytes=5_000), held_out(6, 1.5)])
+    post(harness, claim, [step(5, 0.8), step(6, 0.6, memory_bytes=5_000, elapsed_seconds=42.5), held_out(6, 1.5)])
     job_id = claim["job_id"]
     metrics = harness.client.get(f"/api/jobs/{job_id}/metrics").json()["training"]
     assert [(point["step"], point["loss"]) for point in metrics["points"]] == [
@@ -228,6 +229,7 @@ def test_the_job_page_reads_training_curves_from_stored_events(harness: Harness)
     ]
     assert [(point["step"], point["eval_loss"]) for point in metrics["evals"]] == [(2, 1.4), (4, 1.3), (6, 1.5)]
     assert (metrics["step"], metrics["steps"], metrics["memory_bytes"]) == (6, 6, 5_000)
+    assert [point["elapsed_seconds"] for point in metrics["points"]][-2:] == [None, 42.5]
     assert metrics["rising_from"] == 4
     detail = harness.client.get(f"/api/jobs/{job_id}").json()
     assert (detail["device"], detail["host"], detail["live"], detail["progress"]) == ("mps", "test", False, 1.0)

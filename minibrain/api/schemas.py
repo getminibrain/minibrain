@@ -626,6 +626,7 @@ class TrainPoint(BaseModel):
     grad_norm: float | None = None
     tokens_per_second: float | None = None
     memory_bytes: int | None = None
+    elapsed_seconds: float | None = None
 
 
 class EvalPoint(BaseModel):

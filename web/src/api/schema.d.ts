@@ -9091,6 +9091,8 @@ export interface components {
             tokens_per_second?: number | null;
             /** Memory Bytes */
             memory_bytes?: number | null;
+            /** Elapsed Seconds */
+            elapsed_seconds?: number | null;
         };
         /** TrainingDefaults */
         TrainingDefaults: {

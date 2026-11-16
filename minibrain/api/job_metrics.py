@@ -54,6 +54,7 @@ def train_point(data: dict[str, Any]) -> TrainPoint:
         grad_norm=number(data, "grad_norm"),
         tokens_per_second=number(data, "tokens_per_second"),
         memory_bytes=whole(data, "memory_bytes"),
+        elapsed_seconds=number(data, "elapsed_seconds"),
     )
 
 

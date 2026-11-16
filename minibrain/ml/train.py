@@ -95,6 +95,7 @@ class MetricsCallback(TrainerCallback):
             tokens_per_second=self.throughput(moment, logs.get("num_tokens")),
             memory_bytes=self.memory(),
             eta_seconds=self.eta(moment, step, total),
+            elapsed_seconds=round(moment - self.began, 1),
         )
 
 

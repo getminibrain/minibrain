@@ -39,7 +39,7 @@ import {
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { bytes, relativeTime } from "~/lib/time";
 import { ProgressSection, ScoresSection } from "./ProgressPanels";
-import { LossSection, RateSection } from "./TrainingPanel";
+import { LossSection } from "./TrainingPanel";
 import { JobState } from "./jobCells";
 
 type Fact = [string, ReactNode];
@@ -513,7 +513,6 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
                     <SettingsSection job={job} />
                 </div>
                 {training && <LossSection job={job} metrics={metrics.data} />}
-                {training && <RateSection job={job} metrics={metrics.data} />}
                 {job.kind === "eval" && <ScoresSection job={job} />}
                 <JobLogsSection key={job.id} job={job} anchor={JOB_LOGS_ID} />
             </PanelSections>

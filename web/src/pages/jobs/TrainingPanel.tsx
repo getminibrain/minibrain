@@ -1,30 +1,62 @@
-import { ChartLine, TrendingDown } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "obp-ui";
+import { ChartLine, Hourglass, Minus, TrendingDown, TriangleAlert } from "lucide-react";
+import {
+    SegmentedTabs,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "obp-ui";
 import { type ReactNode, useState } from "react";
 import type { JobDetail, JobMetrics, TrainingMetrics } from "~/api/client";
 import { useComparedRun } from "~/api/jobPageQueries";
 import { ErrorLine, PanelSection } from "~/components/Section";
-import { StepChart, type StepRow, type StepSeries } from "~/components/charts/StepChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
 import { count } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { bytes } from "~/lib/time";
+import {
+    type LaneSeries,
+    LossFigure,
+    type Readout,
+    type ReadoutLine,
+    WARMUP_FILL,
+} from "./LossFigure";
+import {
+    type CurveRow,
+    type Previous,
+    type Training,
+    type Verdict,
+    bestHeld,
+    curveRows,
+    domainEnd,
+    epochAt,
+    epochBoundaries,
+    lastStep,
+    nearest,
+    verdict,
+    warmupEnd,
+} from "./lossCurve";
 
 const TRAIN = "var(--primary)";
 const HELD_OUT = "var(--file-sql)";
 const PREVIOUS = "var(--faint)";
-const LR_HEIGHT = 160;
 const LOSS = (value: number) => value.toFixed(3);
-const LOSS_AXIS = (value: number) => value.toFixed(2);
-const RATE = (value: number) => value.toExponential(1);
-const LEGEND = ["loss", "eval_loss", "previous", "previous_eval"];
+const RATE = (value: number) => (value === 0 ? "0" : value.toExponential(1));
+const RATE_LINE = "var(--muted-foreground)";
 const NONE = "none";
+const SMOOTH_KEY = "minibrain.loss-smoothing";
+const RAW = "raw";
+const SMOOTH = "smooth";
+const SMOOTHING_TABS = [
+    { key: RAW, label: "Raw" },
+    { key: SMOOTH, label: "Smoothed" },
+];
 
-type Previous = NonNullable<JobMetrics["previous"]>;
 type Comparable = NonNullable<JobMetrics["comparable"]>[number];
 type Choice = number | typeof NONE | null;
 type Fact = [string, ReactNode];
-type Training = NonNullable<NonNullable<JobDetail["setup"]>["training"]>;
+type Smoothing = typeof RAW | typeof SMOOTH;
 
 const SHARE = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
 const SCHEDULES: Record<string, string> = {
@@ -32,67 +64,37 @@ const SCHEDULES: Record<string, string> = {
     linear: "falls in a straight line to 0 on a linear schedule",
     constant: "stays at its set value on a constant schedule",
 };
+const SCHEDULE_NAMES: Record<string, string> = {
+    cosine: "Cosine schedule",
+    linear: "Linear schedule",
+    constant: "Constant schedule",
+};
 
-function lastStep(points: { step: number }[]): number {
-    return points.at(-1)?.step ?? 0;
-}
-
-function domainEnd(training: TrainingMetrics, previous: Previous | null | undefined): number {
-    const own = Math.max(lastStep(training.points), lastStep(training.evals));
-    if (training.steps) {
-        return Math.max(training.steps, own);
+function storedSmoothing(): Smoothing {
+    try {
+        return window.localStorage.getItem(SMOOTH_KEY) === RAW ? RAW : SMOOTH;
+    } catch {
+        return SMOOTH;
     }
-    return Math.max(own, lastStep(previous?.points ?? []));
 }
 
-function lossRows(
-    training: TrainingMetrics,
-    previous: Previous | null | undefined,
-    end: number,
-): StepRow[] {
-    const rows = new Map<number, StepRow>();
-    const row = (step: number) => {
-        const found = rows.get(step) ?? {
-            step,
-            loss: null,
-            eval_loss: null,
-            previous: null,
-            previous_eval: null,
-        };
-        rows.set(step, found);
-        return found;
+function useSmoothing() {
+    const [value, setValue] = useState<Smoothing>(storedSmoothing);
+    const choose = (next: Smoothing) => {
+        setValue(next);
+        try {
+            window.localStorage.setItem(SMOOTH_KEY, next);
+        } catch {}
     };
-    for (const point of training.points) {
-        row(point.step).loss = point.loss ?? null;
-    }
-    for (const point of training.evals) {
-        row(point.step).eval_loss = point.eval_loss;
-    }
-    for (const point of previous?.points ?? []) {
-        if (point.step <= end) {
-            row(point.step).previous = point.loss ?? null;
-        }
-    }
-    for (const point of previous?.evals ?? []) {
-        if (point.step <= end) {
-            row(point.step).previous_eval = point.eval_loss;
-        }
-    }
-    return [...rows.values()].sort((left, right) => left.step - right.step);
-}
-
-function rateRows(training: TrainingMetrics): StepRow[] {
-    return training.points.map((point) => ({
-        step: point.step,
-        rate: point.learning_rate ?? null,
-    }));
+    return [value, choose] as const;
 }
 
 function lossSeries(
     training: TrainingMetrics,
     previous: Previous | null | undefined,
-): StepSeries[] {
-    const series: StepSeries[] = [];
+    smoothing: Smoothing,
+): LaneSeries[] {
+    const series: LaneSeries[] = [];
     if (previous && previous.points.length > 0) {
         series.push({
             key: "previous",
@@ -108,15 +110,25 @@ function lossSeries(
             dots: true,
         });
     }
-    series.push({ key: "loss", label: "Training loss", color: TRAIN });
+    if (smoothing === SMOOTH) {
+        series.push(
+            { key: "loss", label: "Training loss (raw)", color: TRAIN, width: 1, opacity: 0.25 },
+            { key: "smooth", label: "Training loss (smoothed)", color: TRAIN },
+        );
+    } else {
+        series.push({ key: "loss", label: "Training loss", color: TRAIN });
+    }
     if (training.evals.length > 0) {
         series.push({ key: "eval_loss", label: "Held-out loss", color: HELD_OUT, dots: true });
     }
     return series;
 }
 
-function legendOrder(series: StepSeries[]): StepSeries[] {
-    return [...series].sort((left, right) => LEGEND.indexOf(left.key) - LEGEND.indexOf(right.key));
+function legendSeries(series: LaneSeries[]): LaneSeries[] {
+    const order: (keyof CurveRow)[] = ["smooth", "loss", "eval_loss", "previous", "previous_eval"];
+    return series
+        .filter((item) => item.opacity === undefined)
+        .sort((left, right) => order.indexOf(left.key) - order.indexOf(right.key));
 }
 
 function latest(values: (number | null | undefined)[]): number | null {
@@ -138,11 +150,6 @@ export function stepText(training: TrainingMetrics): string {
         : count(training.step);
 }
 
-function domainOf(training: TrainingMetrics, rows: StepRow[]): [number, number] {
-    const last = rows.at(-1)?.step ?? 0;
-    return [0, Math.max(training.steps ?? last, last)];
-}
-
 function choiceLabel(item: Comparable): string {
     return item.live ? `v${item.version} (live)` : `v${item.version}`;
 }
@@ -157,7 +164,7 @@ function CompareWith({
     onChange: (next: number | typeof NONE) => void;
 }) {
     return (
-        <div className="ml-auto flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Compare with</span>
             <Select
                 value={String(value)}
@@ -232,14 +239,6 @@ export function trainingFacts(
     return facts;
 }
 
-function OverfitHint({ step }: { step: number }) {
-    return (
-        <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
-            {`Held-out loss has risen since step ${count(step)} while training loss kept falling: the model is starting to memorise its training rows. Fewer epochs or more varied data usually help.`}
-        </div>
-    );
-}
-
 function waiting(job: JobDetail): string {
     return job.status === "queued" || job.status === "running"
         ? "Waiting for the first training step."
@@ -273,19 +272,20 @@ function lossTip(job: JobDetail, metrics: JobMetrics | undefined): string {
     const curves = metrics?.comparable?.length
         ? "Training and held-out loss per step, with another trained version's run behind them in grey."
         : "Training loss per step, held-out loss at each evaluation.";
-    return `${curves}${heldOutText(job.setup?.training)}`;
+    return `${curves}${heldOutText(job.setup?.training)} ${rateTip(job.setup?.training)}`;
 }
 
 function rateTip(training: Training | null | undefined): string {
     const schedule = SCHEDULES[training?.scheduler ?? "cosine"] ?? SCHEDULES.cosine;
     const warmup = training?.warmup;
+    const lead = "The learning rate below sets how far each step moves the weights:";
     if (warmup === null || warmup === undefined) {
-        return `How far each step moves the weights: it warms up, then ${schedule}.`;
+        return `${lead} it warms up, then ${schedule}.`;
     }
     if (warmup === 0) {
-        return `How far each step moves the weights: no warmup, it starts at its set value and ${schedule}.`;
+        return `${lead} no warmup, it starts at its set value and ${schedule}.`;
     }
-    return `How far each step moves the weights: it ramps up from 0 over the first ${SHARE.format(warmup)} of steps, then ${schedule}.`;
+    return `${lead} it ramps up from 0 over the first ${SHARE.format(warmup)} of steps (shaded), then ${schedule}.`;
 }
 
 export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
@@ -313,6 +313,216 @@ function useComparison(job: JobDetail, fallback: Previous | null | undefined) {
     return { previous: compared.data, value: choice, setChoice, compared } as const;
 }
 
+const VERDICT_ICONS = {
+    overfit: TriangleAlert,
+    waiting: Hourglass,
+    single: Hourglass,
+    flat: Minus,
+    falling: TrendingDown,
+} as const;
+
+function VerdictLine({ verdict }: { verdict: Verdict }) {
+    const Icon = VERDICT_ICONS[verdict.kind];
+    const warning = verdict.kind === "overfit";
+    return (
+        <p
+            className={
+                warning
+                    ? "flex items-center gap-2 font-medium text-warning"
+                    : "flex items-center gap-2 font-medium"
+            }
+        >
+            <Icon
+                aria-hidden="true"
+                className={warning ? "size-4 shrink-0" : "size-4 shrink-0 text-muted-foreground"}
+            />
+            {verdict.text}
+        </p>
+    );
+}
+
+type Valued = { step: number; value: number };
+
+function withValue<T extends { step: number }>(
+    items: readonly T[],
+    value: (item: T) => number | null | undefined,
+): Valued[] {
+    return items.flatMap((item) => {
+        const found = value(item);
+        return typeof found === "number" ? [{ step: item.step, value: found }] : [];
+    });
+}
+
+type LineSpec = {
+    key: string;
+    items: Valued[];
+    label: string;
+    color: string;
+    until: number;
+    dot?: boolean;
+    format?: (value: number) => string;
+};
+
+function readoutLine(spec: LineSpec, step: number): ReadoutLine[] {
+    const found = step <= spec.until ? nearest(spec.items, step) : null;
+    if (!found) {
+        return [];
+    }
+    const note = found.step === step ? "" : ` at step ${count(found.step)}`;
+    return [
+        {
+            key: spec.key,
+            value: (spec.format ?? LOSS)(found.value),
+            label: `${spec.label}${note}`,
+            color: spec.color,
+            dot: spec.dot,
+        },
+    ];
+}
+
+function readoutSpecs(
+    training: TrainingMetrics,
+    previous: Previous | null | undefined,
+    rows: CurveRow[],
+    smoothing: Smoothing,
+): LineSpec[] {
+    const version = previous ? `v${previous.version}` : "";
+    const own = Math.max(lastStep(training.points), lastStep(training.evals));
+    const theirs = Math.max(lastStep(previous?.points ?? []), lastStep(previous?.evals ?? []));
+    const specs: LineSpec[] = [
+        {
+            key: "loss",
+            items: withValue(training.points, (point) => point.loss),
+            label: "Training loss",
+            until: own,
+            color: TRAIN,
+        },
+    ];
+    if (smoothing === SMOOTH) {
+        specs.push({
+            key: "smooth",
+            items: withValue(rows, (row) => row.smooth),
+            label: "Smoothed",
+            until: own,
+            color: TRAIN,
+        });
+    }
+    specs.push(
+        {
+            key: "held",
+            items: withValue(training.evals, (point) => point.eval_loss),
+            label: "Held-out loss",
+            until: own,
+            color: HELD_OUT,
+            dot: true,
+        },
+        {
+            key: "previous",
+            items: withValue(rows, (row) => row.previous),
+            label: `${version} training loss${smoothing === SMOOTH ? ", smoothed" : ""}`,
+            until: theirs,
+            color: PREVIOUS,
+        },
+        {
+            key: "previous_held",
+            items: withValue(previous?.evals ?? [], (point) => point.eval_loss),
+            label: `${version} held-out loss`,
+            until: theirs,
+            color: PREVIOUS,
+            dot: true,
+        },
+        {
+            key: "rate",
+            items: withValue(training.points, (point) => point.learning_rate),
+            label: "Learning rate",
+            until: own,
+            color: RATE_LINE,
+            format: RATE,
+        },
+    );
+    return specs;
+}
+
+function readoutOf(
+    training: TrainingMetrics,
+    previous: Previous | null | undefined,
+    setup: Training | null | undefined,
+    rows: CurveRow[],
+    smoothing: Smoothing,
+): (step: number) => Readout {
+    const specs = readoutSpecs(training, previous, rows, smoothing);
+    const elapsed = withValue(training.points, (point) => point.elapsed_seconds);
+    return (step) => {
+        const epoch = epochAt(training, setup, step);
+        const time = nearest(elapsed, step);
+        const title = [
+            `Step ${count(step)}`,
+            epoch === null ? null : `epoch ${epoch.toFixed(2)}`,
+            time && time.step === step ? `${durationText(time.value)} in` : null,
+        ]
+            .filter(Boolean)
+            .join(" · ");
+        return { title, lines: specs.flatMap((spec) => readoutLine(spec, step)) };
+    };
+}
+
+function nowMarker(job: JobDetail, training: TrainingMetrics) {
+    const eta = training.eta_seconds;
+    if (job.status !== "running" || training.step === null || !eta || eta <= 0) {
+        return null;
+    }
+    return { step: training.step, label: `Now · ${durationText(eta)} left` };
+}
+
+function Schedule({
+    setup,
+    warmup,
+    epochs,
+}: {
+    setup: Training | null | undefined;
+    warmup: number;
+    epochs: number[];
+}) {
+    const scheduler = setup?.scheduler ?? "cosine";
+    return (
+        <>
+            <span className="text-foreground">Learning rate</span>
+            <span>{SCHEDULE_NAMES[scheduler] ?? scheduler}</span>
+            {warmup > 0 && (
+                <span className="flex items-center gap-1.5">
+                    <span
+                        aria-hidden="true"
+                        className="size-2.5 shrink-0 rounded-sm border"
+                        style={{ background: WARMUP_FILL }}
+                    />
+                    <span className="tabular-nums">
+                        {`Warmup, ${count(warmup)} ${warmup === 1 ? "step" : "steps"}`}
+                    </span>
+                </span>
+            )}
+            {epochs.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                    <span aria-hidden="true" className="h-3 border-l border-dashed border-faint" />
+                    Epoch boundary
+                </span>
+            )}
+        </>
+    );
+}
+
+function summary(job: JobDetail, training: TrainingMetrics, verdictText: string): string {
+    const loss = latest(training.points.map((point) => point.loss));
+    const held = training.evals.at(-1);
+    const parts = [
+        `Loss by step for job ${job.id}: ${verdictText}.`,
+        `Training loss ${lossText(loss)} at step ${count(training.step ?? lastStep(training.points))}.`,
+    ];
+    if (held) {
+        parts.push(`Held-out loss ${LOSS(held.eval_loss)} at step ${count(held.step)}.`);
+    }
+    return parts.join(" ");
+}
+
 function LossChart({
     job,
     training,
@@ -325,21 +535,38 @@ function LossChart({
     comparable: Comparable[];
 }) {
     const { previous, value, setChoice, compared } = useComparison(job, fallback);
-    const series = lossSeries(training, previous);
+    const [smoothing, setSmoothing] = useSmoothing();
+    const setup = job.setup?.training;
+    const series = lossSeries(training, previous, smoothing);
     const end = domainEnd(training, previous);
-    const rows = lossRows(training, previous, end);
+    const rows = curveRows(training, previous, end, smoothing === SMOOTH);
+    const active = job.status === "queued" || job.status === "running";
+    const result = verdict(training, active);
+    const warmup = warmupEnd(training, setup);
+    const epochs = epochBoundaries(training, setup).filter((step) => step > 0 && step < end);
     return (
         <div className="flex flex-col gap-3">
-            {training.rising_from !== null && training.rising_from !== undefined && (
-                <OverfitHint step={training.rising_from} />
-            )}
-            <div className="flex flex-col gap-1.5">
-                <div className="flex min-h-7 flex-wrap items-center gap-x-5 gap-y-2">
-                    <ChartLegend series={legendOrder(series)} />
+            <div className="flex min-h-7 flex-wrap items-center justify-between gap-x-5 gap-y-2">
+                <VerdictLine verdict={result} />
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <fieldset
+                        aria-label="Training loss smoothing"
+                        className="m-0 min-w-0 border-0 p-0"
+                    >
+                        <SegmentedTabs
+                            size="sm"
+                            tabs={SMOOTHING_TABS}
+                            active={smoothing}
+                            onSelect={(next) => setSmoothing(next === RAW ? RAW : SMOOTH)}
+                        />
+                    </fieldset>
                     {comparable.length > 0 && (
                         <CompareWith value={value} comparable={comparable} onChange={setChoice} />
                     )}
                 </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+                <ChartLegend series={legendSeries(series)} />
                 {previous && !previous.same_data && (
                     <p className="text-sm text-muted-foreground">
                         {`v${previous.version} trained on different data, so losses aren't directly comparable.`}
@@ -347,43 +574,26 @@ function LossChart({
                 )}
             </div>
             <ErrorLine error={compared.error} onRetry={compared.refetch} />
-            <StepChart
+            <LossFigure
+                sync={`loss-${job.id}`}
                 rows={rows}
                 series={series}
-                format={LOSS}
-                axisFormat={LOSS_AXIS}
-                label={`Loss by step for job ${job.id}: training loss ${lossText(latest(rows.map((row) => row.loss)))} at step ${training.step ?? 0}`}
-                marker={training.rising_from}
                 domain={[0, end]}
+                warmup={warmup}
+                epochs={epochs}
+                best={training.evals.length > 1 ? bestHeld(training.evals) : null}
+                overfit={training.rising_from ?? null}
+                now={nowMarker(job, training)}
+                readout={readoutOf(training, previous, setup, rows, smoothing)}
+                schedule={<Schedule setup={setup} warmup={warmup} epochs={epochs} />}
+                rateFormat={RATE}
+                rateColor={RATE_LINE}
+                label={summary(job, training, result.text)}
             />
         </div>
     );
 }
 
-export function RateSection({
-    job,
-    metrics,
-}: {
-    job: JobDetail;
-    metrics: JobMetrics | undefined;
-}) {
-    const training = metrics?.training;
-    if (!training || !training.points.some((point) => typeof point.learning_rate === "number")) {
-        return null;
-    }
-    const rows = rateRows(training);
-    const peak = Math.max(...rows.map((row) => row.rate ?? 0));
-    return (
-        <PanelSection icon={TrendingDown} title="Learning rate" tip={rateTip(job.setup?.training)}>
-            <StepChart
-                rows={rows}
-                series={[{ key: "rate", label: "Learning rate", color: TRAIN }]}
-                format={RATE}
-                label="Learning rate by step"
-                height={LR_HEIGHT}
-                domain={domainOf(training, rows)}
-                yDomain={[0, peak]}
-            />
-        </PanelSection>
-    );
+export function RateSection(_props: { job: JobDetail; metrics: JobMetrics | undefined }) {
+    return null;
 }

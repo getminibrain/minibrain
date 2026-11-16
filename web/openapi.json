@@ -29052,6 +29052,17 @@
               }
             ],
             "title": "Memory Bytes"
+          },
+          "elapsed_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Seconds"
           }
         },
         "type": "object",

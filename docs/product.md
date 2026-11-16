@@ -263,6 +263,15 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Compare loss curves** · shipped · product, ml
   Draw any trained version's loss behind a run; live by default.
   UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
+- **Loss chart** · shipped · product, ml
+  Loss over a learning-rate lane, marking warmup, epochs, best and overfitting.
+  UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
+- **Training verdict** · shipped · product, ml
+  One line says if held-out loss falls, flattens or overfits.
+  UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
+- **Loss smoothing** · shipped · ml
+  Raw or smoothed training loss, remembered per browser.
+  UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
 - **Training list** · shipped · product, ml
   Every training run across models, filtered by model, status and method.
   UI: Training · API: GET /api/jobs, GET /api/jobs/facets
