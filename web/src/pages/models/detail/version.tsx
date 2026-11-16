@@ -1,6 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
-import { BookOpen, Copy, Download, GitCompare, MoreHorizontal, Play, Trash2 } from "lucide-react";
+import {
+    BookOpen,
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    Download,
+    GitCompare,
+    MoreHorizontal,
+    Play,
+    Trash2,
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -18,6 +28,10 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
     cn,
     useToast,
 } from "obp-ui";
@@ -43,7 +57,7 @@ import {
     modelCardHref,
     modelCompareHref,
     modelPageHref,
-    versionCrumb,
+    modelVersionHref,
     versionNumberOf,
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
@@ -397,6 +411,76 @@ function VerdictLine({
     );
 }
 
+function neighbours(
+    versions: VersionInfo[],
+    number: number,
+): { previous: number | null; next: number | null } {
+    const numbers = versions
+        .filter((item) => item.status !== "deleting")
+        .map((item) => item.number);
+    const before = numbers.filter((item) => item < number);
+    const after = numbers.filter((item) => item > number);
+    return {
+        previous: before.length > 0 ? Math.max(...before) : null,
+        next: after.length > 0 ? Math.min(...after) : null,
+    };
+}
+
+function StepLink({
+    slug,
+    number,
+    direction,
+}: { slug: string; number: number | null; direction: "previous" | "next" }) {
+    const Icon = direction === "previous" ? ChevronLeft : ChevronRight;
+    const word = direction === "previous" ? "Previous" : "Next";
+    if (number === null) {
+        return (
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled
+                aria-label={`No ${word.toLowerCase()} version`}
+            >
+                <Icon />
+            </Button>
+        );
+    }
+    const label = `v${number}`;
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" asChild>
+                    <Link
+                        href={modelVersionHref(slug, number)}
+                        aria-label={`${word} version ${label}`}
+                        className="tabular-nums"
+                    >
+                        {direction === "previous" && <Icon aria-hidden="true" />}
+                        {label}
+                        {direction === "next" && <Icon aria-hidden="true" />}
+                    </Link>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>{`${word} version ${label}`}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+function VersionStepper({
+    slug,
+    versions,
+    number,
+}: { slug: string; versions: VersionInfo[]; number: number }) {
+    const { previous, next } = neighbours(versions, number);
+    return (
+        <nav aria-label="Other versions" className="flex items-center text-muted-foreground">
+            <StepLink slug={slug} number={previous} direction="previous" />
+            <span aria-hidden="true">·</span>
+            <StepLink slug={slug} number={next} direction="next" />
+        </nav>
+    );
+}
+
 export function VersionView({ row, number }: { row: ModelRow; number: number | null }) {
     const models = useAllModels();
     const versions = useVersions(row.key);
@@ -408,7 +492,9 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
     const detail = runDetail.data;
     const trained = run?.kind === "train";
     const metrics = useJobMetrics(run?.id ?? 0, Boolean(detail && isActiveJob(detail)), trained);
-    const crumbs = modelCrumbs(row, [{ label: versionCrumb(number) }]);
+    const crumbs = modelCrumbs(row, [
+        { label: "Versions", href: modelPageHref(row.key, "versions") },
+    ]);
     if (!version) {
         return (
             <Page wide>
@@ -443,7 +529,12 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
             <PageHeader
                 title={versionLabel(version)}
                 crumbs={crumbs}
-                badge={<VersionStatus row={row} version={version} />}
+                badge={
+                    <span className="flex items-center gap-3">
+                        <VersionStepper slug={row.key} versions={list} number={version.number} />
+                        <VersionStatus row={row} version={version} />
+                    </span>
+                }
                 caption={`${row.name} on ${base} · created ${relativeTime(version.created_at)}`}
                 actions={
                     <>

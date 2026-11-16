@@ -89,15 +89,18 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
     if (version.current && isDeployed(row)) {
         return { tone: "success", label: "Deployed" };
     }
+    if (
+        version.status === "queued" ||
+        (version.status === "training" && version.job?.status === "queued")
+    ) {
+        return { tone: "neutral", label: "Queued" };
+    }
     if (version.status === "training") {
         const progress = version.job?.progress ?? 0;
         return { tone: "info", label: `Training ${Math.round(progress * 100)}%` };
     }
     if (version.status === "evaluating") {
         return { tone: "info", label: "Scoring" };
-    }
-    if (version.status === "queued") {
-        return { tone: "neutral", label: "Queued" };
     }
     if (isCancelled(version)) {
         return { tone: "neutral", label: "Cancelled" };
@@ -127,10 +130,7 @@ export function VersionStatus({ row, version }: { row: ModelRow; version: Versio
 
 function RunStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const job = version.job;
-    if (version.status === "training" && job?.status === "queued") {
-        return <StatusText tone="neutral">Queued</StatusText>;
-    }
-    if (version.status === "training") {
+    if (version.status === "training" && job?.status !== "queued") {
         return (
             <span className="flex items-center gap-2">
                 <VersionStatus row={row} version={version} />
