@@ -301,10 +301,11 @@ on a move, `from_pool`.
 
 - Each worker in a pool other than `local` asks `main` every 10 s which engines to run (`POST
   /internal/worker/engines`, with the pool's join token) and starts or stops children to match. The answer carries an engine
-  token for that pool (`engine.<pool>.<HMAC-SHA256 of the pool>`, keyed by `<home>/secrets/engine_token` on main),
-  handed to the engines as `MINIBRAIN_ENGINE_TOKEN`, so a worker needs only its own token and never sees the gateway
-  token. An engine token reaches only what an engine needs: announcing engines in its own pool, base weights and
-  adapters. The gateway config (routes and API key digests), request logs, feedback and gateway reports answer it
+  token for that pool (`engine.<join token id>.<pool>.<HMAC-SHA256 of both>`, keyed by `<home>/secrets/engine_token` on
+  main), handed to the engines as `MINIBRAIN_ENGINE_TOKEN`, so a worker needs only its own token and never sees the
+  gateway token. The engine token lives as long as the worker's join token: revoked or expired, its engines get 401
+  ([security](security.md)). An engine token reaches only what an engine needs: announcing engines in its own pool, base
+  weights and adapters. The gateway config (routes and API key digests), request logs, feedback and gateway reports answer it
   with 403, an announcement for another pool too, and a worker in `local` gets no engine token at all.
 - `main` places replicas on the pool's machines with a worker seen in the last 30 s, one worker per machine, skipping
   machines too small for the model, by rendezvous hashing on the model and machine name: a model stays on the same

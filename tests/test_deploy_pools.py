@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select, update
 
-from minibrain.auth.engine_tokens import engine_token
+from minibrain.auth.engine_tokens import signed_claim
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import AuditEvent, Worker, now
@@ -183,7 +183,8 @@ def test_engines_answer_only_with_the_worker_token(harness: Harness) -> None:
     body = worker_body("rack")
     assert harness.client.post("/internal/worker/engines", json=body).status_code == 401
     found = harness.internal("/engines", body).json()
-    assert found["engines"] == [] and found["engine_token"] == engine_token(harness.settings, "rack")
+    assert found["engines"] == [] and signed_claim(harness.settings, found["engine_token"]) is not None
+    assert signed_claim(harness.settings, found["engine_token"] + "0") is None
     assert harness.settings.secret("gateway_token") not in str(found)
     assert harness.internal("/engines", worker_body("local")).json()["engine_token"] is None
 
@@ -220,7 +221,7 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     assert harness.client.get(f"/internal/gateway/artifacts/{adapter}", headers=engine).status_code == 200
     assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=engine).status_code == 404
     assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=harness.gateway_headers).status_code == 200
-    forged = bearer(token.replace("engine.rack.", "engine.local."))
+    forged = bearer(token.replace(".rack.", ".local."))
     assert harness.client.get("/internal/gateway/bases", headers=forged).status_code == 401
     assert harness.client.get("/internal/gateway/bases", headers=bearer("engine.rack.00")).status_code == 401
 

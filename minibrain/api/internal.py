@@ -238,7 +238,7 @@ def hosted_engines(
     config = request.app.state.gateway_config.current()
     placements = {key: found for key, found in config.placements.items() if key not in config.problems}
     wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)
-    token = engine_token(settings, worker.pool) if worker.pool != LOCAL_POOL else None
+    token = engine_token(settings, caller.token) if caller.token is not None else None
     return EnginesResponse(engines=[HostedEngine(model=key) for key in wanted], engine_token=token)
 
 

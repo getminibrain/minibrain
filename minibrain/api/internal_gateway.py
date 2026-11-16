@@ -11,7 +11,7 @@ from minibrain.api.bases import base_file as file_of
 from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import MetricsDep, SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
-from minibrain.auth.engine_tokens import engine_pool
+from minibrain.auth.engine_tokens import engine_caller as derived_caller
 from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, checked
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
@@ -38,10 +38,10 @@ def engine_caller(request: Request, session: SessionDep, authorization: Annotate
     joined = checked(session, token, ENGINE, address_of(request))
     if joined is not None:
         return Caller(joined.pool, joined)
-    pool = engine_pool(settings, token) if token else None
-    if pool is None:
+    derived = derived_caller(session, settings, token, address_of(request)) if token else None
+    if derived is None:
         raise HTTPException(status_code=401, detail="invalid gateway token")
-    return Caller(pool, name="engine token")
+    return derived
 
 
 EngineCaller = Annotated[Caller | None, Depends(engine_caller)]

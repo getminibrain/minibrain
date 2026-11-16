@@ -129,3 +129,40 @@ def test_only_admins_manage_join_tokens(harness: Harness) -> None:
     builder = harness.person(Role.BUILDER)
     assert builder.get(TOKENS).status_code == 403
     assert builder.post(TOKENS, json={"pool": "gpu", "role": "worker"}, headers=csrf(builder)).status_code == 403
+
+
+def engine_token_for(harness: Harness, joined: dict[str, Any], pool: str) -> str:
+    body = {"worker": worker(pool, f"host-{pool}")}
+    response = harness.client.post("/internal/worker/engines", json=body, headers=bearer(joined["secret"]))
+    assert response.status_code == 200, response.text
+    return response.json()["engine_token"]
+
+
+def expire(harness: Harness, token_id: int) -> None:
+    with harness.sessions() as session:
+        row = session.get(JoinToken, token_id)
+        assert row is not None
+        row.expires_at = now() - timedelta(minutes=1)
+        session.commit()
+
+
+def test_engine_tokens_end_with_the_join_token_that_admitted_their_worker(harness: Harness) -> None:
+    gpu, rack, lapsing = create(harness), create(harness, pool="rack"), create(harness, pool="lab", days=1)
+    engines = {pool: engine_token_for(harness, joined, pool) for pool, joined in [("gpu", gpu), ("rack", rack)]}
+    engines["lab"] = engine_token_for(harness, lapsing, "lab")
+    assert all(announce(harness, token, pool).status_code == 204 for pool, token in engines.items())
+    assert harness.client.delete(f"{TOKENS}/{gpu['id']}").status_code == 204
+    for _ in range(3):
+        refused = announce(harness, engines["gpu"], "gpu")
+        assert refused.status_code == 401 and "join token behind this engine token was revoked" in refused.text
+    assert harness.client.get("/internal/gateway/bases", headers=bearer(engines["gpu"])).status_code == 401
+    assert actions(harness, gpu["prefix"]).count("join_token.refused") == 1
+    expire(harness, lapsing["id"])
+    lapsed = announce(harness, engines["lab"], "lab")
+    assert lapsed.status_code == 401 and "expired" in lapsed.text
+    assert actions(harness, lapsing["prefix"])[-1] == "join_token.refused"
+    assert announce(harness, engines["rack"], "rack").status_code == 204
+    assert harness.client.get("/internal/gateway/bases", headers=harness.gateway_headers).status_code == 200
+    local_body = {"worker": worker("local")}
+    local = harness.client.post("/internal/worker/engines", json=local_body, headers=bearer(harness.token))
+    assert local.status_code == 200 and local.json()["engine_token"] is None

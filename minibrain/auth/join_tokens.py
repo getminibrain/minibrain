@@ -71,12 +71,17 @@ def expired(token: JoinToken) -> bool:
     return token.expires_at is not None and token.expires_at <= now()
 
 
-def unusable(token: JoinToken) -> str | None:
+def lapse(token: JoinToken) -> str | None:
     if token.revoked_at is not None:
-        return "this join token was revoked"
+        return "was revoked"
     if expired(token):
-        return "this join token expired"
+        return "expired"
     return None
+
+
+def unusable(token: JoinToken) -> str | None:
+    state = lapse(token)
+    return f"this join token {state}" if state is not None else None
 
 
 def covers(token: JoinToken, role: str) -> bool:
@@ -95,12 +100,16 @@ def note_use(session: Session, token: JoinToken, host: str, role: str) -> None:
     token.last_host = host
 
 
-def refuse(session: Session, target: str, detail: dict[str, Any]) -> None:
+def same(found: dict[str, Any], detail: dict[str, Any]) -> bool:
+    return all(found.get(key) == value for key, value in detail.items())
+
+
+def refuse(session: Session, target: str, detail: dict[str, Any], extra: dict[str, Any] | None = None) -> None:
     since = now() - QUIET
     recent = select(AuditEvent).where(AuditEvent.action == REFUSED, AuditEvent.target == target, AuditEvent.at >= since)
-    if any(event.detail == detail for event in session.scalars(recent)):
+    if any(same(event.detail, detail) for event in session.scalars(recent)):
         return
-    session.add(AuditEvent(actor=SYSTEM_ACTOR, action=REFUSED, target=target, detail=detail))
+    session.add(AuditEvent(actor=SYSTEM_ACTOR, action=REFUSED, target=target, detail=detail | (extra or {})))
     session.commit()
 
 
@@ -109,10 +118,11 @@ class Caller:
     pool: str
     token: JoinToken | None = None
     name: str = LOCAL_TARGET
+    issuer: str | None = None
 
     @property
     def target(self) -> str:
-        return self.token.prefix if self.token is not None else self.name
+        return self.token.prefix if self.token is not None else self.issuer or self.name
 
     @property
     def noun(self) -> str:

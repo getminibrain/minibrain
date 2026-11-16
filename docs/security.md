@@ -160,8 +160,10 @@ out everywhere. A password reset clears the account's lockouts.
   there is no shared token for other pools.
 - Engines a worker starts in a pool get a narrower engine token for that pool (announce in that pool, base weights,
   adapters; [serving](serving.md#deployments-on-a-pool)), never the gateway token, whose config carries routes and API
-  key digests. Engine tokens derive from `<home>/secrets/engine_token` and outlive a revoked join token; the worker
-  that holds them stops on the revocation and stops its engines with it.
+  key digests. An engine token is signed with `<home>/secrets/engine_token` over the pool and the id of the join token
+  that admitted the worker, and main checks that join token on every use: revoking or expiring it ends its engines'
+  tokens at once (401), in that pool only, and each refusal is a `join_token.refused` event on the join token,
+  rate-limited like the others. The `local` pool's engines use the gateway token and are not affected.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM

@@ -520,7 +520,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Create a pool's join token, copy the command, watch it join.
   UI: Infrastructure › Overview, Infrastructure › Machines · API: POST /api/compute/join-tokens, GET /api/compute/join-tokens
 - **Join tokens** · shipped · admin
-  Per-pool tokens for workers and engines, with expiry and revoke.
+  Per-pool tokens for workers and their engines; revoke or expire ends both.
   UI: Infrastructure › Machines › Join tokens · API: GET /api/compute/join-tokens, DELETE /api/compute/join-tokens/{token_id} · Config: MINIBRAIN_JOIN_TOKEN
 - **Artifact storage** · shipped · admin
   Keep artifacts in a local folder or an S3-compatible bucket.
