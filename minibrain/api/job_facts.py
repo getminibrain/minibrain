@@ -8,7 +8,7 @@ from minibrain.data.dataset_versions import version_number
 from minibrain.jobs.metrics import latest_data
 from minibrain.ml.planner import Settings, loss_rows
 from minibrain.models.registry import base_publisher
-from minibrain.registry.models import BaseModel, DatasetVersion, Job, JobKind
+from minibrain.registry.models import BaseModel, DatasetVersion, Job, JobKind, JobStatus
 from minibrain.tasks.service import held_out_score
 
 SFT = "sft"
@@ -63,7 +63,7 @@ def variant_of(base: BaseModel | None) -> str | None:
 def job_facts(job: Job) -> dict[str, Any]:
     recipe = run_recipe(job)
     base = job.base_model
-    scored = job.version is not None and job.kind in SCORED_KINDS
+    scored = job.version is not None and job.kind in SCORED_KINDS and job.status == JobStatus.SUCCEEDED
     return {
         "base_model_name": base.name if base is not None else None,
         "publisher": base_publisher(base) if base is not None else None,

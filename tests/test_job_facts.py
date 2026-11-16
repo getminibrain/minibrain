@@ -71,6 +71,22 @@ def test_listed_training_jobs_carry_method_adapter_and_the_version_score(harness
     assert all(item["method"] is None and item["strategy"] is None for item in others)
 
 
+def test_a_failed_run_shows_no_score_once_its_retry_scores_the_version(harness: Harness) -> None:
+    claim = training_job(harness)
+    body = {"token": claim["token"], "error": "CUDA out of memory", "retryable": False}
+    assert harness.internal(f"/jobs/{claim['job_id']}/fail", body).status_code == 204
+    retried = harness.client.post(f"/api/models/{SLUG}/versions/1/retry")
+    assert retried.status_code == 201, retried.text
+    again = harness.claim([JobKind.TRAIN])
+    assert again is not None and again["job_id"] == retried.json()["id"]
+    complete(harness, again)
+    metric = harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["main_metric"]
+    store_metrics(harness, SLUG, 1, {"eval": {"examples": 20, "scores": [{"metric": metric, "value": 0.85}]}})
+    listed = {item["id"]: item for item in page(harness, "kind=train")["items"]}
+    assert listed[claim["job_id"]]["score"] is None
+    assert listed[again["job_id"]]["score"] == 0.85
+
+
 def test_method_filter_keeps_training_jobs_only(harness: Harness) -> None:
     owner = model_id(harness, "Alpha")
     trained = add_jobs(harness, 2, JobKind.TRAIN, owner)
