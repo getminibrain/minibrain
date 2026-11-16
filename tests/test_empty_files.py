@@ -46,3 +46,10 @@ def test_a_header_only_file_is_refused_whatever_columns_are_picked(harness: Harn
         json={"source_id": head["id"], "input_column": "text", "label_column": "category"},
     )
     assert moved.status_code == 409 and moved.json()["detail"] == NO_ROWS.format(name="head.csv")
+
+
+def test_an_empty_json_array_uploads_as_a_source_with_no_rows(harness: Harness) -> None:
+    added = upload(harness, "empty.json", b"[]")
+    assert added["rows"] == 0
+    refused = harness.client.post("/api/datasets", json={"name": "Empty", "source_id": added["id"]})
+    assert refused.status_code == 409 and refused.json()["detail"] == NO_ROWS.format(name="empty.json")

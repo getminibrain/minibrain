@@ -2,6 +2,7 @@ import hashlib
 import io
 import os
 import stat
+import threading
 from pathlib import Path
 
 import pytest
@@ -76,6 +77,17 @@ def test_random_reads_match_the_plaintext(ring: RingKeys) -> None:
             stream.seek(start)
             assert stream.read(length) == data[start : start + length]
         assert stream.seek(0, io.SEEK_END) == len(data)
+
+
+def test_a_read_on_another_thread_continues_where_the_last_one_stopped(ring: RingKeys) -> None:
+    data = os.urandom(3 * SMALL + 5)
+    found: list[bytes] = []
+    with sealed.open_reader(io.BytesIO(sealed_bytes(ring, data)), ring, b"ctx") as stream:
+        stream.seek(SMALL + 3)
+        reader = threading.Thread(target=lambda: found.extend([stream.read(SMALL), stream.read(), stream.read()]))
+        reader.start()
+        reader.join()
+    assert found == [data[SMALL + 3 : 2 * SMALL + 3], data[2 * SMALL + 3 :], b""]
 
 
 def chunk_slices(blob: bytes) -> list[bytes]:

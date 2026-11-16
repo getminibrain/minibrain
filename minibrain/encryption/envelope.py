@@ -257,6 +257,7 @@ class SealedReader(io.RawIOBase):
         self.lock = threading.Lock()
         self.cache: OrderedDict[int, bytes] = OrderedDict()
         self.position = threading.local()
+        self.shared = 0
 
     def readable(self) -> bool:
         return True
@@ -265,14 +266,18 @@ class SealedReader(io.RawIOBase):
         return True
 
     def tell(self) -> int:
-        return getattr(self.position, "at", 0)
+        return getattr(self.position, "at", self.shared)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         base = {io.SEEK_SET: 0, io.SEEK_CUR: self.tell(), io.SEEK_END: self.size}[whence]
         if base + offset < 0:
             raise ValueError("negative seek position")
-        self.position.at = base + offset
-        return self.position.at
+        self.moved(base + offset)
+        return base + offset
+
+    def moved(self, at: int) -> None:
+        self.position.at = at
+        self.shared = at
 
     def block(self, index: int) -> bytes:
         with self.lock:
@@ -311,7 +316,7 @@ class SealedReader(io.RawIOBase):
                 break
             parts.append(piece)
             at += len(piece)
-        self.position.at = at
+        self.moved(at)
         return b"".join(parts)
 
     def readall(self) -> bytes:
