@@ -93,8 +93,6 @@ const GROUPED: NavMatch[] = [
     ),
 ];
 
-const OTHER_GROUPS = [{ path: "/developers", group: "Developers" }];
-
 function under(pathname: string, path: string): boolean {
     return pathname === path || (path !== "/" && pathname.startsWith(`${path}/`));
 }
@@ -102,12 +100,4 @@ function under(pathname: string, path: string): boolean {
 export function navEntryFor(pathname: string): NavMatch | undefined {
     const matching = GROUPED.filter((entry) => under(pathname, entry.path));
     return matching.sort((left, right) => right.path.length - left.path.length)[0];
-}
-
-export function navGroupFor(pathname: string): string | null {
-    const entry = navEntryFor(pathname);
-    if (entry) {
-        return entry.group;
-    }
-    return OTHER_GROUPS.find((other) => under(pathname, other.path))?.group ?? null;
 }
