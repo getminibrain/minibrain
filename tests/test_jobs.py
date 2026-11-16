@@ -328,3 +328,23 @@ def test_a_job_is_retried_once_so_two_runs_never_build_one_version(harness: Harn
     assert version_status(harness) == "ready"
     assert harness.client.post(f"/api/jobs/{claim['job_id']}/retry").status_code == 409
     assert version_status(harness) == "ready"
+
+
+def test_expiry_fails_a_running_job_without_its_attempt_and_keeps_expiring_the_rest(harness: Harness) -> None:
+    clock = lora_job(harness)
+    broken = harness.claim(["train"], worker_id="a")
+    assert broken is not None
+    with harness.sessions() as session:
+        stray = session.get(Job, broken["job_id"])
+        assert stray is not None
+        other = enqueue(session, JobKind.TRAIN, {}, model_id=stray.model_id, version_id=stray.version_id)
+        stray.attempts.clear()
+        session.commit()
+        other_id = other.id
+    lost = harness.claim(["train"], worker_id="b")
+    assert lost is not None and lost["job_id"] == other_id
+    clock.advance(seconds=LEASE.total_seconds() + 1)
+    assert harness.queue.expire() == 2
+    failed = job(harness, broken["job_id"])
+    assert (failed["status"], failed["error"]) == ("failed", "its run has no attempt 1 on record")
+    assert job(harness, other_id)["attempts"][0]["outcome"] == "lost"

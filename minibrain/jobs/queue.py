@@ -205,6 +205,10 @@ def expirable() -> Select[Job]:
     return select(Job).where(Job.status == JobStatus.RUNNING).with_for_update(skip_locked=True)
 
 
+def attempt_of(job: Job) -> JobAttempt | None:
+    return next((item for item in job.attempts if item.number == job.attempt), None)
+
+
 def same_error_twice(job: Job, error: str) -> bool:
     finished = [attempt for attempt in job.attempts if attempt.outcome != AttemptOutcome.RUNNING]
     return len(finished) >= 2 and finished[-2].error == error
@@ -318,7 +322,7 @@ class SqlJobQueue:
             session.commit()
 
     def current_attempt(self, job: Job) -> JobAttempt:
-        attempt = next((item for item in job.attempts if item.number == job.attempt), None)
+        attempt = attempt_of(job)
         if attempt is None:
             raise JobStateError(f"job {job.id} has no attempt {job.attempt}")
         return attempt
@@ -422,7 +426,12 @@ class SqlJobQueue:
             moment = self.clock()
             expired = 0
             for job in list(session.scalars(expirable())):
-                over_time = moment - self.current_attempt(job).started_at > policy(job.kind).max_runtime
+                attempt = attempt_of(job)
+                if attempt is None:
+                    self.finish(session, job, JobStatus.FAILED, f"its run has no attempt {job.attempt} on record")
+                    expired += 1
+                    continue
+                over_time = moment - attempt.started_at > policy(job.kind).max_runtime
                 lost = job.lease_expires_at is not None and job.lease_expires_at < moment
                 if not (lost or over_time):
                     continue
