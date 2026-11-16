@@ -102,13 +102,53 @@ export function ErrorState({
     );
 }
 
+function NotFoundHeader({
+    title,
+    children,
+    detail,
+    primary,
+    secondary,
+}: {
+    title: string;
+    children: ReactNode;
+    detail?: ReactNode;
+    primary: ErrorAction;
+    secondary?: ErrorAction;
+}) {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    return (
+        <div className="mt-4 flex flex-col gap-4">
+            <PageHeader
+                title={title}
+                icon={false}
+                caption={children}
+                actions={
+                    <>
+                        {secondary && <ActionButton action={secondary} primary={false} />}
+                        <ActionButton action={primary} primary />
+                    </>
+                }
+            />
+            {detail && (
+                <div className="max-w-prose text-base break-words text-muted-foreground">
+                    {detail}
+                </div>
+            )}
+            <p className="flex min-w-0 flex-wrap gap-x-3 font-mono text-sm text-muted-foreground">
+                <span className="text-foreground">404 Not found</span>
+                <span className="min-w-0 truncate">{pathname}</span>
+            </p>
+        </div>
+    );
+}
+
 export function NotFoundState({
     title,
     children,
     detail,
     primary,
     secondary,
-    heading,
+    heading = "h1",
 }: {
     title: string;
     children: ReactNode;
@@ -117,6 +157,13 @@ export function NotFoundState({
     secondary?: ErrorAction;
     heading?: "h1" | "h2";
 }) {
+    if (heading === "h1") {
+        return (
+            <NotFoundHeader title={title} detail={detail} primary={primary} secondary={secondary}>
+                {children}
+            </NotFoundHeader>
+        );
+    }
     return (
         <ErrorState
             icon={SearchX}

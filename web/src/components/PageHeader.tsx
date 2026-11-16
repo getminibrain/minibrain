@@ -22,7 +22,7 @@ export function PageHeader({
     crumbs?: Crumb[];
 }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const Icon = icon ? undefined : navEntryFor(pathname)?.icon;
+    const Icon = icon === undefined ? navEntryFor(pathname)?.icon : undefined;
     const titleRow = (
         <div className="flex min-w-0 items-center gap-x-3">
             <h1 className="flex min-w-0 items-center gap-3 text-3xl font-normal">
