@@ -34,6 +34,8 @@ export const feedbackKeys = {
     facets: (filter: FeedbackFilter) => [...ROOT, "facets", filter] as const,
     item: (id: number) => [...ROOT, "item", id] as const,
     summary: (slug: string) => [...ROOT, "summary", slug] as const,
+    trainingRows: (slug: string, datasetVersion: number) =>
+        [...ROOT, "training-rows", slug, datasetVersion] as const,
     examples: (slug: string) => [...ROOT, "examples", slug] as const,
 };
 
@@ -111,6 +113,22 @@ export function useFeedbackSummary(slug: string) {
                 }),
             ),
         enabled: Boolean(slug),
+    });
+}
+
+export function useFeedbackTrainingRows(slug: string, datasetVersion: number | null) {
+    return useQuery({
+        queryKey: feedbackKeys.trainingRows(slug, datasetVersion ?? 0),
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/models/{name}/feedback/training-rows", {
+                    params: {
+                        path: { name: slug },
+                        query: { dataset_version_id: datasetVersion },
+                    },
+                }),
+            ),
+        enabled: Boolean(slug) && datasetVersion !== null,
     });
 }
 

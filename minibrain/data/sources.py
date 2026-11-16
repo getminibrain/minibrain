@@ -492,17 +492,28 @@ FEEDBACK_MERGED = (
 )
 
 
-def merge_rows(target: Path, rows: Sequence[tuple[str, str, str, str | None]]) -> tuple[int, int]:
+FeedbackTuple = tuple[str, str, str, str | None]
+
+
+def feedback_changes(connection: duckdb.DuckDBPyConnection, parquet: str, rows: Sequence[FeedbackTuple]) -> int:
+    connection.execute(f"CREATE VIEW dataset AS SELECT * FROM read_parquet({quote_literal(parquet)})")
+    connection.execute("CREATE TABLE feedback_rows (messages VARCHAR, input VARCHAR, expected VARCHAR, split VARCHAR)")
+    connection.executemany("INSERT INTO feedback_rows VALUES (?, ?, ?, ?)", list(rows))
+    connection.execute(FEEDBACK_CHANGES)
+    found = connection.execute("SELECT count(*) FROM changes").fetchone()
+    return int(found[0]) if found else 0
+
+
+def count_feedback_changes(location: str, rows: Sequence[FeedbackTuple]) -> int:
+    with duckdb.connect() as connection:
+        register(connection)
+        return feedback_changes(connection, location, rows)
+
+
+def merge_rows(target: Path, rows: Sequence[FeedbackTuple]) -> tuple[int, int]:
     merged = target.with_name(f"merged-{target.name}")
     with duckdb.connect() as connection:
-        connection.execute(f"CREATE VIEW dataset AS SELECT * FROM read_parquet({quote_literal(str(target))})")
-        connection.execute(
-            "CREATE TABLE feedback_rows (messages VARCHAR, input VARCHAR, expected VARCHAR, split VARCHAR)"
-        )
-        connection.executemany("INSERT INTO feedback_rows VALUES (?, ?, ?, ?)", list(rows))
-        connection.execute(FEEDBACK_CHANGES)
-        found = connection.execute("SELECT count(*) FROM changes").fetchone()
-        changed = int(found[0]) if found else 0
+        changed = feedback_changes(connection, str(target), rows)
         if changed:
             connection.execute(
                 f"COPY ({FEEDBACK_MERGED}) TO {quote_literal(str(merged))} "

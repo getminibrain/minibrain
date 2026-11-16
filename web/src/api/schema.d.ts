@@ -2243,6 +2243,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{name}/feedback/training-rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count the accepted feedback rows a run adds to its data */
+        get: operations["feedback_training_rows_api_models__name__feedback_training_rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{name}/test-examples": {
         parameters: {
             query?: never;
@@ -5434,6 +5451,16 @@ export interface components {
              * @description Test examples saved from the Playground, held out for scoring.
              */
             examples: number;
+        };
+        /** FeedbackTrainingRows */
+        FeedbackTrainingRows: {
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /**
+             * Rows
+             * @description Accepted feedback rows a run on this dataset version adds to its data.
+             */
+            rows: number;
         };
         /** FieldScoreInfo */
         FieldScoreInfo: {
@@ -14470,6 +14497,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedbackSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_training_rows_api_models__name__feedback_training_rows_get: {
+        parameters: {
+            query?: {
+                dataset_version_id?: number | null;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackTrainingRows"];
                 };
             };
             /** @description Validation Error */

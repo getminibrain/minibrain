@@ -455,8 +455,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Tests the next version faces, added by hand or from the Playground.
   UI: Playground › Save as test example, Models › model › Evaluation › What it's tested on, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples, DELETE /api/models/{name}/test-examples/{feedback_id}
 - **Train with feedback** · shipped · product, ml
-  Retrain with accepted feedback merged into the training rows.
-  UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary
+  Retrain with accepted feedback merged in; Train shows how many rows.
+  UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary, GET /api/models/{name}/feedback/training-rows
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2

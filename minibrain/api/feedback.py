@@ -8,9 +8,10 @@ from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from minibrain.api.access import builder, viewer
-from minibrain.api.deps import SessionDep
+from minibrain.api.deps import SessionDep, SettingsDep
 from minibrain.auth.identity import current_actor
 from minibrain.data import feedback as store
+from minibrain.data.dataset_versions import chosen_dataset_version, feedback_additions
 from minibrain.data.feedback import CONFLICT, ORIGIN_PLAYGROUND, UNSURE, SavedExample, Submission, suggestion
 from minibrain.data.splits import HELD_OUT
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Model
@@ -122,6 +123,11 @@ class FeedbackSummary(BaseModel):
     pending: int
     rows: int
     examples: int = Field(description="Test examples saved from the Playground, held out for scoring.")
+
+
+class FeedbackTrainingRows(BaseModel):
+    dataset_version_id: int
+    rows: int = Field(description="Accepted feedback rows a run on this dataset version adds to its data.")
 
 
 def signal_of(item: Feedback) -> Signal:
@@ -340,6 +346,21 @@ def feedback_summary(name: str, session: SessionDep) -> FeedbackSummary:
         pending=found.pending,
         rows=found.rows,
         examples=found.examples,
+    )
+
+
+@router.get(
+    "/models/{name}/feedback/training-rows",
+    dependencies=[Depends(viewer)],
+    summary="Count the accepted feedback rows a run adds to its data",
+)
+def feedback_training_rows(
+    name: str, session: SessionDep, settings: SettingsDep, dataset_version_id: int | None = None
+) -> FeedbackTrainingRows:
+    model = get_model(session, name)
+    version = chosen_dataset_version(session, model, dataset_version_id)
+    return FeedbackTrainingRows(
+        dataset_version_id=version.id, rows=feedback_additions(session, settings, model, version)
     )
 
 

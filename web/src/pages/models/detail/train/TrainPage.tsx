@@ -3,6 +3,7 @@ import { GraduationCap, ScrollText } from "lucide-react";
 import { ConfirmDialog, Textarea, cn } from "obp-ui";
 import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
+import { useFeedbackTrainingRows } from "~/api/feedbackQueries";
 import { useAllModels, useModel, useVersions } from "~/api/queries";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
@@ -131,6 +132,27 @@ function useMethod(): [TrainMethod, (next: TrainMethod) => void] {
     return [method, choose];
 }
 
+function FeedbackRowsNote({
+    slug,
+    datasetVersion,
+    data,
+}: {
+    slug: string;
+    datasetVersion: number;
+    data: string;
+}) {
+    const found = useFeedbackTrainingRows(slug, datasetVersion);
+    const rows = found.data?.rows ?? 0;
+    if (rows === 0) {
+        return null;
+    }
+    return (
+        <p className="text-sm text-muted-foreground tabular-nums">
+            {`This run adds ${count(rows)} accepted feedback ${rows === 1 ? "row" : "rows"} to ${data}.`}
+        </p>
+    );
+}
+
 function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run: TrainRun }) {
     const chosen = run.chosen;
     if (!chosen) {
@@ -158,6 +180,11 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
                             relativeTime(item.taken_at ?? item.created_at),
                         ].join(" · "),
                     }))}
+                />
+                <FeedbackRowsNote
+                    slug={row.key}
+                    datasetVersion={chosen.id}
+                    data={`${dataset} v${chosen.number ?? "–"}`}
                 />
                 <ModelDataNotice slug={row.key} />
                 {run.heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={run.heldOut} />}

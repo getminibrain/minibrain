@@ -191,6 +191,23 @@ def test_accepted_feedback_joins_the_rows_a_new_version_trains_on(harness: Harne
     assert (later["version"], later["total"], later["accepted"], later["rows"]) == (2, 0, 0, 3)
 
 
+def test_the_train_page_count_of_feedback_rows_matches_what_the_run_adds(harness: Harness) -> None:
+    before = create_with_dataset(harness)
+    path = f"/api/models/{SLUG}/feedback/training-rows"
+    assert harness.client.get(path).json() == {"dataset_version_id": before["id"], "rows": 0}
+    for text, output in (("ticket 0 about billing", "bug"), ("my card was declined", "billing")):
+        review(harness, played(harness, text, "down", correction=output), "accept")
+    review(harness, played(harness, "ticket 1 about bug", "up", output="bug"), "accept")
+    assert harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()["rows"] == 3
+    counted = harness.client.get(path, params={"dataset_version_id": before["id"]}).json()
+    assert counted == {"dataset_version_id": before["id"], "rows": 2}
+    version = add_version(harness, "prompt")
+    with harness.sessions() as session:
+        copy = session.get(DatasetVersion, version["dataset_version_id"])
+        assert copy is not None and copy.feedback_rows == counted["rows"]
+    assert harness.client.get(path, params={"dataset_version_id": 9999}).status_code == 409
+
+
 def test_saving_a_dataset_version_leaves_feedback_out(harness: Harness) -> None:
     before = create_with_dataset(harness)
     review(harness, played(harness, "ticket 0 about billing", "down", correction="bug"), "accept")

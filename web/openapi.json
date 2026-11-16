@@ -7595,6 +7595,64 @@
         }
       }
     },
+    "/api/models/{name}/feedback/training-rows": {
+      "get": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Count the accepted feedback rows a run adds to its data",
+        "operationId": "feedback_training_rows_api_models__name__feedback_training_rows_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "dataset_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dataset Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackTrainingRows"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{name}/test-examples": {
       "post": {
         "tags": [
@@ -17978,6 +18036,25 @@
           "examples"
         ],
         "title": "FeedbackSummary"
+      },
+      "FeedbackTrainingRows": {
+        "properties": {
+          "dataset_version_id": {
+            "type": "integer",
+            "title": "Dataset Version Id"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows",
+            "description": "Accepted feedback rows a run on this dataset version adds to its data."
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_version_id",
+          "rows"
+        ],
+        "title": "FeedbackTrainingRows"
       },
       "FieldScoreInfo": {
         "properties": {

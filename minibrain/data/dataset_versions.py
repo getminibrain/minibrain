@@ -9,10 +9,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from minibrain.data.checks import Finding, blocking, run_checks
-from minibrain.data.feedback import training_rows
+from minibrain.data.feedback import FeedbackRow, training_rows
 from minibrain.data.limits import load_limits
 from minibrain.data.shared import dataset_sql, dataset_tables, fingerprint
-from minibrain.data.sources import copy_rows, merge_rows
+from minibrain.data.sources import FeedbackTuple, copy_rows, count_feedback_changes, merge_rows
 from minibrain.data.splits import (
     MIN_ROWS,
     SPLITS,
@@ -25,7 +25,7 @@ from minibrain.data.splits import (
     read_rows,
     split,
 )
-from minibrain.registry.files import ArtifactKind, store_file, store_for
+from minibrain.registry.files import ArtifactKind, dataset_version_location, store_file, store_for
 from minibrain.registry.models import Artifact, Dataset, DatasetVersion, Model, Version, now
 from minibrain.registry.service import ConflictError, latest_dataset_version, latest_version
 from minibrain.settings import Settings
@@ -138,6 +138,18 @@ def plain_copy(settings: Settings, dataset_version: DatasetVersion, target: Path
         shutil.copyfileobj(stream, sink)
 
 
+def feedback_tuples(extra: list[FeedbackRow]) -> list[FeedbackTuple]:
+    return [(encode_turns(row.example.turns), row.example.input, row.example.expected, row.split) for row in extra]
+
+
+def feedback_additions(session: Session, settings: Settings, model: Model, version: DatasetVersion) -> int:
+    extra = training_rows(session, model)
+    if not extra:
+        return 0
+    location = dataset_version_location(session, store_for(settings), version)
+    return count_feedback_changes(location, feedback_tuples(extra))
+
+
 def with_feedback(session: Session, settings: Settings, model: Model, version: DatasetVersion) -> DatasetVersion:
     extra = training_rows(session, model)
     if not extra:
@@ -146,8 +158,7 @@ def with_feedback(session: Session, settings: Settings, model: Model, version: D
     with tempfile.TemporaryDirectory(dir=settings.work_dir()) as scratch:
         target = Path(scratch) / DATASET_VERSION_FILE
         plain_copy(settings, version, target)
-        rows = [(encode_turns(row.example.turns), row.example.input, row.example.expected, row.split) for row in extra]
-        _, added = merge_rows(target, rows)
+        _, added = merge_rows(target, feedback_tuples(extra))
         if added == 0:
             return version
         result = checked(session, settings, target)
