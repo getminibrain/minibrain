@@ -92,6 +92,7 @@ export function PoolCard({
 }) {
     const online = pool?.nodes.filter((node) => node.online).length ?? 0;
     const purpose = pool ? usedFor(pool) : null;
+    const newTab = useNewTab();
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-0.5">
@@ -137,8 +138,13 @@ export function PoolCard({
                     {details}
                 </div>
             )}
-            <Link href={poolHref(name)} className="text-sm text-primary hover:underline">
-                Open in Infrastructure →
+            <Link
+                href={poolHref(name)}
+                {...newTab}
+                className="text-sm text-primary hover:underline"
+            >
+                Open in Infrastructure
+                {newTab.target ? <NewTabIcon /> : " →"}
             </Link>
         </div>
     );
