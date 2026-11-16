@@ -7,7 +7,7 @@ import {
     OTHER_COLOR,
     SERIES_COLORS,
 } from "~/components/charts/LineChart";
-import { count } from "~/lib/format";
+import { count, percent } from "~/lib/format";
 
 type Schemas = components["schemas"];
 
@@ -70,11 +70,11 @@ export function ms(value: number | null | undefined): string {
 }
 
 export function rate(value: number | null | undefined): string {
-    return value === null || value === undefined ? "–" : `${(value * 100).toFixed(1)}%`;
+    return percent(value);
 }
 
 export function fineRate(value: number): string {
-    return `${(value * 100).toFixed(value > 0 && value < 0.01 ? 2 : 1)}%`;
+    return value > 0 && value < 0.01 ? `${(value * 100).toFixed(2)}%` : percent(value);
 }
 
 export function gpu(seconds: number | null | undefined): string {

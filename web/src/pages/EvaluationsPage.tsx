@@ -36,7 +36,7 @@ import {
 } from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
 import { costSortValue, costText, deviceTime, headline, measuredOn, priced } from "~/lib/cost";
-import { count, milliseconds, percent } from "~/lib/format";
+import { count, milliseconds, percent, pointsSize } from "~/lib/format";
 import { checkSentence } from "~/lib/judging";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
 import { metricName, metricOf } from "~/lib/metrics";
@@ -89,7 +89,7 @@ function Change({ line }: { line: Line }) {
     if (delta === null) {
         return <span className="text-muted-foreground">–</span>;
     }
-    const points = Math.abs(delta * 100).toFixed(1);
+    const points = pointsSize(delta);
     if (points === "0.0") {
         return <span className="tabular-nums text-muted-foreground">Same</span>;
     }

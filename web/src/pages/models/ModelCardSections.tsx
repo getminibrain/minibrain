@@ -30,7 +30,7 @@ import { PoolLink } from "~/components/PoolLink";
 import { PanelSection, Stat } from "~/components/Section";
 import { auditHref } from "~/lib/audit";
 import { costText, deviceTime, duration, headline, measuredOn, money, priced } from "~/lib/cost";
-import { count, milliseconds, percent } from "~/lib/format";
+import { count, deltaPoints, milliseconds, percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
 import { modelPageHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
@@ -145,7 +145,7 @@ function seconds(value: number | null | undefined): string {
 }
 
 function points(amount: number): string {
-    return `${(amount * 100).toFixed(1)} pts`;
+    return deltaPoints(amount);
 }
 
 export function PurposeSection({ card }: { card: ModelCard }) {

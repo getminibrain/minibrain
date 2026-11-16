@@ -22,7 +22,7 @@ function axisPercent(value: number): string {
 }
 
 function readPercent(value: number): string {
-    return `${value.toFixed(1)}%`;
+    return percent(value / 100);
 }
 
 function ruleLevel(detail: ModelDetail | undefined, metric: string | null): LineMarker | null {

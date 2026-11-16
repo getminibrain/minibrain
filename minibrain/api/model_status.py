@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.model_health import HealthContext, base_health
 from minibrain.api.model_rows import model_job
 from minibrain.api.model_traffic import Subject, overall, subject_of, usual_error_rate
+from minibrain.api.numbers import percent_text, points_text
 from minibrain.api.request_logs import aware
 from minibrain.api.views import teardown_label
 from minibrain.models.handover import moving_to, serving_pool
@@ -104,7 +105,7 @@ def rows_text(count: int) -> str:
 
 
 def share(value: float) -> str:
-    return f"{value * 100:.1f}%"
+    return percent_text(value)
 
 
 def replicas_text(count: int) -> str:
@@ -155,7 +156,7 @@ def failed_status(session: Session, model: Model) -> ModelStatus | None:
 
 
 def points(value: float) -> str:
-    return f"{value * 100:+.1f}"
+    return points_text(value)
 
 
 def promote_status(model: Model) -> ModelStatus | None:

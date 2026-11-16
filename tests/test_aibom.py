@@ -85,7 +85,7 @@ def test_trained_version_is_a_valid_cyclonedx_ml_bom(harness: Harness) -> None:
     assert metrics[("macro-f1", "held-out")] == "0.8469"
     assert metrics[("examples", "test")] == "20"
     assert metrics[("recall", "held-out, label billing")] == "0.375"
-    assert metrics[("latency-p50-ms", "held-out")] == "41.2"
+    assert metrics[("latency-p50-ms", "held-out")] == "41.3"
     limits = model["modelCard"]["considerations"]["technicalLimitations"]
     assert limits == [limit["text"] for limit in card["limits"]["derived"]]
 

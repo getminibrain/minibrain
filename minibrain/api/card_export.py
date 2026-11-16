@@ -15,6 +15,7 @@ from minibrain.api.card_schemas import (
     CardScore,
     ModelCard,
 )
+from minibrain.api.numbers import percent_number, percent_text, points_text
 
 KINDS = {"lora": "Trained (LoRA)", "prompt": "Prompt-only"}
 USE_GROUPS = {
@@ -78,7 +79,7 @@ def code(value: str | None) -> str:
 
 
 def percent(value: float | None) -> str:
-    return NONE if value is None else f"{value:.1%}"
+    return NONE if value is None else percent_text(value)
 
 
 def decimal(value: float | None) -> str:
@@ -98,8 +99,7 @@ def ms(value: float | None) -> str:
 def change(value: float | None) -> str:
     if value is None:
         return NONE
-    points = value * 100
-    return "Same" if round(points, 1) == 0 else f"{points:+.1f} pts"
+    return "Same" if percent_number(value) == 0 else f"{points_text(value)} pts"
 
 
 def duration(seconds: float | None) -> str:

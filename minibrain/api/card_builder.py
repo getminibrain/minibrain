@@ -32,6 +32,7 @@ from minibrain.api.card_schemas import (
     DeploymentKind,
     ModelCard,
 )
+from minibrain.api.numbers import half_up, percent_text
 from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS
 from minibrain.data.dataset_versions import version_number
@@ -76,7 +77,7 @@ def stamp(moment: datetime | None) -> str | None:
 
 
 def rounded(value: Any, digits: int = DIGITS) -> float | None:
-    return None if value is None else round(float(value), digits)
+    return None if value is None else float(half_up(float(value), digits))
 
 
 def whole(value: Any) -> int | None:
@@ -189,7 +190,7 @@ def label_balance(splits: dict[str, list[Example]]) -> list[CardLabelRows]:
         CardLabelRows(
             label=label,
             rows=count,
-            share=round(count / rows, DIGITS),
+            share=float(half_up(count / rows, DIGITS)),
             train=per_split["train"][label],
             held_out=per_split["eval"][label],
             test=per_split["golden"][label],
@@ -531,7 +532,7 @@ def score_limits(evaluation: CardEvaluation) -> list[CardLimit]:
         found.append(
             CardLimit(
                 kind="invalid_outputs",
-                text=f"{split.invalid_rate:.1%} of held-out answers were not one of the labels.",
+                text=f"{percent_text(split.invalid_rate)} of held-out answers were not one of the labels.",
             )
         )
     if 0 < split.examples < SMALL_HELD_OUT:
@@ -549,7 +550,7 @@ def score_limits(evaluation: CardEvaluation) -> list[CardLimit]:
             CardLimit(
                 kind="below_prompt_only",
                 text=f"Prompt-only v{baseline.number} scores higher on held-out rows {data}: "
-                f"{baseline.held_out_accuracy or 0.0:.1%} against {split.accuracy:.1%}.",
+                f"{percent_text(baseline.held_out_accuracy or 0.0)} against {percent_text(split.accuracy)}.",
             )
         )
     return found

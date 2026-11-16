@@ -8,7 +8,7 @@ import { ErrorLine, PanelSection, Stat } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { PromotionDecision } from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
-import { count, percent } from "~/lib/format";
+import { count, percent, pointsSize } from "~/lib/format";
 import { metricName, metricOf } from "~/lib/metrics";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { DeployButton, usePromote } from "../EvaluationsPage";
@@ -146,7 +146,7 @@ export function ProgressSection({
 }
 
 function points(value: number): string {
-    const shown = Math.abs(value * 100).toFixed(1);
+    const shown = pointsSize(value);
     if (shown === "0.0") {
         return "Same";
     }

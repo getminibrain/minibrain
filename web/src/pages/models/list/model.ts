@@ -3,6 +3,7 @@ import type { components } from "~/api/schema";
 import { failingShare } from "~/components/models/ModelMetrics";
 import type { Tone } from "~/components/models/StatusText";
 import { costText } from "~/lib/cost";
+import { percent, pointsSize } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { gpu } from "~/lib/traffic";
 
@@ -75,11 +76,11 @@ export function plural(count: number, word: string): string {
 }
 
 export function pct(value: number | null | undefined): string {
-    return value === null || value === undefined ? "–" : `${(value * 100).toFixed(1)}%`;
+    return percent(value);
 }
 
 export function points(delta: number): string {
-    const value = Math.abs(delta * 100).toFixed(1);
+    const value = pointsSize(delta);
     return delta > 0 ? `+${value}` : delta < 0 ? `−${value}` : "±0.0";
 }
 

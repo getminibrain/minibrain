@@ -17,7 +17,7 @@ import { FormRow, FormRows } from "~/components/FormRows";
 import { type PickOption, PickSelect } from "~/components/PickSelect";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { percent } from "~/lib/format";
+import { percent, pointsSize } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
 import {
     PoolRow,
@@ -29,7 +29,7 @@ import {
 } from "./poolPicker";
 
 export function points(delta: number): string {
-    const value = Math.abs(delta * 100).toFixed(1);
+    const value = pointsSize(delta);
     if (Number(value) === 0) {
         return "±0";
     }

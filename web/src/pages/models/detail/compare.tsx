@@ -17,7 +17,7 @@ import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { count, percent } from "~/lib/format";
+import { count, deltaPoints, percent } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
 import { modelCompareHref, versionNumberOf, versionPlaygroundHref } from "~/lib/modelLinks";
@@ -61,7 +61,7 @@ function scoreRows(a: VersionInfo, b: VersionInfo): CompareRow[] {
             )),
             values,
             differs: values[0] !== values[1],
-            formatDelta: (amount) => `${(amount * 100).toFixed(1)} pts`,
+            formatDelta: deltaPoints,
             better: "higher",
         };
     });

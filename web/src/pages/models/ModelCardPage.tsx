@@ -23,7 +23,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
-import { percent } from "~/lib/format";
+import { percent, pointsSize } from "~/lib/format";
 import {
     modelAibomHref,
     modelCardDownloadHref,
@@ -74,7 +74,7 @@ function Change({ value }: { value: number | null | undefined }) {
     if (value === null || value === undefined) {
         return <span className="text-muted-foreground">–</span>;
     }
-    const points = (Math.abs(value) * 100).toFixed(1);
+    const points = pointsSize(value);
     if (points === "0.0") {
         return <span className="text-muted-foreground">Same</span>;
     }

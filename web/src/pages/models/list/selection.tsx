@@ -16,6 +16,7 @@ import {
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import type { Abilities } from "~/lib/access";
 import { costSortValue, costText } from "~/lib/cost";
+import { deltaPoints } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import type { Entry } from "../entries";
 import { Tip } from "./cells";
@@ -265,7 +266,7 @@ function rowsOf(pair: ModelVersionRow[]): CompareRow[] {
             pair.map((version) => version.score),
             pct,
             "higher",
-            (amount) => `${(amount * 100).toFixed(1)} pts`,
+            deltaPoints,
         ),
         textRow(
             "rule",
