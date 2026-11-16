@@ -2,37 +2,24 @@ import { Server } from "lucide-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
+import { GaugeLegend, type GaugeSegment, UsageGauge, kindLegend } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import {
-    FREE,
-    Legend,
     MachineName,
     type NodeInfo,
     OnlineCount,
     type PoolInfo,
     type ReplicaInfo,
-    SERIES,
-    type Segment,
-    SegmentedBar,
     fleetAnchor,
 } from "./parts";
 
 type NodeJob = NodeInfo["jobs"][number];
 type Served = ReplicaInfo["serves"][number];
 
-const WEIGHTS = SERIES[0];
-const ADAPTERS = SERIES[1];
-const TRAINING = SERIES[2];
-
-const LEGEND = [
-    { label: "Model weights", fill: WEIGHTS },
-    { label: "Adapters", fill: ADAPTERS },
-    { label: "Training", fill: TRAINING },
-    { label: "Free", fill: FREE },
-];
+const LEGEND = kindLegend(["weights", "adapters", "training"]);
 
 const MEMORY_LABELS: Record<string, string> = {
     cuda: "GPU memory",
@@ -58,23 +45,23 @@ function jobLink(job: NodeJob): string {
     return jobHref(job);
 }
 
-function memorySegments(node: NodeInfo, engines: ReplicaInfo[]): Segment[] {
+function memorySegments(node: NodeInfo, engines: ReplicaInfo[]): GaugeSegment[] {
     const served = engines
         .filter((engine) => engine.state !== "failed")
         .flatMap((engine) => [
             {
                 key: `weights-${engine.id}`,
                 label: `${engine.base_model} weights`,
-                value: engine.weights_bytes ?? 0,
-                fill: WEIGHTS,
+                kind: "weights" as const,
+                bytes: engine.weights_bytes ?? 0,
             },
             ...engine.serves
                 .filter((item) => item.adapter_bytes)
                 .map((item) => ({
                     key: `adapter-${engine.id}-${item.model}`,
                     label: `${versioned(item.name, item.version)} adapter`,
-                    value: item.adapter_bytes ?? 0,
-                    fill: ADAPTERS,
+                    kind: "adapters" as const,
+                    bytes: item.adapter_bytes ?? 0,
                 })),
         ]);
     const training = node.jobs
@@ -82,8 +69,8 @@ function memorySegments(node: NodeInfo, engines: ReplicaInfo[]): Segment[] {
         .map((job) => ({
             key: `job-${job.id}`,
             label: `Training ${versioned(job.model_name ?? job.model ?? `job ${job.id}`, job.version)}`,
-            value: job.memory_bytes ?? 0,
-            fill: TRAINING,
+            kind: "training" as const,
+            bytes: job.memory_bytes ?? 0,
         }));
     return [...served, ...training];
 }
@@ -154,18 +141,19 @@ function MemoryLine({ node, engines }: { node: NodeInfo; engines: ReplicaInfo[] 
         );
     }
     const segments = memorySegments(node, engines);
-    const used = segments.reduce((sum, segment) => sum + segment.value, 0);
+    const used = segments.reduce((sum, segment) => sum + segment.bytes, 0);
     const over = used > total;
     return (
         <div className="flex flex-col gap-1.5">
-            <SegmentedBar
+            <UsageGauge
                 segments={segments}
-                total={Math.max(total, used)}
+                capacity={total}
                 label={`${node.host} memory`}
+                legend={false}
             />
             <p className="text-sm text-muted-foreground tabular-nums">
                 {over ? (
-                    <StatusText tone="warning">{`${bytes(used)} planned, more than its ${bytes(total)}`}</StatusText>
+                    <StatusText tone="destructive">{`${bytes(used)} planned, more than its ${bytes(total)}`}</StatusText>
                 ) : (
                     `${bytes(used)} in use · ${bytes(total - used)} free`
                 )}
@@ -261,7 +249,7 @@ export function FleetBoard({ pools }: { pools: PoolInfo[] }) {
             description="Every pool and what each machine is doing. Memory is estimated from weight and adapter files and each training plan."
         >
             <div className="flex flex-col gap-3">
-                <Legend items={LEGEND} />
+                <GaugeLegend items={LEGEND} />
                 <div className="grid items-start gap-4 lg:grid-cols-2">
                     {pools.map((pool) => (
                         <PoolCard key={pool.name} pool={pool} />

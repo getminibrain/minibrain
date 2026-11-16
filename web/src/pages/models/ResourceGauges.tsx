@@ -1,77 +1,15 @@
 import { HardDrive, type LucideIcon, Server } from "lucide-react";
-import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
 import { SummaryLine } from "~/components/CreateLayout";
 import { PoolLink } from "~/components/PoolLink";
+import { UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import type { DiskNeed } from "./BaseSummary";
 import { type PoolFit, runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
-const TICKS = [25, 50, 75];
-
-type Tone = "normal" | "warning" | "destructive";
-
-const TONE_FILL: Record<Tone, string> = {
-    normal: "bg-primary",
-    warning: "bg-warning",
-    destructive: "bg-destructive",
-};
-
-type Segment = { id: string; value: number; fill: string };
-
-function percent(value: number, total: number): number {
-    return total > 0 ? Math.max(0, Math.min(100, (value / total) * 100)) : 0;
-}
-
-export function ResourceBar({
-    label,
-    total,
-    segments,
-    size = "md",
-}: { label: string; total: number; segments: Segment[]; size?: "sm" | "md" }) {
-    const used = segments.reduce((sum, segment) => sum + segment.value, 0);
-    return (
-        <div
-            role="meter"
-            aria-label={label}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(percent(used, total))}
-            className={cn(
-                "relative overflow-hidden rounded-sm border bg-secondary",
-                size === "sm" ? "h-3 p-px" : "h-7 p-[3px]",
-            )}
-        >
-            <div className="flex h-full">
-                {segments.map((segment) => (
-                    <div
-                        key={segment.id}
-                        className={segment.fill}
-                        style={{
-                            width: `${percent(segment.value, total)}%`,
-                            minWidth: segment.value > 0 ? 4 : 0,
-                        }}
-                    />
-                ))}
-            </div>
-            {TICKS.map((tick) => (
-                <span
-                    key={tick}
-                    aria-hidden="true"
-                    className={cn(
-                        "absolute w-px bg-background",
-                        size === "sm" ? "inset-y-px" : "inset-y-[3px]",
-                    )}
-                    style={{ left: `${tick}%` }}
-                />
-            ))}
-        </div>
-    );
-}
-
 function Figures({ icon, children }: { icon: LucideIcon; children: ReactNode }) {
     return (
         <SummaryLine icon={icon} className="tabular-nums">
@@ -144,23 +82,30 @@ export function DiskGauge({
     const download = need?.size ?? 0;
     const here = need ? 0 : (onDisk ?? 0);
     const others = Math.max(0, total - free - here);
-    const after = free - download;
-    const tone: Tone = after < 0 ? "destructive" : after < LOW_SPACE ? "warning" : "normal";
     return (
         <>
-            <ResourceBar
+            <UsageGauge
                 label="Storage for model files"
-                total={total}
+                capacity={total}
+                low={free - download < LOW_SPACE}
                 segments={[
-                    { id: "used", value: others, fill: "bg-faint" },
                     {
-                        id: "model",
-                        value: Math.min(download || here, free + here),
-                        fill: TONE_FILL[tone],
+                        key: "other",
+                        kind: "other",
+                        label: "Other files on the disk",
+                        legend: "Other files",
+                        bytes: others,
+                    },
+                    {
+                        key: "model",
+                        kind: "weights",
+                        label: need ? "This model's download" : "This model",
+                        legend: need ? "To download" : "This model",
+                        bytes: download || here,
+                        planned: Boolean(need),
                     },
                 ]}
             />
-            <Figures icon={HardDrive}>{`${amount} · ${bytes(free)} free`}</Figures>
             {place}
         </>
     );
@@ -190,7 +135,6 @@ function PoolRow({ pool, servesOnly }: { pool: PoolFit; servesOnly: boolean }) {
     const available = fit?.available_bytes ?? 0;
     const needed = fit?.needed_bytes ?? 0;
     const short = needed > available;
-    const tone: Tone = short ? "destructive" : fit?.level === "limited" ? "warning" : "normal";
     return (
         <li className="flex flex-col gap-1.5">
             <span className="flex items-center justify-between gap-3">
@@ -203,15 +147,18 @@ function PoolRow({ pool, servesOnly }: { pool: PoolFit; servesOnly: boolean }) {
             </span>
             {available > 0 && (
                 <>
-                    <ResourceBar
+                    <UsageGauge
                         label={`Memory in pool ${pool.name}`}
-                        total={available}
-                        size="sm"
+                        capacity={available}
+                        low={fit?.level === "limited"}
+                        legend={false}
                         segments={[
                             {
-                                id: "needs",
-                                value: Math.min(needed, available),
-                                fill: TONE_FILL[tone],
+                                key: "needs",
+                                kind: "weights",
+                                label: "This model",
+                                bytes: needed,
+                                planned: true,
                             },
                         ]}
                     />

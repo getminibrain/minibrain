@@ -2,31 +2,23 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Archive, FileStack, HardDrive, Layers } from "lucide-react";
 import { DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { PanelSection, PanelSections, Stat } from "~/components/Section";
+import { type GaugeKind, type GaugeSegment, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { datasetHref } from "~/pages/models/list/cells";
-import {
-    FREE,
-    type InfrastructureInfo,
-    Legend,
-    OTHER,
-    SERIES,
-    type Segment,
-    SegmentedBar,
-    type StoreInfo,
-} from "./parts";
+import type { InfrastructureInfo, StoreInfo } from "./parts";
 
 type StoredItem = InfrastructureInfo["largest"][number];
 
 const LOW_FREE_SHARE = 0.1;
 
-const CATEGORY_FILL: Record<string, string> = {
-    Database: SERIES[0],
-    "Model files": SERIES[1],
-    "Dataset versions": SERIES[2],
-    "Uploads, adapters and results": SERIES[3],
+const CATEGORY_KIND: Record<string, GaugeKind> = {
+    Database: "database",
+    "Model files": "weights",
+    "Dataset versions": "datasets",
+    "Uploads, adapters and results": "uploads",
 };
 
 const STORE_KIND: Record<StoreInfo["kind"], string> = {
@@ -57,22 +49,23 @@ function disksOf(stores: StoreInfo[]): Disk[] {
     return [...found.values()];
 }
 
-function diskSegments(disk: Disk): Segment[] {
+function diskSegments(disk: Disk): GaugeSegment[] {
     const stored = disk.stores.map((store) => ({
         key: store.name,
+        kind: CATEGORY_KIND[store.name] ?? ("other" as const),
         label: store.name,
-        value: store.used_bytes ?? 0,
-        fill: CATEGORY_FILL[store.name] ?? OTHER,
+        legend: store.name,
+        bytes: store.used_bytes ?? 0,
     }));
     const used = disk.total - disk.free;
-    const ours = stored.reduce((sum, segment) => sum + segment.value, 0);
+    const ours = stored.reduce((sum, segment) => sum + segment.bytes, 0);
     return [
         ...stored,
         {
             key: "other",
+            kind: "other",
             label: "Other files on the disk",
-            value: Math.max(0, used - ours),
-            fill: OTHER,
+            bytes: Math.max(0, used - ours),
         },
     ];
 }
@@ -108,19 +101,7 @@ function DiskCard({ disk }: { disk: Disk }) {
                     )}
                 </span>
             </div>
-            <SegmentedBar segments={segments} total={disk.total} label="Disk use" />
-            <Legend
-                items={[
-                    ...segments
-                        .filter((segment) => segment.value > 0)
-                        .map((segment) => ({
-                            label: segment.label,
-                            fill: segment.fill,
-                            value: bytes(segment.value),
-                        })),
-                    { label: "Free", fill: FREE, value: bytes(disk.free) },
-                ]}
-            />
+            <UsageGauge segments={segments} capacity={disk.total} label="Disk use" />
         </div>
     );
 }

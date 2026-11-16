@@ -3,8 +3,8 @@ import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { SummaryLine } from "~/components/CreateLayout";
 import { PoolLink } from "~/components/PoolLink";
+import { UsageGauge } from "~/components/UsageGauge";
 import { count } from "~/lib/format";
-import { ResourceBar } from "../../ResourceGauges";
 import { type OptionInfo, duration, gigabytes } from "./recipe";
 
 export function Row({
@@ -44,24 +44,9 @@ export function timeText(time: PresetTime): string {
 }
 
 const SEGMENTS = [
-    {
-        key: "weights",
-        label: "Weights",
-        fill: "bg-(--chart-memory-1)",
-        danger: "bg-(--chart-memory-over-1)",
-    },
-    {
-        key: "adapter",
-        label: "Adapter",
-        fill: "bg-(--chart-memory-2)",
-        danger: "bg-(--chart-memory-over-2)",
-    },
-    {
-        key: "activations",
-        label: "Activations",
-        fill: "bg-(--chart-memory-3)",
-        danger: "bg-(--chart-memory-over-3)",
-    },
+    { key: "weights", kind: "weights", label: "Weights" },
+    { key: "adapter", kind: "adapters", label: "Adapter" },
+    { key: "activations", kind: "training", label: "Activations" },
 ] as const;
 
 type Segment = (typeof SEGMENTS)[number]["key"];
@@ -116,13 +101,16 @@ export function MemorySummary({
     const available = option.available_bytes ?? option.peak_bytes;
     return (
         <>
-            <ResourceBar
+            <UsageGauge
                 label={`${memoryLabel} for training`}
-                total={Math.max(available, option.peak_bytes)}
+                capacity={available}
+                over={!ok}
                 segments={SEGMENTS.map((segment) => ({
-                    id: segment.key,
-                    value: parts[segment.key],
-                    fill: ok ? segment.fill : segment.danger,
+                    key: segment.key,
+                    kind: segment.kind,
+                    label: segment.label,
+                    legend: segment.label,
+                    bytes: parts[segment.key],
                 }))}
             />
             <SummaryLine
@@ -139,18 +127,6 @@ export function MemorySummary({
                     </>
                 )}
             </SummaryLine>
-            <ul className="flex flex-col gap-0.5 text-muted-foreground tabular-nums">
-                {SEGMENTS.map((segment) => (
-                    <li key={segment.key} className="flex items-center gap-2">
-                        <span
-                            aria-hidden
-                            className={cn("size-2 rounded-xs", ok ? segment.fill : segment.danger)}
-                        />
-                        <span className="flex-1">{segment.label}</span>
-                        <span>{gigabytes(parts[segment.key])}</span>
-                    </li>
-                ))}
-            </ul>
         </>
     );
 }
