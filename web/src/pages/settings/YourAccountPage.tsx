@@ -24,6 +24,7 @@ import { YOUR_ACCOUNT } from "~/pages/settings/settingsIndex";
 const MIN_PASSWORD = 12;
 const PROFILE_FORM = "profile-form";
 const PASSWORD_FORM = "password-form";
+const NAME_INPUT = "profile-name";
 const PROFILE = YOUR_ACCOUNT.profile;
 const PASSWORD = YOUR_ACCOUNT.password;
 const SESSIONS = YOUR_ACCOUNT.sessions;
@@ -74,9 +75,9 @@ function ProfileSection({ profile }: { profile: Profile }) {
         >
             <form id={PROFILE_FORM} onSubmit={save} className="flex flex-col gap-4">
                 <FormRows>
-                    <FormRow id={PROFILE.settings.name.anchor} label={PROFILE.settings.name.label}>
+                    <FormRow id={NAME_INPUT} label={PROFILE.settings.name.label}>
                         <Input
-                            id={PROFILE.settings.name.anchor}
+                            id={NAME_INPUT}
                             value={name}
                             maxLength={200}
                             autoComplete="name"
@@ -89,22 +90,16 @@ function ProfileSection({ profile }: { profile: Profile }) {
                         label={PROFILE.settings.email.label}
                         detail={profile.provider ? `Managed by ${profile.provider}` : undefined}
                     >
-                        <span id={PROFILE.settings.email.anchor} className="min-w-0 truncate">
-                            {profile.email ?? "No email"}
-                        </span>
+                        <span className="min-w-0 truncate">{profile.email ?? "No email"}</span>
                     </FormRow>
                     <FormRow
                         label={PROFILE.settings.role.label}
                         detail={profile.role_locked ? "From your groups" : "Set by an admin"}
                     >
-                        <span id={PROFILE.settings.role.anchor}>
-                            {profile.role ? ROLE_LABELS[profile.role] : "No role"}
-                        </span>
+                        <span>{profile.role ? ROLE_LABELS[profile.role] : "No role"}</span>
                     </FormRow>
                     <FormRow label={PROFILE.settings.signInMethod.label}>
-                        <span id={PROFILE.settings.signInMethod.anchor}>
-                            {signInMethod(profile)}
-                        </span>
+                        <span>{signInMethod(profile)}</span>
                     </FormRow>
                 </FormRows>
                 <ErrorLine error={rename.error} />

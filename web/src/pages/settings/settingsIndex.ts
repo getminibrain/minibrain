@@ -129,27 +129,35 @@ function section<T extends Record<string, SettingSpec>>(
 
 export const YOUR_ACCOUNT = {
     profile: section("Profile", {
-        name: setting("Name", "Shown in the sidebar, on audit events and to admins.", [
-            "display name",
-            "rename",
-            "full name",
-            "profile",
-        ]),
-        email: setting(
-            "Email",
-            "The address you sign in with; set by your identity provider for SSO.",
-            ["email address", "username"],
+        name: onSection(
+            setting("Name", "Shown in the sidebar, on audit events and to admins.", [
+                "display name",
+                "rename",
+                "full name",
+                "profile",
+            ]),
         ),
-        role: setting("Role", "Viewer, Builder or Admin, given by an admin or your groups.", [
-            "permissions",
-            "access",
-        ]),
-        signInMethod: setting("Sign-in method", "Password, single sign-on or a proxy.", [
-            "sso",
-            "oidc",
-            "proxy",
-            "login",
-        ]),
+        email: onSection(
+            setting(
+                "Email",
+                "The address you sign in with; set by your identity provider for SSO.",
+                ["email address", "username"],
+            ),
+        ),
+        role: onSection(
+            setting("Role", "Viewer, Builder or Admin, given by an admin or your groups.", [
+                "permissions",
+                "access",
+            ]),
+        ),
+        signInMethod: onSection(
+            setting("Sign-in method", "Password, single sign-on or a proxy.", [
+                "sso",
+                "oidc",
+                "proxy",
+                "login",
+            ]),
+        ),
     }),
     password: section("Password", {
         changePassword: onSection(
