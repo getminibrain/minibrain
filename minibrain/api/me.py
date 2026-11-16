@@ -153,7 +153,11 @@ def new_password(body: PasswordChange, session: SessionDep, found: IdentityDep, 
         ended = change_password(
             session, user, body.current_password, body.password, peer_address(), current_session_id(session, found)
         )
-    except (WrongPassword, TooManyAttempts, PasswordError):
+    except (WrongPassword, TooManyAttempts) as error:
+        audit_self(session, user, "account.password_change_failed", {"reason": str(error)})
+        session.commit()
+        raise
+    except PasswordError:
         session.commit()
         raise
     audit_self(session, user, "account.password_change", {"sessions_ended": len(ended)})

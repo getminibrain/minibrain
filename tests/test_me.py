@@ -79,7 +79,9 @@ def test_a_wrong_current_password_changes_nothing(install: Install) -> None:
     with install.sessions() as session:
         user = session.scalars(select(User)).one()
         assert verify_password(PASSWORD, user.password_hash)
-    assert install.events("account.password_change") == []
+    assert [event.action for event in install.events("account.password_change")] == ["account.password_change_failed"]
+    [failed] = install.events("account.password_change_failed")
+    assert (failed.actor, failed.detail["reason"]) == (ADMIN, "Your current password is wrong")
 
 
 def test_wrong_current_passwords_count_toward_the_sign_in_lockout(install: Install) -> None:
@@ -89,6 +91,7 @@ def test_wrong_current_passwords_count_toward_the_sign_in_lockout(install: Insta
         assert admin.post("/api/me/password", json=body, headers=csrf(admin)).status_code == 403
     locked = admin.post("/api/me/password", json=body | {"current_password": PASSWORD}, headers=csrf(admin))
     assert locked.status_code == 429 and "Too many wrong passwords" in locked.json()["detail"]
+    assert len(install.events("account.password_change_failed")) == LOCK_AFTER + 1
     refused = install.browser().post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
     assert refused.status_code == 401 and "Too many failed sign-ins" in refused.json()["detail"]
 

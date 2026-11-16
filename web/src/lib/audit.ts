@@ -51,6 +51,7 @@ const ACTIONS: Record<string, string> = {
     "account.create": "Account created",
     "account.password": "Password set",
     "account.password_change": "Password changed",
+    "account.password_change_failed": "Password change refused",
     "account.session_end": "Session ended",
     "account.sessions_end": "Other sessions ended",
     "account.reset": "Password link created",
@@ -411,6 +412,7 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         typeof detail.sessions_ended === "number" && detail.sessions_ended > 0
             ? `Ended ${plainValue(detail.sessions_ended)} other sessions`
             : "No other sessions",
+    "account.password_change_failed": (detail) => plainValue(detail.reason),
     "account.session_end": (detail) =>
         typeof detail.session_ip === "string" ? `From ${detail.session_ip}` : "One session",
     "account.sessions_end": (detail) =>

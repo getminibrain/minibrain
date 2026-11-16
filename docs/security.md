@@ -56,7 +56,8 @@ People sign in to the UI and `/api`; apps call `/v1` with API keys only, and wor
   list their own sessions and end any other one, and local accounts change their password. A change needs the current
   password; wrong ones count toward the same per-address lockout as sign-in. The new password follows the same
   policy, and every other session of the account ends while this one stays. Session ids of other accounts answer 404.
-  Audit actions: `account.update`, `account.password_change`, `account.session_end`, `account.sessions_end`.
+  Audit actions: `account.update`, `account.password_change`, `account.password_change_failed`, `account.session_end`,
+  `account.sessions_end`.
   Single sign-on and proxy accounts have no password in minibrain.
 - The cookie is Secure when the request is HTTPS, a configured proxy says it was (`X-Forwarded-Proto`), or the
   browser's `Origin` is HTTPS. Plain HTTP on loopback (`localhost`, `127.0.0.1`, `::1`) gets no Secure flag, since
