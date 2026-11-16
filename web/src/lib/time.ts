@@ -23,6 +23,13 @@ export function exactTime(value: string): string {
     return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }
 
+export function fileSize(value: number | null | undefined): string {
+    if (value === null || value === undefined || value >= 1024) {
+        return bytes(value);
+    }
+    return `${value} ${value === 1 ? "byte" : "bytes"}`;
+}
+
 export function bytes(value: number | null | undefined): string {
     if (value === null || value === undefined) {
         return "–";

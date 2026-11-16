@@ -89,11 +89,21 @@ def test_a_dataset_suggests_the_output_its_answers_hold(harness: Harness) -> Non
     assert found["kind"] == "json" and found["labels"] is None
     assert found["json_schema"]["properties"] == {"total": {"type": "integer"}, "currency": {"type": "string"}}
     blank = blank_dataset(harness.client)
-    assert harness.client.get(f"/api/datasets/{blank}/output").json()["contract"] == {
-        "kind": "text",
-        "json_schema": None,
-        "labels": None,
+    assert harness.client.get(f"/api/datasets/{blank}/output").json() == {
+        "contract": {"kind": "text", "json_schema": None, "labels": None},
+        "basis": "no answer column is picked in the dataset yet",
     }
+    unpicked = upload(harness, "notes.csv", b"foo,bar\nhello,world\n")
+    created = harness.client.post("/api/datasets", json={"name": "Notes", "source_id": unpicked["id"]}).json()
+    assert created["mapping"]["sql"] is None
+    unmapped = harness.client.get(f"/api/datasets/{created['slug']}/output").json()
+    assert unmapped["basis"] == "no answer column is picked in the dataset yet"
+
+
+def test_the_upload_error_names_every_accepted_format(harness: Harness) -> None:
+    refused = harness.client.post("/api/sources", files={"file": ("notes.txt", b"hello", "text/plain")})
+    assert refused.status_code == 422
+    assert refused.json()["detail"] == "unsupported file type: use CSV, TSV, JSON, JSON Lines or Parquet"
 
 
 def test_a_single_source_dataset_can_say_from_source(harness: Harness) -> None:

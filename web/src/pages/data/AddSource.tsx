@@ -24,7 +24,7 @@ import {
 import { useDatasets, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
-import { bytes } from "~/lib/time";
+import { fileSize } from "~/lib/time";
 import { type SourceGroupId, plural } from "./catalogue";
 import { SourceIcon } from "./icons";
 import { useDataRefresh } from "./parts";
@@ -101,7 +101,7 @@ function NameTakenDialog({
                                 : `A source called ${name} already exists`}
                         </DialogTitle>
                         <DialogDescription>
-                            {`The file you picked${question ? ` (${bytes(question.file.size)})` : ""} has different content. Replace the uploaded one, or keep both.`}
+                            {`The file you picked${question ? ` (${fileSize(question.file.size)})` : ""} has different content. Replace the uploaded one, or keep both.`}
                         </DialogDescription>
                     </DialogHeader>
                     <RadioGroup

@@ -14,7 +14,7 @@ import {
 import { useSourceRows, useSourceStats } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
-import { bytes, relativeTime } from "~/lib/time";
+import { fileSize, relativeTime } from "~/lib/time";
 import { ConnectedFacts } from "./Connected";
 import { CreateDataset } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
@@ -347,7 +347,7 @@ export function FileDetail({
                     />
                 )}
                 {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
-                    <Stat label="Size" value={bytes(source.size)} />
+                    <Stat label="Size" value={fileSize(source.size)} />
                 )}
                 {source.encoding && (
                     <Stat

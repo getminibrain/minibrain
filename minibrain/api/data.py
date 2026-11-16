@@ -112,7 +112,7 @@ from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Sourc
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags
-from minibrain.tasks.contracts import suggested_contract
+from minibrain.tasks.contracts import FREE_TEXT, suggested_contract
 from minibrain.tasks.examples import turns_of
 
 router = APIRouter(prefix="/api")
@@ -123,6 +123,7 @@ SOURCE_ROWS = "SELECT * FROM source"
 QUERY_ROWS = 50
 STATS_SAMPLE = 10_000
 LABEL_COUNTS = 200
+NO_ANSWER_COLUMN = "no answer column is picked in the dataset yet"
 
 
 Aliases = tuple[tuple[str, str], ...]
@@ -639,6 +640,8 @@ def dataset_answers(settings: Settings, store: ArtifactStore, dataset: Dataset) 
 )
 def dataset_output(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> OutputSuggestion:
     dataset = get_dataset(session, slug)
+    if not dataset.sql:
+        return OutputSuggestion(contract=contract_info(FREE_TEXT), basis=NO_ANSWER_COLUMN)
     latest = latest_of(dataset)
     found = suggested_contract(latest.labels if latest else [], dataset_answers(settings, store, dataset))
     return OutputSuggestion(contract=contract_info(found.contract), basis=found.basis)

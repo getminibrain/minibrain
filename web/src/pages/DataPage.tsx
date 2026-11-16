@@ -68,7 +68,7 @@ function SourceSection({ detail }: { detail: ModelDetail }) {
     return (
         <Section
             title="Source"
-            caption="A CSV, TSV, JSON Lines or Parquet file. It is copied into this install."
+            caption="A CSV, TSV, JSON, JSON Lines or Parquet file. It is copied into this install."
             actions={
                 <Button asChild variant={source ? "outline" : "default"} size="sm">
                     <Link href="/data">{source ? "Change data" : "Add data"}</Link>

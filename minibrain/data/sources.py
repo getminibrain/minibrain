@@ -106,7 +106,7 @@ class Quality:
 def safe_filename(filename: str) -> str:
     name = Path(filename).name
     if Path(name).suffix.lower() not in READERS:
-        raise SourceError("unsupported file type: use CSV, TSV, JSON Lines or Parquet")
+        raise SourceError("unsupported file type: use CSV, TSV, JSON, JSON Lines or Parquet")
     return re.sub(r"[^A-Za-z0-9._-]", "_", name)
 
 

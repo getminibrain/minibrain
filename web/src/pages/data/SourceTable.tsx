@@ -27,7 +27,7 @@ import { useDatasets } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { bytes, relativeTime } from "~/lib/time";
+import { fileSize, relativeTime } from "~/lib/time";
 import {
     type ItemRef,
     datasetNameProblem,
@@ -77,7 +77,11 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
         id: "size",
         header: "Size",
         accessorKey: "size",
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.size)}</span>,
+        cell: ({ row }) => (
+            <span className="tabular-nums">
+                {row.original.size ? fileSize(row.original.size) : "–"}
+            </span>
+        ),
     },
     {
         id: "datasets",
@@ -377,7 +381,7 @@ function DeleteSourcesDialog({
                                 <span className="truncate text-sm text-muted-foreground">
                                     {source.datasets.length > 0
                                         ? `Read by ${source.datasets.map(nameOf).join(", ")}`
-                                        : bytes(source.size)}
+                                        : fileSize(source.size)}
                                 </span>
                             </span>
                             {source.datasets.length > 0 && !cascade && (

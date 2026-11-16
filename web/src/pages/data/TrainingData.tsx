@@ -6,7 +6,7 @@ import { keys, useDatasets, useDemoData, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
-import { bytes } from "~/lib/time";
+import { fileSize } from "~/lib/time";
 import { DatasetMapping } from "./DatasetDetail";
 import { datasetsIn, freeDatasetName } from "./catalogue";
 
@@ -116,7 +116,7 @@ function UploadChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                     <span className="min-w-0 truncate text-sm text-muted-foreground">
                         {upload.isPending
                             ? `Reading ${file.name}…`
-                            : (upload.data?.note ?? `${file.name} · ${bytes(file.size)}`)}
+                            : (upload.data?.note ?? `${file.name} · ${fileSize(file.size)}`)}
                     </span>
                 )}
             </div>
