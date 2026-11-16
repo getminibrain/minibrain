@@ -110,7 +110,7 @@ export function PickSelect({
                                 {selected.icon}
                             </span>
                         )}
-                        <span className="flex min-w-0 flex-col items-start text-left">
+                        <span className="flex min-w-0 flex-col text-left">
                             <span className="truncate">{selected.label}</span>
                             {selected.description && (
                                 <span className="truncate text-sm text-muted-foreground">
