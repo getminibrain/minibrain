@@ -402,7 +402,10 @@ function columns(): ColumnDef<AccountInfo, unknown>[] {
             id: "name",
             accessorFn: (row) => row.name.toLowerCase(),
             cell: ({ row }) => (
-                <span className="flex min-w-0 flex-col">
+                <span
+                    className="flex min-w-0 max-w-80 flex-col"
+                    title={[row.original.name, row.original.email].filter(Boolean).join("\n")}
+                >
                     <span className="truncate">{row.original.name}</span>
                     {row.original.email && row.original.email !== row.original.name && (
                         <DataGridDetail className="truncate">{row.original.email}</DataGridDetail>
