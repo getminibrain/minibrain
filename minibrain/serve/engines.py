@@ -24,6 +24,8 @@ from minibrain.worker import HttpClient
 
 GENERATE_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 STARTUP_SECONDS = 600.0
+UNREACHABLE_SECONDS = 30.0
+UNREACHED = (httpx.ConnectError, httpx.ConnectTimeout, OSError)
 FETCH_WAIT_SECONDS = 60.0
 FETCHING = "fetching"
 IDLE_SECONDS = 900.0
@@ -160,6 +162,18 @@ def nothing_serves(base: str, pool: str | None) -> str:
     return f"no engine serves {base} in pool {pool} yet; it starts on a machine in that pool"
 
 
+def unreachable(base: str, replicas: list[dict[str, str]], unreached: set[str]) -> str | None:
+    if not replicas or any(entry.get("state") != "ready" or entry["url"] not in unreached for entry in replicas):
+        return None
+    pools = sorted({entry.get("pool", LOCAL_POOL) for entry in replicas})
+    urls = ", ".join(sorted(entry["url"] for entry in replicas))
+    where = f"pool {pools[0]}" if len(pools) == 1 else f"pools {', '.join(pools)}"
+    return (
+        f"the engine for {base} in {where} reports ready but this gateway cannot reach it at {urls}; check the "
+        "address the engine advertises and any firewall between them"
+    )
+
+
 def drain_engine(http: HttpClient, url: str, routes: list[str], adapters: list[str]) -> dict[str, Any]:
     response = http.request("POST", f"{url}/drain", json={"routes": routes, "adapters": adapters})
     response.raise_for_status()
@@ -259,6 +273,7 @@ class EngineBackend:
         started = time.monotonic()
         deadline = started + STARTUP_SECONDS
         tried: set[str] = set()
+        unreached: set[str] = set()
         waiting: str | None = None
         while True:
             replicas = self.replicas(base, request.pool)
@@ -268,6 +283,9 @@ class EngineBackend:
             if url is None:
                 if waiting is not None and time.monotonic() - started > FETCH_WAIT_SECONDS:
                     raise EngineUnavailableError(waiting)
+                stranded = unreachable(base, replicas, unreached)
+                if stranded is not None and time.monotonic() - started > UNREACHABLE_SECONDS:
+                    raise EngineUnavailableError(stranded)
                 if time.monotonic() > deadline:
                     raise EngineUnavailableError(f"no engine for {base} is reachable")
                 time.sleep(1.0)
@@ -276,11 +294,14 @@ class EngineBackend:
                 continue
             try:
                 response, stack = self.send(url, body, stream)
-            except (httpx.TransportError, OSError):
+            except (httpx.TransportError, OSError) as error:
                 self.balancer.release(url)
                 self.balancer.mark(url, "down")
                 tried.add(url)
+                if isinstance(error, UNREACHED):
+                    unreached.add(url)
                 continue
+            unreached.discard(url)
             stack.callback(self.balancer.release, url)
             if response.status_code == 503:
                 stack.close()

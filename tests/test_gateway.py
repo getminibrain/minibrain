@@ -1,3 +1,5 @@
+import socket
+import time
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
@@ -8,7 +10,8 @@ from fastapi.testclient import TestClient
 from minibrain.base_models import base_model
 from minibrain.gateway.standalone import create_gateway_app
 from minibrain.registry.models import ApiKey, RequestLog
-from minibrain.serve.backend import CompletionRequest
+from minibrain.serve import engines as engines_module
+from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from tests.conftest import FakeBackend, Harness
@@ -123,3 +126,37 @@ def test_unknown_engine_is_a_503(harness: Harness) -> None:
     headers = servable(harness)
     harness.app.state.backend = EngineBackend(dict)
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 503
+
+
+def closed_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def test_an_engine_that_reports_ready_but_cannot_be_reached_fails_fast_naming_its_pool(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = servable(harness)
+    monkeypatch.setattr(engines_module, "UNREACHABLE_SECONDS", 0.5)
+    replica = {"url": f"http://127.0.0.1:{closed_port()}", "state": "ready", "pool": "local"}
+    harness.app.state.backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]})
+    started = time.monotonic()
+    reply = harness.client.post("/v1/chat/completions", headers=headers, json=CHAT)
+    assert reply.status_code == 503
+    assert time.monotonic() - started < 10
+    message = reply.json()["detail"]
+    assert "pool local reports ready but this gateway cannot reach it" in message
+    assert replica["url"] in message
+
+
+def test_an_engine_still_starting_is_waited_for_past_the_unreachable_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(engines_module, "UNREACHABLE_SECONDS", 0.0)
+    monkeypatch.setattr(engines_module, "STARTUP_SECONDS", 1.5)
+    replica = {"url": f"http://127.0.0.1:{closed_port()}", "state": "loading", "pool": "gpu-east"}
+    backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]})
+    request = CompletionRequest(base_model("qwen3-0.6b"), [{"role": "user", "content": "x"}], None, 8)
+    started = time.monotonic()
+    with pytest.raises(EngineUnavailableError, match=r"no engine for qwen3-0\.6b is reachable"):
+        backend.complete(request)
+    assert time.monotonic() - started >= 1.5
