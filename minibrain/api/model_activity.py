@@ -19,6 +19,7 @@ from minibrain.registry.models import (
     JobKind,
     JobStatus,
     Model,
+    User,
     VersionKind,
     VersionStatus,
 )
@@ -50,6 +51,7 @@ class ModelActivityEvent(BaseModel):
     id: int
     at: datetime
     actor: str
+    actor_id: int | None = None
     actor_name: str | None
     action: str
     text: str
@@ -319,26 +321,42 @@ def belongs(owner: Owner, event: AuditEvent) -> bool:
     return event.target == owner.key or (owner.custom and owned)
 
 
+@dataclass(frozen=True)
+class Names:
+    by_id: dict[int, str]
+    by_handle: dict[str, str]
+
+    def of(self, actor: str, actor_id: int | None) -> str | None:
+        if actor == SYSTEM_ACTOR:
+            return None
+        named = self.by_id.get(actor_id) if actor_id is not None else None
+        return named or self.by_handle.get(actor) or actor.partition("@")[0] or actor
+
+
 def display_names(session: Session, actors: set[str]) -> dict[str, str]:
     found = users_by_handle(session, actors)
     return {handle: user.name for handle, user in found.items() if user.name and user.name != handle}
 
 
-def name_of(actor: str, names: dict[str, str]) -> str | None:
-    if actor == SYSTEM_ACTOR:
-        return None
-    return names.get(actor) or actor.partition("@")[0] or actor
+def activity_names(session: Session, people: set[tuple[str, int | None]]) -> Names:
+    ids = {actor_id for _, actor_id in people if actor_id is not None}
+    handles = {actor for actor, actor_id in people if actor_id is None}
+    accounts = session.scalars(select(User).where(User.id.in_(ids))) if ids else []
+    return Names(
+        by_id={user.id: user.name for user in accounts if user.name}, by_handle=display_names(session, handles)
+    )
 
 
 def failure_reason(job: Job) -> str:
     return ": out of memory" if "memory" in (job.error or "").lower() else ""
 
 
-def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: dict[str, str]) -> ModelActivityEvent:
+def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: Names) -> ModelActivityEvent:
     number = job.version_number
     name = f"v{number}"
     failed = job.status == JobStatus.FAILED
     actor = SYSTEM_ACTOR if failed or started is None else started.actor
+    actor_id = None if failed or started is None else started.actor_id
     verb = "trained" if job.kind == JobKind.TRAIN else "scored"
     if failed:
         text = f"{name} failed{failure_reason(job)}"
@@ -348,7 +366,8 @@ def outcome_of(owner: Owner, job: Job, started: AuditEvent | None, names: dict[s
         id=-job.id,
         at=aware(job.finished_at or job.created_at),
         actor=actor,
-        actor_name=name_of(actor, names),
+        actor_id=actor_id,
+        actor_name=names.of(actor, actor_id),
         action="version.failed" if failed else f"version.{verb}",
         text=text,
         link=version_link(owner, number),
@@ -383,13 +402,14 @@ def starts_of(found: list[AuditEvent], jobs: list[Job]) -> dict[int, AuditEvent]
     }
 
 
-def event_of(session: Session, owner: Owner, event: AuditEvent, names: dict[str, str]) -> ModelActivityEvent:
+def event_of(session: Session, owner: Owner, event: AuditEvent, names: Names) -> ModelActivityEvent:
     sentence = said(session, owner, event)
     return ModelActivityEvent(
         id=event.id,
         at=aware(event.at),
         actor=event.actor,
-        actor_name=name_of(event.actor, names),
+        actor_id=event.actor_id,
+        actor_name=names.of(event.actor, event.actor_id),
         action=event.action,
         text=sentence.text,
         link=sentence.link,
@@ -411,12 +431,8 @@ def activity_of(session: Session, name: str, limit: int) -> ModelActivity:
         key=lambda entry: (entry[0], entry[1]),
         reverse=True,
     )[:limit]
-    actors = {
-        item.actor if isinstance(item, AuditEvent) else starts[item.id].actor
-        for _, _, item in moments
-        if isinstance(item, AuditEvent) or item.id in starts
-    }
-    names = display_names(session, actors)
+    sources = [item if isinstance(item, AuditEvent) else starts.get(item.id) for _, _, item in moments]
+    names = activity_names(session, {(source.actor, source.actor_id) for source in sources if source is not None})
     events = [
         event_of(session, owner, item, names)
         if isinstance(item, AuditEvent)

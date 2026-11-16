@@ -21523,6 +21523,17 @@
             "type": "string",
             "title": "Actor"
           },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
           "actor_name": {
             "anyOf": [
               {

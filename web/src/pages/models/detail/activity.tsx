@@ -48,8 +48,15 @@ function hrefOf(row: ModelRow, event: ModelActivityEvent): string | null {
     }
 }
 
+function samePerson(a: ModelActivityEvent, b: ModelActivityEvent): boolean {
+    if (a.actor_id != null || b.actor_id != null) {
+        return a.actor_id === b.actor_id;
+    }
+    return a.actor === b.actor;
+}
+
 function similar(a: ModelActivityEvent, b: ModelActivityEvent): boolean {
-    return a.action === b.action && a.actor === b.actor && dayLabel(a.at) === dayLabel(b.at);
+    return a.action === b.action && samePerson(a, b) && dayLabel(a.at) === dayLabel(b.at);
 }
 
 function entries(events: ModelActivityEvent[]): Entry[] {
