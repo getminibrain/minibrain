@@ -20,6 +20,7 @@ from typing import IO, Any, BinaryIO, Protocol
 import httpx
 
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing, StreamReader
+from minibrain.jobs.device_time import device_time
 from minibrain.jobs.output import OutputParser, structured
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
@@ -459,9 +460,11 @@ class Worker:
             spec_path.write_text(json.dumps(self.spec(claim, workdir, attempt_dir)))
             arguments = [self.modules[kind], str(spec_path)]
             publisher = self.publisher(claim)
+            started = time.monotonic()
             exit_code, cancelled, tail = self.supervise(
                 job_id, token, lease, arguments, log_path, claim.get("env") or {}, publisher, self.secrets(claim)
             )
+            seconds = time.monotonic() - started
             stored_error = publisher.finish() if publisher is not None else None
             log = self.upload_log(log_path)
             if cancelled:
@@ -470,6 +473,8 @@ class Worker:
                 self.client.fail(job_id, token, stored_error, True, log)
             elif exit_code == 0:
                 result = json.loads((attempt_dir / "result.json").read_text())
+                if kind == JobKind.TRAIN:
+                    result["device_time"] = device_time(dict(result.get("summary") or {}), seconds)
                 self.client.complete(job_id, token, result, self.outputs(kind, attempt_dir), log)
                 shutil.rmtree(workdir, ignore_errors=True)
             else:

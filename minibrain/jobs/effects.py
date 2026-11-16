@@ -141,6 +141,7 @@ class DomainEffects:
             raise MissingArtifactError(f"train job {job.id} returned no adapter")
         version.adapter_artifact_id = adapter
         version.recipe = dict((job.result or {}).get("summary", version.recipe))
+        version.device_time = (job.result or {}).get("device_time")
         version.status = VersionStatus.EVALUATING
         session.flush()
         enqueue(

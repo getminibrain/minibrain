@@ -299,6 +299,7 @@ class Version(Base):
     duplicated_from: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     base_model: Mapped[str]
     from_version: Mapped[int | None] = mapped_column(default=None)
+    device_time: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
 
     model: Mapped[Model] = relationship(back_populates="versions")
     dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")

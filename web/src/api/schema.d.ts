@@ -5049,6 +5049,30 @@ export interface components {
                 [key: string]: number;
             } | null;
         };
+        /** DeviceTime */
+        DeviceTime: {
+            /**
+             * Kind
+             * @description gpu for any accelerator; cpu when training ran on the CPU.
+             * @enum {string}
+             */
+            kind: "gpu" | "cpu";
+            /**
+             * Devices
+             * @description Accelerators the training process used.
+             */
+            devices: number;
+            /**
+             * Seconds
+             * @description Wall time the training process ran.
+             */
+            seconds: number;
+            /**
+             * Hours
+             * @description Device-hours: wall time times devices.
+             */
+            hours: number;
+        };
         /** DiffRow */
         DiffRow: {
             /** Input */
@@ -9780,6 +9804,8 @@ export interface components {
              * @description The version whose settings this run started from.
              */
             from_version?: number | null;
+            /** @description Device time its training run took. */
+            device_time?: components["schemas"]["DeviceTime"] | null;
             /**
              * Base Model
              * @description The base the version was made on and runs on.

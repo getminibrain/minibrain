@@ -32,5 +32,8 @@ if __name__ == "__main__":
         answers = {
             name: [row.expected for row in read_split(spec["dataset_version"], name)] for name in ("golden", "eval")
         }
-    result = {"summary": {"fake": True}, "metrics": {"device": "cpu"}, "answers": answers}
+    summary: dict[str, object] = {"fake": True}
+    if os.environ.get("FAKE_JOB_DEVICE"):
+        summary |= {"device": os.environ["FAKE_JOB_DEVICE"], "devices": int(os.environ.get("FAKE_JOB_DEVICES", "1"))}
+    result = {"summary": summary, "metrics": {"device": "cpu"}, "answers": answers}
     Path(spec["result"]).write_text(json.dumps(result))

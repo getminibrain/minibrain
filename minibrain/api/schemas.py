@@ -777,6 +777,13 @@ class VersionFiles(BaseModel):
     files: list[PackedFileInfo]
 
 
+class DeviceTime(BaseModel):
+    kind: Literal["gpu", "cpu"] = Field(description="gpu for any accelerator; cpu when training ran on the CPU.")
+    devices: int = Field(description="Accelerators the training process used.")
+    seconds: float = Field(description="Wall time the training process ran.")
+    hours: float = Field(description="Device-hours: wall time times devices.")
+
+
 class VersionOrigin(BaseModel):
     slug: str
     name: str
@@ -816,6 +823,7 @@ class VersionInfo(BaseModel):
     view: str | None = None
     duplicated_from: VersionOrigin | None = None
     from_version: int | None = Field(default=None, description="The version whose settings this run started from.")
+    device_time: DeviceTime | None = Field(default=None, description="Device time its training run took.")
     base_model: str = Field(default="", description="The base the version was made on and runs on.")
     base_refusal: str | None = Field(
         default=None, description="Why the version can't be deployed: it was made on a base the model has left."

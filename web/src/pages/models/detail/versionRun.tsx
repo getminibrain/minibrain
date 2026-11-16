@@ -120,6 +120,36 @@ function changedText(version: VersionInfo, other: VersionInfo | undefined, label
         : `vs ${label}: ${parts.join(", ")}`;
 }
 
+type DeviceTime = NonNullable<VersionInfo["device_time"]>;
+
+const SMALLEST_HOURS = 0.01;
+
+function deviceHoursText(time: DeviceTime): string {
+    if (time.hours < SMALLEST_HOURS) {
+        return `< ${SMALLEST_HOURS}`;
+    }
+    return time.hours.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function DeviceHours({ version }: { version: VersionInfo }) {
+    const time = version.device_time;
+    if (!time) {
+        return <Stat label="GPU-hours" value="–" />;
+    }
+    const label = time.kind === "cpu" ? "CPU-hours" : "GPU-hours";
+    const devices = time.kind === "gpu" && time.devices > 1 ? ` on ${time.devices} GPUs` : "";
+    return (
+        <Stat
+            label={label}
+            value={
+                <span title={`${durationText(time.seconds)} of wall time${devices}`}>
+                    {deviceHoursText(time)}
+                </span>
+            }
+        />
+    );
+}
+
 function CancelRun({ job }: { job: JobInfo }) {
     const can = useCan();
     const client = useQueryClient();
@@ -389,6 +419,7 @@ export function TrainingSection({
                 <Stat label="Took" value={run ? jobDuration(run) : "–"} />
                 <Stat label="Ran on" value={<RanOnText place={place} />} />
                 <Stat label="Rows trained" value={rows === null ? "–" : count(rows)} />
+                <DeviceHours version={version} />
             </>
         );
         note = (

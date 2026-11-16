@@ -16989,6 +16989,42 @@
         "type": "object",
         "title": "DevicePricesUpdate"
       },
+      "DeviceTime": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "gpu",
+              "cpu"
+            ],
+            "title": "Kind",
+            "description": "gpu for any accelerator; cpu when training ran on the CPU."
+          },
+          "devices": {
+            "type": "integer",
+            "title": "Devices",
+            "description": "Accelerators the training process used."
+          },
+          "seconds": {
+            "type": "number",
+            "title": "Seconds",
+            "description": "Wall time the training process ran."
+          },
+          "hours": {
+            "type": "number",
+            "title": "Hours",
+            "description": "Device-hours: wall time times devices."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "devices",
+          "seconds",
+          "hours"
+        ],
+        "title": "DeviceTime"
+      },
       "DiffRow": {
         "properties": {
           "input": {
@@ -31376,6 +31412,17 @@
             ],
             "title": "From Version",
             "description": "The version whose settings this run started from."
+          },
+          "device_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Device time its training run took."
           },
           "base_model": {
             "type": "string",

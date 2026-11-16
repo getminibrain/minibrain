@@ -168,6 +168,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Started-from lineage** · shipped · product, ml, admin
   Each run records the version its settings came from.
   UI: Models › model › Train, Models › model › Versions › version · API: POST /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/card, GET /api/models/{name}/versions/{number}/aibom.json
+- **GPU-hours per version** · shipped · product, ml, admin
+  Each training run records wall time times the accelerators it used.
+  UI: Models › model › Versions › version · API: GET /api/models/{name}/versions
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/models/{name}, GET /api/models/{name}/versions/{number}/files

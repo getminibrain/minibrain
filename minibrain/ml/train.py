@@ -289,6 +289,7 @@ def main(spec: JobSpec) -> None:
     trainer.save_model(str(spec.path("adapter_out")))
     summary = recipe | {
         "device": device,
+        "devices": trainer.args.n_gpu if kind_of(device) in ("cuda", "xpu") else 1,
         "examples": len(rows),
         "train_seconds": output.metrics.get("train_runtime"),
         "train_loss": output.metrics.get("train_loss"),
