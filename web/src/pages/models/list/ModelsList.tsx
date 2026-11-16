@@ -13,6 +13,7 @@ import { useAllModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { useCan } from "~/lib/access";
+import { modelVersionHref } from "~/lib/modelLinks";
 import { type ModelsSearch, useModelsSearch } from "~/lib/modelsSearch";
 import { retryTeardown } from "~/lib/teardown";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
@@ -363,7 +364,7 @@ export function ModelsList() {
     }
     const hrefOfLine = (line: RowLine) => {
         if (line.type === "version") {
-            return `/models/${encodeURIComponent(line.model.key)}/versions`;
+            return modelVersionHref(line.model.key, line.version.number);
         }
         if (line.type === "variant") {
             return `/models/${encodeURIComponent(line.row.key)}`;

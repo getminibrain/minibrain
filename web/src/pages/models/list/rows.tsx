@@ -36,7 +36,13 @@ import type { ModelRow, ModelVersionRow } from "~/api/client";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { Requests } from "~/components/models/ModelMetrics";
 import type { Abilities } from "~/lib/access";
-import { modelCardHref, modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
+import {
+    modelCardHref,
+    modelPageHref,
+    modelVersionHref,
+    playgroundHref,
+    trainHref,
+} from "~/lib/modelLinks";
 import { RETRY_LABELS, REVIEW_LABEL, busyTearingDown, needsReview } from "~/lib/teardown";
 import { bytes, relativeTime } from "~/lib/time";
 import type { Entry } from "../entries";
@@ -727,7 +733,9 @@ function VersionMenu({
         <DropdownMenu>
             <MenuTrigger label={`More actions for ${model.name} v${version.number}`} />
             <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem onSelect={() => on.open(modelPageHref(model.key, "versions"))}>
+                <DropdownMenuItem
+                    onSelect={() => on.open(modelVersionHref(model.key, version.number))}
+                >
                     <Eye />
                     {`Open v${version.number}`}
                 </DropdownMenuItem>
@@ -815,7 +823,7 @@ export function VersionLine({
                 <span className="ml-1 flex min-w-0 items-center gap-2">
                     <LiveDot live={version.live} />
                     <Link
-                        href={modelPageHref(model.key, "versions")}
+                        href={modelVersionHref(model.key, version.number)}
                         tabIndex={-1}
                         className="shrink-0 whitespace-nowrap font-medium text-foreground tabular-nums hover:underline"
                     >
