@@ -305,11 +305,13 @@ export function SettingsTab({ row, detail }: { row: ModelRow; detail: ModelDetai
     const can = useCan();
     const custom = row.kind === "custom";
     return (
-        <PanelSections>
-            {(custom || can.admin) && <General key={row.updated_at} row={row} />}
-            {isDeployed(row) && <Deployment row={row} />}
-            {detail && <RequestBodies detail={detail} />}
-            <Danger row={row} detail={detail} />
-        </PanelSections>
+        <div className="max-w-3xl">
+            <PanelSections>
+                {(custom || can.admin) && <General key={row.updated_at} row={row} />}
+                {isDeployed(row) && <Deployment row={row} />}
+                {detail && <RequestBodies detail={detail} />}
+                <Danger row={row} detail={detail} />
+            </PanelSections>
+        </div>
     );
 }
