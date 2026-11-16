@@ -9551,6 +9551,11 @@ export interface components {
             loss_rows: number | null;
             /** Changed */
             changed: string[];
+            /**
+             * Available Rows
+             * @description Training rows the run's dataset version offered, feedback rows included.
+             */
+            available_rows?: number | null;
         };
         /** TransferMetrics */
         TransferMetrics: {

@@ -33,6 +33,14 @@ import { bytes } from "~/lib/time";
 import { LossBody, stepText } from "../../jobs/TrainingPanel";
 import { datasetHref } from "./about";
 import { Tip, baseNameOf } from "./header";
+import {
+    type RunValues,
+    type SettingChange,
+    cappedRows,
+    labelOf,
+    presetChanges,
+    recordedRun,
+} from "./train/recipe";
 import type { Peers, Phase } from "./versionState";
 import { failureReason } from "./versions";
 
@@ -55,22 +63,35 @@ const SETTINGS: Record<string, [string, (value: unknown) => string]> = {
     seed: ["seed", String],
 };
 
+type Available = (version: VersionInfo) => number | null;
+
 function recipeOf(version: VersionInfo): Record<string, unknown> {
     return version.recipe as Record<string, unknown>;
 }
 
-function settingChanges(version: VersionInfo, other: VersionInfo): string[] {
-    const mine = recipeOf(version);
-    const theirs = recipeOf(other);
+function numberOf(value: unknown): number | null {
+    const found = Number(value);
+    return value === null || value === undefined || !Number.isFinite(found) ? null : found;
+}
+
+function shownSetting(version: VersionInfo, key: string, available: Available): unknown {
+    const value = recipeOf(version)[key];
+    if (key !== "max_rows" || value === undefined || value === null) {
+        return value;
+    }
+    const rows = available(version);
+    return rows !== null && cappedRows(numberOf(value), rows) === null ? "all" : value;
+}
+
+function settingChanges(version: VersionInfo, other: VersionInfo, available: Available): string[] {
     return Object.entries(SETTINGS).flatMap(([key, [name, format]]) => {
-        const before = theirs[key];
-        const after = mine[key];
+        const before = shownSetting(other, key, available);
+        const after = shownSetting(version, key, available);
         if (after === undefined || after === null || before === undefined || before === null) {
             return [];
         }
-        return String(before) === String(after)
-            ? []
-            : [`${name} ${format(before)} → ${format(after)}`];
+        const text = (value: unknown) => (value === "all" ? "all" : format(value));
+        return String(before) === String(after) ? [] : [`${name} ${text(before)} → ${text(after)}`];
     });
 }
 
@@ -101,20 +122,56 @@ function settingText(version: VersionInfo, key: string): string {
     return found ? `${found[0]} ${found[1](recipeOf(version)[key])}` : key;
 }
 
+function changeText(version: VersionInfo, change: SettingChange): string {
+    const found = SETTINGS[change.key];
+    if (!found || change.before === null || change.after === null) {
+        return settingText(version, change.key);
+    }
+    return `${found[0]} ${found[1](change.before)} → ${found[1](change.after)}`;
+}
+
+function runValues(version: VersionInfo, available: Available): RunValues {
+    const recipe = recipeOf(version);
+    const overrides = Array.isArray(recipe.overrides) ? (recipe.overrides as string[]) : [];
+    return {
+        rank: numberOf(recipe.rank),
+        epochs: numberOf(recipe.epochs),
+        learningRate: numberOf(recipe.learning_rate),
+        maxRows: numberOf(recipe.max_rows),
+        available: available(version),
+        overrides,
+    };
+}
+
+function presetText(version: VersionInfo, available: Available): string {
+    const run = runValues(version, available);
+    if (!recordedRun(run)) {
+        return "Default settings";
+    }
+    const { basis, changes } = presetChanges(run);
+    const label = labelOf(basis);
+    return changes.length === 0
+        ? `${label} preset`
+        : `Changed from ${label}: ${changes.map((change) => changeText(version, change)).join(", ")}`;
+}
+
 function recorded(version: VersionInfo): boolean {
     const recipe = recipeOf(version);
     return Object.keys(SETTINGS).some((key) => recipe[key] !== undefined && recipe[key] !== null);
 }
 
-function changedText(version: VersionInfo, other: VersionInfo | undefined, label: string): string {
+function changedText(
+    version: VersionInfo,
+    other: VersionInfo | undefined,
+    label: string,
+    available: Available = () => null,
+): string {
     if (!other || !recorded(other)) {
-        const overrides = recipeOf(version).overrides;
-        const names = Array.isArray(overrides) ? (overrides as string[]) : [];
-        return names.length === 0
-            ? "Default settings"
-            : `Changed from the defaults: ${names.map((name) => settingText(version, name)).join(", ")}`;
+        return presetText(version, available);
     }
-    const parts = [...settingChanges(version, other), dataChange(version, other)].filter(Boolean);
+    const parts = [...settingChanges(version, other, available), dataChange(version, other)].filter(
+        Boolean,
+    );
     return parts.length === 0
         ? `Same settings and data as ${label}`
         : `vs ${label}: ${parts.join(", ")}`;
@@ -196,6 +253,14 @@ function RanOnText({ place }: { place: RanOn | null }) {
         return <span className="font-mono text-sm">{place.machine}</span>;
     }
     return <PoolLink name={place.pool} machine={place.machine} className="max-w-72" />;
+}
+
+function useAvailableRows(version: VersionInfo): Available {
+    const data = useDatasetVersions(version.dataset_slug ?? "", version.kind === "lora");
+    return (item) => {
+        const found = data.data?.find((entry) => entry.id === item.dataset_version_id);
+        return found ? (found.counts.train ?? 0) + (found.feedback_rows ?? 0) : null;
+    };
 }
 
 function useTrainedRows(version: VersionInfo): number | null {
@@ -327,6 +392,7 @@ export function TrainingSection({
     onRetry: () => unknown;
 }) {
     const rows = useTrainedRows(version);
+    const available = useAvailableRows(version);
     const active = version.job && canCancel(version.job) ? version.job : undefined;
     const shownJob = active ?? run;
     const training = metrics?.training;
@@ -376,7 +442,7 @@ export function TrainingSection({
                 <Stat label="Status" value="Waiting for a worker" />
             </>
         );
-        note = <Note>{changedText(version, compareTo, compareLabel)}</Note>;
+        note = <Note>{changedText(version, compareTo, compareLabel, available)}</Note>;
     } else if (phase === "training") {
         const eta = training?.eta_seconds;
         stats = (
@@ -388,7 +454,7 @@ export function TrainingSection({
                 <Stat label="Ran on" value={<RanOnText place={place} />} />
             </>
         );
-        note = <Note>{changedText(version, compareTo, compareLabel)}</Note>;
+        note = <Note>{changedText(version, compareTo, compareLabel, available)}</Note>;
     } else if (phase === "failed" || phase === "cancelled") {
         stats = (
             <>
@@ -424,8 +490,8 @@ export function TrainingSection({
         );
         note = (
             <Note>
-                <span title={changedText(version, compareTo, compareLabel)}>
-                    {changedText(version, compareTo, compareLabel)}
+                <span title={changedText(version, compareTo, compareLabel, available)}>
+                    {changedText(version, compareTo, compareLabel, available)}
                 </span>
             </Note>
         );

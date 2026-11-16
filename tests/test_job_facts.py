@@ -137,3 +137,13 @@ def test_base_model_jobs_name_the_base_and_its_variant(harness: Harness) -> None
     setup = detail(harness, job_id)["setup"]
     assert setup["base_model"] == "downloaded" and setup["base_model_name"] == "Downloaded base"
     assert setup["variant"] == precision and setup["revision"] == "abc1234def" and setup["training"] is None
+
+
+def test_a_training_job_reports_the_rows_its_dataset_version_offered(harness: Harness) -> None:
+    claim = training_job(harness)
+    training = detail(harness, claim["job_id"])["setup"]["training"]
+    with harness.sessions() as session:
+        job = session.get(Job, claim["job_id"])
+        assert job is not None and job.version is not None and job.version.dataset_version is not None
+        offered = job.version.dataset_version.counts["train"] + job.version.dataset_version.feedback_rows
+    assert offered > 0 and training["available_rows"] == offered

@@ -38,6 +38,7 @@ import {
 } from "~/lib/modelLinks";
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { bytes, relativeTime } from "~/lib/time";
+import { labelOf, presetChanges, recordedRun } from "../models/detail/train/recipe";
 import { ProgressSection, ScoresSection } from "./ProgressPanels";
 import { LossSection } from "./TrainingPanel";
 import { JobState } from "./jobCells";
@@ -321,15 +322,38 @@ function settingsText(training: Training): string {
     return parts.filter(Boolean).join(" · ");
 }
 
+const FITTED_LATER = "; the worker fits batch and memory when the run starts";
+
+function changeName(name: string, after: number | null): string {
+    const label = SETTING_NAMES[name] ?? name;
+    if (name === "max_rows" && after !== null) {
+        return `rows at most ${count(after)}`;
+    }
+    return after === null ? label : `${label} ${after}`;
+}
+
 function changedText(training: Training): string {
-    if (!training.planned && training.changed.length === 0) {
-        return "The install defaults; the worker fits batch and memory when the run starts.";
+    const later = training.planned ? "" : FITTED_LATER;
+    const run = {
+        rank: training.rank ?? null,
+        epochs: training.epochs ?? null,
+        learningRate: training.learning_rate ?? null,
+        maxRows: training.max_rows ?? null,
+        available: training.available_rows ?? null,
+        overrides: training.changed,
+    };
+    if (!recordedRun(run)) {
+        return training.changed.length === 0
+            ? `The install defaults${later}.`
+            : `Changed from the defaults: ${training.changed.map((name) => SETTING_NAMES[name] ?? name).join(", ")}.`;
     }
-    if (training.changed.length === 0) {
-        return "The install defaults.";
+    const { basis, changes } = presetChanges(run);
+    const label = labelOf(basis);
+    if (changes.length === 0) {
+        return `The ${label} preset${later}.`;
     }
-    const names = training.changed.map((name) => SETTING_NAMES[name] ?? name);
-    return `Changed from the defaults: ${names.join(", ")}.`;
+    const names = changes.map((change) => changeName(change.key, change.after));
+    return `Changed from ${label}: ${names.join(", ")}${later}.`;
 }
 
 function dataFacts(setup: Setup): Fact[] {

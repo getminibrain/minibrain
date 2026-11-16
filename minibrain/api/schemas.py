@@ -605,6 +605,9 @@ class TrainingSetup(BaseModel):
         description="Held-out rows the held-out loss is measured on; the final score uses every one."
     )
     changed: list[str]
+    available_rows: int | None = Field(
+        default=None, description="Training rows the run's dataset version offered, feedback rows included."
+    )
 
 
 class JobSetup(BaseModel):

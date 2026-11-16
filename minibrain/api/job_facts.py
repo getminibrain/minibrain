@@ -79,6 +79,13 @@ def dataset_rows(dataset_version: DatasetVersion) -> int:
     return dataset_version.rows or sum(dataset_version.counts.values())
 
 
+def available_rows(job: Job) -> int | None:
+    dataset_version = job.version.dataset_version if job.version is not None else None
+    if dataset_version is None:
+        return None
+    return int(dataset_version.counts.get("train", 0)) + dataset_version.feedback_rows
+
+
 def scored_rows(job: Job) -> int | None:
     dataset_version = job.version.dataset_version if job.version is not None else None
     return None if dataset_version is None else loss_rows(held_out_rows(dataset_version))
@@ -108,6 +115,7 @@ def training_setup(session: Session, job: Job) -> TrainingSetup:
         held_out=whole(started, "held_out"),
         loss_rows=scored_rows(job),
         changed=[str(name) for name in changed] if isinstance(changed, list) else [],
+        available_rows=available_rows(job),
     )
 
 

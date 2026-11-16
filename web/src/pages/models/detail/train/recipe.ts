@@ -275,6 +275,78 @@ export function startFrom(stored: Record<string, unknown> | null | undefined): S
         : { basis: "balanced", recipe, custom: true };
 }
 
+export type RunValues = {
+    rank: number | null;
+    epochs: number | null;
+    learningRate: number | null;
+    maxRows: number | null;
+    available: number | null;
+    overrides: string[];
+};
+
+export type SettingChange = { key: string; before: number | null; after: number | null };
+
+const PRESET_KEYS = ["rank", "epochs", "learning_rate"] as const;
+type PresetKey = (typeof PRESET_KEYS)[number];
+const PRESET_OWNED = new Set<string>([...PRESET_KEYS, "max_rows"]);
+
+function presetValue(quality: Quality, key: PresetKey): number {
+    const preset = PRESETS[quality];
+    if (key === "rank") {
+        return preset.rank;
+    }
+    return key === "epochs" ? preset.epochs : preset.learningRate;
+}
+
+function runValue(run: RunValues, key: PresetKey): number | null {
+    if (key === "rank") {
+        return run.rank;
+    }
+    return key === "epochs" ? run.epochs : run.learningRate;
+}
+
+function sameNumber(left: number, right: number): boolean {
+    return Math.abs(left - right) <= 1e-9 * Math.max(Math.abs(left), Math.abs(right));
+}
+
+export function recordedRun(run: RunValues): boolean {
+    return PRESET_KEYS.some((key) => runValue(run, key) !== null);
+}
+
+export function runPreset(run: RunValues): Quality {
+    const matched = QUALITIES.find((item) =>
+        PRESET_KEYS.every((key) => {
+            const value = runValue(run, key);
+            return value !== null && sameNumber(value, presetValue(item.id, key));
+        }),
+    );
+    return matched?.id ?? "balanced";
+}
+
+export function cappedRows(maxRows: number | null, available: number | null): number | null {
+    if (maxRows === null || available === null || maxRows >= available) {
+        return null;
+    }
+    return maxRows;
+}
+
+export function presetChanges(run: RunValues): { basis: Quality; changes: SettingChange[] } {
+    const basis = runPreset(run);
+    const changes: SettingChange[] = PRESET_KEYS.flatMap((key) => {
+        const after = runValue(run, key);
+        const before = presetValue(basis, key);
+        return after === null || sameNumber(after, before) ? [] : [{ key, before, after }];
+    });
+    const capped = cappedRows(run.maxRows, run.available);
+    if (capped !== null) {
+        changes.push({ key: "max_rows", before: null, after: capped });
+    }
+    const others = run.overrides
+        .filter((name) => !PRESET_OWNED.has(name))
+        .map((key) => ({ key, before: null, after: null }));
+    return { basis, changes: [...changes, ...others] };
+}
+
 export function hoursText(minutes: number): string {
     const hours = minutes / 60;
     return hours < 0.1 ? "< 0.1" : `≈ ${hours.toFixed(1)}`;

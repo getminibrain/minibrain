@@ -30541,6 +30541,18 @@
             },
             "type": "array",
             "title": "Changed"
+          },
+          "available_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Rows",
+            "description": "Training rows the run's dataset version offered, feedback rows included."
           }
         },
         "type": "object",
