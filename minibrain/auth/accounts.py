@@ -3,6 +3,7 @@ import hmac
 import re
 import secrets
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -362,13 +363,19 @@ def person_for(session: Session, user: User, config: AuthConfig) -> Person:
     return person_of(user, role, locked)
 
 
-def groups_of(value: str | None) -> list[str]:
+def unique_groups(items: Iterable[object]) -> list[str]:
     found: list[str] = []
-    for item in (value or "").split(","):
-        group = item.strip()[:NAME_LENGTH]
+    for item in items:
+        group = str(item).strip()[:NAME_LENGTH]
         if group and group not in found:
             found.append(group)
-    return found[:MAX_GROUPS]
+            if len(found) == MAX_GROUPS:
+                break
+    return found
+
+
+def groups_of(value: str | None) -> list[str]:
+    return unique_groups((value or "").split(","))
 
 
 def find_external(session: Session, source: str, subject: str) -> User | None:

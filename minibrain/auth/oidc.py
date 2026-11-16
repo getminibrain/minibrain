@@ -15,7 +15,7 @@ from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwk import KeySet
 
-from minibrain.auth.accounts import csrf_for, csrf_matches
+from minibrain.auth.accounts import csrf_for, csrf_matches, unique_groups
 from minibrain.auth.config import OidcConfig
 
 PENDING_COOKIE = "minibrain_oidc"
@@ -95,13 +95,8 @@ def safe_next(path: str | None) -> str:
 
 
 def groups_from(value: Any) -> list[str]:
-    items = value if isinstance(value, list) else str(value or "").split(",")
-    found: list[str] = []
-    for item in items:
-        group = str(item).strip()
-        if group and group not in found:
-            found.append(group)
-    return found
+    items = cast(list[object], value) if isinstance(value, list) else str(value or "").split(",")
+    return unique_groups(items)
 
 
 def endpoint(document: dict[str, Any], name: str) -> str:

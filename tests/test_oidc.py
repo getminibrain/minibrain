@@ -11,8 +11,10 @@ from joserfc.jwk import RSAKey
 from sqlalchemy import select
 
 from minibrain.app import create_app
+from minibrain.auth.accounts import MAX_GROUPS, NAME_LENGTH
 from minibrain.auth.config import OIDC_CREDENTIAL_ENV, AuthConfigError, load_auth
 from minibrain.auth.first_run import FirstRun, prepare
+from minibrain.auth.oidc import groups_from
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
 from tests.conftest import FakeBackend, blank_dataset
@@ -118,6 +120,16 @@ def test_signing_in_again_updates_groups_and_keeps_one_account(sso: Sso) -> None
     assert sign_in(sso, browser, "//evil.example/") == "/"
     assert browser.get("/api/auth/session").json()["person"]["role"] == "admin"
     assert len(sso.users()) == 1 and len(sso.events("account.create")) == 1
+
+
+def test_group_claims_are_capped_like_proxy_groups(sso: Sso) -> None:
+    long = "g" * 500
+    sso.provider.claims["groups"] = [long, *(f"team-{index}" for index in range(300)), "team-1"]
+    assert sign_in(sso, sso.browser()) == "/models"
+    [user] = sso.users()
+    assert len(user.groups) == MAX_GROUPS
+    assert user.groups[0] == long[:NAME_LENGTH] and user.groups[1] == "team-0"
+    assert groups_from("a, b ,a,,c") == ["a", "b", "c"]
 
 
 @pytest.mark.parametrize(
