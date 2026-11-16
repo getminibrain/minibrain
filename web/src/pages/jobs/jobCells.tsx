@@ -4,7 +4,7 @@ import type { JobInfo } from "~/api/client";
 import type { JobOrder } from "~/api/jobQueries";
 import { ModelName, withDeleted } from "~/components/ModelName";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText, type Tone } from "~/components/models/StatusText";
 import { percent } from "~/lib/format";
 import { jobDuration, jobSeconds, kindNoun } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
@@ -86,19 +86,7 @@ export function JobState({ job }: { job: JobInfo }) {
             </Tooltip>
         );
     }
-    if (!running) {
-        return <span className="flex items-center">{text}</span>;
-    }
-    return (
-        <span className="flex items-center gap-2">
-            {text}
-            <ProgressBar
-                value={job.progress > 0 ? job.progress : null}
-                label={`Job ${job.id} progress`}
-                className="w-16"
-            />
-        </span>
-    );
+    return <span className="flex items-center">{text}</span>;
 }
 
 export function JobOwner({ job }: { job: JobInfo }) {

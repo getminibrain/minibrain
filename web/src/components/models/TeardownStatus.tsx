@@ -1,8 +1,8 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import type { Teardown } from "~/lib/teardown";
-import { ProgressBar, StatusText } from "./StatusText";
+import { StatusText } from "./StatusText";
 
-export function TeardownStatus({ teardown, name }: { teardown: Teardown; name: string }) {
+export function TeardownStatus({ teardown }: { teardown: Teardown }) {
     const failed = teardown.state === "failed";
     const deleting = teardown.kind === "delete";
     return (
@@ -12,14 +12,6 @@ export function TeardownStatus({ teardown, name }: { teardown: Teardown; name: s
                     <StatusText tone={failed || deleting ? "destructive" : "info"} active={!failed}>
                         {teardown.label}
                     </StatusText>
-                    {!failed && (
-                        <ProgressBar
-                            value={null}
-                            label={`${name} ${teardown.label.toLowerCase()}`}
-                            className="w-16"
-                            tone={deleting ? "destructive" : "primary"}
-                        />
-                    )}
                 </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-sm whitespace-normal">

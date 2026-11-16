@@ -320,7 +320,7 @@ function ModelStatus({ model, on, can }: { model: ListModel; on: Handlers; can: 
             {prefix && line.kind !== "on" && line.kind !== "off" && (
                 <span className="text-sm text-muted-foreground">{prefix}</span>
             )}
-            <StatusLineText line={line} name={model.name} replicas={replicasOf(model)} />
+            <StatusLineText line={line} replicas={replicasOf(model)} />
             {line.hint && <StatusHintLink hint={line.hint} />}
             {can.build &&
                 (line.kind === "candidate" || line.kind === "ready") &&
@@ -895,7 +895,7 @@ function VariantStatus({ row }: { row: ModelRow }) {
             {line.kind === "on" ? (
                 <LiveStatus replicas={row.replicas ?? []} pool={row.deployment.pool} />
             ) : (
-                <StatusLineText line={line} name={row.name} replicas={row.replicas ?? []} />
+                <StatusLineText line={line} replicas={row.replicas ?? []} />
             )}
             {row.update_available && (
                 <Tooltip>

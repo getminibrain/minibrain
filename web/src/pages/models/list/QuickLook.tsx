@@ -119,11 +119,7 @@ function Variants({ model }: { model: ListModel }) {
                         {isDeployed(row) && line.kind === "on" ? (
                             <LiveStatus replicas={row.replicas ?? []} pool={row.deployment.pool} />
                         ) : (
-                            <StatusLineText
-                                line={line}
-                                name={row.name}
-                                replicas={row.replicas ?? []}
-                            />
+                            <StatusLineText line={line} replicas={row.replicas ?? []} />
                         )}
                     </li>
                 );
@@ -246,11 +242,7 @@ function Body({ model, on, can }: { model: ListModel; on: Handlers; can: Abiliti
                     </div>
                 </div>
                 <div className="pt-1">
-                    <StatusLineText
-                        line={statusLine(model)}
-                        name={model.name}
-                        replicas={replicasOf(model)}
-                    />
+                    <StatusLineText line={statusLine(model)} replicas={replicasOf(model)} />
                 </div>
             </SheetHeader>
             {model.kind === "custom" ? (

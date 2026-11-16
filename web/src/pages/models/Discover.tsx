@@ -32,7 +32,7 @@ import { type CatalogEntry, type CatalogResponse, api, unwrap } from "~/api/clie
 import { useCatalog } from "~/api/queries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import { ProgressBar, StatusText, percentOf } from "~/components/models/StatusText";
+import { StatusText, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
@@ -120,7 +120,15 @@ export function offlineReason(data: CatalogResponse | undefined): string {
     return `${why}: downloads need a connection. Import model works offline.`;
 }
 
-export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions }) {
+export function EntryAction({
+    entry,
+    on,
+    progress: showProgress = true,
+}: {
+    entry: CatalogEntry;
+    on: Actions;
+    progress?: boolean;
+}) {
     const available = entry.added.find((added) => added.availability.state === "available");
     const moving = entry.added.find((added) =>
         ["downloading", "importing"].includes(added.availability.state),
@@ -139,15 +147,19 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
         const progress = moving.availability.progress;
         return (
             <div className="flex items-center justify-end gap-2">
-                <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm tabular-nums text-muted-foreground">
+                {showProgress && (
+                    <StatusText
+                        tone="info"
+                        active
+                        progress={percentOf(progress)}
+                        className="text-sm tabular-nums"
+                    >
                         {moving.availability.state === "importing" ? "Importing" : "Downloading"}
                         {progress !== null && progress !== undefined
                             ? ` · ${Math.round(progress * 100)}%`
                             : "…"}
-                    </span>
-                    <ProgressBar value={progress} label={`${entry.name} download`} />
-                </div>
+                    </StatusText>
+                )}
                 {moving.availability.job_id !== null &&
                     moving.availability.job_id !== undefined && (
                         <Button
@@ -883,7 +895,9 @@ export function Discover({
                         rowLabel={(entry) => `${entry.name} by ${entry.provider}`}
                         selectedIds={selected}
                         onSelectedIdsChange={select}
-                        rowActions={(entry) => <EntryAction entry={entry} on={on} />}
+                        rowActions={(entry) => (
+                            <EntryAction entry={entry} on={on} progress={false} />
+                        )}
                         empty={empty}
                         minWidth="min-w-[840px]"
                     />

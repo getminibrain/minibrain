@@ -4,7 +4,7 @@ import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { HealthStatus } from "~/components/models/HealthStatus";
-import { ProgressBar, StatusText, percentOf } from "~/components/models/StatusText";
+import { StatusText, percentOf } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { jobHref } from "~/lib/modelLinks";
 import {
@@ -153,19 +153,11 @@ function Explained({ detail, children }: { detail?: string; children: ReactNode 
 
 const IN_PROGRESS = new Set(["starting", "training", "transfer"]);
 
-export function StatusLineText({
-    line,
-    name,
-    replicas,
-}: {
-    line: StatusLine;
-    name: string;
-    replicas: Replica[];
-}) {
+export function StatusLineText({ line, replicas }: { line: StatusLine; replicas: Replica[] }) {
     if (line.kind === "teardown" && line.row.teardown) {
         return (
             <span className="relative z-10">
-                <TeardownStatus teardown={line.row.teardown} name={name} />
+                <TeardownStatus teardown={line.row.teardown} />
             </span>
         );
     }
@@ -204,21 +196,12 @@ export function StatusLineText({
         );
     }
     if (line.kind === "training" || line.kind === "transfer") {
-        return (
-            <span className="flex items-center gap-2">
-                {line.job ? (
-                    <Link href={jobHref(line.job)} className="relative z-10 hover:underline">
-                        {text}
-                    </Link>
-                ) : (
-                    text
-                )}
-                <ProgressBar
-                    value={line.progress}
-                    label={`${name} ${line.text}`}
-                    className="w-12"
-                />
-            </span>
+        return line.job ? (
+            <Link href={jobHref(line.job)} className="relative z-10 hover:underline">
+                {text}
+            </Link>
+        ) : (
+            text
         );
     }
     return <Explained detail={line.detail}>{text}</Explained>;

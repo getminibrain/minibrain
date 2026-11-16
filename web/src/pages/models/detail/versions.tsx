@@ -46,7 +46,7 @@ import {
 } from "~/api/client";
 import { useJobs } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
-import { ProgressBar, StatusText, type Tone, percentOf } from "~/components/models/StatusText";
+import { StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { durationText, jobSeconds } from "~/lib/jobs";
@@ -156,18 +156,6 @@ export function VersionStatus({ row, version }: { row: ModelRow; version: Versio
 
 function RunStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const job = version.job;
-    if (version.status === "training" && job?.status !== "queued") {
-        return (
-            <span className="flex items-center gap-2">
-                <VersionStatus row={row} version={version} />
-                <ProgressBar
-                    value={job?.progress ?? 0}
-                    label={`v${version.number} training`}
-                    className="w-16"
-                />
-            </span>
-        );
-    }
     if (version.status === "failed" && job) {
         return (
             <Tip tip={failureReason(version)}>
