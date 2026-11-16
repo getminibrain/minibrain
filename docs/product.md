@@ -8,7 +8,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
   UI: Data › Add › Upload file, Data › Uploads › drop a file, Models › Add model › Dataset › Upload new · API: POST /api/sources, POST /api/datasets
 - **Non-UTF-8 text files** · shipped · product, ml
-  Read CSV, TSV and JSON that is not UTF-8 as Windows-1252.
+  Read UTF-16 (with its mark) and Windows-1252 CSV, TSV and JSON.
   UI: Data › Sources · API: POST /api/sources, POST /api/sources/folders, POST /api/sources/s3, GET /api/sources/{source_id}
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.

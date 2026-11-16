@@ -5,7 +5,7 @@ from typing import BinaryIO
 
 from minibrain.artifacts import STAGED_NAME, ArtifactStore
 from minibrain.connections.s3 import filesystem
-from minibrain.data.encoding import UTF8, WINDOWS_1252, is_text, known_encoding, transcode
+from minibrain.data.encoding import UTF8, WINDOWS_1252, is_text, known_encoding, transcode, transcoded
 from minibrain.data.folders import FolderScan
 from minibrain.data.remote import S3Reader, plain_message
 from minibrain.data.sources import READERS, SourceError, stage_files
@@ -14,7 +14,9 @@ Opener = Callable[[], BinaryIO]
 
 
 def overall(encodings: Sequence[str]) -> str:
-    return WINDOWS_1252 if WINDOWS_1252 in encodings else UTF8
+    if WINDOWS_1252 in encodings:
+        return WINDOWS_1252
+    return next((encoding for encoding in encodings if transcoded(encoding)), UTF8)
 
 
 def readable(open_file: Opener, label: str) -> BinaryIO:
@@ -48,8 +50,8 @@ def s3_encodings(reader: S3Reader, format: str | None) -> list[str]:
 
 def copy_as_utf8(open_file: Opener, label: str, target: Path, encoding: str) -> str:
     with readable(open_file, label) as source, target.open("wb") as out:
-        if encoding == WINDOWS_1252:
-            transcode(source, out)
+        if transcoded(encoding):
+            transcode(source, out, encoding)
         else:
             shutil.copyfileobj(source, out)
     return str(target)
@@ -63,7 +65,7 @@ def folder_build(found: FolderScan, encodings: Sequence[str]) -> Callable[[Path]
     def build(target: Path) -> None:
         files = []
         for index, (item, encoding) in enumerate(zip(found.files, encodings, strict=True)):
-            if encoding == WINDOWS_1252:
+            if transcoded(encoding):
                 plain = target.parent / f"part-{index}{found.format}"
                 files.append(copy_as_utf8(local_opener(item.path), item.path, plain, encoding))
             else:

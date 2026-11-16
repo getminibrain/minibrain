@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, object_session
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.connections.store import get_connection, resolve
 from minibrain.data.delta import DELTA, LOG, delta_state, local_path, refuse_remote
-from minibrain.data.encoding import WINDOWS_1252, EncodingCheck, is_text, transcode
+from minibrain.data.encoding import EncodingCheck, is_text, transcode, transcoded
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
 from minibrain.data.names import free_name, same_name
 from minibrain.data.remote import (
@@ -102,19 +102,20 @@ def staging_key(artifact_id: str, filename: str) -> str:
     return f"{artifact_id}{Path(filename).suffix.lower()}"
 
 
-def staged_utf8(store: ArtifactStore, artifact_id: str, filename: str, target: Path) -> None:
+def staged_utf8(store: ArtifactStore, artifact_id: str, filename: str, encoding: str, target: Path) -> None:
     suffix = Path(filename).suffix.lower()
     plain = target.parent / Path(filename).name
     with store.open(artifact_id) as stream, plain.open("wb") as out:
-        transcode(stream, out)
+        transcode(stream, out, encoding)
     stage_files([str(plain)], READERS[suffix], filename, target)
 
 
 def staging_of(store: ArtifactStore, source: Source) -> str:
     artifact_id = str(source.artifact_id)
     key = staging_key(artifact_id, source.filename)
-    if source.encoding == WINDOWS_1252:
-        return store.staged(key, lambda target: staged_utf8(store, artifact_id, source.filename, target))
+    encoding = source.encoding
+    if encoding is not None and transcoded(encoding):
+        return store.staged(key, lambda target: staged_utf8(store, artifact_id, source.filename, encoding, target))
     return store.staged(key, lambda target: stage(store.url(artifact_id, source.filename), target))
 
 
@@ -169,7 +170,7 @@ def s3_table(store: ArtifactStore, source: Source, state: RemoteState) -> Table:
     if not isinstance(reader, S3Reader) or state.format is None:
         return Table(name=source.table_name, fingerprint=state.fingerprint, remote=reader)
     encodings = s3_encodings(reader, state.format)
-    if note_encoding(source, encodings) != WINDOWS_1252:
+    if not transcoded(note_encoding(source, encodings)):
         return Table(name=source.table_name, fingerprint=state.fingerprint, remote=reader)
     build = s3_build(reader, state.format, encodings)
     staging = fallback_staging(store, source.table_name, state.fingerprint, build)
@@ -179,7 +180,7 @@ def s3_table(store: ArtifactStore, source: Source, state: RemoteState) -> Table:
 def folder_table(store: ArtifactStore, source: Source) -> Table:
     found = folder_scan(source)
     encodings = folder_encodings(found)
-    if note_encoding(source, encodings) == WINDOWS_1252:
+    if transcoded(note_encoding(source, encodings)):
         staging = fallback_staging(store, source.table_name, found.fingerprint, folder_build(found, encodings))
         return Table(name=source.table_name, staging=staging, fingerprint=found.fingerprint)
     return Table(

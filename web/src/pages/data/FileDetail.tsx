@@ -49,6 +49,8 @@ const CONNECTED_LABELS: Record<string, string> = {
 const ENCODING_LABELS: Record<string, string> = {
     "utf-8": "UTF-8",
     "windows-1252": "Windows-1252",
+    "utf-16le": "UTF-16 LE",
+    "utf-16be": "UTF-16 BE",
 };
 
 function share(part: number, whole: number): string {

@@ -8774,7 +8774,7 @@ export interface components {
             fingerprint_detail?: string | null;
             /**
              * Encoding
-             * @description How the text files are read: utf-8, or windows-1252 when they are not valid UTF-8.
+             * @description How the text files are read: utf-8, utf-16le or utf-16be when they start with a UTF-16 byte order mark, or windows-1252 when they are not valid UTF-8.
              */
             encoding?: string | null;
             /**
@@ -8871,7 +8871,7 @@ export interface components {
             fingerprint_detail?: string | null;
             /**
              * Encoding
-             * @description How the text files are read: utf-8, or windows-1252 when they are not valid UTF-8.
+             * @description How the text files are read: utf-8, utf-16le or utf-16be when they start with a UTF-16 byte order mark, or windows-1252 when they are not valid UTF-8.
              */
             encoding?: string | null;
         };

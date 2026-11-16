@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from minibrain.data import remote
-from minibrain.data.encoding import UTF8, WINDOWS_1252
+from minibrain.data.encoding import UTF8, UTF16_BE, UTF16_LE, WINDOWS_1252
 from tests.conftest import Harness, tickets_csv
 from tests.fake_s3 import FakeS3, fake_s3
 from tests.test_folders import allow
@@ -54,6 +54,34 @@ def test_a_utf8_mark_on_a_windows_1252_file_stays_out_of_the_first_column_name(h
     source = harness.client.post("/api/sources", files=files).json()
     assert source["encoding"] == WINDOWS_1252
     assert [column["name"] for column in source["columns"]] == ["text", "category"]
+    assert texts(harness, source["id"]) == sorted(ROWS)
+
+
+@pytest.mark.parametrize(
+    ("codec", "mark", "encoding"), [("utf-16-le", b"\xff\xfe", UTF16_LE), ("utf-16-be", b"\xfe\xff", UTF16_BE)]
+)
+def test_an_upload_with_a_utf16_mark_is_read_as_utf16(harness: Harness, codec: str, mark: bytes, encoding: str) -> None:
+    lines = ["text,category", *(f'"{text}",{label}' for text, label in zip(ROWS, LABELS, strict=True))]
+    data = mark + ("\r\n".join(lines) + "\r\n").encode(codec)
+    response = harness.client.post("/api/sources", files={"file": ("excel.csv", data, "text/csv")})
+    assert response.status_code == 201, response.text
+    source = response.json()
+    assert (source["encoding"], source["rows"], source["error"]) == (encoding, 3, None)
+    assert [column["name"] for column in source["columns"]] == ["text", "category"]
+    assert texts(harness, source["id"]) == sorted(ROWS)
+
+
+def test_a_folder_with_a_utf16_file_is_read_and_says_so(harness: Harness, tmp_path: Path) -> None:
+    root = tmp_path / "exported"
+    root.mkdir()
+    (root / "old.jsonl").write_bytes(
+        b"\xff\xfe" + "".join(f'{{"text": "{text}"}}\n' for text in ROWS).encode("utf-16-le")
+    )
+    allow(harness, root)
+    response = harness.client.post("/api/sources/folders", json={"path": str(root)})
+    assert response.status_code == 201, response.text
+    source = response.json()
+    assert (source["encoding"], source["rows"], source["error"]) == (UTF16_LE, 3, None)
     assert texts(harness, source["id"]) == sorted(ROWS)
 
 
