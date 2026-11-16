@@ -172,10 +172,9 @@ function RunElsewhere({
                     <section className="flex min-w-0 flex-col gap-1.5">
                         <h3 className="font-medium">A GPU machine in a new pool</h3>
                         <p className="text-muted-foreground">
-                            Install minibrain on it and set MINIBRAIN_WORKER_TOKEN and
-                            MINIBRAIN_GATEWAY_TOKEN from secrets/worker_token and
-                            secrets/gateway_token in this install's home folder. Then start a worker
-                            for training and an engine for serving:
+                            Install minibrain on it, create a join token for the pool under
+                            Infrastructure, Add machine, and set it in MINIBRAIN_JOIN_TOKEN. Then
+                            start a worker for training and an engine for serving:
                         </p>
                         <CodeBlock code={commands} language="bash" copyLabel="Copy the commands" />
                         <Link
