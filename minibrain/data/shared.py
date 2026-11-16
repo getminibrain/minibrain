@@ -68,6 +68,7 @@ LABEL_NAMES = ("label", "category", "intent", "class", "target", "topic", "tag")
 ANSWER_NAMES = ("answer", "response", "output", "completion", "reply", "expected")
 FOLDER = "folder"
 UPLOAD = "upload"
+BLANK_BYTES = b" \t\r\n\xef\xbb\xbf"
 
 
 class Outcome(StrEnum):
@@ -256,15 +257,24 @@ def first_source(session: Session, *conditions: ColumnElement[bool]) -> Source |
     return session.scalar(select(Source).where(*conditions).order_by(Source.id).limit(1))
 
 
-def content_facts(stream: BinaryIO, filename: str) -> tuple[str, str | None]:
+@dataclass(frozen=True)
+class ContentFacts:
+    digest: str
+    encoding: str | None
+    empty: bool
+
+
+def content_facts(stream: BinaryIO, filename: str) -> ContentFacts:
     digest = hashlib.sha256()
     check = EncodingCheck() if is_text(filename) else None
+    empty = True
     while block := stream.read(CHUNK):
         digest.update(block)
+        empty = empty and not block.strip(BLANK_BYTES)
         if check is not None:
             check.feed(block)
     stream.seek(0)
-    return digest.hexdigest(), check.result() if check is not None else None
+    return ContentFacts(digest.hexdigest(), check.result() if check is not None else None, empty)
 
 
 def store_upload(session: Session, store: ArtifactStore, filename: str, stream: BinaryIO, digest: str) -> Artifact:
@@ -318,7 +328,10 @@ def add_source(
     stream: BinaryIO,
     name_taken: NameTaken = NameTaken.KEEP_BOTH,
 ) -> Added:
-    digest, encoding = content_facts(stream, filename)
+    facts = content_facts(stream, filename)
+    if facts.empty:
+        raise SourceError(f"{filename} is empty: upload a file that has rows of data")
+    digest, encoding = facts.digest, facts.encoding
     same = first_source(session, Source.artifact_id == digest)
     if same is not None:
         return Added(same, Outcome.EXISTING)

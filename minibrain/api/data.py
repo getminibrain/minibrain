@@ -301,6 +301,11 @@ def describe_item(item: Source | Dataset, body: CatalogueUpdate) -> None:
         item.tags = merged_tags(item.tags, body.tags) or None
 
 
+def require_rows(settings: Settings, store: ArtifactStore, source: Source) -> None:
+    if cached_describe(table_of(settings, store, source))[1] == 0:
+        raise ConflictError(f"{source.name} has no rows: add rows to it, then make the dataset")
+
+
 def column_source(session: Session, dataset: Dataset, body: MappingUpdate) -> Source:
     if body.source_id is not None:
         return get_source(session, body.source_id)
@@ -336,6 +341,7 @@ def apply_mapping(
         dataset.template = None
     elif template is not None:
         source = column_source(session, dataset, body)
+        require_rows(settings, store, source)
         sql = template_sql(template, source.table_name)
         check_mapping([table_of(settings, store, source)], {}, sql)
         dataset.source = source
@@ -561,6 +567,8 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
         raise ConflictError("pick a source, or write SQL over the sources")
     folder = folder_or_root(session, body.folder_id)
     require_free_dataset_name(session, body.name, folder)
+    if source is not None:
+        require_rows(settings, store, source)
     dataset = add_dataset(session, settings, store, body.name, source, folder)
     mapping = MappingUpdate(
         source_id=body.source_id,
