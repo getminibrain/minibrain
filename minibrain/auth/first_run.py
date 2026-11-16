@@ -110,7 +110,9 @@ def admin_from_environment(session: Session, email: str, environ: Mapping[str, s
     except (AccountError, PasswordError, ConflictError) as error:
         raise FirstRunError(f"{ADMIN_EMAIL_ENV}: {error}") from error
     detail = {"name": user.name, "role": Role.ADMIN.value, "source": "local", "first_admin": True, "via": ENVIRONMENT}
-    session.add(AuditEvent(actor=user.subject, action="account.create", target=user.subject, detail=detail))
+    session.add(
+        AuditEvent(actor=user.subject, actor_id=user.id, action="account.create", target=user.subject, detail=detail)
+    )
     return user.subject
 
 

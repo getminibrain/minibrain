@@ -88,7 +88,19 @@ def test_exports_follow_the_filter_and_defuse_formulas(harness: Harness) -> None
     assert response.headers["content-disposition"].startswith('attachment; filename="minibrain-audit-')
     rows = list(csv.DictReader(io.StringIO(response.text)))
     assert [row["target"] for row in rows] == ["mb_0002", "mb_0001", "mb_0000"]
-    assert list(rows[0]) == ["id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash"]
+    assert list(rows[0]) == [
+        "id",
+        "seq",
+        "at",
+        "actor",
+        "actor_id",
+        "ip",
+        "action",
+        "target",
+        "detail",
+        "prev_hash",
+        "hash",
+    ]
     assert (rows[0]["seq"], rows[0]["hash"]) == ("", "")
     risky = list(csv.DictReader(io.StringIO(harness.client.get("/api/audit/export?action=model.delete").text)))
     assert risky[0]["target"] == "'=HYPERLINK(1)"
@@ -190,4 +202,16 @@ def test_events_name_their_actor_and_say_whether_the_target_still_exists(harness
     one = harness.client.get(f"/api/audit/{events['key.create']['id']}").json()
     assert one == events["key.create"]
     exported = json.loads(harness.client.get("/api/audit/export", params={"format": "jsonl"}).text.splitlines()[0])
-    assert set(exported) == {"id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash"}
+    assert set(exported) == {
+        "id",
+        "seq",
+        "at",
+        "actor",
+        "actor_id",
+        "ip",
+        "action",
+        "target",
+        "detail",
+        "prev_hash",
+        "hash",
+    }

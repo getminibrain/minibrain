@@ -252,3 +252,27 @@ def test_default_role_set_in_the_config_file_is_locked(settings: Settings, monke
         assert refused.status_code == 409
         people = client.get("/api/accounts", headers=admin).json()
         assert (people["default_role"], people["default_role_locked"]) == ("viewer", True)
+
+
+def test_a_display_name_never_takes_over_someone_elses_keys(proxied: Proxied) -> None:
+    client = proxied.client()
+    owner = as_person("bea", "bea@example.com", "ml-team")
+    owner |= csrf_for(client, owner)
+    dataset = blank_dataset(client, owner)
+    body = {"preset": "classify", "labels": ["billing", "bug"], "name": "Triage", "dataset": dataset}
+    slug = client.post("/api/models", json=body, headers=owner).json()["slug"]
+    models = [{"kind": "custom", "key": slug}]
+    key = client.post("/api/keys", json={"name": "bea", "models": models}, headers=owner).json()
+    mallory = as_person("mallory", groups="ml-team") | {"X-Forwarded-Preferred-Username": "bea@example.com"}
+    mallory |= csrf_for(client, mallory)
+    assert client.get("/api/keys", headers=mallory).json() == []
+    assert client.put(f"/api/keys/{key['id']}/models", json={"models": models}, headers=mallory).status_code == 404
+    assert client.delete(f"/api/keys/{key['id']}", headers=mallory).status_code == 404
+    client.post("/api/keys", json={"name": "mine", "models": models}, headers=mallory)
+    assert [item["name"] for item in client.get("/api/keys", headers=owner).json()] == ["bea"]
+    bea, mal = proxied.users()
+    created = proxied.events("key.create")
+    assert [(event.actor, event.actor_id) for event in created] == [
+        ("bea@example.com", bea.id),
+        ("proxy:mallory", mal.id),
+    ]

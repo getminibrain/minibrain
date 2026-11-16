@@ -139,7 +139,9 @@ def signed_in_info(request: Request, response: Response, session: SessionDep, us
 def audit_sign_in(session: SessionDep, user: User, row: LoginSession) -> None:
     person = person_of(user)
     detail = {"sign_in": user.source, "session": row.id}
-    session.add(AuditEvent(actor=person.actor, action="auth.sign_in", target=person.actor, detail=detail))
+    session.add(
+        AuditEvent(actor=person.actor, actor_id=person.id, action="auth.sign_in", target=person.actor, detail=detail)
+    )
 
 
 @router.get("/session", dependencies=[Depends(public)], summary="Read the current session")
@@ -168,7 +170,9 @@ def logout(request: Request, response: Response, session: SessionDep, found: Ide
     if token:
         end_session(session, token)
     if person is not None:
-        session.add(AuditEvent(actor=person.actor, action="auth.sign_out", target=person.actor, detail={}))
+        session.add(
+            AuditEvent(actor=person.actor, actor_id=person.id, action="auth.sign_out", target=person.actor, detail={})
+        )
     session.commit()
     clear_session_cookie(request, response)
 
@@ -180,7 +184,9 @@ def setup(body: SetupBody, request: Request, response: Response, session: Sessio
     user = create_local(session, body.email, body.name, Role.ADMIN, body.password)
     person = person_of(user)
     detail = {"name": user.name, "role": Role.ADMIN.value, "source": LOCAL, "first_admin": True, "via": SETUP_LINK}
-    session.add(AuditEvent(actor=person.actor, action="account.create", target=person.actor, detail=detail))
+    session.add(
+        AuditEvent(actor=person.actor, actor_id=person.id, action="account.create", target=person.actor, detail=detail)
+    )
     commit_first_admin(session)
     return signed_in_info(request, response, session, user)
 
@@ -189,7 +195,9 @@ def setup(body: SetupBody, request: Request, response: Response, session: Sessio
 def reset(body: ResetBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     user = redeem_reset(session, body.token, body.password)
     person = person_of(user)
-    session.add(AuditEvent(actor=person.actor, action="account.password", target=person.actor, detail={}))
+    session.add(
+        AuditEvent(actor=person.actor, actor_id=person.id, action="account.password", target=person.actor, detail={})
+    )
     session.flush()
     return signed_in_info(request, response, session, user)
 
@@ -260,10 +268,18 @@ def oidc_callback(
     person = person_of(user)
     if created:
         detail = {"name": user.name, "source": OIDC, "groups": list(user.groups or [])}
-        session.add(AuditEvent(actor=person.actor, action="account.create", target=person.actor, detail=detail))
+        session.add(
+            AuditEvent(
+                actor=person.actor, actor_id=person.id, action="account.create", target=person.actor, detail=detail
+            )
+        )
     if user.disabled:
         detail = {"sign_in": OIDC, "reason": TURNED_OFF}
-        session.add(AuditEvent(actor=person.actor, action="auth.sign_in_failed", target=person.actor, detail=detail))
+        session.add(
+            AuditEvent(
+                actor=person.actor, actor_id=person.id, action="auth.sign_in_failed", target=person.actor, detail=detail
+            )
+        )
         session.commit()
         return failed_sign_in(TURNED_OFF)
     response = RedirectResponse(pending.next, status_code=303)

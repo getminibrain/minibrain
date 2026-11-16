@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/audit")
 PAGE_SIZE = 50
 PAGE_MAX = 500
 EXPORT_BATCH = 1000
-EXPORT_COLUMNS = ("id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash")
+EXPORT_COLUMNS = ("id", "seq", "at", "actor", "actor_id", "ip", "action", "target", "detail", "prev_hash", "hash")
 EXPORTED: set[str] = set(EXPORT_COLUMNS)
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"}
@@ -51,6 +51,7 @@ class AuditInfo(BaseModel):
     id: int
     at: datetime
     actor: str
+    actor_id: int | None
     ip: str | None
     action: str
     target: str
@@ -172,12 +173,13 @@ FilterDep = Annotated[AuditFilter, Depends(audit_filter)]
 
 
 def event_info(
-    event: AuditEvent, names: dict[str, str] | None = None, targets: dict[int, AuditTarget] | None = None
+    event: AuditEvent, names: dict[int, str] | None = None, targets: dict[int, AuditTarget] | None = None
 ) -> AuditInfo:
     return AuditInfo(
         id=event.id,
         at=event.at,
         actor=event.actor,
+        actor_id=event.actor_id,
         ip=event.ip,
         action=event.action,
         target=event.target,
@@ -186,7 +188,7 @@ def event_info(
         prev_hash=event.prev_hash,
         hash=event.hash,
         actor_kind=actor_kind(event.actor),
-        actor_name=(names or {}).get(event.actor),
+        actor_name=(names or {}).get(event.id),
         target_ref=(targets or {}).get(event.id),
     )
 

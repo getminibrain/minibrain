@@ -12,10 +12,15 @@ class Person:
     source: str
     role: Role | None
     role_locked: bool = False
+    subject: str = ""
 
     @property
     def actor(self) -> str:
-        return self.email or self.name
+        return handle_of(self.email, self.source, self.subject)
+
+
+def handle_of(email: str | None, source: str, subject: str) -> str:
+    return email or f"{source}:{subject}"
 
 
 CURRENT: ContextVar[Person | None] = ContextVar("person", default=None)
@@ -34,6 +39,13 @@ def current_actor() -> str:
     if person is None:
         raise NobodySignedIn("No one is signed in")
     return person.actor
+
+
+def current_account() -> int:
+    person = CURRENT.get()
+    if person is None:
+        raise NobodySignedIn("No one is signed in")
+    return person.id
 
 
 def current_role() -> Role | None:

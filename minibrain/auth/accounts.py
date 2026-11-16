@@ -5,13 +5,13 @@ import secrets
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from minibrain import policy
 from minibrain.auth.config import AuthConfig
-from minibrain.auth.identity import Person
+from minibrain.auth.identity import Person, handle_of
 from minibrain.auth.passwords import check_strength, hash_password, verify_password
 from minibrain.auth.roles import Role, role_of
 from minibrain.registry.models import LoginSession, Setting, User, now
@@ -274,6 +274,7 @@ def person_of(user: User, role: Role | None = None, locked: bool = False) -> Per
         source=user.source,
         role=role,
         role_locked=locked,
+        subject=user.subject,
     )
 
 
@@ -326,3 +327,18 @@ def external_user(
             raise
         return found, False
     return user, True
+
+
+def users_by_handle(session: Session, handles: set[str]) -> dict[str, User]:
+    if not handles:
+        return {}
+    pairs = [(source, subject) for source, _, subject in (h.partition(":") for h in handles) if source in (OIDC, PROXY)]
+    condition = User.email.in_(handles)
+    if pairs:
+        condition = or_(condition, tuple_(User.source, User.subject).in_(pairs))
+    found: dict[str, User] = {}
+    for user in session.scalars(select(User).where(condition).order_by(User.id)):
+        handle = handle_of(user.email, user.source, user.subject)
+        if handle in handles:
+            found.setdefault(handle, user)
+    return found

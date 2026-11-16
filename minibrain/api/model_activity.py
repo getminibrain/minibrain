@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.request_logs import aware
-from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model, User
+from minibrain.auth.accounts import users_by_handle
+from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, Job, JobKind, JobStatus, Model
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
 from minibrain.tasks.service import held_out_score
@@ -297,15 +298,8 @@ def belongs(owner: Owner, event: AuditEvent) -> bool:
 
 
 def display_names(session: Session, actors: set[str]) -> dict[str, str]:
-    if not actors:
-        return {}
-    query = select(User).where(or_(User.email.in_(actors), User.subject.in_(actors)))
-    names: dict[str, str] = {}
-    for user in session.scalars(query):
-        for handle in (user.email, user.subject):
-            if handle in actors and user.name and user.name != handle:
-                names[handle] = user.name
-    return names
+    found = users_by_handle(session, actors)
+    return {handle: user.name for handle, user in found.items() if user.name and user.name != handle}
 
 
 def name_of(actor: str, names: dict[str, str]) -> str | None:

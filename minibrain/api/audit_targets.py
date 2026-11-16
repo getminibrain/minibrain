@@ -7,6 +7,7 @@ from sqlalchemy import select, tuple_
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from minibrain.api.model_activity import display_names
+from minibrain.auth.accounts import users_by_handle
 from minibrain.registry.models import (
     SYSTEM_ACTOR,
     ApiKey,
@@ -116,8 +117,7 @@ def keys_live(session: Session, keys: set[str]) -> set[str]:
 
 
 def accounts_live(session: Session, keys: set[str]) -> set[str]:
-    found = session.execute(select(User.email, User.subject).where(User.email.in_(keys) | User.subject.in_(keys)))
-    return {handle for row in found for handle in row if handle in keys}
+    return set(users_by_handle(session, keys))
 
 
 def by_id(column: InstrumentedAttribute[int]) -> Callable[[Session, set[str]], set[str]]:
@@ -177,7 +177,15 @@ def key_names(session: Session, actors: set[str]) -> dict[str, str]:
     return {actor: names[int(raw)] for actor, raw in wanted.items() if raw.isdigit() and int(raw) in names}
 
 
-def actor_names(session: Session, events: list[AuditEvent]) -> dict[str, str]:
-    actors = {event.actor for event in events}
-    people = {actor for actor in actors if actor_kind(actor) == "user"}
-    return display_names(session, people) | key_names(session, actors)
+def actor_names(session: Session, events: list[AuditEvent]) -> dict[int, str]:
+    ids = {event.actor_id for event in events if event.actor_id is not None}
+    accounts = {row.id: row.name for row in session.execute(select(User.id, User.name).where(User.id.in_(ids)))}
+    rest = {event.actor for event in events if event.actor_id is None}
+    people = {actor for actor in rest if actor_kind(actor) == "user"}
+    by_actor = display_names(session, people) | key_names(session, rest)
+    names: dict[int, str] = {}
+    for event in events:
+        name = accounts.get(event.actor_id) if event.actor_id is not None else by_actor.get(event.actor)
+        if name:
+            names[event.id] = name
+    return names

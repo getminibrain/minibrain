@@ -6,7 +6,7 @@ from minibrain.api.access import builder
 from minibrain.api.deps import SessionDep
 from minibrain.api.schemas import KeyCreate, KeyCreated, KeyExpiry, KeyInfo, KeyScopeUpdate, ModelRef
 from minibrain.api.views import key_info
-from minibrain.auth.identity import current_actor, current_role
+from minibrain.auth.identity import current_account, current_actor, current_role
 from minibrain.auth.roles import LABELS, Role, allows
 from minibrain.registry.models import ApiKey, AuditEvent, BaseModel, Model
 from minibrain.registry.service import (
@@ -75,12 +75,12 @@ def require_admin_for(all_models: bool) -> None:
 
 def visible_keys() -> Select[ApiKey]:
     query = select(ApiKey).order_by(ApiKey.id.desc())
-    return query if is_admin() else query.where(ApiKey.created_by == current_actor())
+    return query if is_admin() else query.where(ApiKey.created_by_id == current_account())
 
 
 def get_key(session: Session, key_id: int) -> ApiKey:
     key = session.get(ApiKey, key_id)
-    if key is None or not (is_admin() or key.created_by == current_actor()):
+    if key is None or not (is_admin() or key.created_by_id == current_account()):
         raise NotFoundError(f"key {key_id} not found")
     return key
 
@@ -123,6 +123,7 @@ def add_key(body: KeyCreate, session: SessionDep) -> KeyCreated:
     days = expiry_days(session, body.expires_in_days)
     key, secret = create_key(session, body.name, models, model_ids, all_models=body.all_models, days=days)
     key.created_by = current_actor()
+    key.created_by_id = current_account()
     audit(session, "key.create", key)
     session.commit()
     return KeyCreated(secret=secret, **key_info(session, key).model_dump())

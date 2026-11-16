@@ -156,7 +156,7 @@ class Identify:
             send = with_header(send, SIGNED_OUT_HEADER, found.ended or "")
         scope.setdefault("state", {})["identity"] = found
         person = found.person
-        signed_in = (person.actor, person.source) if person is not None else None
+        signed_in = (person.actor, person.source, person.id) if person is not None else None
         person_token = CURRENT.set(person)
         signed_token = SIGNED_IN.set(signed_in)
         try:

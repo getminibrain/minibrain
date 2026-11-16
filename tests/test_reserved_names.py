@@ -216,9 +216,10 @@ def test_the_migration_reserves_names_that_history_still_mentions(tmp_path: Path
                 RequestLog(at=seen, model="older", status=200, latency_ms=1.0, model_slug="older", model_name="Older"),
                 RequestLog(at=seen, model="old-base", status=200, latency_ms=1.0, model_name="Old base"),
                 RequestLog(at=seen, model="typo", status=404, latency_ms=1.0),
-                AuditEvent(at=deleted, actor="ana@example.com", action="model.delete", target="gone"),
             ]
         )
+        audit = {"at": deleted, "actor": "ana@example.com", "action": "model.delete", "target": "gone", "detail": {}}
+        session.execute(insert(AuditEvent).values(audit))
         session.commit()
     migrate_to(url, "head")
     with sessions() as session:

@@ -54,12 +54,22 @@ def proxy_identity(session: Session, config: AuthConfig, facts: RequestFacts) ->
     person = person_for(session, user, config)
     if created:
         detail = {"name": user.name, "source": PROXY, "groups": list(user.groups or [])}
-        session.add(AuditEvent(actor=person.actor, action="account.create", target=person.actor, detail=detail))
+        session.add(
+            AuditEvent(
+                actor=person.actor, actor_id=person.id, action="account.create", target=person.actor, detail=detail
+            )
+        )
     moment = now()
     if user.last_sign_in_at is None or moment - user.last_sign_in_at > PROXY_SIGN_IN_GAP:
         user.last_sign_in_at = moment
         session.add(
-            AuditEvent(actor=person.actor, action="auth.sign_in", target=person.actor, detail={"sign_in": PROXY})
+            AuditEvent(
+                actor=person.actor,
+                actor_id=person.id,
+                action="auth.sign_in",
+                target=person.actor,
+                detail={"sign_in": PROXY},
+            )
         )
     return Identity(person=person, csrf_subject=f"proxy:{user.id}")
 

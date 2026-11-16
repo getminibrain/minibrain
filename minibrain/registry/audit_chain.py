@@ -69,13 +69,21 @@ def stamp(at: datetime) -> str:
 
 
 def chain_fields(
-    seq: int, prev_hash: str, at: datetime, actor: str, ip: str | None, action: str, target: str, detail: Any
+    seq: int,
+    prev_hash: str,
+    at: datetime,
+    actor: tuple[str, int | None],
+    ip: str | None,
+    action: str,
+    target: str,
+    detail: Any,
 ) -> dict[str, Any]:
     return {
         "seq": seq,
         "prev_hash": prev_hash,
         "at": stamp(at),
-        "actor": actor,
+        "actor": actor[0],
+        "actor_id": actor[1],
         "ip": ip,
         "action": action,
         "target": target,
@@ -92,7 +100,8 @@ def digest(fields: dict[str, Any]) -> str:
 
 
 def fields_of(event: AuditEvent, seq: int, prev_hash: str) -> dict[str, Any]:
-    return chain_fields(seq, prev_hash, event.at, event.actor, event.ip, event.action, event.target, event.detail)
+    actor = (event.actor, event.actor_id)
+    return chain_fields(seq, prev_hash, event.at, actor, event.ip, event.action, event.target, event.detail)
 
 
 def head_of(session: Session) -> AuditChain:
@@ -248,6 +257,7 @@ def stored(session: Session) -> Iterator[Sealed]:
         AuditEvent.hash,
         AuditEvent.at,
         AuditEvent.actor,
+        AuditEvent.actor_id,
         AuditEvent.ip,
         AuditEvent.action,
         AuditEvent.target,
@@ -256,7 +266,7 @@ def stored(session: Session) -> Iterator[Sealed]:
     query = select(*columns).where(AuditEvent.seq.is_not(None)).order_by(AuditEvent.seq)
     for row in session.execute(query.execution_options(yield_per=VERIFY_BATCH)):
         fields = chain_fields(
-            row.seq, row.prev_hash or "", row.at, row.actor, row.ip, row.action, row.target, row.detail
+            row.seq, row.prev_hash or "", row.at, (row.actor, row.actor_id), row.ip, row.action, row.target, row.detail
         )
         yield Sealed(row.id, row.seq, row.prev_hash, row.hash, fields)
 
@@ -272,6 +282,10 @@ def verify(session: Session) -> ChainReport:
     return walk(stored(session), head, lambda: current_head(session), lambda: prune_anchors(session), pending)
 
 
+def actor_id_of(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def from_export(record: dict[str, Any]) -> Sealed | None:
     seq = record.get("seq")
     if not isinstance(seq, int) or isinstance(seq, bool):
@@ -281,7 +295,7 @@ def from_export(record: dict[str, Any]) -> Sealed | None:
         seq,
         str(prev_hash or ""),
         datetime.fromisoformat(str(record["at"])),
-        str(record["actor"]),
+        (str(record["actor"]), actor_id_of(record.get("actor_id"))),
         record.get("ip"),
         str(record["action"]),
         str(record["target"]),

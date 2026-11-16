@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from minibrain.registry.db import Base, UtcDateTime
 
 PEER_ADDRESS: ContextVar[str | None] = ContextVar("peer_address", default=None)
-SIGNED_IN: ContextVar[tuple[str, str] | None] = ContextVar("signed_in", default=None)
+SIGNED_IN: ContextVar[tuple[str, str, int] | None] = ContextVar("signed_in", default=None)
 SYSTEM_ACTOR = "system"
 
 
@@ -430,6 +430,9 @@ class ApiKey(Base):
     expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_by: Mapped[str | None] = mapped_column(default=None)
     all_models: Mapped[bool] = mapped_column(default=False, server_default=false())
+    created_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_api_keys_created_by_id"), default=None
+    )
 
     scopes: Mapped[list["KeyScope"]] = relationship(
         back_populates="key", cascade="all, delete-orphan", order_by="KeyScope.id"
@@ -667,14 +670,19 @@ class AuditEvent(Base):
     seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
     prev_hash: Mapped[str | None] = mapped_column(default=None)
     hash: Mapped[str | None] = mapped_column(default=None)
+    actor_id: Mapped[int | None]
 
 
 @event.listens_for(AuditEvent, "before_insert")
 def stamp_sign_in(_mapper: Any, _connection: Any, target: AuditEvent) -> None:
     signed_in = SIGNED_IN.get()
     detail = dict(target.detail or {})
-    if signed_in is not None and target.actor == signed_in[0] and "sign_in" not in detail:
+    if signed_in is None or target.actor != signed_in[0]:
+        return
+    if "sign_in" not in detail:
         target.detail = {**detail, "sign_in": signed_in[1]}
+    if target.actor_id is None:
+        target.actor_id = signed_in[2]
 
 
 class AuditChain(Base):

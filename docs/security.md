@@ -210,6 +210,7 @@ at every level, no whitespace (`,` and `:` as separators) and every non-ASCII ch
 | `prev_hash` | The previous event's `hash`; 64 zeros for seq 1 |
 | `at` | UTC time with six fractional digits and `Z`, as `2026-11-03T12:34:56.123456Z` |
 | `actor`, `ip`, `action`, `target` | As recorded; `ip` is `null` when not recorded |
+| `actor_id` | The account id of the person who acted; `null` for the system, the command line, API keys and failed sign-ins |
 | `detail` | The detail object with secret-named string values replaced by `[redacted]`, exactly as the API and exports show it |
 
 The row id is not hashed, so the chain survives a copy into another database. Hashing the redacted detail means every

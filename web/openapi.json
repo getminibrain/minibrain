@@ -10758,6 +10758,17 @@
             "type": "string",
             "title": "Actor"
           },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
           "ip": {
             "anyOf": [
               {
@@ -10852,6 +10863,7 @@
           "id",
           "at",
           "actor",
+          "actor_id",
           "ip",
           "action",
           "target",

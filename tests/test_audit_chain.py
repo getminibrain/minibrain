@@ -66,6 +66,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
     fields = {
         "action": "key.create",
         "actor": "admin@example.com",
+        "actor_id": first.actor_id,
         "at": first.at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "detail": {"name": "Support", "token": "[redacted]"},
         "ip": None,
@@ -73,7 +74,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
         "seq": 1,
         "target": "mb_0000",
     }
-    assert canonical(fields).startswith(b'{"action":"key.create","actor":"admin@example.com","at":"')
+    assert canonical(fields).startswith(b'{"action":"key.create","actor":"admin@example.com","actor_id":null,"at":"')
     assert digest(fields) == first.hash
     with harness.sessions() as session:
         assert (head_of(session).seq, head_of(session).hash) == (3, events[-1].hash)
@@ -144,6 +145,7 @@ def test_events_chained_past_the_head_are_not_trusted(harness: Harness) -> None:
             "prev_hash": newest.hash,
             "at": newest.at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "actor": "admin@example.com",
+            "actor_id": None,
             "ip": None,
             "action": "key.revoke",
             "target": "mb_0001",

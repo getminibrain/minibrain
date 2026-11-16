@@ -3122,6 +3122,8 @@ export interface components {
             at: string;
             /** Actor */
             actor: string;
+            /** Actor Id */
+            actor_id: number | null;
             /** Ip */
             ip: string | null;
             /** Action */
