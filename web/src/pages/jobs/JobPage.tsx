@@ -46,6 +46,7 @@ type Fact = [string, ReactNode];
 
 const LINK = "text-primary hover:underline";
 const BASE_KINDS = ["download", "import", "verify", "repair"];
+const JOB_SECTIONS = [JOBS_PATH, TRAINING_PATH];
 const STRATEGIES: Record<string, string> = { lora: "LoRA", qlora: "QLoRA" };
 const SETTING_NAMES: Record<string, string> = {
     rank: "rank",
@@ -520,12 +521,15 @@ function useCanonical(job: JobDetail | undefined, pathname: string) {
     const router = useRouter();
     const canonical = job ? jobHref(job) : null;
     const here = pathname.replace(/\/+$/, "");
-    const onJobPage = idOf(here.split("/").pop()) !== null;
+    const segments = here.split("/");
+    const id = idOf(segments.pop());
+    const onThisJob =
+        job !== undefined && id === job.id && JOB_SECTIONS.includes(segments.join("/"));
     useEffect(() => {
-        if (canonical && onJobPage && here !== canonical) {
+        if (canonical && onThisJob && here !== canonical) {
             router.history.replace(canonical);
         }
-    }, [canonical, here, onJobPage, router]);
+    }, [canonical, here, onThisJob, router]);
 }
 
 function JobNotFound({ id, section }: { id: string; section: { label: string; href: string } }) {
