@@ -62,11 +62,7 @@ export function AvatarTile({
     return (
         <span
             aria-hidden="true"
-            className={cn(
-                "flex shrink-0 overflow-hidden rounded-md",
-                AVATAR_TILE[size],
-                className,
-            )}
+            className={cn("flex shrink-0 overflow-hidden rounded-md", AVATAR_TILE[size], className)}
         >
             <SvgMarkup markup={markup} />
         </span>
