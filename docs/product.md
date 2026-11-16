@@ -267,8 +267,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Tick jobs to cancel, retry or delete them together, each one audited.
   UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry, POST /api/jobs/delete
 - **Versions** · shipped · product, ml
-  One table of every version and its run, prompt-only or trained.
-  UI: Models › model › Versions, Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}
+  One table of every version and its run; retry any failed one.
+  UI: Models › model › Versions, Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}, POST /api/models/{name}/versions/{number}/retry
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
   UI: Models › model › Train › Pool · API: GET /api/models/{name}/training-plan

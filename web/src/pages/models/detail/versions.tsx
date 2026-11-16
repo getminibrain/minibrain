@@ -214,8 +214,12 @@ function newestFirst(versions: VersionInfo[]): VersionInfo[] {
     return [...versions].sort((a, b) => b.number - a.number);
 }
 
-function retry(jobId: number) {
-    return unwrap(api.POST("/api/jobs/{job_id}/retry", { params: { path: { job_id: jobId } } }));
+function retry(name: string, number: number) {
+    return unwrap(
+        api.POST("/api/models/{name}/versions/{number}/retry", {
+            params: { path: { name, number } },
+        }),
+    );
 }
 
 function busy(version: VersionInfo): boolean {
@@ -341,7 +345,6 @@ function VersionRow({
     onPick,
     onLive,
     onDelete,
-    newest,
 }: {
     row: ModelRow;
     version: VersionInfo;
@@ -351,14 +354,13 @@ function VersionRow({
     onPick: (on: boolean) => void;
     onLive: () => void;
     onDelete: () => void;
-    newest: boolean;
 }) {
     const can = useCan();
     const router = useRouter();
     const client = useQueryClient();
     const toast = useToast();
     const again = useMutation({
-        mutationFn: retry,
+        mutationFn: () => retry(row.key, version.number),
         onSuccess: async (started) => {
             await client.invalidateQueries();
             router.history.push(jobHref(started));
@@ -368,7 +370,7 @@ function VersionRow({
             await client.invalidateQueries();
         },
     });
-    const failedJob = version.status === "failed" ? version.job : null;
+    const failed = version.status === "failed";
     const live = canGoLive(row, version);
     const blocked = live ? liveBlock(row, version) : null;
     const data = version.dataset_version_number;
@@ -417,11 +419,11 @@ function VersionRow({
             </TableCell>
             <TableCell className="pr-4 text-right">
                 <span className="inline-flex items-center gap-1">
-                    {can.build && failedJob && newest && (
+                    {can.build && failed && (
                         <Button
                             variant="outline"
                             disabled={again.isPending}
-                            onClick={() => again.mutate(failedJob.id)}
+                            onClick={() => again.mutate()}
                         >
                             <RotateCcw aria-hidden="true" />
                             Retry
@@ -610,7 +612,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {ordered.map((version, index) => (
+                        {ordered.map((version) => (
                             <VersionRow
                                 key={version.number}
                                 row={row}
@@ -621,7 +623,6 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                                 onPick={(on) => pick(version.number, on)}
                                 onLive={() => setPromoting(version.number)}
                                 onDelete={() => remove([version], false)}
-                                newest={index === 0}
                             />
                         ))}
                     </TableBody>

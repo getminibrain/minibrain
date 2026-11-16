@@ -1818,6 +1818,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{name}/versions/{number}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed version
+         * @description Trains it again when its training failed, otherwise scores it again.
+         */
+        post: operations["retry_version_api_models__name__versions__number__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{name}/versions/{number}/promote": {
         parameters: {
             query?: never;
@@ -13447,6 +13467,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_version_api_models__name__versions__number__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobInfo"];
+                };
             };
             /** @description Validation Error */
             422: {

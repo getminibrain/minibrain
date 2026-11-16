@@ -2,15 +2,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, QueueDep, SessionDep, SettingsDep, StoreDep
-from minibrain.api.jobs import canceller
+from minibrain.api.jobs import canceller, retry
 from minibrain.api.placing import audit_deploy, place_custom
 from minibrain.api.schemas import (
     AnswerSide,
     ExampleAnswer,
+    JobInfo,
     ModelDetail,
     PackedFileInfo,
     PromoteRequest,
@@ -24,7 +26,7 @@ from minibrain.api.schemas import (
     VersionTestResult,
 )
 from minibrain.api.training_plan import refuse, require_trainable, training_plan
-from minibrain.api.views import detail, version_info
+from minibrain.api.views import detail, job_info, version_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.data.dataset_versions import require_splits, training_dataset_version
@@ -46,6 +48,7 @@ from minibrain.registry.models import (
     AuditEvent,
     BaseModel,
     DatasetVersion,
+    Job,
     JobKind,
     Model,
     Version,
@@ -62,6 +65,7 @@ from minibrain.tasks.contracts import answer_of
 from minibrain.tasks.examples import Example, turns_of
 from minibrain.tasks.graders import GraderError
 from minibrain.tasks.rebase import other_base
+from minibrain.tasks.rescore import RESCORE
 from minibrain.tasks.service import decision, graders_of, new_version, version_contract
 from minibrain.teardown import (
     a_job_running,
@@ -289,6 +293,43 @@ def delete_version(
     remove_version(session, settings, version)
     session.commit()
     return Response(status_code=204)
+
+
+def failed_step(version: Version) -> JobKind:
+    untrained = version.kind == VersionKind.LORA and version.adapter_artifact_id is None
+    return JobKind.TRAIN if untrained else JobKind.EVAL
+
+
+def last_run(session: Session, version: Version, kind: JobKind) -> Job | None:
+    query = select(Job).where(Job.version_id == version.id, Job.kind == kind).order_by(Job.id.desc())
+    return next((job for job in session.scalars(query) if RESCORE not in job.params), None)
+
+
+@router.post(
+    "/models/{name}/versions/{number}/retry",
+    status_code=201,
+    dependencies=[Depends(builder)],
+    summary="Retry a failed version",
+    description="Trains it again when its training failed, otherwise scores it again.",
+)
+def retry_version(name: str, number: int, session: SessionDep, settings: SettingsDep, queue: QueueDep) -> JobInfo:
+    model = get_model(session, name)
+    version = get_version(model, number)
+    if version.status != VersionStatus.FAILED:
+        raise ConflictError(f"{name}@{number} has not failed ({version.status})")
+    step = failed_step(version)
+    job = last_run(session, version, step)
+    if job is not None:
+        again = retry(session, queue, job)
+    elif step == JobKind.TRAIN:
+        raise ConflictError(f"{name}@{number}'s training job was deleted; train a new version instead")
+    else:
+        version.status = VersionStatus.EVALUATING
+        session.flush()
+        again = enqueue(session, JobKind.EVAL, eval_params(session, settings, version), model.id, version.id)
+        audit_version(session, model, number=number, action="version.rescore", job=again.id)
+    session.commit()
+    return job_info(again)
 
 
 def deleting(model: Model, version: Version) -> JSONResponse:

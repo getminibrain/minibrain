@@ -5783,6 +5783,58 @@
         }
       }
     },
+    "/api/models/{name}/versions/{number}/retry": {
+      "post": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "Retry a failed version",
+        "description": "Trains it again when its training failed, otherwise scores it again.",
+        "operationId": "retry_version_api_models__name__versions__number__retry_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{name}/versions/{number}/promote": {
       "post": {
         "tags": [

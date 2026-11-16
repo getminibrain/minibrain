@@ -348,7 +348,9 @@ function Failure({ version }: { version: VersionInfo }) {
     return (
         <PanelSection icon={Gauge} title="Score">
             <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
-                <span className="font-medium">Training failed</span>
+                <span className="font-medium">
+                    {version.job?.kind === "train" ? "Training failed" : "Scoring failed"}
+                </span>
                 <span className="text-sm">{version.job?.error ?? "No reason was recorded."}</span>
             </div>
         </PanelSection>

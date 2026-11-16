@@ -119,6 +119,8 @@ def version_said(event: AuditEvent) -> Said:
         return Said(f"deployed {name}", link, "success")
     if event.action in ("version.delete", "version.delete_finished"):
         return Said(f"deleted {name}")
+    if event.action == "version.rescore":
+        return Said(f"started scoring {name} again", link)
     if event.action == "version.card":
         return Said(f"edited the {name} model card", link)
     return Said(f"{humanised(event.action)} {name}", link)
