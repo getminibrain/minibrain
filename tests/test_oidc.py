@@ -123,36 +123,46 @@ def test_signing_in_again_updates_groups_and_keeps_one_account(sso: Sso) -> None
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        ({"aud": "someone-else"}, "did not verify"),
-        ({"iss": "https://other.example.test"}, "did not verify"),
-        ({"nonce": "replayed"}, "did not verify"),
-        ({"exp": 1_000_000}, "did not verify"),
+        ({"aud": "someone-else"}, "unverified"),
+        ({"iss": "https://other.example.test"}, "unverified"),
+        ({"nonce": "replayed"}, "unverified"),
+        ({"exp": 1_000_000}, "unverified"),
     ],
 )
 def test_id_tokens_that_do_not_verify_are_refused(sso: Sso, change: dict, message: str) -> None:
     sso.provider.token_claims = change
-    assert message in error_of(sign_in(sso, sso.browser()))
+    assert error_of(sign_in(sso, sso.browser())) == message
     assert sso.users() == []
 
 
 def test_a_token_signed_by_another_key_is_refused(sso: Sso) -> None:
     sso.provider.signing_key = RSAKey.generate_key(2048, parameters={"kid": "signing"})
-    assert "did not verify" in error_of(sign_in(sso, sso.browser()))
+    assert error_of(sign_in(sso, sso.browser())) == "unverified"
 
 
 def test_the_callback_needs_the_browser_that_started_it(sso: Sso) -> None:
     started = sso.browser().get("/api/auth/oidc/start")
     callback = urlparse(sso.provider.authorize(started.headers["location"]))
     stranger = sso.browser()
-    assert "another browser" in error_of(stranger.get(f"{callback.path}?{callback.query}").headers["location"])
+    assert error_of(stranger.get(f"{callback.path}?{callback.query}").headers["location"]) == "expired"
     browser = sso.browser()
     started = browser.get("/api/auth/oidc/start")
     callback = urlparse(sso.provider.authorize(started.headers["location"]))
     forged = callback.query.replace("state=", "state=x")
-    assert "does not match" in error_of(browser.get(f"{callback.path}?{forged}").headers["location"])
+    assert error_of(browser.get(f"{callback.path}?{forged}").headers["location"]) == "mismatch"
     refused = browser.get("/api/auth/oidc/callback", params={"error": "access_denied"})
-    assert "access_denied" in error_of(refused.headers["location"])
+    assert error_of(refused.headers["location"]) == "denied"
     assert sso.users() == []
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [("login_required", "sign_in_there"), ("temporarily_unavailable", "unavailable"), ("Call 555-0100", "refused")],
+)
+def test_provider_errors_come_back_as_fixed_codes_only(sso: Sso, error: str, code: str) -> None:
+    told = {"error": error, "error_description": "Your account is locked. Call 555-0100 to unlock it."}
+    location = sso.browser().get("/api/auth/oidc/callback", params=told).headers["location"]
+    assert location == f"/?sign_in_error={code}"
 
 
 def test_a_wrong_pkce_verifier_is_refused_by_the_provider(sso: Sso) -> None:
@@ -161,7 +171,7 @@ def test_a_wrong_pkce_verifier_is_refused_by_the_provider(sso: Sso) -> None:
     location = started.headers["location"]
     tampered = location.replace("code_challenge=", "code_challenge=x")
     callback = urlparse(sso.provider.authorize(tampered))
-    assert "refused the sign-in" in error_of(browser.get(f"{callback.path}?{callback.query}").headers["location"])
+    assert error_of(browser.get(f"{callback.path}?{callback.query}").headers["location"]) == "refused"
 
 
 def test_turned_off_people_cannot_sign_in_with_sso(sso: Sso) -> None:
@@ -169,7 +179,7 @@ def test_turned_off_people_cannot_sign_in_with_sso(sso: Sso) -> None:
     with sso.app.state.sessions() as session:
         session.scalars(select(User)).one().disabled = True
         session.commit()
-    assert "turned off" in error_of(sign_in(sso, sso.browser()))
+    assert error_of(sign_in(sso, sso.browser())) == "turned_off"
 
 
 def test_unmapped_people_wait_for_an_admin(sso: Sso) -> None:
@@ -181,14 +191,14 @@ def test_unmapped_people_wait_for_an_admin(sso: Sso) -> None:
 
 def test_a_provider_that_names_another_issuer_is_refused(sso: Sso) -> None:
     sso.provider.issuer = "https://impostor.example.test"
-    assert "different issuer" in error_of(sso.browser().get("/api/auth/oidc/start").headers["location"])
+    assert error_of(sso.browser().get("/api/auth/oidc/start").headers["location"]) == "misconfigured"
 
 
 def test_without_oidc_the_start_route_says_so(settings: Settings) -> None:
     settings.home.mkdir(parents=True)
     app = create_app(settings=settings, backend=FakeBackend(), background=False)
     with TestClient(app, base_url="https://testserver", follow_redirects=False) as client:
-        assert "not set up" in error_of(client.get("/api/auth/oidc/start").headers["location"])
+        assert error_of(client.get("/api/auth/oidc/start").headers["location"]) == "not_set_up"
 
 
 def test_oidc_config_is_checked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

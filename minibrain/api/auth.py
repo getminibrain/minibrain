@@ -1,4 +1,5 @@
-from urllib.parse import quote, urlparse
+import logging
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
@@ -34,8 +35,18 @@ from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent, LoginSession, User, peer_address
 
 router = APIRouter(prefix="/api/auth")
+log = logging.getLogger("minibrain.auth")
 
 FAILED_ACTOR_LENGTH = 200
+PROVIDER_ERRORS = {
+    "access_denied": "denied",
+    "login_required": "sign_in_there",
+    "interaction_required": "sign_in_there",
+    "consent_required": "sign_in_there",
+    "account_selection_required": "sign_in_there",
+    "server_error": "unavailable",
+    "temporarily_unavailable": "unavailable",
+}
 
 
 class PersonInfo(BaseModel):
@@ -205,7 +216,7 @@ def reset(body: ResetBody, request: Request, response: Response, session: Sessio
 def oidc_client(request: Request) -> OidcClient:
     client: OidcClient | None = request.app.state.oidc
     if client is None:
-        raise OidcError("Single sign-on is not set up on this install")
+        raise OidcError("Single sign-on is not set up on this install", "not_set_up")
     return client
 
 
@@ -213,10 +224,18 @@ def callback_url(request: Request, client: OidcClient) -> str:
     return client.config.redirect_url or str(request.url_for("oidc_callback"))
 
 
-def failed_sign_in(message: str) -> RedirectResponse:
-    response = RedirectResponse(f"/?sign_in_error={quote(message)}", status_code=303)
+def failed_sign_in(failure: OidcError) -> RedirectResponse:
+    log.warning("single sign-on failed (%s): %s", failure.code, failure)
+    response = RedirectResponse(f"/?sign_in_error={failure.code}", status_code=303)
     response.delete_cookie(PENDING_COOKIE, path=PENDING_PATH)
     return response
+
+
+def provider_error(error: str, description: str) -> OidcError:
+    if not error:
+        return OidcError("The identity provider sent no sign-in code", "no_code")
+    told = f"{error[:100]}: {description[:300]}" if description else error[:100]
+    return OidcError(f"The identity provider sent an error: {told!r}", PROVIDER_ERRORS.get(error, "refused"))
 
 
 @router.get(
@@ -227,7 +246,7 @@ def oidc_start(request: Request, next: str = "/") -> RedirectResponse:
         client = oidc_client(request)
         url, pending = client.start(callback_url(request, client), next)
     except OidcError as error:
-        return failed_sign_in(str(error))
+        return failed_sign_in(error)
     response = RedirectResponse(url, status_code=303)
     response.set_cookie(
         PENDING_COOKIE,
@@ -259,11 +278,11 @@ def oidc_callback(
     try:
         client = oidc_client(request)
         if error or not code:
-            raise OidcError(error_description or error or "The identity provider sent no sign-in code")
+            raise provider_error(error, error_description)
         pending = unseal(request.app.state.csrf_key, request.cookies.get(PENDING_COOKIE))
         claims = client.finish(callback_url(request, client), pending, code, state)
     except OidcError as failure:
-        return failed_sign_in(str(failure))
+        return failed_sign_in(failure)
     user, created = external_user(session, OIDC, claims.subject, claims.email, claims.name, claims.groups)
     person = person_of(user)
     if created:
@@ -281,7 +300,7 @@ def oidc_callback(
             )
         )
         session.commit()
-        return failed_sign_in(TURNED_OFF)
+        return failed_sign_in(OidcError(TURNED_OFF, "turned_off"))
     response = RedirectResponse(pending.next, status_code=303)
     signed_in_info(request, response, session, user)
     response.delete_cookie(PENDING_COOKIE, path=PENDING_PATH)

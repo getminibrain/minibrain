@@ -28,7 +28,9 @@ DISCOVERY = "/.well-known/openid-configuration"
 
 
 class OidcError(Exception):
-    pass
+    def __init__(self, message: str, code: str = "refused") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,7 @@ def seal(key: bytes, pending: Pending) -> str:
 def unseal(key: bytes, value: str | None) -> Pending:
     payload, _, signature = (value or "").partition(".")
     if not payload or not csrf_matches(key, f"oidc:{payload}", signature):
-        raise OidcError("The sign-in took too long or started in another browser. Try again.")
+        raise OidcError("The sign-in took too long or started in another browser. Try again.", "expired")
     found = json.loads(decoded(payload))
     pending = Pending(
         state=str(found["state"]),
@@ -82,7 +84,7 @@ def unseal(key: bytes, value: str | None) -> Pending:
         expires=int(found["expires"]),
     )
     if pending.expires < time.time():
-        raise OidcError("The sign-in took too long. Try again.")
+        raise OidcError("The sign-in took too long. Try again.", "expired")
     return pending
 
 
@@ -105,7 +107,7 @@ def groups_from(value: Any) -> list[str]:
 def endpoint(document: dict[str, Any], name: str) -> str:
     value = document.get(name)
     if not isinstance(value, str) or urlparse(value).scheme not in ("https", "http"):
-        raise OidcError(f"The identity provider's configuration has no {name}")
+        raise OidcError(f"The identity provider's configuration has no {name}", "misconfigured")
     return value
 
 
@@ -128,14 +130,16 @@ class OidcClient:
                 response.raise_for_status()
                 return response.json()
         except (httpx2.HTTPError, ValueError) as error:
-            raise OidcError(f"Could not reach the identity provider: {error}") from error
+            raise OidcError(f"Could not reach the identity provider: {error}", "unreachable") from error
 
     def discover(self) -> Provider:
         if self.provider is None:
             issuer = self.config.issuer.rstrip("/")
             document = self.fetch(issuer + DISCOVERY)
             if str(document.get("issuer", "")).rstrip("/") != issuer:
-                raise OidcError("The identity provider reports a different issuer than auth.oidc.issuer")
+                raise OidcError(
+                    "The identity provider reports a different issuer than auth.oidc.issuer", "misconfigured"
+                )
             self.provider = Provider(
                 issuer=str(document["issuer"]),
                 authorization_endpoint=endpoint(document, "authorization_endpoint"),
@@ -186,7 +190,7 @@ class OidcClient:
 
     def finish(self, redirect_uri: str, pending: Pending, code: str, state: str) -> OidcClaims:
         if not secrets.compare_digest(state.encode(), pending.state.encode()):
-            raise OidcError("The sign-in response does not match the request. Try again.")
+            raise OidcError("The sign-in response does not match the request. Try again.", "mismatch")
         provider = self.discover()
         client = self.oauth(redirect_uri)
         try:
@@ -197,7 +201,7 @@ class OidcClient:
             cast(httpx2.Client, client).close()
         id_token = token.get("id_token")
         if not isinstance(id_token, str):
-            raise OidcError("The identity provider sent no ID token")
+            raise OidcError("The identity provider sent no ID token", "unverified")
         return self.claims_of(id_token, provider, pending.nonce)
 
     def verified(self, id_token: str) -> dict[str, Any]:
@@ -218,7 +222,7 @@ class OidcClient:
                 nonce={"essential": True, "value": nonce},
             ).validate(claims)
         except (JoseError, ValueError) as error:
-            raise OidcError(f"The ID token did not verify: {error}") from error
+            raise OidcError(f"The ID token did not verify: {error}", "unverified") from error
         email = claims.get("email") if str(claims.get("email_verified")).lower() != "false" else None
         name = claims.get("name") or claims.get("preferred_username") or email
         return OidcClaims(

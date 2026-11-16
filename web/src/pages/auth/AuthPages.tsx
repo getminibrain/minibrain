@@ -118,9 +118,32 @@ function ssoHref(): string {
     return `/api/auth/oidc/start?next=${encodeURIComponent(next || "/")}`;
 }
 
+const SSO_ERRORS: Record<string, string> = {
+    not_set_up: "Single sign-on is not set up on this install.",
+    unreachable: "Could not reach the identity provider. Try again later.",
+    misconfigured:
+        "The identity provider's settings do not match this install. Ask an admin to check single sign-on.",
+    expired: "The sign-in took too long or started in another browser. Try again.",
+    mismatch: "The sign-in response does not match the request. Try again.",
+    no_code: "The identity provider sent no sign-in code. Try again.",
+    denied: "The identity provider denied the sign-in.",
+    sign_in_there: "Sign in at the identity provider first, then try again.",
+    unavailable: "The identity provider is unavailable right now. Try again later.",
+    refused: "The identity provider refused the sign-in.",
+    unverified:
+        "The identity provider's answer did not verify. Ask an admin to check single sign-on.",
+    turned_off: "This account is turned off. Ask an admin to turn it back on.",
+};
+
+const SSO_FAILED = "Single sign-on did not finish. Try again.";
+
 function ssoError(): string | null {
     const query = typeof window === "undefined" ? "" : window.location.search;
-    return new URLSearchParams(query).get("sign_in_error");
+    const code = new URLSearchParams(query).get("sign_in_error");
+    if (code === null) {
+        return null;
+    }
+    return Object.hasOwn(SSO_ERRORS, code) ? SSO_ERRORS[code] : SSO_FAILED;
 }
 
 function SingleSignOn({ label, divider }: { label: string; divider: string }) {
