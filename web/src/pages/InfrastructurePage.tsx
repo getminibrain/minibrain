@@ -6,8 +6,11 @@ import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
+import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
+import { AddMachine } from "./infrastructure/AddMachine";
 import { FleetBoard } from "./infrastructure/FleetBoard";
+import { JoinTokens } from "./infrastructure/JoinTokens";
 import { MachinesTab } from "./infrastructure/MachinesTab";
 import { NeedsALook } from "./infrastructure/NeedsALook";
 import { SetupDiagram } from "./infrastructure/SetupDiagram";
@@ -86,11 +89,14 @@ export function InfrastructurePage() {
         (pools.data ?? []).flatMap((pool) => pool.nodes).find((node) => node.roles.includes("main"))
             ?.versions ?? {};
     const active = SECTIONS.find((item) => item.href === pathname)?.href ?? "/infrastructure";
+    const can = useCan();
+    const adds = can.admin && active !== "/infrastructure/storage";
     return (
         <Page wide>
             <PageHeader
                 title="Infrastructure"
                 caption="Where minibrain runs and where it keeps its data."
+                actions={adds ? <AddMachine pools={pools.data ?? []} /> : undefined}
             />
             <TabNav label="Infrastructure pages" tabs={SECTIONS} />
             <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
@@ -110,6 +116,7 @@ export function InfrastructurePage() {
                         info={infrastructure.data}
                         loading={pools.isLoading}
                     />
+                    {can.admin && <JoinTokens />}
                     <PanelSection
                         icon={Cpu}
                         title="This main process"
