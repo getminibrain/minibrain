@@ -180,6 +180,7 @@ ROUTE_ROLES = {
     ("POST", "/api/keys"): "builder",
     ("PUT", "/api/keys/{key_id}/models"): "builder",
     ("DELETE", "/api/keys/{key_id}"): "builder",
+    ("GET", "/api/keys/expiry"): "builder",
     ("GET", "/api/jobs"): "viewer",
     ("GET", "/api/jobs/facets"): "viewer",
     ("GET", "/api/jobs/{job_id}"): "viewer",
