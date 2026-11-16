@@ -4,7 +4,7 @@ import duckdb
 from sqlalchemy import select
 
 from minibrain.registry.files import store_for
-from minibrain.registry.models import AuditEvent
+from minibrain.registry.models import AuditEvent, DatasetVersion
 from tests.conftest import Harness, tickets_csv
 
 LIMIT = 1_000
@@ -95,3 +95,21 @@ def test_small_sources_are_unaffected(harness: Harness) -> None:
     assert (asked.json()["number"], asked.json()["rows"], asked.json()["sample"]) == (1, 600, None)
     with harness.sessions() as session:
         assert session.scalars(select(AuditEvent).where(AuditEvent.action == "dataset.sample")).first() is None
+
+
+def test_a_model_on_a_dataset_without_a_version_takes_a_sample_when_over_the_limit(harness: Harness) -> None:
+    source = big_dataset(harness)
+    assert created(harness, source, "Tickets", {"rows": 500, "seed": 3}).status_code == 201
+    with harness.sessions() as session:
+        for version in session.scalars(select(DatasetVersion)):
+            version.dataset = None
+        session.commit()
+    body = {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"], "dataset": "tickets"}
+    refused = harness.client.post("/api/models", json=body)
+    assert refused.status_code == 409, refused.text
+    assert (refused.json()["total_rows"], refused.json()["row_limit"]) == (TOTAL, LIMIT)
+    assert harness.client.get("/api/models/triage").status_code == 404
+    made = harness.client.post("/api/models", json=body | {"sample": {"rows": 700, "seed": 5}})
+    assert made.status_code == 201, made.text
+    version = harness.client.get("/api/datasets/tickets").json()["dataset_version"]
+    assert (version["rows"], version["sample"]) == (700, {"rows": 700, "seed": 5, "total": TOTAL})

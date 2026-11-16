@@ -24,6 +24,7 @@ import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { useSourceAdder } from "../data/AddSource";
+import { SampleOffer, type SampleRequest, overLimitOf, useOverLimit } from "../data/SampleOffer";
 import {
     AddModelNotices,
     AddModelSummary,
@@ -299,10 +300,16 @@ export function AddModelPage() {
     const nameTouched = name !== firstName.current;
     const [attempted, setAttempted] = useState(false);
     const cancel = () => router.history.push(modelsHref());
+    const resolvedBase = useRef<string | null>(null);
     const add = useMutation({
-        mutationFn: async (slug: string) => {
+        mutationFn: async ({ slug, sample }: { slug: string; sample?: SampleRequest }) => {
             const baseModel =
-                option?.kind === "local" && option.baseKey ? option.baseKey : await plan.run();
+                option?.kind === "local" && option.baseKey
+                    ? option.baseKey
+                    : sample && resolvedBase.current !== null
+                      ? resolvedBase.current
+                      : await plan.run();
+            resolvedBase.current = baseModel;
             return unwrap(
                 api.POST("/api/models", {
                     body: {
@@ -311,11 +318,20 @@ export function AddModelPage() {
                         ...outputBody(output),
                         dataset: slug,
                         avatar: avatarBody(identity.avatar),
+                        sample: sample ?? null,
                     },
                 }),
             );
         },
         onError: (error) => {
+            if (overLimitOf(error)) {
+                toast({
+                    title: "The dataset has more rows than the limit",
+                    description: "Take a random sample under Dataset to create the model.",
+                    tone: "warning",
+                });
+                return;
+            }
             toast({
                 title: "The model was not created",
                 description: errorMessage(error),
@@ -391,7 +407,7 @@ export function AddModelPage() {
             }
             return;
         }
-        add.mutate(chosenDataset.slug);
+        add.mutate({ slug: chosenDataset.slug });
     };
     const shortcut = (event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -399,6 +415,8 @@ export function AddModelPage() {
             submit();
         }
     };
+    const overLimit = useOverLimit(add.error, add.isPending && Boolean(add.variables?.sample));
+    const over = add.variables?.slug === chosenSlug ? overLimit : null;
     const outcome = outcomeOf(chosenDataset);
     const showFormat = plan.target.kind === "catalogue" && Boolean(plan.variant);
     const form = (
@@ -443,7 +461,7 @@ export function AddModelPage() {
                         </FormControl>
                     </FormRow>
                 )}
-                <FormRow id="create-dataset" label="Dataset">
+                <FormRow id="create-dataset" label="Dataset" align={over ? "start" : undefined}>
                     <FormControl>
                         <DatasetPicker
                             value={dataset}
@@ -461,6 +479,15 @@ export function AddModelPage() {
                         )}
                         <ErrorLine error={datasets.error} onRetry={datasets.refetch} />
                         <ErrorLine error={demoAdder.error ?? maker.error} />
+                        {over && chosenSlug && (
+                            <SampleOffer
+                                subject="dataset"
+                                total={over.total_rows}
+                                limit={over.row_limit}
+                                pending={add.isPending}
+                                onTake={(sample) => add.mutate({ slug: chosenSlug, sample })}
+                            />
+                        )}
                         <UploadDatasetDialog
                             open={uploading}
                             datasets={datasetList}

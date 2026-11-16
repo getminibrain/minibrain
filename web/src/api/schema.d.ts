@@ -258,7 +258,10 @@ export interface paths {
          */
         get: operations["list_models_api_models_get"];
         put?: never;
-        /** Create a custom model */
+        /**
+         * Create a custom model
+         * @description Refused with 409 and the row counts when the dataset has no version yet and its query returns more rows than the limit; send a sample to save a random sample as its first version instead.
+         */
         post: operations["create_api_models_post"];
         delete?: never;
         options?: never;
@@ -6810,6 +6813,7 @@ export interface components {
             avatar?: components["schemas"]["ModelAvatar"] | null;
             /** Api Name */
             api_name?: string | null;
+            sample?: components["schemas"]["SampleRequest"] | null;
         };
         /** ModelDatasetRef */
         ModelDatasetRef: {
@@ -10409,6 +10413,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description The query returns more rows than the limit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverLimitInfo"];
                 };
             };
             /** @description Validation Error */

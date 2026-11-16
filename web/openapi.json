@@ -605,6 +605,7 @@
           "Models"
         ],
         "summary": "Create a custom model",
+        "description": "Refused with 409 and the row counts when the dataset has no version yet and its query returns more rows than the limit; send a sample to save a random sample as its first version instead.",
         "operationId": "create_api_models_post",
         "requestBody": {
           "required": true,
@@ -623,6 +624,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The query returns more rows than the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverLimitInfo"
                 }
               }
             }
@@ -22378,6 +22389,16 @@
               }
             ],
             "title": "Api Name"
+          },
+          "sample": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

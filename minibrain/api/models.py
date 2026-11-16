@@ -37,6 +37,7 @@ from minibrain.api.schemas import (
     QueryResponse,
     RequestBodiesUpdate,
     RescoreResult,
+    SampleRequest,
 )
 from minibrain.api.versions import audit_version, start_version
 from minibrain.api.views import dataset_lock, detail, sample_of
@@ -144,11 +145,13 @@ def rule_from(info: PromotionInfo | None, fallback: Rule) -> dict[str, Any]:
         raise ConflictError(str(error)) from error
 
 
-def first_version(session: Session, settings: Settings, store: ArtifactStore, model: Model) -> None:
+def first_version(
+    session: Session, settings: Settings, store: ArtifactStore, model: Model, sample: SampleRequest | None = None
+) -> None:
     dataset = model.dataset
     dataset_version = latest_dataset_version(model)
     if dataset is not None and dataset_version is None:
-        dataset_version = version_if_mapped(session, settings, dataset)
+        dataset_version = version_if_mapped(session, settings, dataset, sample_of(sample))
     start_version(session, settings, store, model, VersionKind.PROMPT, dataset_version)
 
 
@@ -176,11 +179,19 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     model.promotion = rule_from(body.promotion, chosen.promotion)
     model.dataset = get_dataset(session, body.dataset)
     session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
-    first_version(session, settings, store, model)
+    first_version(session, settings, store, model, body.sample)
     return model
 
 
-@router.post("", status_code=201, dependencies=[Depends(builder)], summary="Create a custom model")
+@router.post(
+    "",
+    status_code=201,
+    responses=OVER_LIMIT,
+    dependencies=[Depends(builder)],
+    summary="Create a custom model",
+    description="Refused with 409 and the row counts when the dataset has no version yet and its query returns more "
+    "rows than the limit; send a sample to save a random sample as its first version instead.",
+)
 def create(body: ModelCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> ModelDetail:
     model = configured(session, settings, store, body, body.base_model or DEFAULT_BASE_MODEL)
     session.commit()

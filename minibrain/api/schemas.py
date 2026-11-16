@@ -172,6 +172,7 @@ class ModelCreate(BaseModel):
     dataset: str = Field(min_length=1, max_length=200)
     avatar: ModelAvatar | None = None
     api_name: str | None = Field(default=None, max_length=48)
+    sample: "SampleRequest | None" = None
 
 
 class ColumnInfo(BaseModel):
