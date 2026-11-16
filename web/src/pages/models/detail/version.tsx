@@ -946,12 +946,12 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                     <Progress row={row} versions={list} version={version} />
                 )}
                 {version.status === "failed" && <Failure version={version} />}
-                {job?.kind === "train" && <Curves key={job.id} job={job} />}
+                {job?.kind === "train" && <Curves key={`curves-${job.id}`} job={job} />}
                 <Differs row={row} versions={list} version={version} />
                 <MadeFrom row={row} versions={list} version={version} job={run} detail={job} />
                 <Identifiers row={row} version={version} />
                 <Exports row={row} version={version} />
-                {run && <JobLogsSection key={run.id} job={job ?? run} anchor="logs" />}
+                {run && <JobLogsSection key={`logs-${run.id}`} job={job ?? run} anchor="logs" />}
             </PanelSections>
         </Page>
     );
