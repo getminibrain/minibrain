@@ -476,7 +476,7 @@ writes the same two into `sbom/`.
 
 | File | Format | Made by | Covers |
 |---|---|---|---|
-| `minibrain-python.cdx.json` | CycloneDX 1.5 | `uv export --format cyclonedx1.5` from `uv.lock` | The wheel's dependencies with every extra (`postgres`, `mlx`, `llamacpp`), no dev group: version, purl, the SHA-256 of every sdist and wheel, platform markers and the dependency graph |
+| `minibrain-python.cdx.json` | CycloneDX 1.5 | `uv export --format cyclonedx1.5` from `uv.lock` | The wheel's dependencies with every extra (`postgres`, `mlx`, `llamacpp`, `qlora`, `hsm`: `--all-extras`), no dev group: version, purl, the SHA-256 of every sdist and wheel, platform markers and the dependency graph |
 | `minibrain-web.cdx.json` | CycloneDX 1.6 | syft from `web/pnpm-lock.yaml` | Every package in the lockfile, by name, version and purl. syft does not tell dev dependencies apart in pnpm lockfiles, so the build tools (Vite, TypeScript, Biome) are listed too; the built UI ships only what `dependencies` pulls in |
 
 - Both read only the lockfile: no install, no registry lookups. `uv export --frozen` never resolves; uv marks the
