@@ -564,6 +564,7 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                 <ScoreSection version={version} versions={list} phase={phase} peers={peers} />
                 <ChangesSection slug={row.key} version={version} phase={phase} peers={peers} />
                 <TrainingSection
+                    slug={row.key}
                     versions={list}
                     version={version}
                     phase={phase}

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Download, Fingerprint, GitBranch, Hourglass } from "lucide-react";
-import { Button, Link, cn } from "obp-ui";
+import { Download, Fingerprint, GitBranch, Hourglass, RotateCcw } from "lucide-react";
+import { Button, Link, cn, useToast } from "obp-ui";
 import type { ReactNode } from "react";
 import {
     type JobDetail,
@@ -42,7 +42,7 @@ import {
     recordedRun,
 } from "./train/recipe";
 import type { Peers, Phase } from "./versionState";
-import { failureReason } from "./versions";
+import { failureReason, retry } from "./versions";
 
 const CHART_HEIGHT = "min-h-[29.25rem] xl:min-h-[27.4375rem]";
 
@@ -204,6 +204,29 @@ function DeviceHours({ version }: { version: VersionInfo }) {
                 </span>
             }
         />
+    );
+}
+
+function RetryRun({ slug, version }: { slug: string; version: VersionInfo }) {
+    const can = useCan();
+    const client = useQueryClient();
+    const toast = useToast();
+    const again = useMutation({
+        mutationFn: () => retry(slug, version.number),
+        onSuccess: () => client.invalidateQueries(),
+        onError: async (error) => {
+            toast({ title: "Retry failed", description: error.message, tone: "destructive" });
+            await client.invalidateQueries();
+        },
+    });
+    if (!can.build || version.status !== "failed") {
+        return null;
+    }
+    return (
+        <Button variant="outline" disabled={again.isPending} onClick={() => again.mutate()}>
+            <RotateCcw aria-hidden="true" />
+            Retry
+        </Button>
     );
 }
 
@@ -371,6 +394,7 @@ function Chart({
 }
 
 export function TrainingSection({
+    slug,
     versions,
     version,
     phase,
@@ -381,6 +405,7 @@ export function TrainingSection({
     metricsError,
     onRetry,
 }: {
+    slug: string;
     versions: VersionInfo[];
     version: VersionInfo;
     phase: Phase;
@@ -403,6 +428,7 @@ export function TrainingSection({
     const actions = (
         <>
             {active && <CancelRun job={active} />}
+            <RetryRun slug={slug} version={version} />
             {shownJob ? (
                 <Button variant="outline" asChild>
                     <Link href={jobHref(shownJob)}>{`Job #${shownJob.id}`}</Link>

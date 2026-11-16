@@ -236,7 +236,7 @@ function newestFirst(versions: VersionInfo[]): VersionInfo[] {
     return [...versions].sort((a, b) => b.number - a.number);
 }
 
-function retry(name: string, number: number) {
+export function retry(name: string, number: number) {
     return unwrap(
         api.POST("/api/models/{name}/versions/{number}/retry", {
             params: { path: { name, number } },
