@@ -32554,6 +32554,12 @@
             ],
             "title": "Job Id"
           },
+          "queued": {
+            "type": "boolean",
+            "title": "Queued",
+            "description": "Its training or scoring job waits for a worker.",
+            "default": false
+          },
           "error": {
             "anyOf": [
               {

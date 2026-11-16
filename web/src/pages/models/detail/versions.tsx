@@ -99,6 +99,8 @@ export function failureReason(version: VersionInfo): string {
     return version.job?.error ?? "No reason was recorded.";
 }
 
+const IN_PROGRESS = new Set(["training", "evaluating"]);
+
 export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
     if (version.current && isDeployed(row)) {
         return { tone: "success", label: "Deployed" };
@@ -108,7 +110,7 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
     }
     if (
         version.status === "queued" ||
-        (version.status === "training" && version.job?.status === "queued")
+        (IN_PROGRESS.has(version.status) && version.job?.status === "queued")
     ) {
         return { tone: "neutral", label: "Queued" };
     }
@@ -133,8 +135,6 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
     }
     return { tone: "neutral", label: "Ready" };
 }
-
-const IN_PROGRESS = new Set(["training", "evaluating"]);
 
 export function VersionStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const status = versionStatus(row, version);

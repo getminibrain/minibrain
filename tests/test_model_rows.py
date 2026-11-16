@@ -41,6 +41,25 @@ def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
     assert (row["score"], row["metric"]) == (0.8, "label_accuracy")
 
 
+def test_a_version_row_says_when_its_job_still_waits_for_a_worker(harness: Harness) -> None:
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
+    )
+    give_data(harness, SLUG)
+    add_version(harness, "prompt")
+    waiting = custom_row(harness, SLUG)["versions"][0]
+    assert (waiting["status"], waiting["queued"]) == ("evaluating", True)
+    assert harness.claim(["eval"]) is not None
+    running = custom_row(harness, SLUG)["versions"][0]
+    assert (running["status"], running["queued"]) == ("evaluating", False)
+
+
 def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> None:
     harness.client.post(
         "/api/models",

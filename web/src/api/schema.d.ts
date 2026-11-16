@@ -10192,6 +10192,12 @@ export interface components {
             progress: number | null;
             /** Job Id */
             job_id: number | null;
+            /**
+             * Queued
+             * @description Its training or scoring job waits for a worker.
+             * @default false
+             */
+            queued?: boolean;
             /** Error */
             error: string | null;
             usage: components["schemas"]["Usage"] | null;

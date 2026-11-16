@@ -255,6 +255,7 @@ def version_rows(
                 was_live=version.live_at is not None,
                 progress=running_progress(job) if job is not None and active else None,
                 job_id=job.id if job is not None else None,
+                queued=job is not None and job.status == JobStatus.QUEUED,
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
                 usage=version_usage.get((model.id, version.number)),
                 created_at=version.created_at,

@@ -54,6 +54,7 @@ export type StatusLine = {
     detail?: string;
     version?: number;
     progress?: number | null;
+    waiting?: boolean;
     job?: JobLink | null;
 };
 
@@ -353,13 +354,14 @@ function customLine(model: ListModel): StatusLine {
     }
     const busy = busyVersion(model);
     if (busy) {
-        const verb = busy.status === "training" ? "training" : "scoring";
+        const verb = busy.queued ? "queued" : busy.status === "training" ? "training" : "scoring";
         return {
             kind: "training",
             text: `v${busy.number} ${verb}${percentage(busy.progress)}`,
-            tone: "info",
+            tone: busy.queued ? "neutral" : "info",
             version: busy.number,
             progress: busy.progress,
+            waiting: busy.queued,
             job: jobOf(busy.job_id, busy.status === "training" ? "train" : "eval"),
             row,
         };
@@ -418,6 +420,7 @@ export function variantLine(row: ModelRow): StatusLine {
             text: `${row.activity.label}${percentage(row.activity.progress)}`,
             tone: "info",
             progress: row.activity.progress,
+            waiting: row.activity.state === "queued",
             job: jobOf(row.activity.job_id, row.activity.kind ?? "download"),
             row,
         };
@@ -558,6 +561,9 @@ export function versionState(version: ModelVersionRow): {
     label: string;
     tone: Tone;
 } {
+    if (version.queued && (version.status === "training" || version.status === "evaluating")) {
+        return { label: "Queued", tone: "neutral" };
+    }
     if (version.status === "training") {
         return { label: "Training", tone: "info" };
     }

@@ -186,7 +186,7 @@ export function StatusLineText({
         <StatusText
             tone={line.tone}
             active={IN_PROGRESS.has(line.kind)}
-            waiting={line.kind === "transfer" && line.row.activity.state === "queued"}
+            waiting={line.waiting}
             progress={"progress" in line ? percentOf(line.progress) : null}
         >
             <span className="tabular-nums">{line.text}</span>
@@ -285,7 +285,12 @@ export function VersionStatus({
                 : ` · ${Math.round(version.progress * 100)}%`;
         return (
             <span className="flex items-center gap-2 whitespace-nowrap">
-                <StatusText tone="info" active progress={percentOf(version.progress)}>
+                <StatusText
+                    tone={state.tone}
+                    active
+                    waiting={version.queued}
+                    progress={percentOf(version.progress)}
+                >
                     <span className="tabular-nums">{`${state.label}${share}`}</span>
                 </StatusText>
                 {version.job_id && (

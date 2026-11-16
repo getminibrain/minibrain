@@ -1483,6 +1483,7 @@ class VersionRow(BaseModel):
     was_live: bool = False
     progress: float | None
     job_id: int | None
+    queued: bool = Field(default=False, description="Its training or scoring job waits for a worker.")
     error: str | None
     usage: Usage | None
     created_at: datetime
