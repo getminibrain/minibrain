@@ -16,7 +16,7 @@ from minibrain.settings import Settings
 from minibrain.worker import MainClient, WorkerConfig
 from tests.conftest import Harness, fake_adapter
 from tests.test_compute import RACK
-from tests.test_flow import SLUG, create_model, create_on_data, finish
+from tests.test_flow import SLUG, add_version, create_model, create_on_data, create_with_dataset, finish
 from tests.test_routing import FakeEngines, replicas
 
 BASE = QWEN3_0_6B.key
@@ -202,6 +202,9 @@ def test_worker_token_reaches_no_gateway_endpoint(harness: Harness) -> None:
 
 
 def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "lora")
+    finish(harness, "train")
     token = harness.internal("/engines", worker_body("rack")).json()["engine_token"]
     engine = bearer(token)
     announce = {"id": "e", "host": "h", "url": "http://h:1", "base_model": BASE, "engine": "sglang", "state": "ready"}
@@ -219,7 +222,10 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     adapter = harness.upload(fake_adapter(), "adapter", "tar", "adapter")
     data = harness.upload(b"question,answer\n", "dataset_version", "file", "data.csv")
     assert harness.client.get(f"/internal/gateway/artifacts/{adapter}", headers=engine).status_code == 200
-    assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=engine).status_code == 404
+    assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=engine).status_code == 403
+    idle = bearer(harness.internal("/engines", worker_body("lab")).json()["engine_token"])
+    elsewhere_adapter = harness.client.get(f"/internal/gateway/artifacts/{adapter}", headers=idle)
+    assert elsewhere_adapter.status_code == 403 and "served in pool lab" in elsewhere_adapter.json()["detail"]
     assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=harness.gateway_headers).status_code == 200
     forged = bearer(token.replace(".rack.", ".local."))
     assert harness.client.get("/internal/gateway/bases", headers=forged).status_code == 401

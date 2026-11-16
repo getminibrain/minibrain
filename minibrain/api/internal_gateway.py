@@ -5,6 +5,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from minibrain.api.bases import BaseWeights, LiveBases, live
 from minibrain.api.bases import base_file as file_of
@@ -12,21 +14,30 @@ from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import MetricsDep, SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.auth.engine_tokens import engine_caller as derived_caller
-from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, checked
+from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, checked, refuse
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import CHAT_KIND, LogEntry, database_sink
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.machine_metrics import MachineSample
+from minibrain.models.placement import deployments
 from minibrain.models.usage import touch
-from minibrain.registry.compute import EngineReport, GatewayReport, node_id, record_engine, record_gateway
+from minibrain.registry.compute import (
+    EngineReport,
+    GatewayReport,
+    live_engines,
+    node_id,
+    record_engine,
+    record_gateway,
+)
 from minibrain.registry.files import ArtifactKind
-from minibrain.registry.models import Artifact
+from minibrain.registry.models import Artifact, Version
 
 MAX_WAIT_SECONDS = 30.0
 
 
+NOT_SERVED = "an engine token gets only the adapters of models served in pool"
 ENGINE_ONLY = "an engine token reaches only what engines need: announcing themselves, base weights and adapters"
 
 
@@ -180,10 +191,29 @@ def feedback(body: FeedbackBody, session: SessionDep) -> FeedbackStored:
     return FeedbackStored(id=item.id)
 
 
+def pool_bases(session: Session, pool: str) -> set[str]:
+    placed = {key for _, key, where in deployments(session) if where == pool}
+    return placed | {replica.base_model for replica in live_engines(session) if replica.pool == pool}
+
+
+def served_in(session: Session, pool: str, artifact_id: str) -> bool:
+    found = session.get(Artifact, artifact_id)
+    if found is None or found.kind != ArtifactKind.ADAPTER:
+        return False
+    query = select(Version.id).where(Version.adapter_artifact_id == artifact_id)
+    return session.scalar(query.where(Version.base_model.in_(pool_bases(session, pool))).limit(1)) is not None
+
+
 @router.get("/artifacts/{artifact_id}")
-def artifact(artifact_id: str, store: StoreDep, session: SessionDep, caller: EngineCaller) -> StreamingResponse:
-    found = session.get(Artifact, artifact_id) if caller is not None else None
-    hidden = caller is not None and (found is None or found.kind != ArtifactKind.ADAPTER)
-    if hidden or not is_artifact_id(artifact_id) or not store.has(artifact_id):
+def artifact(
+    artifact_id: str, request: Request, store: StoreDep, session: SessionDep, caller: EngineCaller
+) -> StreamingResponse:
+    if not is_artifact_id(artifact_id):
+        raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
+    if caller is not None and not served_in(session, caller.pool, artifact_id):
+        detail = {"pool": caller.pool, "reason": NOT_SERVED, "address": address_of(request)}
+        refuse(session, caller.target, detail, {"artifact": artifact_id})
+        raise HTTPException(status_code=403, detail=f"{NOT_SERVED} {caller.pool}")
+    if not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")

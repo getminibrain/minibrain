@@ -42,6 +42,7 @@ MODULES: dict[str, str] = {
 }
 PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, JobKind.VERIFY, JobKind.REPAIR)
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
+LEASE_HEADER = "X-Job-Lease"
 WEIGHTS = "weights"
 PRUNE_SECONDS = 600.0
 REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE]
@@ -125,6 +126,12 @@ class MainClient:
         self.http: HttpClient = http or httpx.Client(base_url=config.api_url, timeout=httpx.Timeout(60.0, connect=10.0))
         self.headers = {"Authorization": f"Bearer {config.token}"}
         self.stop = threading.Event()
+
+    def hold(self, lease: str | None) -> None:
+        if lease is None:
+            self.headers.pop(LEASE_HEADER, None)
+        else:
+            self.headers[LEASE_HEADER] = lease
 
     def call(self, method: str, path: str, opener: Callable[[], Any] | None = None, **kwargs: Any) -> Response:
         delay = 1.0
@@ -473,6 +480,7 @@ class Worker:
         log_path = attempt_dir / "log.txt"
         publisher: Publisher | None = None
         lease = Lease(self.client, job_id, token)
+        self.client.hold(token)
         try:
             spec_path = attempt_dir / "spec.json"
             spec_path.write_text(json.dumps(self.spec(claim, workdir, attempt_dir)))
@@ -503,6 +511,7 @@ class Worker:
         except Exception as error:
             self.client.fail(job_id, token, f"worker error: {type(error).__name__}: {error}", True, None)
         finally:
+            self.client.hold(None)
             lease.end()
 
     def supervise(

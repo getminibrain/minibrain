@@ -159,11 +159,20 @@ out everywhere. A password reset clears the account's lockouts.
 - The worker main starts on its own machine uses `<home>/secrets/worker_token`, which joins the `local` pool only;
   there is no shared token for other pools.
 - Engines a worker starts in a pool get a narrower engine token for that pool (announce in that pool, base weights,
-  adapters; [serving](serving.md#deployments-on-a-pool)), never the gateway token, whose config carries routes and API
-  key digests. An engine token is signed with `<home>/secrets/engine_token` over the pool and the id of the join token
-  that admitted the worker, and main checks that join token on every use: revoking or expiring it ends its engines'
-  tokens at once (401), in that pool only, and each refusal is a `join_token.refused` event on the join token,
-  rate-limited like the others. The `local` pool's engines use the gateway token and are not affected.
+  adapters of models served in that pool; [serving](serving.md#deployments-on-a-pool)), never the gateway token, whose
+  config carries routes and API key digests. An engine token is signed with `<home>/secrets/engine_token` over the pool
+  and the id of the join token that admitted the worker, and main checks that join token on every use: revoking or
+  expiring it ends its engines' tokens at once (401), in that pool only, and each refusal is a `join_token.refused`
+  event on the join token, rate-limited like the others. The `local` pool's engines use the gateway token and are not
+  affected.
+- A worker on a join token downloads only what the jobs it holds need. Each download (`/internal/worker/artifacts/<id>`,
+  `/internal/worker/bases/<key>`, its files and `/stored`) carries the job's lease in `X-Job-Lease`, and main answers
+  only for an artifact or base model named in the params of that running job, leased to a worker of the token's pool:
+  its dataset version, adapter and base model. Anything else, including another pool's dataset or the same job's
+  inputs after its lease ends, answers 403 and writes a `join_token.refused` event (one per token, reason and address in
+  10 minutes; the first asked id is in the event). An engine token gets an adapter only when a version on a base model
+  deployed, or running, in its pool uses it; other artifacts answer 403 the same way. The local worker token is
+  unaffected: that worker shares main's machine.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM

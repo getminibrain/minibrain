@@ -1,5 +1,6 @@
 import hmac
 import time
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -7,6 +8,8 @@ import pydantic
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from minibrain.api.bases import BaseWeights, LiveBases, live
 from minibrain.api.bases import base_file as file_of
@@ -15,7 +18,7 @@ from minibrain.api.deps import MetricsDep, QueueDep, SessionDep, SettingsDep, St
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.auth.engine_tokens import engine_token
-from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_of, admit, bearer, checked
+from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_of, admit, bearer, checked, refuse
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
@@ -29,9 +32,10 @@ from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
 from minibrain.registry.compute import DRAINING, node_id, record_node
 from minibrain.registry.files import register
-from minibrain.registry.models import Artifact, BaseModel, Job, JobKind
+from minibrain.registry.models import Artifact, BaseModel, Job, JobKind, JobStatus, Worker
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
+from minibrain.worker import LEASE_HEADER
 
 CLAIM_POLL_SECONDS = 0.5
 MAX_CLAIM_WAIT_SECONDS = 30.0
@@ -48,6 +52,46 @@ def worker_caller(request: Request, session: SessionDep, authorization: Annotate
 
 
 WorkerCaller = Annotated[Caller, Depends(worker_caller)]
+NOT_LEASED = "a worker gets only what the jobs it holds need"
+
+
+def strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from strings(item)
+
+
+def leased_needs(session: Session, pool: str, lease: str) -> set[str]:
+    running = select(Job).where(Job.status == JobStatus.RUNNING, Job.lease_token == lease)
+    job = session.scalar(running) if lease else None
+    owner = session.get(Worker, job.lease_owner) if job is not None and job.lease_owner else None
+    if job is None or owner is None or owner.pool != pool:
+        return set()
+    return set(strings(job.params))
+
+
+def needed(request: Request, session: Session, caller: Caller, wanted: str) -> None:
+    if caller.token is None or wanted in leased_needs(session, caller.pool, request.headers.get(LEASE_HEADER, "")):
+        return
+    detail = {"pool": caller.pool, "reason": NOT_LEASED, "address": address_of(request)}
+    refuse(session, caller.target, detail, {"asked": wanted})
+    raise HTTPException(status_code=403, detail=f"{NOT_LEASED}; none needs {wanted}")
+
+
+def needed_key(request: Request, session: SessionDep, caller: WorkerCaller, key: str) -> None:
+    needed(request, session, caller, key)
+
+
+def needed_model(request: Request, session: SessionDep, caller: WorkerCaller, base_model_id: str) -> None:
+    needed(request, session, caller, base_model_id)
+
+
+ForKey = [Depends(needed_key)]
 router = APIRouter(prefix="/internal/worker", include_in_schema=False, dependencies=[Depends(worker_caller)])
 
 
@@ -294,8 +338,13 @@ async def upload_artifact(
 
 
 @router.get("/artifacts/{artifact_id}")
-def download_artifact(artifact_id: str, store: StoreDep) -> StreamingResponse:
-    if not is_artifact_id(artifact_id) or not store.has(artifact_id):
+def download_artifact(
+    artifact_id: str, request: Request, session: SessionDep, caller: WorkerCaller, store: StoreDep
+) -> StreamingResponse:
+    if not is_artifact_id(artifact_id):
+        raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
+    needed(request, session, caller, artifact_id)
+    if not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")
 
@@ -304,7 +353,7 @@ class StoredFiles(pydantic.BaseModel):
     files: list[dict[str, Any]]
 
 
-@router.get("/bases/{base_model_id}/stored")
+@router.get("/bases/{base_model_id}/stored", dependencies=[Depends(needed_model)])
 def stored(base_model_id: str, session: SessionDep, store: StoreDep) -> StoredFiles:
     model = session.get(BaseModel, base_model_id)
     if model is None:
@@ -317,13 +366,13 @@ def bases(session: SessionDep) -> LiveBases:
     return live(session)
 
 
-@router.get("/bases/{key}")
+@router.get("/bases/{key}", dependencies=ForKey)
 def base_weights(
     key: str, session: SessionDep, settings: SettingsDep, store: StoreDep, response: Response
 ) -> BaseWeights:
     return weights_of(session, settings, store, key, response)
 
 
-@router.get("/bases/{key}/files/{path:path}")
+@router.get("/bases/{key}/files/{path:path}", dependencies=ForKey)
 def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -> FileResponse:
     return file_of(session, settings, key, path)
