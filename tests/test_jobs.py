@@ -1,8 +1,13 @@
 import threading
 from datetime import datetime, timedelta
+from types import SimpleNamespace
+from typing import cast
 
+from fastapi import Request
+from sqlalchemy import event
 from sqlalchemy.dialects import postgresql
 
+from minibrain.api.jobs import events_after
 from minibrain.jobs.policy import LEASE
 from minibrain.jobs.queue import WorkerInfo, enqueue, expirable
 from minibrain.registry.models import Job, JobKind, now
@@ -259,6 +264,25 @@ def test_events_stream_until_the_job_ends(harness: Harness) -> None:
     fail(harness, claim, "stop", retryable=False)
     stream = harness.client.get(f"/api/jobs/{claim['job_id']}/events").text
     assert "step 1" in stream and stream.rstrip().endswith(f'data: {{"job": {claim["job_id"]}}}')
+
+
+def test_the_event_stream_reads_the_job_status_before_its_events(harness: Harness) -> None:
+    lora_job(harness)
+    claim = harness.claim(["train"])
+    assert claim is not None
+    engine = harness.sessions.kw["bind"]
+    tables: list[str] = []
+
+    def note(*args: object) -> None:
+        statement = str(args[2])
+        tables.extend(table for table in ("FROM job_events", "FROM jobs") if table in statement)
+
+    event.listen(engine, "before_cursor_execute", note)
+    try:
+        events_after(cast(Request, SimpleNamespace(app=harness.app)), claim["job_id"], 0)
+    finally:
+        event.remove(engine, "before_cursor_execute", note)
+    assert tables == ["FROM jobs", "FROM job_events"]
 
 
 def test_job_rows_outlive_the_model(harness: Harness) -> None:

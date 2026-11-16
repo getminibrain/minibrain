@@ -245,10 +245,12 @@ def event_info(event: JobEvent) -> JobEventInfo:
 
 def events_after(request: Request, job_id: int, after: int) -> tuple[list[JobEventInfo], bool]:
     with request.app.state.sessions() as session:
-        job = get_job(session, job_id)
+        status = session.scalar(select(Job.status).where(Job.id == job_id))
+        if status is None:
+            raise NotFoundError(f"No job {job_id}")
         query = select(JobEvent).where(JobEvent.job_id == job_id, JobEvent.id > after).order_by(JobEvent.id)
         events = [event_info(event) for event in session.scalars(query.limit(EVENT_BATCH))]
-        return events, job.status in FINAL_JOB_STATUSES
+        return events, status in FINAL_JOB_STATUSES
 
 
 @router.get("/jobs/{job_id}/events", response_class=StreamingResponse, dependencies=[Depends(viewer)])
