@@ -52,8 +52,10 @@ def detect(stream: BinaryIO) -> str:
 
 
 def transcode(source: BinaryIO, target: BinaryIO) -> None:
+    mark = codecs.BOM_UTF8
     while block := source.read(BLOCK):
-        target.write(block.decode("cp1252", errors=UNDEFINED_AS_LATIN1).encode(UTF8))
+        target.write(block.removeprefix(mark).decode("cp1252", errors=UNDEFINED_AS_LATIN1).encode(UTF8))
+        mark = b""
 
 
 KNOWN: dict[Hashable, str] = {}

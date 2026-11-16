@@ -49,6 +49,14 @@ def test_an_upload_that_is_not_utf8_is_read_as_windows_1252(harness: Harness) ->
     assert sorted(row["input"] for row in preview["rows"]) == sorted(ROWS)
 
 
+def test_a_utf8_mark_on_a_windows_1252_file_stays_out_of_the_first_column_name(harness: Harness) -> None:
+    files = {"file": ("marked.csv", b"\xef\xbb\xbf" + windows_1252_csv(), "text/csv")}
+    source = harness.client.post("/api/sources", files=files).json()
+    assert source["encoding"] == WINDOWS_1252
+    assert [column["name"] for column in source["columns"]] == ["text", "category"]
+    assert texts(harness, source["id"]) == sorted(ROWS)
+
+
 def test_a_folder_of_windows_1252_files_is_read_and_says_so(harness: Harness, tmp_path: Path) -> None:
     root = tmp_path / "legacy"
     root.mkdir()
