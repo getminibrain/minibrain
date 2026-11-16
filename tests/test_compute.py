@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
 from minibrain.models import hardware
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
+from minibrain.registry import settings_store
 from minibrain.registry.models import (
     Artifact,
     BaseModel,
@@ -270,6 +272,22 @@ def test_storage_lists_adapters_uploads_and_logs_and_what_could_be_freed(harness
     assert [item["key"] for item in freed["unused_models"]] == ["spare-1b"]
     assert (freed["orphan_uploads"], freed["orphan_uploads_bytes"]) == (1, 70)
     assert (freed["dataset_versions"], freed["dataset_versions_bytes"]) == (1, 123)
+
+
+def test_free_up_space_keeps_base_models_used_as_judge_or_safety_model(harness: Harness) -> None:
+    serve_on_rack(harness)
+    keys = ("judge-1b", "guard-1b", "install-judge", "install-guard", "spare-1b")
+    with harness.sessions() as session:
+        for key in keys:
+            session.add(BaseModel(id=key, source="download", name=key, status=BaseModelStatus.AVAILABLE, size_bytes=10))
+        model = session.scalars(select(Model).where(Model.slug == "triage")).one()
+        model.judge_model = "judge-1b"
+        model.safety = {"model": "guard-1b", "answers": False}
+        settings_store.write(session, "judge", {"model": "install-judge"})
+        settings_store.write(session, "safety", {"model": "install-guard", "answers": False})
+        session.commit()
+    freed = harness.client.get("/api/system/infrastructure").json()["reclaimable"]
+    assert [item["key"] for item in freed["unused_models"]] == ["spare-1b"]
 
 
 def finish_on_rack(harness: Harness, count: int) -> list[int]:

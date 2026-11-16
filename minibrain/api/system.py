@@ -33,6 +33,7 @@ from minibrain.models.bucket import WEIGHTS, writes_bucket
 from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.models.registry import models_dir
+from minibrain.models.safety import install_safety
 from minibrain.object_store import CREDENTIAL_ENV, S3, StorageConfig, StorageError, load_config, read_secret
 from minibrain.object_store import apply as apply_storage
 from minibrain.object_store import check as check_storage
@@ -56,6 +57,7 @@ from minibrain.registry.models import (
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
+from minibrain.tasks.judges import install_judge
 
 router = APIRouter(prefix="/api")
 
@@ -322,12 +324,22 @@ def log_items(session: Session) -> list[StoredItem]:
     ]
 
 
+def checking_bases(session: Session) -> set[str]:
+    found = {install_judge(session), install_safety(session).model}
+    found |= set(session.scalars(select(Model.judge_model)))
+    for safety in session.scalars(select(Model.safety)):
+        if isinstance(safety, dict) and safety.get("model"):
+            found.add(str(safety["model"]))
+    return {key for key in found if key}
+
+
 def reclaimable(session: Session) -> Reclaimable:
     doomed = doomed_dataset_versions(session)
     doomed_ids = {item.id for item in doomed}
     kept = set(session.scalars(select(DatasetVersion.artifact_id).where(DatasetVersion.id.not_in(doomed_ids))))
     freed = {item.artifact_id: item.size for item in doomed if item.artifact_id not in kept}
-    built_on = set(session.scalars(select(Model.base_model))) | set(session.scalars(select(Version.base_model)))
+    needed = set(session.scalars(select(Model.base_model))) | set(session.scalars(select(Version.base_model)))
+    needed |= checking_bases(session)
     unused = [
         UnusedModel(key=base.id, name=base.name, size_bytes=base.size_bytes)
         for base in session.scalars(
@@ -335,7 +347,7 @@ def reclaimable(session: Session) -> Reclaimable:
             .where(*on_main(), BaseModel.size_bytes > 0, BaseModel.deployed.is_(False))
             .order_by(BaseModel.size_bytes.desc())
         )
-        if base.id not in built_on
+        if base.id not in needed
     ]
     referenced = select(Source.artifact_id).where(Source.artifact_id.is_not(None))
     orphans = session.execute(
