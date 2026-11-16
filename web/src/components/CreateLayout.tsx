@@ -2,6 +2,7 @@ import { type LucideIcon, X } from "lucide-react";
 import { Button, Card, cn } from "obp-ui";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { FORM_GROUP_GAP } from "./FormRows";
+import { NewTabLinks } from "./NewTab";
 
 export function CreateLayout({
     form,
@@ -52,25 +53,27 @@ export function CreateLayout({
         </>
     );
     return (
-        <form noValidate className="@container" onSubmit={send} onKeyDown={onKeyDown}>
-            <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex min-w-0 flex-col gap-6 [&>:last-child]:flex-1">{form}</div>
-                <aside aria-label={summaryLabel} className="flex min-w-0 flex-col self-start">
-                    {summary}
-                </aside>
-            </div>
-            <div className="mt-6 hidden items-center gap-3 border-t pt-4 @3xl:flex">
-                {actions()}
-            </div>
-            <div
-                className={cn(
-                    "sticky bottom-0 z-10 -mx-6 -mb-6 mt-6 flex items-center gap-3 border-t bg-background px-6 pt-3",
-                    "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] @3xl:hidden",
-                )}
-            >
-                {actions("@max-md:sr-only")}
-            </div>
-        </form>
+        <NewTabLinks>
+            <form noValidate className="@container" onSubmit={send} onKeyDown={onKeyDown}>
+                <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
+                    <div className="flex min-w-0 flex-col gap-6 [&>:last-child]:flex-1">{form}</div>
+                    <aside aria-label={summaryLabel} className="flex min-w-0 flex-col self-start">
+                        {summary}
+                    </aside>
+                </div>
+                <div className="mt-6 hidden items-center gap-3 border-t pt-4 @3xl:flex">
+                    {actions()}
+                </div>
+                <div
+                    className={cn(
+                        "sticky bottom-0 z-10 -mx-6 -mb-6 mt-6 flex items-center gap-3 border-t bg-background px-6 pt-3",
+                        "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] @3xl:hidden",
+                    )}
+                >
+                    {actions("@max-md:sr-only")}
+                </div>
+            </form>
+        </NewTabLinks>
     );
 }
 

@@ -2,6 +2,7 @@ import { Link, Popover, PopoverContent, PopoverTrigger, cn } from "obp-ui";
 import { type ReactNode, useRef, useState } from "react";
 import { usePools } from "~/api/queries";
 import type { components } from "~/api/schema";
+import { NewTabIcon, useNewTab } from "~/components/NewTab";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
@@ -162,6 +163,7 @@ export function PoolLink({
     className?: string;
 }) {
     const pool = usePool(name);
+    const newTab = useNewTab();
     const [open, setOpen] = useState(false);
     const card = useRef<HTMLDivElement>(null);
     return (
@@ -174,6 +176,7 @@ export function PoolLink({
                     render={
                         <Link
                             href={poolHref(name)}
+                            {...newTab}
                             role="link"
                             onFocus={() => setOpen(true)}
                             onBlur={(event) => {
@@ -186,6 +189,7 @@ export function PoolLink({
                     }
                 >
                     {name}
+                    <NewTabIcon />
                 </PopoverTrigger>
                 <PopoverContent
                     align={align}
@@ -208,6 +212,7 @@ export function PoolLink({
 }
 
 export function PoolList({ names, details }: { names: string[]; details?: ReactNode }) {
+    const newTab = useNewTab();
     const [first, ...rest] = names;
     if (!first) {
         return null;
@@ -218,8 +223,13 @@ export function PoolList({ names, details }: { names: string[]; details?: ReactN
             {rest.map((name, index) => (
                 <span key={name}>
                     {index > 0 && ", "}
-                    <Link href={poolHref(name)} className="text-primary hover:underline">
+                    <Link
+                        href={poolHref(name)}
+                        {...newTab}
+                        className="text-primary hover:underline"
+                    >
                         {name}
+                        <NewTabIcon />
                     </Link>
                 </span>
             ))}

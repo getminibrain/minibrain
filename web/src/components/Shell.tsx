@@ -30,7 +30,7 @@ function KitLink({ href, onClick, ...rest }: UILinkProps) {
     const follow = (event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
         const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
-        if (event.defaultPrevented || modified || event.button !== 0) {
+        if (event.defaultPrevented || modified || event.button !== 0 || rest.target === "_blank") {
             return;
         }
         event.preventDefault();
