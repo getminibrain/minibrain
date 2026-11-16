@@ -96,11 +96,14 @@ function ProblemBadge({ problems }: { problems: Problem[] }) {
         return null;
     }
     const label = problems.map((problem) => problem.label).join(", ");
+    const tone = problems.some((problem) => problem.tone === "destructive")
+        ? "destructive"
+        : "warning";
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button type="button" aria-label={label} className="shrink-0 rounded-sm">
-                    <Badge variant="warning" className="tabular-nums">
+                    <Badge variant={tone} className="tabular-nums">
                         <TriangleAlert aria-hidden="true" />
                         {problems.length > 1 ? count(problems.length) : null}
                     </Badge>
