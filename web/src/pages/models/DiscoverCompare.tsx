@@ -42,7 +42,7 @@ import {
 } from "./Discover";
 import { TIERS, licenceOf, licenceUseLabel } from "./DiscoverFilters";
 import { useModelsRefresh } from "./dialogs";
-import { FormatHelp, formatName, formatUse, schemes } from "./formats";
+import { FormatHelp, formatName, formatUse, scheme, schemes } from "./formats";
 import { TRAIN_MEMORY_INFO, leastTrainMemory } from "./runsHere";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
@@ -107,7 +107,7 @@ function VariantList({
                     className="flex flex-wrap items-center justify-between gap-x-2"
                 >
                     <span className="min-w-0 truncate text-muted-foreground">
-                        {formatName(variant)}
+                        {scheme(variant)}
                     </span>
                     <span className="ml-auto flex items-center gap-1.5 tabular-nums">
                         {best !== undefined && value(variant) === best && (
@@ -531,10 +531,10 @@ function ModelHeader({
                     <X />
                 </IconAction>
             </div>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
                 <EntryAction entry={entry} on={on} />
                 {count > 1 && (
-                    <div className="flex opacity-0 group-focus-within/model:opacity-100 group-hover/model:opacity-100 [@media(hover:none)]:opacity-100">
+                    <div className="ml-auto flex opacity-0 group-focus-within/model:opacity-100 group-hover/model:opacity-100 [@media(hover:none)]:opacity-100">
                         <IconAction
                             label={`Move ${entry.name} left`}
                             tip="Move left"
@@ -901,6 +901,7 @@ export function DiscoverComparePage() {
                     <CompareTable
                         label="Model comparison"
                         className={comparing ? undefined : "max-w-3xl"}
+                        columnWidth="10.75rem"
                         columns={columns}
                         sections={sections}
                         baseline={pinned}

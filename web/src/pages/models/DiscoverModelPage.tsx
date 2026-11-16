@@ -29,7 +29,7 @@ import {
 } from "./Discover";
 import { Tip } from "./detail/header";
 import { useModelsRefresh } from "./dialogs";
-import { FormatHelp, formatName, formatUse } from "./formats";
+import { FormatHelp, formatName } from "./formats";
 import { TRAIN_MEMORY_INFO, runnable, trainMemory } from "./runsHere";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
@@ -111,8 +111,15 @@ function variantColumns(
             header: "Format",
             meta: { info: <FormatHelp /> },
             accessorFn: formatName,
+            cell: ({ row }) => (
+                <span className="flex flex-col">
+                    {formatName(row.original)}
+                    <span className="text-sm whitespace-normal text-muted-foreground">
+                        {row.original.runtimes.join(", ")}
+                    </span>
+                </span>
+            ),
         },
-        { id: "use", header: "Training", accessorFn: formatUse },
         {
             id: "size",
             header: "Download size",
@@ -124,7 +131,7 @@ function variantColumns(
             header: "Memory to run",
             accessorFn: (variant) => variant.fit.needed_bytes,
             cell: ({ row }) => (
-                <span className="inline-flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-x-2 whitespace-normal">
                     {bytes(row.original.fit.needed_bytes)}
                     {runnable(row.original.fit.level) && (
                         <StatusText tone="success">
@@ -139,7 +146,7 @@ function variantColumns(
         },
         {
             id: "train",
-            header: "Memory to train (QLoRA)",
+            header: "Memory to train",
             meta: { info: TRAIN_MEMORY_INFO },
             accessorFn: (variant) => trainMemory(variant) ?? Number.POSITIVE_INFINITY,
             cell: ({ row }) => {
@@ -147,7 +154,7 @@ function variantColumns(
                 return value === null ? (
                     <span className="text-muted-foreground">Serve only</span>
                 ) : (
-                    <span className="inline-flex items-center gap-2">
+                    <span className="flex flex-wrap items-center gap-x-2 whitespace-normal">
                         {bytes(value)}
                         {row.original.train_fit.level === "fits" && (
                             <StatusText tone="success">
@@ -160,11 +167,6 @@ function variantColumns(
                     </span>
                 );
             },
-        },
-        {
-            id: "runtimes",
-            header: "Engines",
-            accessorFn: (variant) => variant.runtimes.join(", "),
         },
         {
             id: "action",
