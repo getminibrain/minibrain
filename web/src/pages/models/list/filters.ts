@@ -55,7 +55,7 @@ export const COLUMNS: { id: Column; label: string; min: number; roomy?: number }
 
 export const DEFAULT_COLUMNS: Column[] = ["data", "quality", "requests", "cost"];
 
-const MODEL_MIN = 10;
+const MODEL_MIN = 15;
 const STATUS_MIN = 8.5;
 const STATUS_MAX = 14;
 const MENU = 3;

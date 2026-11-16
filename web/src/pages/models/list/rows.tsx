@@ -821,7 +821,7 @@ export function VersionLine({
                     >
                         <VersionName version={version} />
                     </Link>
-                    <span className="truncate text-sm text-muted-foreground">
+                    <span className="min-w-0 truncate text-sm text-muted-foreground">
                         {relativeTime(version.created_at)}
                     </span>
                 </span>
