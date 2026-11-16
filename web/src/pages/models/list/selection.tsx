@@ -116,6 +116,13 @@ export function SelectionBar({
     const idleVariants = variants.filter(
         (item) => !isDeployed(item.row) && item.row.availability.state === "available",
     );
+    const runnableVariants = idleVariants.filter((item) => item.row.health?.state !== "cant_run");
+    const deployBlock =
+        idleVariants.length === 0
+            ? "None of them can be deployed now."
+            : runnableVariants.length === 0
+              ? "None of them can run here."
+              : null;
     const canDelete = can.admin || variants.length === 0;
     return (
         <div className="flex min-h-8 flex-wrap items-center gap-2">
@@ -158,16 +165,10 @@ export function SelectionBar({
                 )}
                 {can.build && !mixed && variants.length > 0 && (
                     <>
-                        <Tip
-                            tip={
-                                idleVariants.length === 0
-                                    ? "None of them can be deployed now."
-                                    : null
-                            }
-                        >
+                        <Tip tip={deployBlock}>
                             <Button
                                 variant="outline"
-                                disabled={idleVariants.length === 0}
+                                disabled={Boolean(deployBlock)}
                                 onClick={() => on.deploy(idleVariants.map((item) => item.row))}
                             >
                                 Deploy

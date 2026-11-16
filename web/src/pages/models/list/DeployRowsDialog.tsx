@@ -24,6 +24,10 @@ import { plural } from "./model";
 
 type Fit = { target: string | null; text: string; runs: boolean };
 
+function cantRun(row: ModelRow): string | null {
+    return row.health?.state === "cant_run" ? row.health.detail : null;
+}
+
 function fitOf(placement: Placement | undefined, value: string): Fit {
     if (!placement) {
         return { target: null, text: "Checking pools…", runs: false };
@@ -57,28 +61,36 @@ function poolOptions(placements: (Placement | undefined)[]): PickOption[] {
 }
 
 function RowFit({ row, fit }: { row: ModelRow; fit: Fit }) {
+    const reason = cantRun(row);
     return (
         <li className="flex min-h-10 items-center gap-3 px-3 py-1.5">
             <ModelAvatar row={row} size="sm" />
             <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{row.variant_label ?? row.name}</span>
                 <span className="truncate font-mono text-sm text-muted-foreground">{row.key}</span>
+                {reason && <span className="text-sm text-muted-foreground">{reason}</span>}
             </span>
-            <span
-                className={
-                    fit.runs
-                        ? "shrink-0 text-sm text-muted-foreground"
-                        : "shrink-0 text-sm text-destructive"
-                }
-            >
-                {fit.target && (
-                    <>
-                        <PoolLink name={fit.target} />
-                        {" · "}
-                    </>
-                )}
-                {fit.text}
-            </span>
+            {reason ? (
+                <span className="shrink-0 text-sm text-destructive">
+                    {`Skipped: ${row.health?.label ?? "can't run here"}`}
+                </span>
+            ) : (
+                <span
+                    className={
+                        fit.runs
+                            ? "shrink-0 text-sm text-muted-foreground"
+                            : "shrink-0 text-sm text-destructive"
+                    }
+                >
+                    {fit.target && (
+                        <>
+                            <PoolLink name={fit.target} />
+                            {" · "}
+                        </>
+                    )}
+                    {fit.text}
+                </span>
+            )}
         </li>
     );
 }
@@ -100,7 +112,10 @@ function BulkDeployDialog({
     );
     const known = placements.map((query) => query.data);
     const fits = rows.map((row, index) => ({ row, fit: fitOf(known[index], pool) }));
-    const runnable = fits.filter((item) => item.fit.runs).map((item) => item.row);
+    const cannot = rows.filter((row) => cantRun(row) !== null).length;
+    const runnable = fits
+        .filter((item) => item.fit.runs && cantRun(item.row) === null)
+        .map((item) => item.row);
     const loading = placements.some((query) => query.isPending);
     const deploy = useMutation({
         mutationFn: () => deployRows(runnable, true, pool),
@@ -110,7 +125,7 @@ function BulkDeployDialog({
             toast({ title: `${plural(runnable.length, "model")} deployed`, tone: "success" });
         },
     });
-    const skipped = rows.length - runnable.length;
+    const skipped = rows.length - runnable.length - cannot;
     return (
         <Dialog open onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-xl">
@@ -136,9 +151,16 @@ function BulkDeployDialog({
                         <RowFit key={row.key} row={row} fit={fit} />
                     ))}
                 </ul>
-                {!loading && skipped > 0 && (
+                {!loading && (skipped > 0 || cannot > 0) && (
                     <p className="text-sm text-muted-foreground">
-                        {`${plural(skipped, "variant")} ${skipped === 1 ? "does" : "do"} not fit there and ${skipped === 1 ? "stays" : "stay"} undeployed.`}
+                        {[
+                            skipped > 0 &&
+                                `${plural(skipped, "variant")} ${skipped === 1 ? "does" : "do"} not fit there and ${skipped === 1 ? "stays" : "stay"} undeployed.`,
+                            cannot > 0 &&
+                                `${plural(cannot, "variant")} ${cannot === 1 ? "is" : "are"} skipped: ${cannot === 1 ? "it" : "they"} can't run here.`,
+                        ]
+                            .filter(Boolean)
+                            .join(" ")}
                     </p>
                 )}
                 <ErrorLine error={deploy.error ?? placements.find((query) => query.error)?.error} />
