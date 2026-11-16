@@ -8258,6 +8258,11 @@ export interface components {
             /** Fingerprint Detail */
             fingerprint_detail?: string | null;
             /**
+             * Encoding
+             * @description How the text files are read: utf-8, or windows-1252 when they are not valid UTF-8.
+             */
+            encoding?: string | null;
+            /**
              * Outcome
              * @enum {string}
              */
@@ -8349,6 +8354,11 @@ export interface components {
             fingerprint?: string | null;
             /** Fingerprint Detail */
             fingerprint_detail?: string | null;
+            /**
+             * Encoding
+             * @description How the text files are read: utf-8, or windows-1252 when they are not valid UTF-8.
+             */
+            encoding?: string | null;
         };
         /** SplitScore */
         SplitScore: {

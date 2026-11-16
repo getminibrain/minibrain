@@ -179,7 +179,9 @@ def read_extensions() -> ExtensionsInfo:
 def add_s3_source(
     body: S3SourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
-    added = add_remote(session, settings, S3_SOURCE, body.connection_id, body.name, path=body.path, format=body.format)
+    added = add_remote(
+        session, settings, store, S3_SOURCE, body.connection_id, body.name, path=body.path, format=body.format
+    )
     return added_source(session, settings, store, added, response)
 
 
@@ -196,6 +198,7 @@ def add_database_source(
     added = add_remote(
         session,
         settings,
+        store,
         DATABASE,
         body.connection_id,
         body.name,
@@ -216,5 +219,5 @@ def add_database_source(
 def add_iceberg_source(
     body: IcebergSourceCreate, response: Response, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> SourceAdded:
-    added = add_remote(session, settings, ICEBERG, body.connection_id, body.name, path=body.path)
+    added = add_remote(session, settings, store, ICEBERG, body.connection_id, body.name, path=body.path)
     return added_source(session, settings, store, added, response)

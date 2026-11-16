@@ -109,6 +109,7 @@ class S3Reader:
     files: tuple[str, ...]
     reader: str
     scope: str
+    objects: tuple[str, ...] = ()
 
     @property
     def extensions(self) -> tuple[str, ...]:
@@ -290,7 +291,9 @@ def s3_state(connection: Resolved, path: str, format: str | None) -> RemoteState
     urls = tuple(f"s3://{info['name']}" for info in kept)
     size = sum(int(info.get("size") or 0) for info in kept)
     newest = max((stamp for stamp in (modified(info) for info in kept) if stamp), default=None)
-    reader = S3Reader(connection=connection, files=urls, reader=READERS[chosen], scope=f"s3://{bucket}/")
+    reader = S3Reader(
+        connection=connection, files=urls, reader=READERS[chosen], scope=f"s3://{bucket}/", objects=tuple(lines)
+    )
     return RemoteState(
         fingerprint=digest(lines),
         detail=f"{len(kept):,} objects; changes are tracked by their ETags and sizes",

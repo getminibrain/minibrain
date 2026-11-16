@@ -238,6 +238,10 @@ class SourceSummary(BaseModel):
     change_column: str | None = None
     fingerprint: str | None = None
     fingerprint_detail: str | None = None
+    encoding: str | None = Field(
+        default=None,
+        description="How the text files are read: utf-8, or windows-1252 when they are not valid UTF-8.",
+    )
 
 
 class SourceAdded(SourceSummary):

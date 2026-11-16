@@ -122,17 +122,21 @@ def table_name_base(name: str) -> str:
     return base
 
 
-def stage(source: str | Path, staging_path: Path) -> None:
-    name = Path(str(source)).name
-    relation = READERS[Path(name).suffix.lower()].format(quote_literal(str(source)))
+def create_staged(query: str, label: str, staging_path: Path) -> None:
     staging_path.unlink(missing_ok=True)
     try:
         with duckdb.connect(str(staging_path)) as connection:
             register(connection)
-            connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS SELECT * FROM {relation}")
+            connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS {query}")
     except duckdb.Error as error:
         staging_path.unlink(missing_ok=True)
-        raise SourceError(f"could not read {name}: {error}") from error
+        raise SourceError(f"could not read {label}: {error}") from error
+
+
+def stage(source: str | Path, staging_path: Path) -> None:
+    name = Path(str(source)).name
+    relation = READERS[Path(name).suffix.lower()].format(quote_literal(str(source)))
+    create_staged(f"SELECT * FROM {relation}", name, staging_path)
 
 
 def file_list(files: Sequence[str]) -> str:
@@ -141,6 +145,10 @@ def file_list(files: Sequence[str]) -> str:
 
 def read_files(reader: str, files: Sequence[str]) -> str:
     return "SELECT * FROM " + reader.format(f"{file_list(files)}, union_by_name = true")
+
+
+def stage_files(files: Sequence[str], reader: str, label: str, staging_path: Path) -> None:
+    create_staged(read_files(reader, files), label, staging_path)
 
 
 def table_relation(connection: duckdb.DuckDBPyConnection, table: Table, attached: str) -> str:

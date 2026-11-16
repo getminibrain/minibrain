@@ -105,6 +105,7 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.data.templates import Template, pair_template, template_sql
+from minibrain.data.transcoded import drop_fallbacks
 from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Source, now
@@ -229,6 +230,7 @@ def source_summary(settings: Settings, store: ArtifactStore, source: Source) -> 
         columns=list(columns),
         datasets=[dataset.slug for dataset in source.datasets],
         created_at=source.created_at,
+        encoding=source.encoding,
         **fields,
     )
 
@@ -533,10 +535,11 @@ def delete_source(source_id: int, session: SessionDep, store: StoreDep) -> None:
     if source.datasets:
         names = ", ".join(dataset.name for dataset in source.datasets)
         raise ConflictError(f"{source.name} is used by {names}; delete those datasets first")
-    artifact_id, filename = source.artifact_id, source.filename
+    artifact_id, filename, table_name = source.artifact_id, source.filename, source.table_name
     session.delete(source)
     release_upload(session, store, artifact_id, filename)
     session.commit()
+    drop_fallbacks(store, table_name)
 
 
 @router.get("/datasets", dependencies=[Depends(builder)], summary="List datasets")

@@ -133,6 +133,7 @@ class Source(Base):
     description: Mapped[str | None] = mapped_column(default=None)
     tags: Mapped[list[str] | None] = mapped_column(JSON, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    encoding: Mapped[str | None] = mapped_column(default=None)
 
     connection: Mapped["Connection | None"] = relationship(back_populates="sources")
     datasets: Mapped[list["Dataset"]] = relationship(

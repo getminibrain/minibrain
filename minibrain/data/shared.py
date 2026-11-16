@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, object_session
 from minibrain.artifacts import CHUNK, ArtifactStore, Packing
 from minibrain.connections.store import get_connection, resolve
 from minibrain.data.delta import DELTA, LOG, delta_state, local_path, refuse_remote
+from minibrain.data.encoding import WINDOWS_1252, EncodingCheck, is_text, transcode
 from minibrain.data.folders import FolderScan, allowed_roots, check_folder, detect_format, inside, scan
 from minibrain.data.names import free_name, same_name
 from minibrain.data.remote import (
@@ -20,6 +21,7 @@ from minibrain.data.remote import (
     REMOTE_KINDS,
     S3_SOURCE,
     RemoteState,
+    S3Reader,
     cached,
     check_column,
     check_query,
@@ -36,6 +38,7 @@ from minibrain.data.sources import (
     Table,
     describe,
     stage,
+    stage_files,
     statement_tables,
     table_name_base,
 )
@@ -46,6 +49,14 @@ from minibrain.data.templates import (
     missing_columns,
     pair_template,
     template_sql,
+)
+from minibrain.data.transcoded import (
+    fallback_staging,
+    folder_build,
+    folder_encodings,
+    overall,
+    s3_build,
+    s3_encodings,
 )
 from minibrain.registry.files import ArtifactKind, register
 from minibrain.registry.models import Artifact, Dataset, DatasetFolder, DatasetVersion, Model, Source, Version, now
@@ -86,9 +97,19 @@ def staging_key(artifact_id: str, filename: str) -> str:
     return f"{artifact_id}{Path(filename).suffix.lower()}"
 
 
+def staged_utf8(store: ArtifactStore, artifact_id: str, filename: str, target: Path) -> None:
+    suffix = Path(filename).suffix.lower()
+    plain = target.parent / f"utf8{suffix}"
+    with store.open(artifact_id) as stream, plain.open("wb") as out:
+        transcode(stream, out)
+    stage_files([str(plain)], READERS[suffix], filename, target)
+
+
 def staging_of(store: ArtifactStore, source: Source) -> str:
     artifact_id = str(source.artifact_id)
     key = staging_key(artifact_id, source.filename)
+    if source.encoding == WINDOWS_1252:
+        return store.staged(key, lambda target: staged_utf8(store, artifact_id, source.filename, target))
     return store.staged(key, lambda target: stage(store.url(artifact_id, source.filename), target))
 
 
@@ -131,18 +152,47 @@ def remote_state(settings: Settings, source: Source) -> RemoteState:
     return cached(key, lambda: database_state(connection, source.path, source.query, source.change_column))
 
 
+def note_encoding(source: Source, encodings: list[str]) -> str | None:
+    found = overall(encodings) if encodings else None
+    if source.encoding != found:
+        source.encoding = found
+    return found
+
+
+def s3_table(store: ArtifactStore, source: Source, state: RemoteState) -> Table:
+    reader = state.reader
+    if not isinstance(reader, S3Reader) or state.format is None:
+        return Table(name=source.table_name, fingerprint=state.fingerprint, remote=reader)
+    encodings = s3_encodings(reader, state.format)
+    if note_encoding(source, encodings) != WINDOWS_1252:
+        return Table(name=source.table_name, fingerprint=state.fingerprint, remote=reader)
+    build = s3_build(reader, state.format, encodings)
+    staging = fallback_staging(store, source.table_name, state.fingerprint, build)
+    return Table(name=source.table_name, staging=staging, fingerprint=state.fingerprint)
+
+
+def folder_table(store: ArtifactStore, source: Source) -> Table:
+    found = folder_scan(source)
+    encodings = folder_encodings(found)
+    if note_encoding(source, encodings) == WINDOWS_1252:
+        staging = fallback_staging(store, source.table_name, found.fingerprint, folder_build(found, encodings))
+        return Table(name=source.table_name, staging=staging, fingerprint=found.fingerprint)
+    return Table(
+        name=source.table_name,
+        files=tuple(item.path for item in found.files),
+        reader=READERS[found.format],
+        fingerprint=found.fingerprint,
+    )
+
+
 def table_of(settings: Settings, store: ArtifactStore, source: Source) -> Table:
+    if source.kind == S3_SOURCE:
+        return s3_table(store, source, remote_state(settings, source))
     if source.kind in REMOTE_KINDS or source.kind == DELTA:
         state = delta_of(source) if source.kind == DELTA else remote_state(settings, source)
         return Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader)
     if source.kind == FOLDER:
-        found = folder_scan(source)
-        return Table(
-            name=source.table_name,
-            files=tuple(item.path for item in found.files),
-            reader=READERS[found.format],
-            fingerprint=found.fingerprint,
-        )
+        return folder_table(store, source)
     return Table(name=source.table_name, staging=staging_of(store, source), fingerprint=fingerprint(settings, source))
 
 
@@ -206,12 +256,15 @@ def first_source(session: Session, *conditions: ColumnElement[bool]) -> Source |
     return session.scalar(select(Source).where(*conditions).order_by(Source.id).limit(1))
 
 
-def content_hash(stream: BinaryIO) -> str:
+def content_facts(stream: BinaryIO, filename: str) -> tuple[str, str | None]:
     digest = hashlib.sha256()
+    check = EncodingCheck() if is_text(filename) else None
     while block := stream.read(CHUNK):
         digest.update(block)
+        if check is not None:
+            check.feed(block)
     stream.seek(0)
-    return digest.hexdigest()
+    return digest.hexdigest(), check.result() if check is not None else None
 
 
 def store_upload(session: Session, store: ArtifactStore, filename: str, stream: BinaryIO, digest: str) -> Artifact:
@@ -239,7 +292,13 @@ def release_upload(session: Session, store: ArtifactStore, artifact_id: str | No
 
 
 def replace_upload(
-    session: Session, store: ArtifactStore, source: Source, filename: str, stream: BinaryIO, digest: str
+    session: Session,
+    store: ArtifactStore,
+    source: Source,
+    filename: str,
+    stream: BinaryIO,
+    digest: str,
+    encoding: str | None,
 ) -> None:
     if source.kind != UPLOAD:
         raise ConflictError(f"{source.name} is not an uploaded file, so a file cannot replace it; keep both instead")
@@ -248,6 +307,7 @@ def replace_upload(
     source.filename = filename
     source.artifact_id = artifact.id
     source.size = artifact.size
+    source.encoding = encoding
     release_upload(session, store, previous, previous_name)
 
 
@@ -258,7 +318,7 @@ def add_source(
     stream: BinaryIO,
     name_taken: NameTaken = NameTaken.KEEP_BOTH,
 ) -> Added:
-    digest = content_hash(stream)
+    digest, encoding = content_facts(stream, filename)
     same = first_source(session, Source.artifact_id == digest)
     if same is not None:
         return Added(same, Outcome.EXISTING)
@@ -266,7 +326,7 @@ def add_source(
     if clash is not None and name_taken == NameTaken.FAIL:
         raise taken_error(session, clash, filename)
     if clash is not None and name_taken == NameTaken.REPLACE:
-        replace_upload(session, store, clash, filename, stream, digest)
+        replace_upload(session, store, clash, filename, stream, digest, encoding)
         return Added(clash, Outcome.REPLACED)
     name = free_source_name(session, filename)
     artifact = store_upload(session, store, filename, stream, digest)
@@ -276,6 +336,7 @@ def add_source(
         table_name=free_table_name(session, name),
         artifact_id=artifact.id,
         size=artifact.size,
+        encoding=encoding,
     )
     session.add(source)
     session.flush()
@@ -306,6 +367,7 @@ def add_folder(session: Session, path: str, name: str | None, format: str | None
         format=chosen,
         size=found.size,
     )
+    note_encoding(source, folder_encodings(found))
     session.add(source)
     session.flush()
     return Added(source, Outcome.CREATED)
@@ -335,6 +397,7 @@ def add_delta(session: Session, path: str, name: str | None) -> Added:
 def add_remote(
     session: Session,
     settings: Settings,
+    store: ArtifactStore,
     kind: str,
     connection_id: int,
     name: str | None,
@@ -378,7 +441,7 @@ def add_remote(
     source.size = state.size
     if kind == S3_SOURCE and source.format is None:
         source.format = state.format
-    describe(Table(name=source.table_name, fingerprint=state.fingerprint, remote=state.reader))
+    describe(table_of(settings, store, source))
     return Added(source, Outcome.CREATED)
 
 

@@ -46,6 +46,11 @@ const CONNECTED_LABELS: Record<string, string> = {
     database: "Database",
 };
 
+const ENCODING_LABELS: Record<string, string> = {
+    "utf-8": "UTF-8",
+    "windows-1252": "Windows-1252",
+};
+
 function share(part: number, whole: number): string {
     if (whole === 0) {
         return "–";
@@ -343,6 +348,12 @@ export function FileDetail({
                 )}
                 {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
                     <Stat label="Size" value={bytes(source.size)} />
+                )}
+                {source.encoding && (
+                    <Stat
+                        label="Encoding"
+                        value={ENCODING_LABELS[source.encoding] ?? source.encoding}
+                    />
                 )}
                 <Stat label="Datasets" value={count(datasets.length)} />
             </div>
