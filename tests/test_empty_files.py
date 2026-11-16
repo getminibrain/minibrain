@@ -48,8 +48,18 @@ def test_a_header_only_file_is_refused_whatever_columns_are_picked(harness: Harn
     assert moved.status_code == 409 and moved.json()["detail"] == NO_ROWS.format(name="head.csv")
 
 
-def test_an_empty_json_array_uploads_as_a_source_with_no_rows(harness: Harness) -> None:
-    added = upload(harness, "empty.json", b"[]")
-    assert added["rows"] == 0
-    refused = harness.client.post("/api/datasets", json={"name": "Empty", "source_id": added["id"]})
-    assert refused.status_code == 409 and refused.json()["detail"] == NO_ROWS.format(name="empty.json")
+@pytest.mark.parametrize(
+    ("name", "data"), [("empty.json", b"[]"), ("spaced.json", b"\xef\xbb\xbf [ \n ]\n"), ("lines.jsonl", b"[]\n")]
+)
+def test_an_empty_json_array_is_refused_at_upload_like_an_empty_file(harness: Harness, name: str, data: bytes) -> None:
+    refused = harness.client.post("/api/sources", files={"file": (name, data, "application/json")})
+    assert refused.status_code == 422
+    assert refused.json()["detail"] == f"{name} is empty: upload a file that has rows of data"
+    assert harness.client.get("/api/sources").json() == []
+
+
+def test_a_json_array_with_rows_and_a_csv_of_brackets_still_upload(harness: Harness) -> None:
+    rows = upload(harness, "rows.json", b'[{"text": "hi", "category": "greeting"}]')
+    assert rows["rows"] == 1
+    head = upload(harness, "brackets.csv", b"[]\n")
+    assert head["rows"] == 0

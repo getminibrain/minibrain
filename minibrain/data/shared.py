@@ -1,3 +1,4 @@
+import codecs
 import hashlib
 import shutil
 from collections.abc import Sequence
@@ -69,6 +70,9 @@ ANSWER_NAMES = ("answer", "response", "output", "completion", "reply", "expected
 FOLDER = "folder"
 UPLOAD = "upload"
 BLANK_BYTES = b" \t\r\n\xef\xbb\xbf"
+WHITESPACE = b" \t\r\n"
+EMPTY_ARRAY = b"[]"
+JSON_READERS = frozenset(READERS[suffix] for suffix in (".json", ".jsonl", ".ndjson"))
 
 
 class Outcome(StrEnum):
@@ -268,13 +272,18 @@ def content_facts(stream: BinaryIO, filename: str) -> ContentFacts:
     digest = hashlib.sha256()
     check = EncodingCheck() if is_text(filename) else None
     empty = True
+    content = bytearray()
     while block := stream.read(CHUNK):
         digest.update(block)
         empty = empty and not block.strip(BLANK_BYTES)
+        if len(content) <= len(EMPTY_ARRAY):
+            content += block.removeprefix(codecs.BOM_UTF8) if not content else block
+            content = bytearray(content.translate(None, WHITESPACE))
         if check is not None:
             check.feed(block)
     stream.seek(0)
-    return ContentFacts(digest.hexdigest(), check.result() if check is not None else None, empty)
+    array = read_as(filename) in JSON_READERS and content == EMPTY_ARRAY
+    return ContentFacts(digest.hexdigest(), check.result() if check is not None else None, empty or array)
 
 
 def read_as(filename: str) -> str | None:
