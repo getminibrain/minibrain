@@ -193,3 +193,12 @@ def test_expired_sessions_are_not_counted_as_signed_in(install: Install) -> None
     ended = admin.delete("/api/me/sessions", headers=csrf(admin))
     assert ended.json() == {"ended": 1}
     assert len(session_ids(install)) == 1
+
+
+def test_a_name_drops_control_and_direction_characters(install: Install) -> None:
+    admin = set_up(install)
+    typed = "Ada\u0000 \u202eKing\u2066 \U0001f469\u200d\U0001f52c"
+    renamed = admin.patch("/api/me", json={"name": typed}, headers=csrf(admin))
+    assert renamed.json()["name"] == "Ada King \U0001f469\u200d\U0001f52c"
+    only_controls = admin.patch("/api/me", json={"name": "\u202e\u0007"}, headers=csrf(admin))
+    assert only_controls.status_code == 422

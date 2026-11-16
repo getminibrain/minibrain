@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import re
 import secrets
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -32,6 +33,8 @@ TOUCH_EVERY = timedelta(seconds=60)
 AGENT_LENGTH = 300
 NAME_LENGTH = 200
 MAX_GROUPS = 200
+JOINERS = frozenset({"\u200c", "\u200d"})
+HIDDEN = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+")
 WRONG = "Wrong email or password"
 TURNED_OFF = "This account is turned off. Ask an admin to turn it back on."
@@ -73,8 +76,12 @@ def normal_email(email: str) -> str:
     return cleaned
 
 
+def printable(text: str) -> str:
+    return "".join(" " if unicodedata.category(char) in HIDDEN and char not in JOINERS else char for char in text)
+
+
 def clean_name(name: str, fallback: str) -> str:
-    return " ".join(name.split())[:NAME_LENGTH] or fallback
+    return " ".join(printable(name).split())[:NAME_LENGTH] or fallback
 
 
 def users_exist(session: Session) -> bool:

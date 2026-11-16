@@ -12,6 +12,7 @@ from minibrain.api.deps import SessionDep
 from minibrain.auth.accounts import (
     LOCAL,
     AccountError,
+    clean_name,
     create_local,
     enabled_admins,
     end_sessions,
@@ -29,7 +30,6 @@ from minibrain.registry.models import AuditEvent, User, now
 router = APIRouter(prefix="/api/accounts")
 
 RESET_PATH = "/reset-password"
-NAME_LENGTH = 200
 ROLE_LOCKED = "This role comes from the identity provider's groups and is set in minibrain.yaml"
 ADMIN_LISTED = "This person is listed in auth.admins in minibrain.yaml, so they stay an admin"
 LAST_ADMIN = "Keep at least one admin: give someone else the Admin role first"
@@ -118,7 +118,7 @@ def one_account(session: Session, config: AuthConfig, user: User) -> AccountInfo
 
 
 def cleaned(name: str | None) -> str:
-    return " ".join((name or "").split())[:NAME_LENGTH]
+    return clean_name(name or "", "")
 
 
 def audit(session: Session, action: str, user: User, detail: dict[str, Any]) -> None:
