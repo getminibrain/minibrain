@@ -91,6 +91,23 @@ function CheckRow({
     );
 }
 
+function CrowdedRow({ label }: { label: string }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Label className={cn(ROW, "h-auto py-1.5 text-muted-foreground")}>
+                    <Checkbox checked disabled />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{label}</span>
+                        <span className="text-sm">Hidden: not enough room</span>
+                    </span>
+                </Label>
+            </TooltipTrigger>
+            <TooltipContent>Widen the window or turn off another column to show it.</TooltipContent>
+        </Tooltip>
+    );
+}
+
 function BaseLabel({ option }: { option: BaseOption }) {
     return (
         <>
@@ -257,11 +274,13 @@ function DisplaySection({
     nested,
     onNested,
     columns,
+    crowded,
     onColumns,
 }: {
     nested: boolean;
     onNested: (value: boolean) => void;
     columns: Column[];
+    crowded: Column[];
     onColumns: (value: Column[]) => void;
 }) {
     const id = useId();
@@ -274,23 +293,27 @@ function DisplaySection({
             </Label>
             <fieldset className="flex flex-col">
                 <GroupLabel>Columns</GroupLabel>
-                {COLUMNS.map((column) => (
-                    <CheckRow
-                        key={column.id}
-                        label={column.label}
-                        checked={columns.includes(column.id)}
-                        onChange={(on) =>
-                            onColumns(
-                                toggled(
-                                    columns,
-                                    column.id,
-                                    on,
-                                    COLUMNS.map((item) => item.id),
-                                ),
-                            )
-                        }
-                    />
-                ))}
+                {COLUMNS.map((column) =>
+                    crowded.includes(column.id) ? (
+                        <CrowdedRow key={column.id} label={column.label} />
+                    ) : (
+                        <CheckRow
+                            key={column.id}
+                            label={column.label}
+                            checked={columns.includes(column.id)}
+                            onChange={(on) =>
+                                onColumns(
+                                    toggled(
+                                        columns,
+                                        column.id,
+                                        on,
+                                        COLUMNS.map((item) => item.id),
+                                    ),
+                                )
+                            }
+                        />
+                    ),
+                )}
             </fieldset>
         </section>
     );
@@ -308,6 +331,7 @@ export function ViewOptions({
     nested,
     onNested,
     columns,
+    crowded,
     onColumns,
 }: {
     pool: ListModel[];
@@ -321,6 +345,7 @@ export function ViewOptions({
     nested: boolean;
     onNested: (value: boolean) => void;
     columns: Column[];
+    crowded: Column[];
     onColumns: (value: Column[]) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -377,6 +402,7 @@ export function ViewOptions({
                             nested={nested}
                             onNested={onNested}
                             columns={columns}
+                            crowded={crowded}
                             onColumns={onColumns}
                         />
                     </div>

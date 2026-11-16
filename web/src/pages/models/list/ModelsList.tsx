@@ -523,6 +523,7 @@ export function ModelsList() {
                 }
             }}
             columns={chosenColumns}
+            crowded={chosenColumns.filter((column) => !shownColumns.includes(column))}
             onColumns={setColumns}
         />
     );
