@@ -1,18 +1,26 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Archive, Eraser, FileStack, HardDrive, Layers } from "lucide-react";
+import { Archive, Eraser, FileStack, HardDrive, Layers, Server } from "lucide-react";
 import { DataGrid, Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MiddleTruncate } from "~/components/MiddleTruncate";
+import { PoolLink } from "~/components/PoolLink";
 import { PanelSection, PanelSections, Stat } from "~/components/Section";
 import { type GaugeKind, type GaugeSegment, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { JOBS_PATH, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
-import { bytes } from "~/lib/time";
+import { bytes, relativeTime } from "~/lib/time";
 import { datasetHref } from "~/pages/models/list/cells";
 import { lowSpace } from "./NeedsALook";
-import { type InfrastructureInfo, type StoreInfo, plural } from "./parts";
+import {
+    type InfrastructureInfo,
+    MachineName,
+    type NodeInfo,
+    type PoolInfo,
+    type StoreInfo,
+    plural,
+} from "./parts";
 
 type StoredItem = InfrastructureInfo["largest"][number];
 type Reclaimable = NonNullable<InfrastructureInfo["reclaimable"]>;
@@ -70,14 +78,14 @@ function shareSegments(disk: Disk): GaugeSegment[] {
     }));
 }
 
-function diskSegments(disk: Disk, ours: number): GaugeSegment[] {
+function diskSegments(free: number, total: number, ours: number): GaugeSegment[] {
     return [
         { key: "minibrain", kind: "minibrain", label: "minibrain", bytes: ours },
         {
             key: "other",
             kind: "other",
             label: "Other files on the disk",
-            bytes: Math.max(0, disk.total - disk.free - ours),
+            bytes: Math.max(0, total - free - ours),
         },
     ];
 }
@@ -95,35 +103,43 @@ function commonFolder(paths: string[]): string {
     return shared.join("/") || "/";
 }
 
-function DiskCard({ disk }: { disk: Disk }) {
-    const share = shareSegments(disk);
-    const ours = share.reduce((sum, segment) => sum + segment.bytes, 0);
-    const low = lowSpace(disk.free, disk.total);
-    const where = commonFolder(disk.stores.map((store) => store.location));
-    const mount = disk.stores[0]?.mount ?? where;
-    const free = `${bytes(disk.free)} free of ${bytes(disk.total)}`;
+type DiskView = {
+    mount: string;
+    where: string;
+    free: number;
+    total: number;
+    ours: number;
+    share: GaugeSegment[];
+    heading?: ReactNode;
+};
+
+function DiskCard({ view }: { view: DiskView }) {
+    const { mount, where, free, total, ours, share } = view;
+    const low = lowSpace(free, total);
+    const left = `${bytes(free)} free of ${bytes(total)}`;
     return (
         <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
             <div className="flex min-w-0 flex-col gap-0.5">
+                {view.heading}
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                     <span className="min-w-0 truncate font-mono font-medium">{mount}</span>
                     <span className="text-sm tabular-nums">
                         {low ? (
-                            <StatusText tone="warning">{free}</StatusText>
+                            <StatusText tone="warning">{left}</StatusText>
                         ) : (
-                            <span className="text-muted-foreground">{free}</span>
+                            <span className="text-muted-foreground">{left}</span>
                         )}
                     </span>
                 </div>
                 <MiddleTruncate text={where} className="text-sm text-muted-foreground" />
             </div>
             <UsageGauge
-                segments={diskSegments(disk, ours)}
-                capacity={disk.total}
+                segments={diskSegments(free, total, ours)}
+                capacity={total}
                 low={low}
                 label={`Disk use of ${mount}`}
             />
-            {ours > 0 && (
+            {share.length > 1 && ours > 0 && (
                 <div className="flex flex-col gap-1.5">
                     <p className="text-sm text-muted-foreground tabular-nums">
                         {`minibrain's share · ${bytes(ours)}`}
@@ -137,6 +153,87 @@ function DiskCard({ disk }: { disk: Disk }) {
                 </div>
             )}
         </div>
+    );
+}
+
+function mainDiskView(disk: Disk): DiskView {
+    const share = shareSegments(disk);
+    const where = commonFolder(disk.stores.map((store) => store.location));
+    return {
+        mount: disk.stores[0]?.mount ?? where,
+        where,
+        free: disk.free,
+        total: disk.total,
+        ours: share.reduce((sum, segment) => sum + segment.bytes, 0),
+        share,
+    };
+}
+
+type MachineDisk = { key: string; node: NodeInfo; pool: string; view: DiskView };
+
+function machineDisks(pools: PoolInfo[]): MachineDisk[] {
+    return pools.flatMap((pool) =>
+        pool.nodes
+            .filter((node) => !node.roles.includes("main"))
+            .flatMap((node) =>
+                (node.disks ?? []).flatMap((disk) =>
+                    disk.total_bytes && disk.free_bytes !== null && disk.free_bytes !== undefined
+                        ? [
+                              {
+                                  key: `${node.id}-${disk.path}`,
+                                  node,
+                                  pool: pool.name,
+                                  view: {
+                                      mount: disk.mount ?? disk.path,
+                                      where: disk.path,
+                                      free: disk.free_bytes,
+                                      total: disk.total_bytes,
+                                      ours: disk.minibrain_bytes ?? 0,
+                                      share: [],
+                                  },
+                              },
+                          ]
+                        : [],
+                ),
+            ),
+    );
+}
+
+function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
+    const disks = machineDisks(pools);
+    return (
+        <PanelSection
+            flush
+            icon={Server}
+            title="Disks on other machines"
+            description="The disk each worker and engine keeps model copies and job files on, as each last reported."
+        >
+            {disks.length === 0 ? (
+                <p className="px-4 py-3 text-muted-foreground">
+                    No other machine has reported its disk.
+                </p>
+            ) : (
+                <div className="flex flex-col divide-y">
+                    {disks.map((disk) => (
+                        <DiskCard
+                            key={disk.key}
+                            view={{
+                                ...disk.view,
+                                heading: (
+                                    <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground">
+                                        <MachineName node={disk.node} />
+                                        <PoolLink name={disk.pool} />
+                                        {!disk.node.online && disk.node.disks?.[0]?.reported_at && (
+                                            <span>{`reported ${relativeTime(disk.node.disks[0].reported_at)}`}</span>
+                                        )}
+                                    </span>
+                                ),
+                            }}
+                        />
+                    ))}
+                </div>
+            )}
+        </PanelSection>
     );
 }
 
@@ -219,7 +316,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
         <PanelSection
             flush
             icon={HardDrive}
-            title="Disks"
+            title="Disks on main"
             description="What minibrain keeps on each disk, and what is left."
         >
             {disks.length === 0 ? (
@@ -227,7 +324,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
             ) : (
                 <div className="flex flex-col divide-y">
                     {disks.map((disk) => (
-                        <DiskCard key={disk.key} disk={disk} />
+                        <DiskCard key={disk.key} view={mainDiskView(disk)} />
                     ))}
                 </div>
             )}
@@ -371,10 +468,17 @@ function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined })
     );
 }
 
-export function StorageTab({ info }: { info: InfrastructureInfo | undefined }) {
+export function StorageTab({
+    info,
+    pools,
+}: {
+    info: InfrastructureInfo | undefined;
+    pools: PoolInfo[];
+}) {
     return (
         <PanelSections>
             <StorageSection info={info} />
+            <MachineDisksSection pools={pools} />
             <FreeUpSection info={info} />
             <LargestSection info={info} />
             <StoresSection info={info} />

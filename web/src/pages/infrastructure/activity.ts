@@ -1,4 +1,4 @@
-import type { GaugeSegment } from "~/components/UsageGauge";
+import type { GaugeBasis, GaugeSegment } from "~/components/UsageGauge";
 import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import type { NodeInfo, ReplicaInfo } from "./parts";
 
@@ -90,4 +90,44 @@ export function memorySegments(node: NodeInfo, engines: ReplicaInfo[]): GaugeSeg
             bytes: job.memory_bytes ?? 0,
         }));
     return [...served, ...training];
+}
+
+export type MemoryView = {
+    basis: GaugeBasis;
+    capacity: number;
+    used: number;
+    segments: GaugeSegment[];
+};
+
+export function measuredView(node: NodeInfo): MemoryView | null {
+    const metrics = node.online ? node.metrics : null;
+    const total = metrics?.memory_total_bytes;
+    const used = metrics?.memory_used_bytes;
+    if (!total || used === null || used === undefined) {
+        return null;
+    }
+    return {
+        basis: "measured",
+        capacity: total,
+        used,
+        segments: [{ key: "measured", kind: "measured", label: "In use, measured", bytes: used }],
+    };
+}
+
+export function estimatedView(node: NodeInfo, engines: ReplicaInfo[]): MemoryView | null {
+    const total = node.usable_bytes;
+    if (!node.online || !total) {
+        return null;
+    }
+    const segments = memorySegments(node, engines);
+    return {
+        basis: "estimated",
+        capacity: total,
+        used: segments.reduce((sum, segment) => sum + segment.bytes, 0),
+        segments,
+    };
+}
+
+export function memoryView(node: NodeInfo, engines: ReplicaInfo[]): MemoryView | null {
+    return measuredView(node) ?? estimatedView(node, engines);
 }

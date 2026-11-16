@@ -2,7 +2,7 @@ import { Server } from "lucide-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
-import { GaugeLegend, UsageGauge, kindLegend } from "~/components/UsageGauge";
+import { BASIS_LABELS, GaugeLegend, UsageGauge, kindLegend } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { kindNoun } from "~/lib/jobs";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -13,20 +13,22 @@ import {
     type NodeJob,
     jobLink,
     jobSubject,
-    memorySegments,
+    memoryView,
     servedHref,
     versioned,
 } from "./activity";
+import { machineStatus } from "./machines";
 import {
     MachineName,
     type NodeInfo,
     OnlineCount,
     type PoolInfo,
     type ReplicaInfo,
+    RoomLine,
     fleetAnchor,
 } from "./parts";
 
-const LEGEND = kindLegend(["weights", "adapters", "training"]);
+const LEGEND = kindLegend(["measured", "weights", "adapters", "training"]);
 
 function EngineActivity({ engine }: { engine: ReplicaInfo }) {
     const verb = ENGINE_DOING[engine.state] ?? "Serving";
@@ -79,30 +81,29 @@ function JobActivity({ job }: { job: NodeJob }) {
 }
 
 function MemoryLine({ node, engines }: { node: NodeInfo; engines: ReplicaInfo[] }) {
-    const total = node.usable_bytes;
-    if (total === null || total === undefined || total <= 0) {
+    const view = memoryView(node, engines);
+    if (view === null) {
         return (
             <p className="text-sm text-muted-foreground">
                 This machine has not reported its memory.
             </p>
         );
     }
-    const segments = memorySegments(node, engines);
-    const used = segments.reduce((sum, segment) => sum + segment.bytes, 0);
-    const over = used > total;
+    const { used, capacity, basis } = view;
     return (
         <div className="flex flex-col gap-1.5">
             <UsageGauge
-                segments={segments}
-                capacity={total}
+                segments={view.segments}
+                capacity={capacity}
                 label={`${node.host} memory`}
                 legend={false}
+                basis={basis}
             />
             <p className="text-sm text-muted-foreground tabular-nums">
-                {over ? (
-                    <StatusText tone="destructive">{`${bytes(used)} planned, more than its ${bytes(total)}`}</StatusText>
+                {used > capacity ? (
+                    <StatusText tone="destructive">{`${bytes(used)} planned, more than its ${bytes(capacity)}`}</StatusText>
                 ) : (
-                    `${bytes(used)} in use · ${bytes(total - used)} free`
+                    `${bytes(used)} in use · ${bytes(capacity - used)} free · ${BASIS_LABELS[basis].toLowerCase()}`
                 )}
             </p>
         </div>
@@ -119,10 +120,18 @@ function MachineTile({ node, engines }: { node: NodeInfo; engines: ReplicaInfo[]
         .filter(Boolean)
         .join(" · ");
     const busy = engines.length > 0 || node.jobs.length > 0;
+    const draining = node.state === "draining";
     return (
         <li className="flex min-w-0 flex-col gap-2 px-4 py-3">
             <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <MachineName node={node} />
+                <span className="flex min-w-0 items-baseline gap-2">
+                    <MachineName node={node} />
+                    {draining && (
+                        <span className="text-sm text-muted-foreground">
+                            {machineStatus(node, engines).label}
+                        </span>
+                    )}
+                </span>
                 <span className="min-w-0 truncate text-sm text-muted-foreground tabular-nums">
                     {hardware}
                 </span>
@@ -166,7 +175,8 @@ function PoolCard({ pool }: { pool: PoolInfo }) {
                         <span className="truncate text-sm text-muted-foreground">{pool.label}</span>
                     )}
                 </span>
-                <span className="text-sm">
+                <span className="flex flex-wrap items-baseline gap-x-3 text-sm">
+                    <RoomLine room={pool.room} />
                     <OnlineCount nodes={pool.nodes} />
                 </span>
             </header>
@@ -193,7 +203,7 @@ export function FleetBoard({ pools }: { pools: PoolInfo[] }) {
             bare
             icon={Server}
             title="Machines"
-            description="Every pool and what each machine is doing. Memory is estimated from weight and adapter files and each training plan."
+            description="Every pool and what each machine is doing. Memory is measured where the machine reports it, else estimated from weight and adapter files and each training plan."
         >
             <div className="flex flex-col gap-3">
                 <GaugeLegend items={LEGEND} />

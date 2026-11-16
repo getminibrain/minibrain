@@ -21,13 +21,17 @@ import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref } from "~/lib/modelLinks";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { MachineActions } from "./MachineActions";
+import { LiveMetrics } from "./MachineLive";
 import { Command, lowDiskText, rejoinCommand, rejoinHint } from "./NeedsALook";
 import {
     MEMORY_LABELS,
+    type MemoryView,
     engineLabel,
+    estimatedView,
     jobLink,
     jobSubject,
-    memorySegments,
+    measuredView,
     servedHref,
     versioned,
 } from "./activity";
@@ -37,6 +41,7 @@ import {
     failedEngines,
     hardwareText,
     lowDiskOf,
+    machineStatus,
     versionDrift,
 } from "./machines";
 import type { InfrastructureInfo, NodeInfo, ReplicaInfo } from "./parts";
@@ -70,9 +75,22 @@ function Muted({ children }: { children: ReactNode }) {
     return <p className="text-muted-foreground">{children}</p>;
 }
 
+function machineDiskFacts(node: NodeInfo): [string, ReactNode][] {
+    return (node.disks ?? [])
+        .filter(
+            (disk) => disk.total_bytes && disk.free_bytes !== null && disk.free_bytes !== undefined,
+        )
+        .map((disk) => [
+            `Disk ${disk.mount ?? disk.path}`,
+            <span key={disk.path} className="tabular-nums">
+                {`${bytes(disk.free_bytes)} free of ${bytes(disk.total_bytes)} · minibrain keeps ${bytes(disk.minibrain_bytes)}`}
+            </span>,
+        ]);
+}
+
 function diskFacts(row: MachineRow, info: InfrastructureInfo | undefined): [string, ReactNode][] {
     if (!row.node.roles.includes("main")) {
-        return [];
+        return machineDiskFacts(row.node);
     }
     const disks = new Map<string, NonNullable<InfrastructureInfo["stores"]>[number]>();
     for (const store of info?.stores ?? []) {
@@ -176,19 +194,31 @@ function EngineItem({ engine }: { engine: ReplicaInfo }) {
     );
 }
 
+function MemoryGauge({ view, host }: { view: MemoryView | null; host: string }) {
+    if (view === null) {
+        return null;
+    }
+    return (
+        <UsageGauge
+            segments={view.segments}
+            capacity={view.capacity}
+            basis={view.basis}
+            label={`${host} memory`}
+        />
+    );
+}
+
 function RunningBlock({ row }: { row: MachineRow }) {
     const { node, engines } = row;
     const recent = node.recent ?? [];
-    const total = node.usable_bytes;
+    const measured = measuredView(node);
+    const estimated = estimatedView(node, engines);
     return (
         <Block title="Running">
-            {node.online && total ? (
-                <UsageGauge
-                    segments={memorySegments(node, engines)}
-                    capacity={total}
-                    label={`${node.host} memory`}
-                />
-            ) : null}
+            <MemoryGauge view={measured} host={node.host} />
+            {(measured === null || (estimated?.segments.length ?? 0) > 0) && (
+                <MemoryGauge view={estimated} host={node.host} />
+            )}
             {engines.length === 0 && node.jobs.length === 0 ? (
                 <Muted>
                     {node.online ? "Idle: no engine and no job." : "Nothing while offline."}
@@ -395,7 +425,7 @@ function ProblemsBlock({
               ]
             : []),
         ...lowDiskOf(row.node, info).map((store) => ({
-            key: `disk-${store.name}`,
+            key: `disk-${store.key}`,
             tone: "warning" as const,
             text: lowDiskText(store),
             fix: (
@@ -448,8 +478,8 @@ export function MachineSheet({
                         <SheetHeader>
                             <SheetTitle className="font-mono">{row.node.host}</SheetTitle>
                             <SheetDescription className="flex flex-wrap items-baseline gap-x-2">
-                                <StatusText tone={row.node.online ? "success" : "neutral"}>
-                                    {row.node.online ? "Online" : "Offline"}
+                                <StatusText tone={machineStatus(row.node, row.engines).tone}>
+                                    {machineStatus(row.node, row.engines).label}
                                 </StatusText>
                                 <span>{`· ${row.node.roles.join(", ")} · ${hardwareText(row.node)}`}</span>
                             </SheetDescription>
@@ -457,10 +487,13 @@ export function MachineSheet({
                         <ProblemsBlock row={row} main={main} info={info} problems={problems} />
                         <HardwareBlock row={row} info={info} />
                         <RunningBlock row={row} />
+                        <Block title="Live">
+                            <LiveMetrics row={row} />
+                        </Block>
                         <VersionsBlock node={row.node} main={main} />
                         <ConnectionBlock row={row} />
                         <Block title="Actions">
-                            <Muted>Drain and Remove from pool will appear here.</Muted>
+                            <MachineActions row={row} />
                         </Block>
                     </>
                 )}

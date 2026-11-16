@@ -11,7 +11,7 @@ pool name.
 |---|---|
 | [security.md](security.md) | Policies, trust zones, ports |
 | [state.md](state.md) | Failure modes, database, artifacts, several mains |
-| [serving.md](serving.md) | Planes, request path, engines, routing, compute pools |
+| [serving.md](serving.md) | Planes, request path, engines, routing, compute pools, machine heartbeats and drain |
 | [models.md](models.md) | Catalogue, Add from Hugging Face, sources, import formats |
 | [jobs.md](jobs.md) | Job contract, lifecycle, retries |
 

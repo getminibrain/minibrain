@@ -11,7 +11,7 @@ from pydantic import Field
 from minibrain.api.bases import BaseWeights, LiveBases, live
 from minibrain.api.bases import base_file as file_of
 from minibrain.api.bases import base_weights as weights_of
-from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import MetricsDep, QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.auth.engine_tokens import engine_token
@@ -23,10 +23,11 @@ from minibrain.jobs.queue import EventIn, WorkerInfo
 from minibrain.lifecycle import STOPPING
 from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.machine_metrics import MachineSample
 from minibrain.models.placement import desired_engines
 from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
-from minibrain.registry.compute import record_node
+from minibrain.registry.compute import DRAINING, node_id, record_node
 from minibrain.registry.files import register
 from minibrain.registry.models import Artifact, BaseModel, Job, JobKind
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -57,6 +58,7 @@ class WorkerBody(pydantic.BaseModel):
     gpus: int = 1
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = Field(default_factory=dict)
+    metrics: MachineSample | None = None
 
     def info(self) -> WorkerInfo:
         return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus, pool=self.pool)
@@ -156,9 +158,13 @@ def job_secrets(session: SessionDep, settings: Settings, job_id: int) -> dict[st
     return job_env(resolve(session, settings, get_connection(session, int(connection_id))))
 
 
-def report_worker(session: SessionDep, body: WorkerBody) -> None:
-    record_node(session, body.pool, body.host, "worker", body.hardware)
+def report_worker(session: SessionDep, metrics: MetricsDep, body: WorkerBody, rejoin: bool = False) -> str:
+    node = record_node(session, body.pool, body.host, "worker", body.hardware, rejoin)
+    state = node.state
     session.commit()
+    if body.metrics is not None:
+        metrics.record(node_id(body.pool, body.host), body.metrics)
+    return state
 
 
 def admitted(session: SessionDep, request: Request, caller: Caller, body: WorkerBody) -> None:
@@ -167,11 +173,16 @@ def admitted(session: SessionDep, request: Request, caller: Caller, body: Worker
 
 @router.post("/register", status_code=204)
 def register_worker(
-    body: WorkerBody, request: Request, caller: WorkerCaller, queue: QueueDep, session: SessionDep
+    body: WorkerBody,
+    request: Request,
+    caller: WorkerCaller,
+    queue: QueueDep,
+    session: SessionDep,
+    metrics: MetricsDep,
 ) -> None:
     admitted(session, request, caller, body)
+    report_worker(session, metrics, body, rejoin=True)
     queue.register(body.info())
-    report_worker(session, body)
 
 
 @router.post("/claim", response_model=None)
@@ -182,12 +193,16 @@ def claim(
     queue: QueueDep,
     session: SessionDep,
     settings: SettingsDep,
+    metrics: MetricsDep,
 ) -> ClaimResponse | Response:
     admitted(session, request, caller, body.worker)
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
     worker = body.worker.info()
+    state = report_worker(session, metrics, body.worker)
     queue.register(worker)
-    report_worker(session, body.worker)
+    if state == DRAINING:
+        STOPPING.wait(max(0.0, deadline - time.monotonic()))
+        return Response(status_code=204)
     while True:
         claimed = queue.claim(worker)
         if claimed is not None:
@@ -214,11 +229,12 @@ def hosted_engines(
     queue: QueueDep,
     session: SessionDep,
     settings: SettingsDep,
+    metrics: MetricsDep,
 ) -> EnginesResponse:
     worker = body.worker
     admitted(session, request, caller, worker)
+    report_worker(session, metrics, worker)
     queue.register(worker.info())
-    report_worker(session, worker)
     config = request.app.state.gateway_config.current()
     placements = {key: found for key, found in config.placements.items() if key not in config.problems}
     wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)

@@ -21,7 +21,7 @@ import {
 } from "obp-ui";
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useState } from "react";
 import { PoolLink } from "~/components/PoolLink";
-import { UsageGauge } from "~/components/UsageGauge";
+import { BASIS_LABELS, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
@@ -29,14 +29,7 @@ import { splitList, useListSearch } from "~/lib/listSearch";
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { relativeTime } from "~/lib/time";
 import { MachineSheet } from "./MachineSheet";
-import {
-    ENGINE_DOING,
-    jobLink,
-    jobSubject,
-    memorySegments,
-    servedHref,
-    versioned,
-} from "./activity";
+import { ENGINE_DOING, jobLink, jobSubject, memoryView, servedHref, versioned } from "./activity";
 import {
     type MachineFilters,
     type MachineRow,
@@ -46,6 +39,7 @@ import {
     acceleratorOf,
     hardwareParts,
     machineRows,
+    machineStatus,
     matches,
     problemsOf,
     statusOf,
@@ -55,6 +49,7 @@ import {
     type NodeInfo,
     OnlineCount,
     type PoolInfo,
+    RoomLine,
     plural,
 } from "./parts";
 
@@ -195,25 +190,24 @@ function HardwareCell({ node }: { node: NodeInfo }) {
 }
 
 function MemoryCell({ row }: { row: MachineRow }) {
-    const total = row.node.usable_bytes;
-    if (!row.node.online || total === null || total === undefined || total <= 0) {
+    const view = memoryView(row.node, row.engines);
+    if (view === null) {
         return (
             <span className="text-muted-foreground">{row.node.online ? "Not reported" : "–"}</span>
         );
     }
-    const segments = memorySegments(row.node, row.engines);
-    const used = segments.reduce((sum, segment) => sum + segment.bytes, 0);
     return (
         <span className="flex items-center gap-2">
             <UsageGauge
-                segments={segments}
-                capacity={total}
+                segments={view.segments}
+                capacity={view.capacity}
                 label={`${row.node.host} memory`}
                 legend={false}
+                basis={view.basis}
                 className="w-14 shrink-0"
             />
-            <span className="text-sm text-muted-foreground tabular-nums">
-                {shareText(used, total)}
+            <span className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
+                {`${shareText(view.used, view.capacity)} ${BASIS_LABELS[view.basis].toLowerCase()}`}
             </span>
         </span>
     );
@@ -235,6 +229,7 @@ function GroupRow({ pool }: { pool: PoolInfo }) {
                     <span className="text-muted-foreground tabular-nums">
                         {plural(pool.engines.length, "engine")}
                     </span>
+                    <RoomLine room={pool.room} />
                 </span>
             </TableCell>
         </TableRow>
@@ -255,6 +250,7 @@ function MachineLine({
     onOpen: (row: MachineRow) => void;
 }) {
     const { node } = row;
+    const status = machineStatus(node, row.engines);
     const click = (event: MouseEvent<HTMLTableRowElement>) => {
         if ((event.target as HTMLElement).closest(INTERACTIVE)) {
             return;
@@ -274,7 +270,7 @@ function MachineLine({
         <TableRow
             id={anchor}
             tabIndex={0}
-            aria-label={`${node.host}, ${node.online ? "online" : "offline"}`}
+            aria-label={`${node.host}, ${status.label.toLowerCase()}`}
             onClick={click}
             onKeyDown={key}
             className={cn(
@@ -283,9 +279,7 @@ function MachineLine({
             )}
         >
             <TableCell className="py-2">
-                <StatusText tone={node.online ? "success" : "neutral"}>
-                    {node.online ? "Online" : "Offline"}
-                </StatusText>
+                <StatusText tone={status.tone}>{status.label}</StatusText>
             </TableCell>
             <TableCell className="py-2">
                 <span className="flex min-w-0 items-center gap-2">

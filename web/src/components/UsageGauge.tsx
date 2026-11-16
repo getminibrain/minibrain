@@ -10,6 +10,7 @@ export type GaugeKind =
     | "datasets"
     | "uploads"
     | "minibrain"
+    | "measured"
     | "other";
 
 type KindStyle = { label: string; color: string; danger: string };
@@ -50,8 +51,41 @@ export const GAUGE_KINDS: Record<GaugeKind, KindStyle> = {
         color: "var(--chart-series-5)",
         danger: "var(--destructive)",
     },
+    measured: {
+        label: "In use (measured)",
+        color: "var(--chart-series-5)",
+        danger: "var(--destructive)",
+    },
     other: { label: "Other files", color: "var(--faint)", danger: "var(--faint)" },
 };
+
+export type GaugeBasis = "measured" | "estimated";
+
+export const BASIS_LABELS: Record<GaugeBasis, string> = {
+    measured: "Measured",
+    estimated: "Estimated",
+};
+
+export const BASIS_HINTS: Record<GaugeBasis, string> = {
+    measured: "Read from the machine with its last heartbeat.",
+    estimated:
+        "Worked out from weight and adapter files and each training plan; not read from the machine.",
+};
+
+export function BasisLabel({ basis }: { basis: GaugeBasis }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="cursor-default text-sm text-muted-foreground">
+                    {BASIS_LABELS[basis]}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">
+                {BASIS_HINTS[basis]}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
 
 export type GaugeSegment = {
     key: string;
@@ -119,6 +153,7 @@ export function UsageGauge({
     over = false,
     legend = true,
     free = true,
+    basis,
     className,
 }: {
     label: string;
@@ -128,6 +163,7 @@ export function UsageGauge({
     over?: boolean;
     legend?: boolean;
     free?: boolean;
+    basis?: GaugeBasis;
     className?: string;
 }) {
     const total = used(segments);
@@ -139,7 +175,7 @@ export function UsageGauge({
         <div className={cn("flex min-w-0 flex-col gap-2", className)}>
             <div
                 role="meter"
-                aria-label={label}
+                aria-label={basis ? `${label}, ${BASIS_LABELS[basis].toLowerCase()}` : label}
                 aria-valuemin={0}
                 aria-valuemax={Math.max(capacity, 1)}
                 aria-valuenow={Math.min(total, capacity)}
@@ -179,10 +215,13 @@ export function UsageGauge({
                 )}
             </div>
             {legend && (
-                <GaugeLegend
-                    items={legendItems(segments, capacity, state, anyPlanned, free)}
-                    short={total > capacity ? total - capacity : null}
-                />
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <GaugeLegend
+                        items={legendItems(segments, capacity, state, anyPlanned, free)}
+                        short={total > capacity ? total - capacity : null}
+                    />
+                    {basis && <BasisLabel basis={basis} />}
+                </div>
             )}
         </div>
     );

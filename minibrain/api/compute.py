@@ -1,19 +1,31 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain import provision
 from minibrain.api.access import admin, viewer
-from minibrain.api.deps import LocalNodeDep, SessionDep
+from minibrain.api.deps import LocalNodeDep, MetricsDep, SessionDep
 from minibrain.api.job_facts import TRAIN_START
 from minibrain.auth.identity import current_actor
 from minibrain.jobs.metrics import latest_data
+from minibrain.models.hardware import LOCAL_POOL, NodeReport, needed_bytes
+from minibrain.models.machine_metrics import (
+    DiskSample,
+    GpuSample,
+    MachineSample,
+    MetricsHistory,
+    gpu_percent,
+    largest_free,
+    measured_memory,
+)
 from minibrain.models.placement import pools_of, weights_of
-from minibrain.registry.compute import Pool, node_id, pools, replica_host
+from minibrain.models.room import Free, pool_room
+from minibrain.registry.compute import ACTIVE, REMOVED, Pool, PoolNode, node_id, pools, replica_host
+from minibrain.registry.machines import drain, remove, undrain
 from minibrain.registry.models import (
     Artifact,
     AuditEvent,
@@ -23,6 +35,7 @@ from minibrain.registry.models import (
     JobKind,
     JobStatus,
     Model,
+    Node,
     Version,
     Worker,
 )
@@ -64,11 +77,44 @@ class RecentJob(BaseModel):
     finished_at: datetime
 
 
+class NodeMetrics(BaseModel):
+    at: datetime
+    gpus: list[GpuSample]
+    ram_used_bytes: int | None
+    ram_total_bytes: int | None
+    cpu_percent: float | None
+    gpu_percent: float | None = Field(description="Mean busy share of the machine's GPUs, in percent.")
+    memory_used_bytes: int | None = Field(description="Measured memory in use where models run.")
+    memory_total_bytes: int | None
+
+
+class MetricsPoint(BaseModel):
+    at: datetime
+    gpu_percent: float | None
+    memory_used_bytes: int | None
+    memory_total_bytes: int | None
+    cpu_percent: float | None
+
+
+class MachineMetricsInfo(BaseModel):
+    current: NodeMetrics | None
+    history: list[MetricsPoint] = Field(description="Samples of the last hour, oldest first.")
+
+
+class NodeDisk(DiskSample):
+    reported_at: datetime
+
+
 class NodeInfo(BaseModel):
     id: str
     host: str
     roles: list[str]
     online: bool
+    state: Literal["active", "draining"] = Field(
+        default="active", description="A draining machine finishes its work and takes no new jobs or engines."
+    )
+    metrics: NodeMetrics | None = Field(default=None, description="The latest measured sample, while fresh.")
+    disks: list[NodeDisk] = Field(default=[], description="The disk this machine keeps models on, last reported.")
     seen_at: datetime | None
     system: str
     arch: str
@@ -103,11 +149,23 @@ class ReplicaInfo(BaseModel):
     serves: list[ServedModel]
 
 
+class PoolRoom(BaseModel):
+    serve_count: int
+    serve_size: str | None
+    serve_bytes: int | None
+    train_size: str | None
+    train_strategy: str | None
+    free_bytes: int
+    measured: bool
+    basis: str
+
+
 class PoolInfo(BaseModel):
     name: str
     label: str
     nodes: list[NodeInfo]
     engines: list[ReplicaInfo]
+    room: PoolRoom | None = Field(default=None, description="What still fits on the online machines that take work.")
 
 
 def planned_peak(session: Session, job: Job) -> int | None:
@@ -206,29 +264,199 @@ def replica_info(
     )
 
 
+def node_metrics(sample: MachineSample, at: datetime, accelerator: str) -> NodeMetrics:
+    memory = measured_memory(sample, accelerator)
+    return NodeMetrics(
+        at=at,
+        gpus=sample.gpus,
+        ram_used_bytes=sample.ram_used_bytes,
+        ram_total_bytes=sample.ram_total_bytes,
+        cpu_percent=sample.cpu_percent,
+        gpu_percent=gpu_percent(sample),
+        memory_used_bytes=memory[0] if memory else None,
+        memory_total_bytes=memory[1] if memory else None,
+    )
+
+
+def estimated_use(engines: list[ReplicaInfo], jobs: list[NodeJob]) -> int:
+    weights = sum(needed_bytes(engine.weights_bytes or 0) for engine in engines if engine.state != "failed")
+    adapters = sum(served.adapter_bytes or 0 for engine in engines for served in engine.serves)
+    return weights + adapters + sum(job.memory_bytes or 0 for job in jobs)
+
+
+def measured_free(item: PoolNode, sample: MachineSample) -> Free | None:
+    report = item.report
+    memory = measured_memory(sample, report.accelerator)
+    if memory is None:
+        return None
+    free = max(0, memory[1] - memory[0])
+    largest = largest_free(sample, report.accelerator) or 0
+    if report.usable_bytes and report.accelerator == "mps":
+        free, largest = min(free, report.usable_bytes), min(largest, report.usable_bytes)
+    return Free(report, item.roles, free, largest, True)
+
+
+def free_of(
+    item: PoolNode, sample: MachineSample | None, engines: list[ReplicaInfo], jobs: list[NodeJob]
+) -> Free | None:
+    found = measured_free(item, sample) if sample is not None else None
+    if found is not None:
+        return found
+    usable = item.report.usable_bytes
+    if not usable:
+        return None
+    free = max(0, usable - estimated_use(engines, jobs))
+    biggest = max((gpu.memory_bytes for gpu in item.report.gpus), default=usable)
+    return Free(item.report, item.roles, free, min(biggest, free), False)
+
+
+Sampled = tuple[MachineSample, datetime]
+
+
+def node_disks(metrics: MetricsHistory, item: PoolNode) -> list[NodeDisk]:
+    found = metrics.disks(item.id)
+    if found is None:
+        return []
+    at, disks = found
+    return [NodeDisk(reported_at=at, **disk.model_dump()) for disk in disks]
+
+
+def node_info(
+    item: PoolNode, jobs: list[NodeJob], recent: list[RecentJob], sample: Sampled | None, disks: list[NodeDisk]
+) -> NodeInfo:
+    fields = {key: value for key, value in item.report.as_dict().items() if key != "host"}
+    fields |= {
+        "id": item.id,
+        "host": item.host,
+        "roles": item.roles,
+        "online": item.online,
+        "state": "draining" if item.state != ACTIVE else "active",
+        "metrics": node_metrics(sample[0], sample[1], item.report.accelerator) if sample else None,
+        "seen_at": item.seen_at,
+        "jobs": jobs,
+        "recent": recent,
+        "disks": disks,
+    }
+    return NodeInfo.model_validate(fields)
+
+
+def latest_sample(metrics: MetricsHistory, item: PoolNode) -> Sampled | None:
+    point = metrics.latest(item.id) if item.online else None
+    return (point.sample, point.at) if point is not None else None
+
+
+def pool_info(
+    session: Session,
+    pool: Pool,
+    jobs: dict[str, list[NodeJob]],
+    recent: dict[str, list[RecentJob]],
+    served: dict[tuple[str, str], list[ServedModel]],
+    metrics: MetricsHistory,
+) -> PoolInfo:
+    engines = [replica_info(session, replica, served) for replica in pool.engines]
+    nodes: list[NodeInfo] = []
+    machines: list[Free] = []
+    for item in pool.nodes:
+        sample = latest_sample(metrics, item)
+        disks = node_disks(metrics, item)
+        nodes.append(node_info(item, jobs.get(item.id, []), recent.get(item.id, []), sample, disks))
+        here = [engine for engine in engines if engine.host == item.host]
+        free = free_of(item, sample[0] if sample else None, here, jobs.get(item.id, []))
+        if item.online and item.state == ACTIVE and free is not None:
+            machines.append(free)
+    room = pool_room(session, pool.name, machines, sorted({engine.base_model for engine in engines}))
+    return PoolInfo(
+        name=pool.name,
+        label=pool.label,
+        nodes=nodes,
+        engines=engines,
+        room=PoolRoom.model_validate(room.__dict__) if room is not None else None,
+    )
+
+
 @router.get("/pools", dependencies=[Depends(viewer)], summary="List compute pools")
-def list_pools(session: SessionDep, node: LocalNodeDep) -> list[PoolInfo]:
-    found: list[PoolInfo] = []
+def list_pools(session: SessionDep, node: LocalNodeDep, metrics: MetricsDep) -> list[PoolInfo]:
     jobs = running_jobs(session)
     recent = recent_jobs(session)
     served = served_models(session)
-    for pool in pools(session, node):
-        nodes = [
-            NodeInfo(
-                id=item.id,
-                host=item.host,
-                roles=item.roles,
-                online=item.online,
-                seen_at=item.seen_at,
-                jobs=jobs.get(item.id, []),
-                recent=recent.get(item.id, []),
-                **{key: value for key, value in item.report.as_dict().items() if key != "host"},
-            )
-            for item in pool.nodes
-        ]
-        engines = [replica_info(session, replica, served) for replica in pool.engines]
-        found.append(PoolInfo(name=pool.name, label=pool.label, nodes=nodes, engines=engines))
+    return [pool_info(session, pool, jobs, recent, served, metrics) for pool in pools(session, node)]
+
+
+def machine_of(session: Session, local: str, pool: str, host: str) -> Node:
+    if pool == LOCAL_POOL and host == local:
+        raise HTTPException(status_code=409, detail=f"{host} is main: it runs minibrain itself and stays in its pool")
+    found = session.get(Node, node_id(pool, host))
+    if found is None or found.state == REMOVED:
+        raise HTTPException(status_code=404, detail=f"No machine {host} in pool {pool}")
     return found
+
+
+def audit_machine(session: Session, action: str, machine: Node) -> None:
+    detail = {"pool": machine.pool, "host": machine.host}
+    session.add(AuditEvent(actor=current_actor(), action=action, target=machine.id, detail=detail))
+
+
+def accelerator_of(session: Session, local: NodeReport, pool: str, host: str) -> str:
+    if pool == LOCAL_POOL and host == local.host:
+        return local.accelerator
+    found = session.get(Node, node_id(pool, host))
+    if found is None or found.state == REMOVED:
+        raise HTTPException(status_code=404, detail=f"No machine {host} in pool {pool}")
+    return str(found.hardware.get("accelerator") or "cpu")
+
+
+MACHINE = "/pools/{pool}/machines/{host}"
+
+
+def metrics_point(found: NodeMetrics) -> MetricsPoint:
+    return MetricsPoint(
+        at=found.at,
+        gpu_percent=found.gpu_percent,
+        memory_used_bytes=found.memory_used_bytes,
+        memory_total_bytes=found.memory_total_bytes,
+        cpu_percent=found.cpu_percent,
+    )
+
+
+@router.get(f"{MACHINE}/metrics", dependencies=[Depends(viewer)], summary="Read a machine's live metrics")
+def machine_metrics(
+    pool: str, host: str, session: SessionDep, node: LocalNodeDep, metrics: MetricsDep
+) -> MachineMetricsInfo:
+    accelerator = accelerator_of(session, node, pool, host)
+    key = node_id(pool, host)
+    latest = metrics.latest(key)
+    return MachineMetricsInfo(
+        current=node_metrics(latest.sample, latest.at, accelerator) if latest else None,
+        history=[metrics_point(node_metrics(point.sample, point.at, accelerator)) for point in metrics.history(key)],
+    )
+
+
+@router.post(f"{MACHINE}/drain", status_code=204, dependencies=[Depends(admin)], summary="Drain a machine")
+def drain_machine(pool: str, host: str, session: SessionDep, node: LocalNodeDep) -> Response:
+    machine = machine_of(session, node.host, pool, host)
+    if drain(machine):
+        audit_machine(session, "machine.drain", machine)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.post(f"{MACHINE}/undrain", status_code=204, dependencies=[Depends(admin)], summary="Undrain a machine")
+def undrain_machine(pool: str, host: str, session: SessionDep, node: LocalNodeDep) -> Response:
+    machine = machine_of(session, node.host, pool, host)
+    if undrain(machine):
+        audit_machine(session, "machine.undrain", machine)
+    session.commit()
+    return Response(status_code=204)
+
+
+@router.delete(MACHINE, status_code=204, dependencies=[Depends(admin)], summary="Remove a machine from its pool")
+def remove_machine(pool: str, host: str, session: SessionDep, node: LocalNodeDep, metrics: MetricsDep) -> Response:
+    machine = machine_of(session, node.host, pool, host)
+    remove(session, machine)
+    audit_machine(session, "machine.remove", machine)
+    session.commit()
+    metrics.forget(machine.id)
+    return Response(status_code=204)
 
 
 class PoolPrice(BaseModel):

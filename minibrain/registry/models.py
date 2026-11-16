@@ -801,6 +801,7 @@ class Node(Base):
     hardware: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    state: Mapped[str] = mapped_column(default="active", server_default="active")
 
 
 class EngineReplica(Base):

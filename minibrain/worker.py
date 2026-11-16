@@ -26,6 +26,7 @@ from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import size_problems
+from minibrain.models.machine_metrics import Sampler
 from minibrain.registry.models import JobKind
 from minibrain.telemetry.logs import configure_logging
 
@@ -70,6 +71,17 @@ class WorkerStoppedError(Exception):
     pass
 
 
+class MachineRemovedError(WorkerStoppedError):
+    pass
+
+
+def refusal_of(response: Any) -> str:
+    try:
+        return str(response.json().get("detail") or response.text)
+    except ValueError:
+        return str(response.text)
+
+
 class Response(Protocol):
     status_code: int
     text: str
@@ -100,6 +112,7 @@ class WorkerConfig:
     hardware: dict[str, Any] = field(default_factory=dict)
     models: Path | None = None
     prune: bool = True
+    sampler: Sampler | None = None
 
     @property
     def models_dir(self) -> Path:
@@ -126,6 +139,8 @@ class MainClient:
             else:
                 if response.status_code == 409:
                     raise LeaseLostError(response.text)
+                if response.status_code == 410:
+                    raise MachineRemovedError(refusal_of(response))
                 if response.status_code < 500 or attempt == RETRIES - 1:
                     response.raise_for_status()
                     return response
@@ -146,7 +161,7 @@ class MainClient:
             "gpus": config.gpus,
             "pool": config.pool,
             "hardware": config.hardware,
-        }
+        } | ({"metrics": config.sampler.body()} if config.sampler is not None else {})
 
     def register(self) -> None:
         self.call("POST", "/internal/worker/register", json=self.worker_body())
@@ -344,6 +359,9 @@ class Worker:
                 if time.monotonic() - pruned > PRUNE_SECONDS:
                     self.prune_copies()
                     pruned = time.monotonic()
+        except MachineRemovedError as error:
+            log.error("%s", error)
+            stop.set()
         except WorkerStoppedError:
             return
 

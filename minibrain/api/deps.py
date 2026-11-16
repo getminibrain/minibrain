@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from minibrain.artifacts import ArtifactStore
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.models.hardware import NodeReport, report
+from minibrain.models.machine_metrics import MetricsHistory
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 
@@ -42,9 +43,14 @@ def get_store(request: Request) -> ArtifactStore:
     return request.app.state.store
 
 
+def get_metrics(request: Request) -> MetricsHistory:
+    return request.app.state.machine_metrics
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 BackendDep = Annotated[ServingBackend, Depends(get_backend)]
 QueueDep = Annotated[SqlJobQueue, Depends(get_queue)]
 StoreDep = Annotated[ArtifactStore, Depends(get_store)]
 LocalNodeDep = Annotated[NodeReport, Depends(get_local_node)]
+MetricsDep = Annotated[MetricsHistory, Depends(get_metrics)]

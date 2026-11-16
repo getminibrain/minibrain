@@ -501,6 +501,15 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Machine versions** · shipped · admin
   Compare each machine's libraries, CUDA and NVIDIA driver with main.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
+- **Live machine metrics** · shipped · admin
+  See measured GPU memory, GPU and CPU load, and the last hour.
+  UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/compute/pools/{pool}/machines/{host}/metrics
+- **Drain and remove machines** · shipped · admin
+  Drain a machine of new work, undrain it, or remove it.
+  UI: Infrastructure › Machines · API: POST /api/compute/pools/{pool}/machines/{host}/drain, POST /api/compute/pools/{pool}/machines/{host}/undrain, DELETE /api/compute/pools/{pool}/machines/{host}
+- **Room per pool** · shipped · admin
+  See how many more models fit and the largest that trains.
+  UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
@@ -520,8 +529,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep base weights in the bucket; machines fetch them by signed links.
   UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
-  See disk use, minibrain's share, the largest items and what to free.
-  UI: Infrastructure › Storage · API: GET /api/system/infrastructure
+  See disk use on main and every machine, and what to free.
+  UI: Infrastructure › Storage · API: GET /api/system/infrastructure, GET /api/compute/pools
 - **Highly available main** · shipped · admin
   Run several mains on Postgres, with a leader for background work.
   Config: MINIBRAIN_DATABASE_URL

@@ -1636,6 +1636,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/compute/pools/{pool}/machines/{host}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a machine's live metrics */
+        get: operations["machine_metrics_api_compute_pools__pool__machines__host__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/pools/{pool}/machines/{host}/drain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drain a machine */
+        post: operations["drain_machine_api_compute_pools__pool__machines__host__drain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/pools/{pool}/machines/{host}/undrain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undrain a machine */
+        post: operations["undrain_machine_api_compute_pools__pool__machines__host__undrain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/pools/{pool}/machines/{host}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a machine from its pool */
+        delete: operations["remove_machine_api_compute_pools__pool__machines__host__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/compute/prices": {
         parameters: {
             query?: never;
@@ -5733,6 +5801,20 @@ export interface components {
             /** Memory Bytes */
             memory_bytes: number;
         };
+        /** GpuSample */
+        GpuSample: {
+            /** Index */
+            index: number;
+            /** Memory Used Bytes */
+            memory_used_bytes?: number | null;
+            /** Memory Total Bytes */
+            memory_total_bytes?: number | null;
+            /**
+             * Utilization
+             * @description Busy share in percent.
+             */
+            utilization?: number | null;
+        };
         /** GraderConfig */
         GraderConfig: {
             /** Name */
@@ -6743,6 +6825,15 @@ export interface components {
             /** Key Name */
             key_name: string | null;
         };
+        /** MachineMetricsInfo */
+        MachineMetricsInfo: {
+            current: components["schemas"]["NodeMetrics"] | null;
+            /**
+             * History
+             * @description Samples of the last hour, oldest first.
+             */
+            history: components["schemas"]["MetricsPoint"][];
+        };
         /** MachinePlanInfo */
         MachinePlanInfo: {
             /** Name */
@@ -6830,6 +6921,22 @@ export interface components {
             tool_call_id?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /** MetricsPoint */
+        MetricsPoint: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Gpu Percent */
+            gpu_percent: number | null;
+            /** Memory Used Bytes */
+            memory_used_bytes: number | null;
+            /** Memory Total Bytes */
+            memory_total_bytes: number | null;
+            /** Cpu Percent */
+            cpu_percent: number | null;
         };
         /** Mistake */
         Mistake: {
@@ -7413,6 +7520,30 @@ export interface components {
              */
             base?: string | null;
         };
+        /** NodeDisk */
+        NodeDisk: {
+            /**
+             * Path
+             * @description The folder minibrain keeps models and artifacts in.
+             */
+            path: string;
+            /** Mount */
+            mount?: string | null;
+            /** Total Bytes */
+            total_bytes?: number | null;
+            /** Free Bytes */
+            free_bytes?: number | null;
+            /**
+             * Minibrain Bytes
+             * @description What minibrain keeps in that folder.
+             */
+            minibrain_bytes?: number | null;
+            /**
+             * Reported At
+             * Format: date-time
+             */
+            reported_at: string;
+        };
         /** NodeInfo */
         NodeInfo: {
             /** Id */
@@ -7423,6 +7554,21 @@ export interface components {
             roles: string[];
             /** Online */
             online: boolean;
+            /**
+             * State
+             * @description A draining machine finishes its work and takes no new jobs or engines.
+             * @default active
+             * @enum {string}
+             */
+            state?: "active" | "draining";
+            /** @description The latest measured sample, while fresh. */
+            metrics?: components["schemas"]["NodeMetrics"] | null;
+            /**
+             * Disks
+             * @description The disk this machine keeps models on, last reported.
+             * @default []
+             */
+            disks?: components["schemas"]["NodeDisk"][];
             /** Seen At */
             seen_at: string | null;
             /** System */
@@ -7478,6 +7624,34 @@ export interface components {
              * @description The training plan's peak memory, once planned.
              */
             memory_bytes?: number | null;
+        };
+        /** NodeMetrics */
+        NodeMetrics: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Gpus */
+            gpus: components["schemas"]["GpuSample"][];
+            /** Ram Used Bytes */
+            ram_used_bytes: number | null;
+            /** Ram Total Bytes */
+            ram_total_bytes: number | null;
+            /** Cpu Percent */
+            cpu_percent: number | null;
+            /**
+             * Gpu Percent
+             * @description Mean busy share of the machine's GPUs, in percent.
+             */
+            gpu_percent: number | null;
+            /**
+             * Memory Used Bytes
+             * @description Measured memory in use where models run.
+             */
+            memory_used_bytes: number | null;
+            /** Memory Total Bytes */
+            memory_total_bytes: number | null;
         };
         /** OpenAIErrorBody */
         OpenAIErrorBody: {
@@ -7807,6 +7981,8 @@ export interface components {
             nodes: components["schemas"]["NodeInfo"][];
             /** Engines */
             engines: components["schemas"]["ReplicaInfo"][];
+            /** @description What still fits on the online machines that take work. */
+            room?: components["schemas"]["PoolRoom"] | null;
         };
         /** PoolPlacement */
         PoolPlacement: {
@@ -7838,6 +8014,25 @@ export interface components {
             hourly_price: number | null;
             /** Locked */
             locked?: string | null;
+        };
+        /** PoolRoom */
+        PoolRoom: {
+            /** Serve Count */
+            serve_count: number;
+            /** Serve Size */
+            serve_size: string | null;
+            /** Serve Bytes */
+            serve_bytes: number | null;
+            /** Train Size */
+            train_size: string | null;
+            /** Train Strategy */
+            train_strategy: string | null;
+            /** Free Bytes */
+            free_bytes: number;
+            /** Measured */
+            measured: boolean;
+            /** Basis */
+            basis: string;
         };
         /** PresetInfo */
         PresetInfo: {
@@ -13685,6 +13880,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolInfo"][];
+                };
+            };
+        };
+    };
+    machine_metrics_api_compute_pools__pool__machines__host__metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineMetricsInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drain_machine_api_compute_pools__pool__machines__host__drain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undrain_machine_api_compute_pools__pool__machines__host__undrain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_machine_api_compute_pools__pool__machines__host__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+                host: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

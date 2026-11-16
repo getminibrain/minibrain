@@ -5026,6 +5026,189 @@
         }
       }
     },
+    "/api/compute/pools/{pool}/machines/{host}/metrics": {
+      "get": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Read a machine's live metrics",
+        "operationId": "machine_metrics_api_compute_pools__pool__machines__host__metrics_get",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pool"
+            }
+          },
+          {
+            "name": "host",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Host"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineMetricsInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/pools/{pool}/machines/{host}/drain": {
+      "post": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Drain a machine",
+        "operationId": "drain_machine_api_compute_pools__pool__machines__host__drain_post",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pool"
+            }
+          },
+          {
+            "name": "host",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Host"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/pools/{pool}/machines/{host}/undrain": {
+      "post": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Undrain a machine",
+        "operationId": "undrain_machine_api_compute_pools__pool__machines__host__undrain_post",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pool"
+            }
+          },
+          {
+            "name": "host",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Host"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/pools/{pool}/machines/{host}": {
+      "delete": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Remove a machine from its pool",
+        "operationId": "remove_machine_api_compute_pools__pool__machines__host__delete",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pool"
+            }
+          },
+          {
+            "name": "host",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Host"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/prices": {
       "get": {
         "tags": [
@@ -18948,6 +19131,58 @@
         ],
         "title": "GpuInfo"
       },
+      "GpuSample": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization",
+            "description": "Busy share in percent."
+          }
+        },
+        "type": "object",
+        "required": [
+          "index"
+        ],
+        "title": "GpuSample"
+      },
       "GraderConfig": {
         "properties": {
           "name": {
@@ -22024,6 +22259,34 @@
         ],
         "title": "LoggedRequest"
       },
+      "MachineMetricsInfo": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/MetricsPoint"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "Samples of the last hour, oldest first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "history"
+        ],
+        "title": "MachineMetricsInfo"
+      },
       "MachinePlanInfo": {
         "properties": {
           "name": {
@@ -22341,6 +22604,68 @@
           "role"
         ],
         "title": "Message"
+      },
+      "MetricsPoint": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "gpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Percent"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "gpu_percent",
+          "memory_used_bytes",
+          "memory_total_bytes",
+          "cpu_percent"
+        ],
+        "title": "MetricsPoint"
       },
       "Mistake": {
         "properties": {
@@ -24175,6 +24500,76 @@
         ],
         "title": "NextAction"
       },
+      "NodeDisk": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 4096,
+            "title": "Path",
+            "description": "The folder minibrain keeps models and artifacts in."
+          },
+          "mount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mount"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          },
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          },
+          "minibrain_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minibrain Bytes",
+            "description": "What minibrain keeps in that folder."
+          },
+          "reported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reported At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "reported_at"
+        ],
+        "title": "NodeDisk"
+      },
       "NodeInfo": {
         "properties": {
           "id": {
@@ -24195,6 +24590,36 @@
           "online": {
             "type": "boolean",
             "title": "Online"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draining"
+            ],
+            "title": "State",
+            "description": "A draining machine finishes its work and takes no new jobs or engines.",
+            "default": "active"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The latest measured sample, while fresh."
+          },
+          "disks": {
+            "items": {
+              "$ref": "#/components/schemas/NodeDisk"
+            },
+            "type": "array",
+            "title": "Disks",
+            "description": "The disk this machine keeps models on, last reported.",
+            "default": []
           },
           "seen_at": {
             "anyOf": [
@@ -24379,6 +24804,102 @@
           "progress"
         ],
         "title": "NodeJob"
+      },
+      "NodeMetrics": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuSample"
+            },
+            "type": "array",
+            "title": "Gpus"
+          },
+          "ram_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Used Bytes"
+          },
+          "ram_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Total Bytes"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          },
+          "gpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Percent",
+            "description": "Mean busy share of the machine's GPUs, in percent."
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes",
+            "description": "Measured memory in use where models run."
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "gpus",
+          "ram_used_bytes",
+          "ram_total_bytes",
+          "cpu_percent",
+          "gpu_percent",
+          "memory_used_bytes",
+          "memory_total_bytes"
+        ],
+        "title": "NodeMetrics"
       },
       "OpenAIErrorBody": {
         "properties": {
@@ -25268,6 +25789,17 @@
             },
             "type": "array",
             "title": "Engines"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoolRoom"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What still fits on the online machines that take work."
           }
         },
         "type": "object",
@@ -25372,6 +25904,82 @@
           "hourly_price"
         ],
         "title": "PoolPrice"
+      },
+      "PoolRoom": {
+        "properties": {
+          "serve_count": {
+            "type": "integer",
+            "title": "Serve Count"
+          },
+          "serve_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serve Size"
+          },
+          "serve_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serve Bytes"
+          },
+          "train_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Size"
+          },
+          "train_strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Strategy"
+          },
+          "free_bytes": {
+            "type": "integer",
+            "title": "Free Bytes"
+          },
+          "measured": {
+            "type": "boolean",
+            "title": "Measured"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "serve_count",
+          "serve_size",
+          "serve_bytes",
+          "train_size",
+          "train_strategy",
+          "free_bytes",
+          "measured",
+          "basis"
+        ],
+        "title": "PoolRoom"
       },
       "PresetInfo": {
         "properties": {

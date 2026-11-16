@@ -156,7 +156,9 @@ export function InfrastructurePage() {
                     </PanelSection>
                 </PanelSections>
             )}
-            {active === "/infrastructure/storage" && <StorageTab info={infrastructure.data} />}
+            {active === "/infrastructure/storage" && (
+                <StorageTab info={infrastructure.data} pools={pools.data ?? []} />
+            )}
         </Page>
     );
 }

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from minibrain.api.bases import BaseWeights, LiveBases, live
 from minibrain.api.bases import base_file as file_of
 from minibrain.api.bases import base_weights as weights_of
-from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import MetricsDep, SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.auth.engine_tokens import engine_pool
 from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, checked
@@ -18,8 +18,9 @@ from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import CHAT_KIND, LogEntry, database_sink
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
+from minibrain.models.machine_metrics import MachineSample
 from minibrain.models.usage import touch
-from minibrain.registry.compute import EngineReport, GatewayReport, record_engine, record_gateway
+from minibrain.registry.compute import EngineReport, GatewayReport, node_id, record_engine, record_gateway
 from minibrain.registry.files import ArtifactKind
 from minibrain.registry.models import Artifact
 
@@ -107,6 +108,7 @@ class EngineBody(BaseModel):
     managed: bool = False
     error: str | None = None
     code: str | None = None
+    metrics: MachineSample | None = None
 
 
 class GatewayBody(BaseModel):
@@ -118,10 +120,14 @@ class GatewayBody(BaseModel):
 
 
 @router.post("/engines", status_code=204)
-def register_engine(body: EngineBody, request: Request, session: SessionDep, caller: EngineCaller) -> None:
+def register_engine(
+    body: EngineBody, request: Request, session: SessionDep, caller: EngineCaller, metrics: MetricsDep
+) -> None:
     if caller is not None:
         admit(session, caller, body.pool, body.host, ENGINE, address_of(request))
-    record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code"})))
+    record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code", "metrics"})))
+    if body.metrics is not None:
+        metrics.record(node_id(body.pool, body.host), body.metrics)
     if body.state == "failed":
         record_load_failure(session, body.base_model, body.code, body.error, body.host)
     elif body.state == "ready":

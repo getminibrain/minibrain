@@ -118,29 +118,56 @@ function failedIssue(engine: ReplicaInfo, pool: string): Issue {
     };
 }
 
-export function lowSpace(free: number, total: number): boolean {
-    return free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE;
+export function lowSpace(
+    free: number | null | undefined,
+    total: number | null | undefined,
+): boolean {
+    return (
+        free !== null &&
+        free !== undefined &&
+        !!total &&
+        (free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE)
+    );
 }
 
-export function lowDiskText(store: StoreInfo): string {
-    const where = store.mount ? `Disk ${store.mount}` : store.name;
-    return `${where}: only ${bytes(store.free_bytes)} free`;
+export function lowDiskText(disk: {
+    name: string;
+    mount?: string | null;
+    free_bytes?: number | null;
+}): string {
+    const where = disk.mount ? `Disk ${disk.mount}` : disk.name;
+    return `${where}: only ${bytes(disk.free_bytes)} free`;
 }
 
 export function lowStores(info: InfrastructureInfo | undefined): StoreInfo[] {
     const disks = new Map<string, StoreInfo>();
     for (const store of info?.stores ?? []) {
-        if (
-            store.free_bytes !== null &&
-            store.free_bytes !== undefined &&
-            store.total_bytes &&
-            lowSpace(store.free_bytes, store.total_bytes)
-        ) {
+        if (lowSpace(store.free_bytes, store.total_bytes)) {
             const key = store.disk ?? store.name;
             disks.set(key, disks.get(key) ?? store);
         }
     }
     return [...disks.values()];
+}
+
+function machineDiskIssues(pools: PoolInfo[]): Issue[] {
+    return pools.flatMap((pool) =>
+        pool.nodes
+            .filter((node) => !node.roles.includes("main"))
+            .flatMap((node) =>
+                (node.disks ?? [])
+                    .filter((disk) => lowSpace(disk.free_bytes, disk.total_bytes))
+                    .map((disk) => ({
+                        key: `disk-${node.id}-${disk.path}`,
+                        tone: "warning" as const,
+                        text: `Pool ${pool.name}: ${node.host} has only ${bytes(disk.free_bytes)} free on ${disk.mount ?? disk.path}`,
+                        fix: (
+                            <span>{`Free up space on ${node.host}: minibrain keeps ${bytes(disk.minibrain_bytes)} in ${disk.path}.`}</span>
+                        ),
+                        href: machineHref(node),
+                    })),
+            ),
+    );
 }
 
 function lowDisk(info: InfrastructureInfo | undefined): Issue[] {
@@ -174,7 +201,7 @@ function issuesOf(
         ),
         ...pools.flatMap((pool) =>
             pool.nodes
-                .filter((node) => !node.online)
+                .filter((node) => !node.online && node.state !== "draining")
                 .map((node) => offlineIssue(node, pool.name, origin)),
         ),
         ...pools.flatMap((pool) =>
@@ -187,6 +214,7 @@ function issuesOf(
                 .map((node) => driftIssue(node, pool.name, main)),
         ),
         ...lowDisk(info),
+        ...machineDiskIssues(pools),
     ];
 }
 

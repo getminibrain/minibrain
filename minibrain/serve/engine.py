@@ -20,6 +20,7 @@ from minibrain.ml.completion import Completion, Piece
 from minibrain.models.copies import BUCKET, Progress, bucket_client, ensure, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
 from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
+from minibrain.models.machine_metrics import Sampler
 from minibrain.serve.backend import (
     AdapterNotSupportedError,
     AdapterRef,
@@ -356,6 +357,7 @@ def create_engine_app(
     requested: str | None = None,
     managed: bool = False,
     fetch: Fetch | None = None,
+    sampler: Sampler | None = None,
 ) -> FastAPI:
     base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
@@ -374,7 +376,8 @@ def create_engine_app(
     }
 
     def announced() -> dict[str, Any]:
-        return {"engine": current["engine"]} | (current["failure"] or {})
+        measured = {"metrics": sampler.body()} if sampler is not None else {}
+        return {"engine": current["engine"]} | (current["failure"] or {}) | measured
 
     def fail(failure: dict[str, str]) -> None:
         current["failure"] = failure

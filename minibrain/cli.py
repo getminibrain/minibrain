@@ -194,6 +194,7 @@ def engine(args: argparse.Namespace) -> None:
     import httpx
 
     from minibrain.base_models import BaseModelSpec
+    from minibrain.models.machine_metrics import Sampler
     from minibrain.serve.engine import create_engine_app, local_copy, prune_engines, remote_base
     from minibrain.settings import load_settings
 
@@ -224,6 +225,7 @@ def engine(args: argparse.Namespace) -> None:
         requested=args.engine,
         managed=args.parent is not None,
         fetch=fetch,
+        sampler=Sampler(settings.home),
     )
     threading.Thread(target=watch_parent, args=(args.parent, threading.Event(), terminate_self), daemon=True).start()
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
@@ -249,6 +251,7 @@ def worker(args: argparse.Namespace) -> None:
     import httpx
 
     from minibrain.models.hardware import LOCAL_POOL, report
+    from minibrain.models.machine_metrics import Sampler
     from minibrain.serve.host import AdvertiseError, EngineHost, advertise_address
     from minibrain.settings import load_settings
     from minibrain.worker import REMOTE_KINDS, MainClient, Worker, WorkerConfig
@@ -267,6 +270,7 @@ def worker(args: argparse.Namespace) -> None:
         hardware=report().as_dict(),
         models=settings.home / "models" if parent is not None else None,
         prune=parent is None,
+        sampler=Sampler(settings.home),
     )
     stop = threading.Event()
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()

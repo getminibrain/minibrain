@@ -249,6 +249,40 @@ hardware and the model's weight format:
   `MINIBRAIN_VLLM_PYTHON`). The vLLM engine shares SGLang's request path (an OpenAI-compatible server per base model)
   and has not been run on a GPU yet.
 
+## Machine heartbeats
+
+Every call a worker makes to claim work or ask for engines (about every 10 to 25 s), and every engine announcement
+(every 10 s), carries the machine's static `hardware` and, since this version, a `metrics` sample:
+
+| Field | Source | Unknown |
+|---|---|---|
+| `gpus[]`: `index`, `memory_used_bytes`, `memory_total_bytes`, `utilization` (percent) | `nvidia-smi`, else `rocm-smi`, when on the PATH | No GPU tool: an empty list; a field the tool prints as `[N/A]`: null |
+| `ram_used_bytes`, `ram_total_bytes`, `cpu_percent` | psutil | null; `cpu_percent` is null on the first sample |
+| `disks[]`: `path`, `mount`, `total_bytes`, `free_bytes`, `minibrain_bytes` | The disk under `MINIBRAIN_HOME`; minibrain's share is recounted every 5 minutes | No disk found: an empty list |
+
+- Samples are taken at most every 15 s per process. Apple MPS and CPU machines report no GPU entry; their measured
+  memory is host RAM. Nothing is guessed: a value the machine cannot read stays null.
+- `main` keeps the last hour per machine in memory, at most one sample every 10 s, and samples itself the same way.
+  A restart of `main` starts the history again. `GET /api/compute/pools` returns each machine's latest sample while
+  it is under 2 minutes old (`metrics`, with `memory_used_bytes` and `memory_total_bytes` summed where models run)
+  and its last reported disks even when it is offline (`disks`); `GET /api/compute/pools/{pool}/machines/{host}/metrics`
+  returns the latest sample and the hour of history.
+- Each pool has `room`: how many more models of one size still fit (the largest size the pool already serves that
+  fits, else the largest catalogue size that fits) and the largest catalogue model the planner can train, from the
+  measured free memory of its online active machines, or estimates from weights, adapters and training plans where a
+  machine does not measure. SGLang and vLLM reserve most of a GPU up front, so measured free memory is small there.
+
+### Drain and remove
+
+| Action | Effect |
+|---|---|
+| Drain (`POST …/machines/{host}/drain`) | The machine's claims return no job; jobs it runs finish. It drops out of engine placement; each engine it runs keeps serving until a replica on another machine of the pool is ready, then stops. |
+| Undrain | It takes jobs and engines again. |
+| Remove (`DELETE …/machines/{host}`) | Refused (409) while it runs a job or a live engine, and while it is online and not drained. It disappears from the pool; its next claim or engine call gets 410 and the worker exits. `minibrain worker` started again on it registers and rejoins. |
+
+All three are admin only and audited (`machine.drain`, `machine.undrain`, `machine.remove`). Main cannot be drained
+or removed.
+
 ## Deployments on a pool
 
 A deployment is a model's live version on one compute pool with N replicas (1 by default), kept true continuously.

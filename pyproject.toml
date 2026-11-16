@@ -17,6 +17,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.45.1",
     "opentelemetry-sdk>=1.45.1",
     "peft",
+    "psutil",
     "python-multipart>=0.0.32",
     "s3fs>=2026.7.0",
     "sqlalchemy>=2.1.6",
@@ -95,6 +96,7 @@ ignore = ["S311"]
 "minibrain/worker.py" = ["S603"]
 "minibrain/cli.py" = ["S603"]
 "minibrain/supervise.py" = ["S603"]
+"minibrain/models/machine_metrics.py" = ["S603"]
 "minibrain/ml/train.py" = ["S606"]
 "minibrain/data/sources.py" = ["S608"]
 "minibrain/data/remote.py" = ["S608"]

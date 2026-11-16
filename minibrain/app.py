@@ -87,6 +87,7 @@ from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
 from minibrain.models.catalog import seed
 from minibrain.models.health import report_problems
+from minibrain.models.machine_metrics import MetricsHistory, Sampler, sample_forever
 from minibrain.models.placement import PlacementError
 from minibrain.models.registry import missing_files
 from minibrain.object_store import apply as apply_storage
@@ -94,7 +95,7 @@ from minibrain.policy import LockedError, PolicyError
 from minibrain.policy import load as load_policy
 from minibrain.provision import check_config
 from minibrain.recent_logs import capture
-from minibrain.registry.compute import forget_gateway
+from minibrain.registry.compute import MachineRemovedError, forget_gateway, main_node_id
 from minibrain.registry.db import close_sessions, make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
@@ -134,6 +135,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     EngineUnavailableError: 503,
     PolicyError: 403,
     PlacementError: 422,
+    MachineRemovedError: 410,
     LockedError: 409,
     ConnectionProblem: 422,
     AccountError: 422,
@@ -219,6 +221,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             (LocalConfig.refresh_forever, (app.state.gateway_config, stop)),
             (LogBuffer.flush_forever, (app.state.request_logs, stop)),
             (app.state.telemetry.refresh_forever, (stop,)),
+            (sample_forever, (app.state.machine_metrics, main_node_id(), Sampler(), stop)),
         ):
             threading.Thread(target=target, args=args, daemon=True).start()
         if isinstance(app.state.backend, EngineBackend):
@@ -299,6 +302,7 @@ def create_app(
     app.state.metrics_access = load_metrics_access()
     app.state.telemetry = main_telemetry(sessions, settings, app.state.metrics_access)
     app.state.telemetry.refresh()
+    app.state.machine_metrics = MetricsHistory()
     for error in ERROR_STATUS:
         app.add_exception_handler(error, domain_error)
     app.add_exception_handler(OpenAIError, openai_error)

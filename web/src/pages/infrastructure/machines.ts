@@ -1,5 +1,6 @@
+import type { Tone } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
-import { differences, lowDiskText, lowStores } from "./NeedsALook";
+import { differences, lowDiskText, lowSpace, lowStores } from "./NeedsALook";
 import type { InfrastructureInfo, NodeInfo, PoolInfo, ReplicaInfo, StoreInfo } from "./parts";
 
 export type MachineRow = {
@@ -27,8 +28,27 @@ export type MachineFilters = {
 
 export const STATUSES = [
     { value: "online", label: "Online" },
+    { value: "draining", label: "Draining" },
     { value: "offline", label: "Offline" },
 ];
+
+export type LowDisk = { key: string; name: string; mount: string | null; free_bytes: number };
+
+export type MachineStatus = { label: string; tone: Tone };
+
+export function busyOf(node: NodeInfo, engines: ReplicaInfo[]): boolean {
+    return node.jobs.length > 0 || engines.length > 0;
+}
+
+export function machineStatus(node: NodeInfo, engines: ReplicaInfo[]): MachineStatus {
+    if (node.state === "draining") {
+        const label = busyOf(node, engines) ? "Draining" : "Drained";
+        return { label: node.online ? label : `${label}, offline`, tone: "warning" };
+    }
+    return node.online
+        ? { label: "Online", tone: "success" }
+        : { label: "Offline", tone: "neutral" };
+}
 
 export const ROLES = [
     { value: "main", label: "Main" },
@@ -37,6 +57,9 @@ export const ROLES = [
 ];
 
 export function statusOf(node: NodeInfo): string {
+    if (node.state === "draining") {
+        return "draining";
+    }
     return node.online ? "online" : "offline";
 }
 
@@ -101,8 +124,23 @@ export function failedEngines(row: MachineRow): ReplicaInfo[] {
     return row.engines.filter((engine) => engine.state === "failed");
 }
 
-export function lowDiskOf(node: NodeInfo, info: InfrastructureInfo | undefined): StoreInfo[] {
-    return node.roles.includes("main") ? lowStores(info) : [];
+export function lowDiskOf(node: NodeInfo, info: InfrastructureInfo | undefined): LowDisk[] {
+    if (node.roles.includes("main")) {
+        return lowStores(info).map((store: StoreInfo) => ({
+            key: store.name,
+            name: store.name,
+            mount: store.mount ?? null,
+            free_bytes: store.free_bytes ?? 0,
+        }));
+    }
+    return (node.disks ?? [])
+        .filter((disk) => lowSpace(disk.free_bytes, disk.total_bytes))
+        .map((disk) => ({
+            key: disk.path,
+            name: disk.path,
+            mount: disk.mount ?? disk.path,
+            free_bytes: disk.free_bytes ?? 0,
+        }));
 }
 
 export function problemsOf(

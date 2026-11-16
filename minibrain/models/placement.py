@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, fit, needed_bytes, pool_fit
-from minibrain.registry.compute import Pool, live_engines, node_id, pools
+from minibrain.registry.compute import DRAINING, Pool, held_hosts, live_engines, node_id, node_state, pools
 from minibrain.registry.models import BaseModel, CatalogVariant, Model, Node, Worker, now
 from minibrain.tasks.service import serving_base
 
@@ -126,9 +126,11 @@ class Asked:
 
 def engine_hosts(session: Session, pool: str) -> dict[str, str]:
     fresh = Worker.seen_at >= now() - HOST_FRESH
+    held = held_hosts(session, pool)
     hosts: dict[str, str] = {}
     for worker in session.scalars(select(Worker).where(Worker.pool == pool, fresh).order_by(Worker.id)):
-        hosts.setdefault(worker.host, worker.id)
+        if worker.host not in held:
+            hosts.setdefault(worker.host, worker.id)
     return hosts
 
 
@@ -171,10 +173,29 @@ def replica_count(session: Session, pool: str, key: str, name: str, asked: int |
 def desired_engines(
     session: Session, placements: dict[str, dict[str, int]], pool: str, host: str, worker: str
 ) -> list[str]:
-    if pool == LOCAL_POOL or engine_hosts(session, pool).get(host) != worker:
+    if pool == LOCAL_POOL:
+        return []
+    if node_state(session, pool, host) == DRAINING:
+        return kept_while_draining(session, placements, pool, host)
+    if engine_hosts(session, pool).get(host) != worker:
         return []
     wanted = [key for key, pools_of in placements.items() if pools_of.get(pool)]
     return sorted(key for key in wanted if host in assigned(session, pool, key, placements[key][pool]))
+
+
+def kept_while_draining(session: Session, placements: dict[str, dict[str, int]], pool: str, host: str) -> list[str]:
+    here = node_id(pool, host)
+    running: set[str] = set()
+    ready_elsewhere: set[str] = set()
+    for replica in live_engines(session):
+        if replica.pool != pool:
+            continue
+        if replica.node_id == here:
+            running.add(replica.base_model)
+        elif replica.state == "ready":
+            ready_elsewhere.add(replica.base_model)
+    wanted = [key for key, pools_of in placements.items() if pools_of.get(pool)]
+    return sorted(key for key in wanted if key in running and key not in ready_elsewhere)
 
 
 STATE_ORDER = ("ready", "fetching", "loading", "failed")

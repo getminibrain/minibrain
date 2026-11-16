@@ -1,3 +1,4 @@
+import platform
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -15,6 +16,13 @@ FORGET_ENGINES = timedelta(hours=1)
 FORGET_GATEWAYS = timedelta(hours=1)
 FORGET_NODES = timedelta(days=7)
 STOPPED = "stopped"
+ACTIVE = "active"
+DRAINING = "draining"
+REMOVED = "removed"
+
+
+class MachineRemovedError(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,7 @@ class PoolNode:
     report: NodeReport
     seen_at: datetime | None
     online: bool
+    state: str = ACTIVE
 
 
 @dataclass(frozen=True)
@@ -65,6 +74,10 @@ def node_id(pool: str, host: str) -> str:
     return f"{pool}/{host}"
 
 
+def main_node_id() -> str:
+    return node_id(LOCAL_POOL, platform.node() or "localhost")
+
+
 def pool_of_host(session: Session, host: str) -> str:
     found = select(Node.pool).where(Node.host == host).order_by(Node.seen_at.desc()).limit(1)
     return session.scalar(found) or LOCAL_POOL
@@ -74,9 +87,20 @@ def pool_label(name: str) -> str:
     return LOCAL_LABEL if name == LOCAL_POOL else name
 
 
-def record_node(session: Session, pool: str, host: str, role: str, hardware: dict[str, Any]) -> Node:
+def removed_message(pool: str, host: str) -> str:
+    return f"An admin removed {host} from pool {pool}. Restart minibrain worker on {host} to join the pool again."
+
+
+def record_node(
+    session: Session, pool: str, host: str, role: str, hardware: dict[str, Any], rejoin: bool = False
+) -> Node:
     key = node_id(pool, host)
-    node = session.get(Node, key) or Node(id=key, pool=pool, host=host, roles=[], hardware={})
+    node = session.get(Node, key) or Node(id=key, pool=pool, host=host, roles=[], hardware={}, state=ACTIVE)
+    if node.state == REMOVED:
+        if not rejoin:
+            raise MachineRemovedError(removed_message(pool, host))
+        node.state = ACTIVE
+        node.roles = []
     if hardware:
         node.hardware = hardware
     if role not in node.roles:
@@ -155,10 +179,12 @@ def pools(session: Session, local: NodeReport) -> list[Pool]:
         if node.id == main_id:
             main_roles += [role for role in node.roles if role not in main_roles]
             continue
+        if node.state == REMOVED:
+            continue
         online = node.seen_at >= moment - NODE_FRESH
         report = NodeReport.from_dict(node.hardware | {"host": node.host})
         nodes.setdefault(node.pool, []).append(
-            PoolNode(node.id, node.host, list(node.roles), report, node.seen_at, online)
+            PoolNode(node.id, node.host, list(node.roles), report, node.seen_at, online, node.state)
         )
     nodes[LOCAL_POOL].insert(0, PoolNode(main_id, local.host, main_roles, local, None, True))
     engines: dict[str, list[EngineReplica]] = {}
@@ -166,6 +192,15 @@ def pools(session: Session, local: NodeReport) -> list[Pool]:
         engines.setdefault(replica.pool, []).append(replica)
     names = sorted(nodes.keys() | engines.keys(), key=lambda name: (name != LOCAL_POOL, name))
     return [Pool(name, pool_label(name), nodes.get(name, []), engines.get(name, [])) for name in names]
+
+
+def held_hosts(session: Session, pool: str) -> set[str]:
+    return set(session.scalars(select(Node.host).where(Node.pool == pool, Node.state != ACTIVE)))
+
+
+def node_state(session: Session, pool: str, host: str) -> str:
+    node = session.get(Node, node_id(pool, host))
+    return node.state if node is not None else ACTIVE
 
 
 def find_pool(found: list[Pool], name: str | None) -> Pool:
