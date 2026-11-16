@@ -80,6 +80,11 @@ export function SampleOffer({
     const [typed, setTyped] = useState(String(limit));
     const rows = parsedRows(typed);
     const valid = Number.isInteger(rows) && rows >= 1 && rows <= limit;
+    const take = () => {
+        if (valid && !pending) {
+            onTake({ rows, seed: seed ?? null });
+        }
+    };
     return (
         <div className="flex flex-col gap-2">
             <p>
@@ -95,11 +100,14 @@ export function SampleOffer({
                     value={typed}
                     aria-invalid={valid ? undefined : true}
                     onChange={(event) => setTyped(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            take();
+                        }
+                    }}
                 />
-                <Button
-                    disabled={!valid || pending}
-                    onClick={() => onTake({ rows, seed: seed ?? null })}
-                >
+                <Button type="button" disabled={!valid || pending} onClick={take}>
                     {pending
                         ? "Sampling…"
                         : `Take a random sample of ${valid ? count(rows) : "…"} rows`}
