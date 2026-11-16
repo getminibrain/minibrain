@@ -91,15 +91,23 @@ function CheckRow({
     );
 }
 
-function CrowdedRow({ label }: { label: string }) {
+function CrowdedRow({
+    label,
+    onChange,
+}: {
+    label: string;
+    onChange: (on: boolean) => void;
+}) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Label className={cn(ROW, "h-auto py-1.5 text-muted-foreground")}>
-                    <Checkbox checked disabled />
+                <Label className={cn(ROW, "h-auto py-1.5")}>
+                    <Checkbox checked onCheckedChange={(next) => onChange(next === true)} />
                     <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate">{label}</span>
-                        <span className="text-sm">Hidden: not enough room</span>
+                        <span className="text-sm text-muted-foreground">
+                            Hidden: not enough room
+                        </span>
                     </span>
                 </Label>
             </TooltipTrigger>
@@ -293,27 +301,27 @@ function DisplaySection({
             </Label>
             <fieldset className="flex flex-col">
                 <GroupLabel>Columns</GroupLabel>
-                {COLUMNS.map((column) =>
-                    crowded.includes(column.id) ? (
-                        <CrowdedRow key={column.id} label={column.label} />
+                {COLUMNS.map((column) => {
+                    const onChange = (on: boolean) =>
+                        onColumns(
+                            toggled(
+                                columns,
+                                column.id,
+                                on,
+                                COLUMNS.map((item) => item.id),
+                            ),
+                        );
+                    return crowded.includes(column.id) ? (
+                        <CrowdedRow key={column.id} label={column.label} onChange={onChange} />
                     ) : (
                         <CheckRow
                             key={column.id}
                             label={column.label}
                             checked={columns.includes(column.id)}
-                            onChange={(on) =>
-                                onColumns(
-                                    toggled(
-                                        columns,
-                                        column.id,
-                                        on,
-                                        COLUMNS.map((item) => item.id),
-                                    ),
-                                )
-                            }
+                            onChange={onChange}
                         />
-                    ),
-                )}
+                    );
+                })}
             </fieldset>
         </section>
     );
