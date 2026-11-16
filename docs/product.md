@@ -160,7 +160,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Traffic, latency, errors, versions, callers and requests of one model.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
 - **Version page** · shipped · product, ml
-  Live training and scoring, then score, differences, run, loss and files.
+  One fixed layout in every state: verdict, score, changes, training, lineage.
   UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.

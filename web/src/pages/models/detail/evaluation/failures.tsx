@@ -16,7 +16,7 @@ import { ErrorLine, PanelSection } from "~/components/Section";
 import { count, percent } from "~/lib/format";
 import { isDeployed } from "../header";
 import { liveOf, versionLabel } from "../makeLive";
-import { inputOf, useAnswers, verdictOf } from "../version";
+import { inputOf, useAnswers, verdictOf } from "../versionChanges";
 import { AnswerSheet, type Change, type FailureRow, rightOf } from "./answerSheet";
 import { scoredVersions } from "./scores";
 

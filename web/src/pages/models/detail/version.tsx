@@ -1,19 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
-import {
-    BookOpen,
-    Copy,
-    Download,
-    Fingerprint,
-    Gauge,
-    GitCompare,
-    Hourglass,
-    MoreHorizontal,
-    Package,
-    Play,
-    SlidersHorizontal,
-    Trash2,
-} from "lucide-react";
+import { BookOpen, Copy, Download, GitCompare, MoreHorizontal, Play, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -31,48 +18,28 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    Link,
     cn,
     useToast,
 } from "obp-ui";
-import { type ReactNode, useState } from "react";
-import {
-    type ExampleAnswer,
-    type JobDetail,
-    type JobInfo,
-    type JobMetrics,
-    type ModelRow,
-    type VersionInfo,
-    api,
-    unwrap,
-} from "~/api/client";
+import { useState } from "react";
+import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useDatasetVersions } from "~/api/dataQueries";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import {
     isActiveJob,
-    keys,
     useAllModels,
     useJob,
     useJobs,
     useVersionFiles,
     useVersions,
 } from "~/api/queries";
-import { CopyButton } from "~/components/CopyButton";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
-import { Facts } from "~/components/Facts";
-import { canCancel } from "~/components/JobSelection";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
-import { PoolLink } from "~/components/PoolLink";
-import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
-import { ProgressBar } from "~/components/models/StatusText";
+import { Page, PanelSections } from "~/components/Section";
+import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
-import { count, percent } from "~/lib/format";
-import { durationText, jobDuration } from "~/lib/jobs";
-import { metricName } from "~/lib/metrics";
 import {
-    jobHref,
-    jobLogsHref,
     modelCardHref,
     modelCompareHref,
     modelPageHref,
@@ -81,620 +48,17 @@ import {
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
-import { LossBody, LossSection, RateSection, stepText } from "../../jobs/TrainingPanel";
 import { ConfirmAction, type Confirmation } from "../dialogs";
-import { InlineFacts, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
-import {
-    DeployVersionDialog,
-    canGoLive,
-    liveBlock,
-    liveOf,
-    points,
-    versionLabel,
-} from "./makeLive";
-import { VersionStatus, failureReason, isCancelled, runJob, trainingText } from "./versions";
-
-export function useAnswers(slug: string, number: number, against: number | null, enabled: boolean) {
-    return useQuery({
-        queryKey: [...keys.answers(slug, number), against],
-        queryFn: () =>
-            unwrap(
-                api.GET("/api/models/{name}/versions/{number}/answers", {
-                    params: {
-                        path: { name: slug, number },
-                        query: against === null ? {} : { against },
-                    },
-                }),
-            ),
-        enabled,
-        retry: false,
-    });
-}
-
-export type Verdict = "better" | "worse" | "same";
-
-export function verdictOf(answer: ExampleAnswer, metric: string | null | undefined): Verdict {
-    if (!answer.live || !metric) {
-        return "same";
-    }
-    const mine = answer.version.scores[metric] ?? 0;
-    const theirs = answer.live.scores[metric] ?? 0;
-    if (mine > theirs + 1e-9) {
-        return "better";
-    }
-    return mine < theirs - 1e-9 ? "worse" : "same";
-}
-
-function Delta({ value, suffix }: { value: number; suffix: string }) {
-    const tone =
-        value > 0.0005
-            ? "text-success"
-            : value < -0.0005
-              ? "text-destructive"
-              : "text-muted-foreground";
-    return (
-        <span className={cn("tabular-nums", tone)}>
-            {points(value)}
-            <span className="text-muted-foreground">{` ${suffix}`}</span>
-        </span>
-    );
-}
-
-type Reference = { version: VersionInfo; label: string };
-
-function references(row: ModelRow, versions: VersionInfo[], version: VersionInfo): Reference[] {
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
-    const zero = versions.find((item) => item.number === 0);
-    const found: Reference[] = [];
-    if (live && live.score !== null && live.number !== version.number) {
-        found.push({ version: live, label: `live v${live.number}` });
-    }
-    if (zero && zero.score !== null && zero.number !== version.number) {
-        found.push({ version: zero, label: "v0 · Baseline" });
-    }
-    return found;
-}
-
-function ScoreSection({
-    row,
-    versions,
-    version,
-}: {
-    row: ModelRow;
-    versions: VersionInfo[];
-    version: VersionInfo;
-}) {
-    if (version.score === null) {
-        return null;
-    }
-    const held = version.held_out?.examples ?? 0;
-    return (
-        <PanelSection
-            icon={Gauge}
-            title="Score"
-            tip={`${metricName(version.main_metric)} on ${count(held)} held-out rows it never trained on.`}
-        >
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-                <span className="text-3xl tabular-nums">{percent(version.score)}</span>
-                {references(row, versions, version).map((reference) => (
-                    <Delta
-                        key={reference.label}
-                        value={(version.score ?? 0) - (reference.version.score ?? 0)}
-                        suffix={`vs ${reference.label} (${percent(reference.version.score)})`}
-                    />
-                ))}
-            </div>
-        </PanelSection>
-    );
-}
-
-function Answered({
-    label,
-    value,
-    right,
-}: { label: string; value: string; right: boolean | null }) {
-    return (
-        <div className="flex min-w-0 flex-col">
-            <span className="text-sm text-muted-foreground">{label}</span>
-            <span
-                className={cn(
-                    "line-clamp-3 font-mono text-sm break-words",
-                    right === false ? "text-destructive" : "text-foreground",
-                )}
-            >
-                {value || "–"}
-                {right !== null && (
-                    <span className="sr-only">{right ? " (right)" : " (wrong)"}</span>
-                )}
-            </span>
-        </div>
-    );
-}
-
-export function inputOf(answer: ExampleAnswer): string {
-    return answer.messages.filter((turn) => turn.role === "user").at(-1)?.content ?? "";
-}
-
-export function ExampleList({
-    rows,
-    mine,
-    theirs,
-    metric,
-}: {
-    rows: ExampleAnswer[];
-    mine: string;
-    theirs: string;
-    metric: string | null | undefined;
-}) {
-    const right = (scores: Record<string, number>) =>
-        metric && metric in scores ? scores[metric] >= 0.999 : null;
-    return (
-        <ul className="flex flex-col divide-y rounded-md border">
-            {rows.map((answer, index) => (
-                <li key={`${index}-${answer.expected}`} className="flex flex-col gap-2 px-3 py-2.5">
-                    <span className="line-clamp-2 min-w-0 break-words">{inputOf(answer)}</span>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        <Answered label="Expected" value={answer.expected} right={null} />
-                        <Answered
-                            label={mine}
-                            value={answer.version.answer}
-                            right={right(answer.version.scores)}
-                        />
-                        <Answered
-                            label={theirs}
-                            value={answer.live?.answer ?? ""}
-                            right={answer.live ? right(answer.live.scores) : null}
-                        />
-                    </div>
-                </li>
-            ))}
-        </ul>
-    );
-}
-
-function Differs({
-    row,
-    versions,
-    version,
-}: {
-    row: ModelRow;
-    versions: VersionInfo[];
-    version: VersionInfo;
-}) {
-    const reference = references(row, versions, version)[0];
-    const [shown, setShown] = useState<"better" | "worse" | null>(null);
-    const can = useCan();
-    const ready =
-        can.build && version.status === "ready" && version.score !== null && Boolean(reference);
-    const answers = useAnswers(row.key, version.number, reference?.version.number ?? null, ready);
-    if (!ready || !reference) {
-        return null;
-    }
-    const all = answers.data?.examples ?? [];
-    const metric = answers.data?.metric;
-    const groups = {
-        better: all.filter((answer) => verdictOf(answer, metric) === "better"),
-        worse: all.filter((answer) => verdictOf(answer, metric) === "worse"),
-    };
-    const line = (verdict: "better" | "worse", label: string) => (
-        <span className="flex items-baseline gap-2">
-            <span className="font-medium tabular-nums">
-                {`${label} on ${groups[verdict].length} ${groups[verdict].length === 1 ? "example" : "examples"}`}
-            </span>
-            {groups[verdict].length > 0 && (
-                <Button
-                    variant="link"
-                    className="h-auto p-0 tabular-nums"
-                    aria-expanded={shown === verdict}
-                    onClick={() => setShown(shown === verdict ? null : verdict)}
-                >
-                    {shown === verdict ? "Hide them" : `Show the ${groups[verdict].length}`}
-                </Button>
-            )}
-        </span>
-    );
-    return (
-        <PanelSection
-            icon={GitCompare}
-            title="Where it differs"
-            tip={`Against ${reference.label}, on ${count(all.length)} held-out rows.`}
-        >
-            <div className="flex flex-col gap-3">
-                <ErrorLine error={answers.error} onRetry={answers.refetch} />
-                {answers.isLoading ? (
-                    <p className="text-muted-foreground">Comparing answers…</p>
-                ) : (
-                    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-                        {line("better", "Better")}
-                        {line("worse", "Worse")}
-                    </div>
-                )}
-                {shown && (
-                    <ExampleList
-                        rows={groups[shown]}
-                        mine={`This version, v${version.number}`}
-                        theirs={reference.label.charAt(0).toUpperCase() + reference.label.slice(1)}
-                        metric={metric}
-                    />
-                )}
-            </div>
-        </PanelSection>
-    );
-}
-
-const TRAINING_STATES = ["queued", "training"];
-const RUNNING_STATES = [...TRAINING_STATES, "evaluating"];
-
-function CancelRun({ job }: { job: JobInfo }) {
-    const can = useCan();
-    const client = useQueryClient();
-    const cancel = useMutation({
-        mutationFn: () =>
-            unwrap(api.POST("/api/jobs/{job_id}/cancel", { params: { path: { job_id: job.id } } })),
-        onSettled: () => client.invalidateQueries(),
-    });
-    if (!can.build || !canCancel(job)) {
-        return null;
-    }
-    return (
-        <>
-            <ErrorLine error={cancel.error} />
-            <Button variant="outline" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
-                Cancel
-            </Button>
-        </>
-    );
-}
-
-function useHeldOutRows(version: VersionInfo, enabled: boolean): number | null {
-    const data = useDatasetVersions(version.dataset_slug ?? "", enabled);
-    const found = data.data?.find((item) => item.id === version.dataset_version_id);
-    return found?.counts.eval ?? null;
-}
-
-function runTitle(version: VersionInfo, rows: number | null): string {
-    if (version.status !== "evaluating") {
-        return `Training v${version.number}`;
-    }
-    return rows
-        ? `Scoring v${version.number} on ${count(rows)} held-out rows`
-        : `Scoring v${version.number}`;
-}
-
-function runStats(job: JobInfo, metrics: JobMetrics | undefined): [string, string][] {
-    if (job.status === "queued") {
-        return [];
-    }
-    const stats: [string, string][] = [];
-    const training = metrics?.training;
-    if (job.kind === "train") {
-        stats.push(["Step", training ? stepText(training) : "–"]);
-    }
-    const counted = metrics?.counted;
-    if (job.kind !== "train" && counted) {
-        stats.push(["Rows scored", `${count(counted.done)} of ${count(counted.total)}`]);
-    }
-    stats.push(["Elapsed", jobDuration(job)]);
-    if (job.kind === "train" && job.status === "running") {
-        const eta = training?.eta_seconds;
-        stats.push(["Time left", eta === null || eta === undefined ? "–" : durationText(eta)]);
-    }
-    return stats;
-}
-
-function Progress({
-    row,
-    versions,
-    version,
-    job,
-    train,
-}: {
-    row: ModelRow;
-    versions: VersionInfo[];
-    version: VersionInfo;
-    job: JobInfo;
-    train: JobDetail | undefined;
-}) {
-    const metrics = useJobMetrics(job.id, isActiveJob(job));
-    const scoring = version.status === "evaluating";
-    const rows = useHeldOutRows(version, scoring);
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
-    const stats = runStats(job, metrics.data);
-    const curve = !scoring && train?.id === job.id ? train : undefined;
-    return (
-        <PanelSection
-            icon={Hourglass}
-            title={runTitle(version, rows)}
-            tip={`Scored against ${live ? `deployed v${live.number} and ` : ""}v0 · Baseline when it finishes.`}
-            actions={
-                <>
-                    <CancelRun job={job} />
-                    <Button variant="outline" asChild>
-                        <Link href={jobHref(job)}>{`Job #${job.id}`}</Link>
-                    </Button>
-                </>
-            }
-        >
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                    <VersionStatus row={row} version={version} />
-                    <ProgressBar
-                        value={version.job?.progress ?? 0}
-                        label={`v${version.number} progress`}
-                        className="w-full"
-                    />
-                </div>
-                {job.status === "queued" ? (
-                    <p className="text-muted-foreground">Waiting for a worker.</p>
-                ) : (
-                    <div className="flex flex-wrap gap-x-10 gap-y-3">
-                        {stats.map(([label, value]) => (
-                            <Stat key={label} label={label} value={value} />
-                        ))}
-                    </div>
-                )}
-                <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
-                {curve && curve.status !== "queued" && (
-                    <LossBody job={curve} metrics={metrics.data} />
-                )}
-            </div>
-        </PanelSection>
-    );
-}
-
-function Failure({ version }: { version: VersionInfo }) {
-    const job = version.job;
-    const cancelled = isCancelled(version);
-    return (
-        <PanelSection
-            icon={Gauge}
-            title="Score"
-            actions={
-                job && (
-                    <Button variant="outline" asChild>
-                        <Link href={jobLogsHref(job)}>View logs</Link>
-                    </Button>
-                )
-            }
-        >
-            <div
-                className={cn(
-                    "flex flex-col gap-1 rounded-md border px-3 py-2.5",
-                    cancelled ? "bg-muted" : "border-destructive/40 bg-destructive-soft",
-                )}
-            >
-                <span className="font-medium">
-                    {`${job?.kind === "train" ? "Training" : "Scoring"} ${cancelled ? "cancelled" : "failed"}`}
-                </span>
-                <span className="text-sm">{failureReason(version)}</span>
-            </div>
-        </PanelSection>
-    );
-}
-
-const SETTING_NAMES: Record<string, (recipe: Record<string, unknown>) => string> = {
-    rank: (recipe) => `rank ${recipe.rank}`,
-    epochs: (recipe) => `${recipe.epochs} ${recipe.epochs === 1 ? "epoch" : "epochs"}`,
-    learning_rate: (recipe) => `learning rate ${recipe.learning_rate}`,
-    warmup: (recipe) =>
-        Number(recipe.warmup) === 0 ? "no warmup" : `warmup ${percent(Number(recipe.warmup))}`,
-    scheduler: (recipe) => `${recipe.scheduler} schedule`,
-    dropout: (recipe) => `dropout ${recipe.dropout}`,
-    weight_decay: (recipe) => `weight decay ${recipe.weight_decay}`,
-    max_rows: (recipe) => `${count(Number(recipe.max_rows))} rows at most`,
-    strategy: (recipe) => (recipe.strategy === "qlora" ? "QLoRA" : "LoRA"),
-    checkpointing: (recipe) => `checkpointing ${recipe.checkpointing ? "on" : "off"}`,
-    micro_batch: (recipe) => `batch ${recipe.micro_batch}`,
-    seq_len: (recipe) => `sequence ${count(Number(recipe.seq_len))} tokens`,
-    alpha: (recipe) => `alpha ${recipe.alpha}`,
-    grad_accum: (recipe) => `accumulation ${recipe.grad_accum}`,
-    eval_every: (recipe) => `scored every ${recipe.eval_every} steps`,
-    seed: (recipe) => `seed ${recipe.seed}`,
-};
-
-function settingsText(version: VersionInfo): string {
-    const recipe = version.recipe as Record<string, unknown>;
-    const overrides = Array.isArray(recipe.overrides) ? (recipe.overrides as string[]) : [];
-    const changed = overrides.map((name) => SETTING_NAMES[name]?.(recipe) ?? name);
-    return changed.length === 0 ? "Default settings" : `${changed.join(", ")}; the rest default`;
-}
-
-function jobText(job: JobInfo): string {
-    const seconds =
-        job.started_at && job.finished_at
-            ? (Date.parse(job.finished_at) - Date.parse(job.started_at)) / 1000
-            : null;
-    const took =
-        job.status === "running"
-            ? "running"
-            : job.status === "failed"
-              ? "failed"
-              : seconds
-                ? durationText(seconds)
-                : null;
-    return `${job.kind === "train" ? "Training" : "Scoring"} job #${job.id}${took ? ` · ${took}` : ""} →`;
-}
-
-type RanOn = { pool: string | null; machine: string | null };
-
-function ranOn(version: VersionInfo, job: JobDetail | undefined): RanOn | null {
-    const parts = [job?.host, job?.device].filter(Boolean);
-    if (parts.length > 0) {
-        return { pool: job?.pool ?? null, machine: parts.join(" · ") };
-    }
-    const plan = (version.recipe as { plan?: { machine?: unknown; pool?: unknown } }).plan;
-    const machine = typeof plan?.machine === "string" ? plan.machine : null;
-    const pool = typeof plan?.pool === "string" && plan.pool ? plan.pool : null;
-    return machine || pool ? { pool, machine } : null;
-}
-
-function RanOnText({ place }: { place: RanOn }) {
-    if (!place.pool) {
-        return <span className="font-mono text-sm">{place.machine}</span>;
-    }
-    return <PoolLink name={place.pool} machine={place.machine} />;
-}
-
-function MadeFrom({
-    row,
-    versions,
-    version,
-    job,
-    detail,
-}: {
-    row: ModelRow;
-    versions: VersionInfo[];
-    version: VersionInfo;
-    job: JobInfo | undefined;
-    detail: JobDetail | undefined;
-}) {
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
-    const since =
-        live && live.number !== version.number && live.dataset_version_rows
-            ? (version.dataset_version_rows ?? 0) - live.dataset_version_rows
-            : 0;
-    const data =
-        version.dataset_version_number !== null && version.dataset_version_number !== undefined
-            ? `${version.dataset_slug ? `${version.dataset_slug} ` : ""}v${version.dataset_version_number} · ${count(version.dataset_version_rows ?? 0)} rows${since !== 0 ? `, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since live` : ""}`
-            : "No data";
-    const parts: [string, ReactNode][] = [
-        [
-            "Data",
-            <span key="data" className="tabular-nums">
-                {data}
-            </span>,
-        ],
-        [
-            "Method",
-            version.kind === "prompt" ? (
-                <span key="method">
-                    Instructions only: the base with its instructions, no training
-                </span>
-            ) : (
-                <Tip
-                    key="method"
-                    tip="Supervised fine-tuning: it learns to answer like your labelled rows."
-                >
-                    <span className="cursor-default underline decoration-dotted underline-offset-4">
-                        Supervised fine-tuning (SFT)
-                    </span>
-                </Tip>
-            ),
-        ],
-    ];
-    parts.push(["Training", <span key="training">{trainingText(version)}</span>]);
-    if (version.kind !== "prompt") {
-        parts.push(["Settings", <span key="settings">{settingsText(version)}</span>]);
-    }
-    const place = ranOn(version, detail);
-    if (place) {
-        parts.push(["Pool", <RanOnText key="pool" place={place} />]);
-    }
-    if (version.duplicated_from) {
-        parts.push([
-            "Copied from",
-            <Link
-                key="copy"
-                href={modelPageHref(version.duplicated_from.slug)}
-                className="text-primary hover:underline"
-            >
-                {`${version.duplicated_from.name} v${version.duplicated_from.number}`}
-            </Link>,
-        ]);
-    }
-    if (job) {
-        parts.push([
-            "Job",
-            <Link key="job" href={jobHref(job)} className="text-primary hover:underline">
-                {jobText(job)}
-            </Link>,
-        ]);
-    }
-    return (
-        <PanelSection icon={SlidersHorizontal} title="Made from">
-            <Facts items={parts} />
-        </PanelSection>
-    );
-}
-
-function Identifiers({ row, version }: { row: ModelRow; version: VersionInfo }) {
-    const callable = `${row.key}@${version.number}`;
-    const files = useVersionFiles(
-        row.key,
-        version.kind === "lora" && version.status === "ready" ? version.number : null,
-    );
-    const sha = files.data?.artifact_id;
-    return (
-        <PanelSection
-            icon={Fingerprint}
-            title="Identifiers"
-            tip="The short SHA-256 identifies its adapter."
-        >
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="flex items-center gap-0.5">
-                    <span className="font-mono text-sm">{callable}</span>
-                    <CopyButton value={callable} label={`Copy ${callable}`} />
-                </span>
-                {sha && (
-                    <Tip tip={sha}>
-                        <span className="cursor-default font-mono text-sm text-muted-foreground">
-                            {sha.slice(0, 12)}
-                        </span>
-                    </Tip>
-                )}
-            </div>
-        </PanelSection>
-    );
-}
+import { Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
+import { DeployVersionDialog, liveBlock, versionLabel } from "./makeLive";
+import { ChangesSection } from "./versionChanges";
+import { DetailsSection, LineageSection, TrainingSection } from "./versionRun";
+import { ScoreSection } from "./versionScore";
+import { type Peers, type Phase, peersOf, phaseOf, verdictLine } from "./versionState";
+import { VersionStatus, runJob } from "./versions";
 
 function artifactHref(id: string): string {
     return `/api/artifacts/${id}`;
-}
-
-function Exports({ row, version }: { row: ModelRow; version: VersionInfo }) {
-    const can = useCan();
-    const models = useAllModels();
-    const files = useVersionFiles(
-        row.key,
-        version.kind === "lora" && version.status === "ready" ? version.number : null,
-    );
-    const sha = files.data?.artifact_id;
-    if (!sha) {
-        return null;
-    }
-    return (
-        <PanelSection icon={Package} title="Exports" flush>
-            <ul className="divide-y">
-                <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-panel py-3">
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="flex flex-wrap items-baseline gap-x-2">
-                            <span className="font-medium">Adapter only</span>
-                            <span className="text-sm text-muted-foreground tabular-nums">
-                                {`${bytes(files.data?.size)} · safetensors in a tar · loads on ${baseNameOf(models.data, version.base_model || row.base_model)} in minibrain, vLLM or PEFT`}
-                            </span>
-                        </span>
-                        <span className="flex min-w-0 items-center gap-1">
-                            <span className="shrink-0 text-sm text-muted-foreground">SHA-256</span>
-                            <span className="truncate font-mono text-sm" title={sha}>
-                                {sha}
-                            </span>
-                            <span className="-my-1.5 shrink-0">
-                                <CopyButton value={sha} label="Copy SHA-256" />
-                            </span>
-                        </span>
-                    </span>
-                    {can.build && (
-                        <Button variant="outline" asChild>
-                            <a href={artifactHref(sha)} download>
-                                <Download aria-hidden="true" />
-                                Download
-                            </a>
-                        </Button>
-                    )}
-                </li>
-            </ul>
-        </PanelSection>
-    );
 }
 
 const FORMATS = [
@@ -951,17 +315,44 @@ function VersionMenu({
     );
 }
 
-function LiveButton({
+function deployReason(
+    row: ModelRow,
+    version: VersionInfo,
+    phase: Phase,
+    peers: Peers,
+    builder: boolean,
+): string | null {
+    if (!builder) {
+        return "You need build access to deploy.";
+    }
+    if (peers.isLive && isDeployed(row)) {
+        return `v${version.number} is already live.`;
+    }
+    if (phase === "queued" || phase === "training") {
+        return `v${version.number} is still training; it can be deployed once it is scored.`;
+    }
+    if (phase === "scoring") {
+        return `v${version.number} is still being scored; it can be deployed once it is scored.`;
+    }
+    if (phase === "failed") {
+        return `v${version.number} failed, so there is nothing to deploy.`;
+    }
+    if (phase === "cancelled") {
+        return `v${version.number} was cancelled before it finished, so there is nothing to deploy.`;
+    }
+    return liveBlock(row, version);
+}
+
+function DeployButton({
     row,
     versions,
     version,
-}: { row: ModelRow; versions: VersionInfo[]; version: VersionInfo }) {
+    phase,
+    peers,
+}: { row: ModelRow; versions: VersionInfo[]; version: VersionInfo; phase: Phase; peers: Peers }) {
     const can = useCan();
     const [open, setOpen] = useState(false);
-    if (!can.build || !canGoLive(row, version)) {
-        return null;
-    }
-    const blocked = liveBlock(row, version);
+    const blocked = deployReason(row, version, phase, peers, can.build);
     return (
         <>
             <Tip tip={blocked}>
@@ -969,24 +360,40 @@ function LiveButton({
                     {`Deploy v${version.number}`}
                 </Button>
             </Tip>
-            <DeployVersionDialog
-                row={row}
-                versions={versions}
-                number={open ? version.number : null}
-                onOpenChange={setOpen}
-            />
+            {!blocked && (
+                <DeployVersionDialog
+                    row={row}
+                    versions={versions}
+                    number={open ? version.number : null}
+                    onOpenChange={setOpen}
+                />
+            )}
         </>
     );
 }
 
-function Curves({ job, loss }: { job: JobDetail; loss: boolean }) {
-    const metrics = useJobMetrics(job.id, isActiveJob(job));
+function useHeldOutRows(version: VersionInfo, enabled: boolean): number | null {
+    const data = useDatasetVersions(version.dataset_slug ?? "", enabled);
+    const found = data.data?.find((item) => item.id === version.dataset_version_id);
+    return found?.counts.eval ?? null;
+}
+
+function VerdictLine({
+    version,
+    phase,
+    peers,
+    eta,
+}: { version: VersionInfo; phase: Phase; peers: Peers; eta: number | null | undefined }) {
+    const rows = useHeldOutRows(version, phase === "scoring");
+    const verdict = verdictLine({ version, phase, peers, eta, heldOutRows: rows });
     return (
-        <>
-            {loss && <ErrorLine error={metrics.error} onRetry={metrics.refetch} />}
-            {loss && <LossSection job={job} metrics={metrics.data} />}
-            <RateSection job={job} metrics={metrics.data} />
-        </>
+        <p className="flex min-h-6 min-w-0 items-center" aria-live="polite">
+            <StatusText tone={verdict.tone} className="min-w-0">
+                <span className="truncate tabular-nums" title={verdict.text}>
+                    {verdict.text}
+                </span>
+            </StatusText>
+        </p>
     );
 }
 
@@ -998,7 +405,9 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
     const version = list.find((item) => item.number === number);
     const run = version ? runJob(version, jobs.data ?? []) : undefined;
     const runDetail = useJob(run?.id ?? null);
-    const job = runDetail.data;
+    const detail = runDetail.data;
+    const trained = run?.kind === "train";
+    const metrics = useJobMetrics(run?.id ?? 0, Boolean(detail && isActiveJob(detail)), trained);
     const crumbs = modelCrumbs(row, [{ label: versionCrumb(number) }]);
     if (!version) {
         return (
@@ -1025,64 +434,52 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
             </Page>
         );
     }
-    const live = isDeployed(row) ? liveOf(list) : undefined;
-    const delta =
-        version.status === "ready" &&
-        live &&
-        live.number !== version.number &&
-        live.score !== null &&
-        version.score !== null
-            ? version.score - live.score
-            : null;
+    const phase = phaseOf(version);
+    const peers = peersOf(row, list, version);
     const base = baseNameOf(models.data, version.base_model || row.base_model);
+    const trainMetrics = trained ? metrics.data : undefined;
     return (
         <Page wide>
             <PageHeader
                 title={versionLabel(version)}
                 crumbs={crumbs}
-                badge={
-                    <InlineFacts
-                        items={[
-                            <VersionStatus key="status" row={row} version={version} />,
-                            delta !== null ? (
-                                <Delta key="delta" value={delta} suffix="vs live" />
-                            ) : null,
-                        ]}
-                    />
-                }
+                badge={<VersionStatus row={row} version={version} />}
                 caption={`${row.name} on ${base} · created ${relativeTime(version.created_at)}`}
                 actions={
                     <>
-                        <LiveButton row={row} versions={list} version={version} />
+                        <DeployButton
+                            row={row}
+                            versions={list}
+                            version={version}
+                            phase={phase}
+                            peers={peers}
+                        />
                         <VersionMenu row={row} versions={list} version={version} />
                     </>
                 }
             />
+            <VerdictLine
+                version={version}
+                phase={phase}
+                peers={peers}
+                eta={trainMetrics?.training?.eta_seconds}
+            />
             <PanelSections>
-                {version.status === "ready" && (
-                    <ScoreSection row={row} versions={list} version={version} />
-                )}
-                {RUNNING_STATES.includes(version.status) && version.job && (
-                    <Progress
-                        row={row}
-                        versions={list}
-                        version={version}
-                        job={version.job}
-                        train={job}
-                    />
-                )}
-                {version.status === "failed" && <Failure version={version} />}
-                {job?.kind === "train" && (
-                    <Curves
-                        key={`curves-${job.id}`}
-                        job={job}
-                        loss={!TRAINING_STATES.includes(version.status)}
-                    />
-                )}
-                <Differs row={row} versions={list} version={version} />
-                <MadeFrom row={row} versions={list} version={version} job={run} detail={job} />
-                <Identifiers row={row} version={version} />
-                <Exports row={row} version={version} />
+                <ScoreSection version={version} versions={list} phase={phase} peers={peers} />
+                <ChangesSection slug={row.key} version={version} phase={phase} peers={peers} />
+                <TrainingSection
+                    versions={list}
+                    version={version}
+                    phase={phase}
+                    peers={peers}
+                    run={run}
+                    detail={trained ? detail : undefined}
+                    metrics={trainMetrics}
+                    metricsError={trained ? metrics.error : null}
+                    onRetry={metrics.refetch}
+                />
+                <LineageSection row={row} version={version} peers={peers} />
+                <DetailsSection row={row} version={version} phase={phase} />
             </PanelSections>
         </Page>
     );

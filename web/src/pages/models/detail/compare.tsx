@@ -32,7 +32,7 @@ import {
     versionLabel,
 } from "./makeLive";
 import { SCHEDULERS } from "./train/recipe";
-import { ExampleList, useAnswers, verdictOf } from "./version";
+import { ExampleList, useAnswers, verdictOf } from "./versionChanges";
 import { recipeText } from "./versions";
 
 function columnName(row: ModelRow, versions: VersionInfo[], version: VersionInfo): string {
