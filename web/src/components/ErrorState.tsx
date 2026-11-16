@@ -10,6 +10,7 @@ import {
 import { Button, Link, cn } from "obp-ui";
 import { type ReactNode, useId } from "react";
 import { errorStatus, isUnreachable } from "~/api/client";
+import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, errorMessage } from "~/components/Section";
 import { navEntryFor } from "~/components/navigation";
@@ -251,13 +252,25 @@ export function ErrorPage({ fallback, children }: { fallback: string; children: 
     );
 }
 
+function sectionCrumbs(pathname: string): Crumb[] {
+    const entry = navEntryFor(pathname);
+    if (!entry) {
+        return [{ label: "Home", href: "/" }];
+    }
+    return entry.group === "Settings"
+        ? [{ label: "Settings", href: "/settings" }]
+        : [{ label: entry.label, href: entry.path }];
+}
+
 export function NotFoundPage() {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
     return (
-        <ErrorPage fallback="Page not found">
-            <NotFoundState title="Nothing lives at this address" primary={GO_HOME} heading="h2">
-                Check the address, or start again from Home.
+        <Page>
+            <PageCrumbs items={sectionCrumbs(pathname)} />
+            <NotFoundState title="Page not found" primary={GO_HOME}>
+                Nothing lives at this address. Check it, or start again from Home.
             </NotFoundState>
-        </ErrorPage>
+        </Page>
     );
 }
 
