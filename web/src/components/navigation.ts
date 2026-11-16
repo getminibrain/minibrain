@@ -18,6 +18,7 @@ import {
     SlidersHorizontal,
     Table2,
     ThumbsUp,
+    UserRound,
     Users,
 } from "lucide-react";
 import type { IconComponent } from "obp-ui/shell";
@@ -58,8 +59,11 @@ export const SECTIONS: NavSection[] = [
     },
 ];
 
+export const ACCOUNT_PATH = "/settings/account";
+
 export const SETTINGS_PAGES: NavEntry[] = [
-    { label: "General", path: "/settings", icon: SlidersHorizontal },
+    { label: "Your account", path: ACCOUNT_PATH, icon: UserRound },
+    { label: "General", path: "/settings", icon: SlidersHorizontal, role: "viewer" },
     { label: "Security", path: "/settings/security", icon: ShieldCheck, role: "admin" },
     { label: "Accounts", path: "/settings/accounts", icon: Users, role: "admin" },
     { label: "Audit log", path: "/settings/audit", icon: ScrollText, role: "admin" },

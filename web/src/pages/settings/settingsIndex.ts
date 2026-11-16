@@ -1,6 +1,7 @@
 import type { Role } from "~/api/authQueries";
 
 export type SettingsPath =
+    | "/settings/account"
     | "/settings"
     | "/settings/security"
     | "/settings/accounts"
@@ -126,7 +127,50 @@ function section<T extends Record<string, SettingSpec>>(
     };
 }
 
-export const GENERAL = {
+export const YOUR_ACCOUNT = {
+    profile: section("Profile", {
+        name: setting("Name", "Shown in the sidebar, on audit events and to admins.", [
+            "display name",
+            "rename",
+            "full name",
+            "profile",
+        ]),
+        email: setting(
+            "Email",
+            "The address you sign in with; set by your identity provider for SSO.",
+            ["email address", "username"],
+        ),
+        role: setting("Role", "Viewer, Builder or Admin, given by an admin or your groups.", [
+            "permissions",
+            "access",
+        ]),
+        signInMethod: setting("Sign-in method", "Password, single sign-on or a proxy.", [
+            "sso",
+            "oidc",
+            "proxy",
+            "login",
+        ]),
+    }),
+    password: section("Password", {
+        changePassword: onSection(
+            setting(
+                "Change password",
+                "Needs your current password; signs you out everywhere else.",
+                ["new password", "reset password", "credentials", "security"],
+            ),
+        ),
+    }),
+    sessions: section("Sessions", {
+        signOutOthers: onSection(
+            setting("Sign out everywhere else", "Ends every session but this one.", [
+                "devices",
+                "browsers",
+                "logout",
+                "sign out",
+                "active sessions",
+            ]),
+        ),
+    }),
     appearance: section("Appearance", {
         theme: aka(
             ["dark mode", "light mode"],
@@ -142,6 +186,9 @@ export const GENERAL = {
             ),
         ),
     }),
+};
+
+export const GENERAL = {
     catalogue: section(
         "Model catalogue",
         {
@@ -878,6 +925,7 @@ export const INSTALL = {
 };
 
 const PAGES: [SettingsPath, Record<string, SettingsSection>][] = [
+    ["/settings/account", YOUR_ACCOUNT],
     ["/settings", GENERAL],
     ["/settings/security", SECURITY],
     ["/settings/accounts", ACCOUNTS],

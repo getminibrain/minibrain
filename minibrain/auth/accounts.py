@@ -13,7 +13,7 @@ from minibrain import policy
 from minibrain.auth import throttle
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.identity import Person, handle_of
-from minibrain.auth.passwords import check_strength, hash_password, verify_password
+from minibrain.auth.passwords import PasswordError, check_strength, hash_password, verify_password
 from minibrain.auth.roles import Role, role_of
 from minibrain.registry.models import LoginSession, Setting, User, now
 from minibrain.registry.service import ConflictError, NotFoundError
@@ -36,6 +36,8 @@ EMAIL = re.compile(r"[^@\s]+@[^@\s]+")
 WRONG = "Wrong email or password"
 TURNED_OFF = "This account is turned off. Ask an admin to turn it back on."
 TAKEN = "This install already has an admin account; sign in instead"
+WRONG_CURRENT = "Your current password is wrong"
+UNCHANGED = "Choose a password different from your current one"
 
 
 class AccountError(Exception):
@@ -43,6 +45,10 @@ class AccountError(Exception):
 
 
 class SignInError(Exception):
+    pass
+
+
+class WrongPassword(Exception):
     pass
 
 
@@ -179,6 +185,16 @@ def end_sessions(session: Session, user: User) -> None:
     session.execute(delete(LoginSession).where(LoginSession.user_id == user.id))
 
 
+def end_other_sessions(session: Session, user: User, keep: int | None) -> list[int]:
+    query = select(LoginSession.id).where(LoginSession.user_id == user.id)
+    if keep is not None:
+        query = query.where(LoginSession.id != keep)
+    ended = list(session.scalars(query))
+    if ended:
+        session.execute(delete(LoginSession).where(LoginSession.id.in_(ended)))
+    return ended
+
+
 def ensure_csrf_key(session: Session) -> bytes:
     stored = read(session, CSRF_KEY)
     if not stored:
@@ -244,7 +260,7 @@ def redeem_reset(session: Session, token: str, password: str) -> User:
     return user
 
 
-def set_password(session: Session, user: User, password: str) -> None:
+def store_password(session: Session, user: User, password: str) -> None:
     check_strength(password)
     user.password_hash = hash_password(password)
     user.reset_hash = None
@@ -252,7 +268,41 @@ def set_password(session: Session, user: User, password: str) -> None:
     user.updated_at = now()
     if user.email:
         throttle.forget_failures(session, user.email)
+
+
+def set_password(session: Session, user: User, password: str) -> None:
+    store_password(session, user, password)
     end_sessions(session, user)
+
+
+def check_current_password(session: Session, user: User, password: str, address: str | None) -> None:
+    moment = now()
+    place = address or ""
+    typed = user.subject[:NAME_LENGTH]
+    throttle.forget_old(session, moment)
+    throttle.check_address(session, place, moment)
+    attempt = throttle.record(session, place, typed, moment)
+    locked = throttle.lock_ends(session, place, typed, moment)
+    if locked is not None:
+        verify_password(password, None)
+        minutes = throttle.minutes_until(moment, locked)
+        raise throttle.TooManyAttempts(f"Too many wrong passwords. Try again in {minutes} minutes.")
+    if not verify_password(password, user.password_hash):
+        attempt.failed = True
+        raise WrongPassword(WRONG_CURRENT)
+
+
+def change_password(
+    session: Session, user: User, current: str, password: str, address: str | None, keep: int | None
+) -> list[int]:
+    if user.source != LOCAL:
+        raise AccountError("Only local accounts have a password in minibrain")
+    check_current_password(session, user, current, address)
+    check_strength(password)
+    if verify_password(password, user.password_hash):
+        raise PasswordError(UNCHANGED)
+    store_password(session, user, password)
+    return end_other_sessions(session, user, keep)
 
 
 def role_for(session: Session, user: User, config: AuthConfig) -> tuple[Role | None, bool]:

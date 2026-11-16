@@ -52,6 +52,12 @@ People sign in to the UI and `/api`; apps call `/v1` with API keys only, and wor
 - Sessions: a random 256-bit token in an HttpOnly, SameSite=Lax cookie; the database keeps only its SHA-256. Idle
   and absolute lifetimes are the `session_idle_minutes` (480, a working day) and `session_hours` (168, a week) policies. Signing out, a new
   password or turning an account off ends sessions at once.
+- Your account (Settings › Your account, `/api/me`, any signed-in person, no role needed): people rename themselves,
+  list their own sessions and end any other one, and local accounts change their password. A change needs the current
+  password; wrong ones count toward the same per-address lockout as sign-in. The new password follows the same
+  policy, and every other session of the account ends while this one stays. Session ids of other accounts answer 404.
+  Audit actions: `account.update`, `account.password_change`, `account.session_end`, `account.sessions_end`.
+  Single sign-on and proxy accounts have no password in minibrain.
 - The cookie is Secure when the request is HTTPS, a configured proxy says it was (`X-Forwarded-Proto`), or the
   browser's `Origin` is HTTPS. Plain HTTP on loopback (`localhost`, `127.0.0.1`, `::1`) gets no Secure flag, since
   Safari drops Secure cookies on `http://localhost`. Plain HTTP on any other address gets it, so the browser keeps

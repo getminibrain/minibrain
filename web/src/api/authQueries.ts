@@ -10,10 +10,14 @@ export type PersonInfo = Schemas["PersonInfo"];
 export type AccountInfo = Schemas["AccountInfo"];
 export type PasswordLink = Schemas["PasswordLink"];
 export type Role = NonNullable<PersonInfo["role"]>;
+export type Profile = Schemas["Profile"];
+export type SignInSession = Schemas["SignInSession"];
 
 export const authKeys = {
     session: ["auth", "session"] as const,
     accounts: ["accounts"] as const,
+    me: ["me"] as const,
+    mySessions: ["me", "sessions"] as const,
 };
 
 async function loadSession(): Promise<SessionInfo> {
@@ -89,5 +93,59 @@ export function useAccounts(enabled: boolean) {
         queryKey: authKeys.accounts,
         queryFn: () => unwrap(api.GET("/api/accounts")),
         enabled,
+    });
+}
+
+export function useProfile() {
+    return useQuery({ queryKey: authKeys.me, queryFn: () => unwrap(api.GET("/api/me")) });
+}
+
+export function useRename() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (name: string) => unwrap(api.PATCH("/api/me", { body: { name } })),
+        onSuccess: async (profile) => {
+            client.setQueryData(authKeys.me, profile);
+            await client.invalidateQueries({ queryKey: authKeys.session });
+            await client.invalidateQueries({ queryKey: authKeys.accounts });
+            await client.invalidateQueries({ queryKey: ["audit"] });
+        },
+    });
+}
+
+export function useChangePassword() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (body: Schemas["PasswordChange"]) =>
+            unwrap(api.POST("/api/me/password", { body })),
+        onSuccess: () => client.invalidateQueries({ queryKey: authKeys.mySessions }),
+    });
+}
+
+export function useMySessions() {
+    return useQuery({
+        queryKey: authKeys.mySessions,
+        queryFn: () => unwrap(api.GET("/api/me/sessions")),
+    });
+}
+
+export function useEndSession() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) =>
+            succeed(
+                api.DELETE("/api/me/sessions/{session_id}", {
+                    params: { path: { session_id: id } },
+                }),
+            ),
+        onSettled: () => client.invalidateQueries({ queryKey: authKeys.mySessions }),
+    });
+}
+
+export function useEndOtherSessions() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: () => unwrap(api.DELETE("/api/me/sessions")),
+        onSettled: () => client.invalidateQueries({ queryKey: authKeys.mySessions }),
     });
 }

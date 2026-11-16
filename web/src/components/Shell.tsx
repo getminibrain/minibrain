@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, LogOut, Settings, SunMoon } from "lucide-react";
+import { ArrowLeft, BookOpen, LogOut, Settings, SunMoon, UserRound } from "lucide-react";
 import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
@@ -14,7 +14,13 @@ import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
 import { SettingsSearch } from "~/components/SettingsSearch";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
-import { SETTINGS_PAGES, isSettingsPath, sectionsFor, visibleTo } from "~/components/navigation";
+import {
+    ACCOUNT_PATH,
+    SETTINGS_PAGES,
+    isSettingsPath,
+    sectionsFor,
+    visibleTo,
+} from "~/components/navigation";
 import { ROLE_LABELS, initialOf } from "~/lib/access";
 import { appPageToReturnTo, rememberAppPage } from "~/lib/lastAppPage";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
@@ -107,8 +113,13 @@ function Account() {
     const name = person?.name ?? "";
     const sub = person?.email ?? (person?.role ? ROLE_LABELS[person.role] : "No role");
     const items: AccountMenuItem[] = [
-        { icon: <Settings />, label: "Settings", href: "/settings" },
-        { icon: <BookOpen />, label: "API reference", href: API_REFERENCE_PATH },
+        { icon: <UserRound />, label: "Your account", href: ACCOUNT_PATH },
+        ...(person?.role
+            ? [
+                  { icon: <Settings />, label: "Settings", href: "/settings" },
+                  { icon: <BookOpen />, label: "API reference", href: API_REFERENCE_PATH },
+              ]
+            : []),
         { kind: "theme", icon: <SunMoon />, label: "Theme" },
         ...(signsOut
             ? [
@@ -147,7 +158,7 @@ function Gate({ pathname, children }: { pathname: string; children: ReactNode })
     if (info?.person && pathname === SETUP_PATH) {
         return <Navigate to="/" replace />;
     }
-    if (info?.person && info.person.role == null) {
+    if (info?.person && info.person.role == null && pathname !== ACCOUNT_PATH) {
         return <NoAccessPage session={info} />;
     }
     return children;

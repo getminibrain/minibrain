@@ -652,9 +652,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: v2
 
 ## Settings
+- **Your account** · shipped · product, admin
+  Change your name and password, and sign out other devices.
+  UI: Settings › Your account · API: GET /api/me, PATCH /api/me, POST /api/me/password, GET /api/me/sessions, DELETE /api/me/sessions, DELETE /api/me/sessions/{session_id}
 - **Appearance** · shipped · product
   Choose a light, dark or device theme.
-  UI: Settings › General › Appearance
+  UI: Settings › Your account › Appearance
 - **Settings search** · shipped · product, admin
   Find any setting by name or keyword.
   UI: Settings › Search

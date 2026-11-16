@@ -96,7 +96,11 @@ SETTINGS = Section(
     "Install-wide settings: storage, data, judge, safety, catalogue, policies and encryption.",
     ("/api/settings", "/api/policies", "/api/catalog/settings"),
 )
-ACCOUNTS = Section("Accounts", "Sign-in, sessions and the people who use this install.", ("/api/auth", "/api/accounts"))
+ACCOUNTS = Section(
+    "Accounts",
+    "Sign-in, your own account and sessions, and the people who use this install.",
+    ("/api/auth", "/api/me", "/api/accounts"),
+)
 AUDIT = Section("Audit", "The audit log, its export and its hash chain.", ("/api/audit",))
 REFERENCE = Section("Reference", "The OpenAPI documents this page renders.", ("/api/openapi",))
 

@@ -21,6 +21,7 @@ import {
 } from "~/api/authQueries";
 import { signOutReason } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
+import { ACCOUNT_PATH } from "~/components/navigation";
 
 const MIN_PASSWORD = 12;
 
@@ -399,14 +400,18 @@ export function NoAccessPage({ session }: { session: SessionInfo }) {
                 <p className="text-base">
                     An admin can give you one under Settings, Accounts. Then reload this page.
                 </p>
-                <Button
-                    variant="outline"
-                    className="w-fit"
-                    onClick={() => signOut.mutate()}
-                    disabled={signOut.isPending}
-                >
-                    Sign out
-                </Button>
+                <div className="flex flex-wrap gap-3">
+                    <Button asChild variant="outline">
+                        <a href={ACCOUNT_PATH}>Your account</a>
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => signOut.mutate()}
+                        disabled={signOut.isPending}
+                    >
+                        Sign out
+                    </Button>
+                </div>
             </div>
         </AuthFrame>
     );

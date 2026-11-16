@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, Coins, GraduationCap, Palette, Scale, Split } from "lucide-react";
+import { BookMarked, Coins, GraduationCap, Scale, Split } from "lucide-react";
 import {
     Button,
     Select,
@@ -20,7 +20,6 @@ import { ErrorLine, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SourceBadge } from "~/components/SourceBadge";
-import { ThemeChoice } from "~/components/ThemeChoice";
 import { useCan } from "~/lib/access";
 import { CURRENCIES } from "~/lib/cost";
 import { count } from "~/lib/format";
@@ -34,19 +33,6 @@ const SPLIT_LABELS: Record<string, string> = {
     shots: "Few-shot (max)",
     min_rows: "Minimum rows",
 };
-
-function Appearance() {
-    return (
-        <SettingsSection
-            icon={Palette}
-            anchor={GENERAL.appearance.anchor}
-            title={GENERAL.appearance.title}
-            description="Light, dark or your device's setting, for this browser."
-        >
-            <ThemeChoice />
-        </SettingsSection>
-    );
-}
 
 const CATALOGUE = GENERAL.catalogue;
 const PRICES = GENERAL.prices;
@@ -318,11 +304,10 @@ export function SettingsPage() {
     return (
         <SettingsLayout
             title="General"
-            caption="Appearance, the model catalogue, compute prices and the defaults new models start from."
+            caption="The model catalogue, compute prices and the defaults new models start from."
         >
             <ErrorLine error={error} />
             <SettingsSections>
-                <Appearance />
                 {can.admin && <ModelCatalogue />}
                 {can.admin && <ComputePrices />}
                 {can.admin && <JudgeModel />}

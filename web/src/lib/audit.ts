@@ -50,6 +50,9 @@ const ACTIONS: Record<string, string> = {
     "settings.prices": "Compute prices changed",
     "account.create": "Account created",
     "account.password": "Password set",
+    "account.password_change": "Password changed",
+    "account.session_end": "Session ended",
+    "account.sessions_end": "Other sessions ended",
     "account.reset": "Password link created",
     "account.update": "Account changed",
     "audit.prune": "Audit events deleted",
@@ -404,6 +407,14 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "account.create": (detail) => `Role ${plainValue(detail.role, undefined, "role")}`,
     "account.password": (detail) =>
         detail.via === "command line" ? "On the command line" : "With a one-time link",
+    "account.password_change": (detail) =>
+        typeof detail.sessions_ended === "number" && detail.sessions_ended > 0
+            ? `Ended ${plainValue(detail.sessions_ended)} other sessions`
+            : "No other sessions",
+    "account.session_end": (detail) =>
+        typeof detail.session_ip === "string" ? `From ${detail.session_ip}` : "One session",
+    "account.sessions_end": (detail) =>
+        Array.isArray(detail.sessions) ? `${detail.sessions.length} sessions` : "Other sessions",
     "account.reset": (detail) =>
         `Link expires ${plainValue(detail.link_expires_at, undefined, "link_expires_at")}`,
     "auth.setup_link": () => "For the first admin; earlier links stop working",

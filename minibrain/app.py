@@ -30,6 +30,7 @@ from minibrain.api import (
     job_metrics,
     jobs,
     keys,
+    me,
     model_activity,
     model_page,
     model_resource,
@@ -55,7 +56,7 @@ from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
 from minibrain.api.sections import tag_sections
 from minibrain.artifacts import ArtifactError
-from minibrain.auth.accounts import AccountError, SignInError, ensure_csrf_key
+from minibrain.auth.accounts import AccountError, SignInError, WrongPassword, ensure_csrf_key
 from minibrain.auth.config import load_auth
 from minibrain.auth.first_run import SetupTokenError
 from minibrain.auth.oidc import OidcClient
@@ -137,6 +138,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     AccountError: 422,
     PasswordError: 422,
     SignInError: 401,
+    WrongPassword: 403,
     TooManyAttempts: 429,
     SetupTokenError: 403,
     EncryptionError: 422,
@@ -307,6 +309,7 @@ def create_app(
     app.add_middleware(SecurityHeaders)
     for module in (
         auth,
+        me,
         accounts,
         models,
         rebase,

@@ -11,6 +11,7 @@ import { CrashPage, NotFoundPage } from "./components/ErrorState";
 import { NeedsRole } from "./components/NeedsRole";
 import { redirectTo } from "./components/Redirect";
 import { Shell } from "./components/Shell";
+import { ACCOUNT_PATH } from "./components/navigation";
 import {
     API_KEYS_PATH,
     API_REFERENCE_PATH,
@@ -48,6 +49,7 @@ import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPag
 import { DataSettingsPage } from "./pages/settings/DataSettingsPage";
 import { InstallSettingsPage } from "./pages/settings/InstallSettingsPage";
 import { StorageSettingsPage } from "./pages/settings/StorageSettingsPage";
+import { YourAccountPage } from "./pages/settings/YourAccountPage";
 import { TrainingItemPage, TrainingListPage } from "./pages/training/TrainingPages";
 
 const rootRoute = createRootRoute({ component: Shell });
@@ -119,6 +121,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/monitor/requests", MonitorPage),
     globalPage(API_REFERENCE_PATH, ApiReferencePage),
     globalPage(MANAGEMENT_REFERENCE_PATH, ApiReferencePage),
+    globalPage(ACCOUNT_PATH, YourAccountPage),
     globalPage("/settings", SettingsPage),
     globalPage("/settings/security", guarded("admin", SecurityPage)),
     globalPage("/settings/accounts", guarded("admin", AccountsSettingsPage)),
