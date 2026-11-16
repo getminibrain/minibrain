@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { BookOpen, Check, CircleCheck, CircleX, KeyRound, Send, TriangleAlert } from "lucide-react";
 import {
     Button,
@@ -17,11 +17,12 @@ import {
 } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type KeyCreated, type ModelRow, api, unwrap } from "~/api/client";
-import { keys, useKeys, useModel } from "~/api/queries";
+import { useKeys, useModel } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs, SAMPLE } from "~/components/HarnessConfigs";
 import { errorMessage } from "~/components/Section";
+import { useRefreshKeys } from "~/components/keys/KeyDialog";
 import { useCan } from "~/lib/access";
 import { API_REFERENCE_PATH, modelPageHref } from "~/lib/modelLinks";
 import { isDeployed } from "./header";
@@ -215,7 +216,7 @@ function KeyStep({
     onLeave: () => void;
 }) {
     const can = useCan();
-    const client = useQueryClient();
+    const refreshKeys = useRefreshKeys();
     const create = useMutation({
         mutationFn: () =>
             unwrap(
@@ -229,7 +230,7 @@ function KeyStep({
             ),
         onSuccess: async (created) => {
             onCreated(created);
-            await client.invalidateQueries({ queryKey: keys.apiKeys });
+            await refreshKeys();
         },
     });
     if (secret) {
