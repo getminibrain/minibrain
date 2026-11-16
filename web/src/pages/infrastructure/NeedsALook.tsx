@@ -2,12 +2,11 @@ import { TriangleAlert } from "lucide-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { poolHref } from "~/components/PoolLink";
 import { PanelSection } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
-import type { InfrastructureInfo, NodeInfo, PoolInfo, ReplicaInfo } from "./parts";
+import type { InfrastructureInfo, NodeInfo, PoolInfo, ReplicaInfo, StoreInfo } from "./parts";
 
 const COMPARED = ["minibrain", "torch", "transformers", "peft"];
 const LOW_FREE_SHARE = 0.1;
@@ -34,7 +33,7 @@ export function differences(
     ).map((name) => `${name} ${versions[name]} (main has ${main[name]})`);
 }
 
-function Command({ value, label }: { value: string; label: string }) {
+export function Command({ value, label }: { value: string; label: string }) {
     return (
         <span className="flex max-w-full min-w-0 items-center gap-1 rounded-md border bg-muted pl-3">
             <code className="min-w-0 overflow-x-auto py-1 font-mono text-sm whitespace-nowrap">
@@ -45,7 +44,11 @@ function Command({ value, label }: { value: string; label: string }) {
     );
 }
 
-function rejoinCommand(node: NodeInfo, pool: string, origin: string): string {
+export function machineHref(node: NodeInfo): string {
+    return `/infrastructure/machines?machine=${encodeURIComponent(node.id)}`;
+}
+
+export function rejoinCommand(node: NodeInfo, pool: string, origin: string): string {
     if (node.roles.includes("worker")) {
         return `minibrain worker --api-url ${origin} --pool ${pool}`;
     }
@@ -67,7 +70,7 @@ function offlineIssue(node: NodeInfo, pool: string, origin: string): Issue {
                 />
             </>
         ),
-        href: poolHref(pool),
+        href: machineHref(node),
     };
 }
 
@@ -79,7 +82,7 @@ function driftIssue(node: NodeInfo, pool: string, main: Record<string, string>):
         fix: (
             <span>{`Install the versions main runs on ${node.host}, then restart it: ${differences(node.versions ?? {}, main).join("; ")}.`}</span>
         ),
-        href: poolHref(pool),
+        href: machineHref(node),
     };
 }
 
@@ -102,8 +105,8 @@ function failedIssue(engine: ReplicaInfo, pool: string): Issue {
     };
 }
 
-function lowDisk(info: InfrastructureInfo | undefined): Issue[] {
-    const low = (info?.stores ?? []).filter(
+export function lowStores(info: InfrastructureInfo | undefined): StoreInfo[] {
+    return (info?.stores ?? []).filter(
         (store) =>
             store.free_bytes !== null &&
             store.free_bytes !== undefined &&
@@ -111,7 +114,10 @@ function lowDisk(info: InfrastructureInfo | undefined): Issue[] {
             (store.free_bytes < LOW_FREE_BYTES ||
                 store.free_bytes / store.total_bytes < LOW_FREE_SHARE),
     );
-    return low.map((store) => ({
+}
+
+function lowDisk(info: InfrastructureInfo | undefined): Issue[] {
+    return lowStores(info).map((store) => ({
         key: `disk-${store.name}`,
         tone: "warning",
         text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,

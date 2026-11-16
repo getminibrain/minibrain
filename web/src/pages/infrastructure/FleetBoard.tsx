@@ -2,11 +2,21 @@ import { Server } from "lucide-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
-import { GaugeLegend, type GaugeSegment, UsageGauge, kindLegend } from "~/components/UsageGauge";
+import { GaugeLegend, UsageGauge, kindLegend } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { kindNoun } from "~/lib/jobs";
-import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
+import { modelPageHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
+import {
+    ENGINE_DOING,
+    MEMORY_LABELS,
+    type NodeJob,
+    jobLink,
+    jobSubject,
+    memorySegments,
+    servedHref,
+    versioned,
+} from "./activity";
 import {
     MachineName,
     type NodeInfo,
@@ -16,70 +26,7 @@ import {
     fleetAnchor,
 } from "./parts";
 
-type NodeJob = NodeInfo["jobs"][number];
-type Served = ReplicaInfo["serves"][number];
-
 const LEGEND = kindLegend(["weights", "adapters", "training"]);
-
-const MEMORY_LABELS: Record<string, string> = {
-    cuda: "GPU memory",
-    rocm: "GPU memory",
-    xpu: "GPU memory",
-    mps: "unified memory",
-};
-
-function versioned(name: string, version: number | null | undefined): string {
-    return version === null || version === undefined ? name : `${name} v${version}`;
-}
-
-function servedHref(served: Served): string {
-    return served.version === null || served.version === undefined
-        ? modelPageHref(served.model)
-        : modelVersionHref(served.model, served.version);
-}
-
-function jobLink(job: NodeJob): string {
-    if (job.kind === "train" && job.model && job.version !== null && job.version !== undefined) {
-        return modelVersionHref(job.model, job.version);
-    }
-    return jobHref(job);
-}
-
-function memorySegments(node: NodeInfo, engines: ReplicaInfo[]): GaugeSegment[] {
-    const served = engines
-        .filter((engine) => engine.state !== "failed")
-        .flatMap((engine) => [
-            {
-                key: `weights-${engine.id}`,
-                label: `${engine.base_model} weights`,
-                kind: "weights" as const,
-                bytes: engine.weights_bytes ?? 0,
-            },
-            ...engine.serves
-                .filter((item) => item.adapter_bytes)
-                .map((item) => ({
-                    key: `adapter-${engine.id}-${item.model}`,
-                    label: `${versioned(item.name, item.version)} adapter`,
-                    kind: "adapters" as const,
-                    bytes: item.adapter_bytes ?? 0,
-                })),
-        ]);
-    const training = node.jobs
-        .filter((job) => job.memory_bytes)
-        .map((job) => ({
-            key: `job-${job.id}`,
-            label: `Training ${versioned(job.model_name ?? job.model ?? `job ${job.id}`, job.version)}`,
-            kind: "training" as const,
-            bytes: job.memory_bytes ?? 0,
-        }));
-    return [...served, ...training];
-}
-
-const ENGINE_DOING: Record<string, string> = {
-    loading: "Loading",
-    fetching: "Fetching weights for",
-    failed: "Engine failed for",
-};
 
 function EngineActivity({ engine }: { engine: ReplicaInfo }) {
     const verb = ENGINE_DOING[engine.state] ?? "Serving";
@@ -119,7 +66,7 @@ function EngineActivity({ engine }: { engine: ReplicaInfo }) {
 }
 
 function JobActivity({ job }: { job: NodeJob }) {
-    const subject = versioned(job.model_name ?? job.model ?? `job ${job.id}`, job.version);
+    const subject = jobSubject(job);
     return (
         <li className="flex min-w-0 flex-wrap items-baseline gap-x-1">
             <StatusText tone="info">{kindNoun(job.kind)}</StatusText>

@@ -486,6 +486,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Compute pools** · shipped · admin
   See each machine's memory use, current work and issues with fixes.
   UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
+- **Machine list** · shipped · admin
+  Filter every machine, spot its problems and open its details.
+  UI: Infrastructure › Machines · API: GET /api/compute/pools
+- **Machine versions** · shipped · admin
+  Compare each machine's libraries, CUDA and NVIDIA driver with main.
+  UI: Infrastructure › Machines · API: GET /api/compute/pools
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
