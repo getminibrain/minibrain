@@ -78,7 +78,21 @@ export function isCancelled(version: VersionInfo): boolean {
     return version.status === "failed" && version.job?.status === "cancelled";
 }
 
+export function finishedBeforeCancel(version: VersionInfo): boolean {
+    return isCancelled(version) && (version.job?.progress ?? 0) >= 1;
+}
+
+export function cancelling(version: VersionInfo): boolean {
+    const job = version.job;
+    return (
+        Boolean(job?.cancel_requested) && (job?.status === "running" || job?.status === "queued")
+    );
+}
+
 export function failureReason(version: VersionInfo): string {
+    if (finishedBeforeCancel(version)) {
+        return "Finished before the cancel took effect; its result was not kept.";
+    }
     if (isCancelled(version)) {
         return "Cancelled before it finished.";
     }
@@ -88,6 +102,9 @@ export function failureReason(version: VersionInfo): string {
 export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
     if (version.current && isDeployed(row)) {
         return { tone: "success", label: "Deployed" };
+    }
+    if (cancelling(version)) {
+        return { tone: "warning", label: "Cancelling…" };
     }
     if (
         version.status === "queued" ||

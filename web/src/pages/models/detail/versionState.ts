@@ -4,7 +4,7 @@ import { count } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { isDeployed } from "./header";
 import { liveOf, points } from "./makeLive";
-import { isCancelled } from "./versions";
+import { cancelling, finishedBeforeCancel, isCancelled } from "./versions";
 
 export type Phase =
     | "queued"
@@ -111,6 +111,9 @@ export function verdictLine({
     heldOutRows: number | null;
 }): VerdictText {
     const progress = Math.round((version.job?.progress ?? 0) * 100);
+    if (cancelling(version) && UNSCORED.includes(phase)) {
+        return { tone: "warning", text: "Cancelling…" };
+    }
     if (phase === "queued") {
         return { tone: "neutral", text: "Queued · waiting for a worker to start training" };
     }
@@ -127,7 +130,10 @@ export function verdictLine({
         return { tone: "destructive", text: `${what} failed: ${shortReason(version.job?.error)}` };
     }
     if (phase === "cancelled") {
-        return { tone: "neutral", text: "Cancelled" };
+        const text = finishedBeforeCancel(version)
+            ? "Finished before the cancel took effect"
+            : "Cancelled";
+        return { tone: "neutral", text };
     }
     if (phase === "deleting") {
         return { tone: "neutral", text: "Deleting" };

@@ -12,7 +12,7 @@ import {
     unwrap,
 } from "~/api/client";
 import { useDatasetVersions } from "~/api/dataQueries";
-import { useAllModels, useVersionFiles } from "~/api/queries";
+import { keys, useAllModels, useVersionFiles } from "~/api/queries";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { canCancel } from "~/components/JobSelection";
@@ -42,7 +42,7 @@ import {
     recordedRun,
 } from "./train/recipe";
 import type { Peers, Phase } from "./versionState";
-import { failureReason, retry } from "./versions";
+import { failureReason, finishedBeforeCancel, retry } from "./versions";
 
 const CHART_HEIGHT = "min-h-[29.25rem] xl:min-h-[27.4375rem]";
 
@@ -230,12 +230,22 @@ function RetryRun({ slug, version }: { slug: string; version: VersionInfo }) {
     );
 }
 
-function CancelRun({ job }: { job: JobInfo }) {
+function markCancelling(versions: VersionInfo[] | undefined, jobId: number) {
+    return versions?.map((item) =>
+        item.job?.id === jobId ? { ...item, job: { ...item.job, cancel_requested: true } } : item,
+    );
+}
+
+function CancelRun({ slug, job }: { slug: string; job: JobInfo }) {
     const can = useCan();
     const client = useQueryClient();
     const cancel = useMutation({
         mutationFn: () =>
             unwrap(api.POST("/api/jobs/{job_id}/cancel", { params: { path: { job_id: job.id } } })),
+        onMutate: () =>
+            client.setQueryData<VersionInfo[]>(keys.versions(slug), (old) =>
+                markCancelling(old, job.id),
+            ),
         onSettled: () => client.invalidateQueries(),
     });
     if (!can.build || !canCancel(job)) {
@@ -427,7 +437,7 @@ export function TrainingSection({
     const compareLabel = compareTo ? `${liveLabel}v${compareTo.number}` : "";
     const actions = (
         <>
-            {active && <CancelRun job={active} />}
+            {active && <CancelRun slug={slug} job={active} />}
             <RetryRun slug={slug} version={version} />
             {shownJob ? (
                 <Button variant="outline" asChild>
@@ -485,7 +495,13 @@ export function TrainingSection({
         stats = (
             <>
                 <Stat
-                    label={phase === "failed" ? "Failed after" : "Cancelled after"}
+                    label={
+                        phase === "failed"
+                            ? "Failed after"
+                            : finishedBeforeCancel(version)
+                              ? "Finished in"
+                              : "Cancelled after"
+                    }
                     value={run ? jobDuration(run) : "–"}
                 />
                 <Stat label="Reached step" value={training ? stepText(training) : "–"} />
