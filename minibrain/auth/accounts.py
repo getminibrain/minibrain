@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from minibrain import policy
+from minibrain.auth import throttle
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.identity import Person, handle_of
 from minibrain.auth.passwords import check_strength, hash_password, verify_password
@@ -27,8 +28,6 @@ OIDC = "oidc"
 PROXY = "proxy"
 TOKEN_BYTES = 32
 RESET_LIFETIME = timedelta(hours=24)
-LOCK_AFTER = 10
-LOCK_LIFETIME = timedelta(minutes=15)
 TOUCH_EVERY = timedelta(seconds=60)
 AGENT_LENGTH = 300
 NAME_LENGTH = 200
@@ -102,7 +101,6 @@ def create_local(session: Session, email: str, name: str, role: Role, password: 
         groups=[],
         disabled=False,
         password_hash=hash_password(password) if password is not None else None,
-        failed_sign_ins=0,
     )
     session.add(user)
     session.flush()
@@ -197,28 +195,31 @@ def csrf_matches(key: bytes, subject: str, given: str | None) -> bool:
     return given is not None and hmac.compare_digest(csrf_for(key, subject), given)
 
 
-def sign_in(session: Session, email: str, password: str) -> User:
+def local_for(session: Session, email: str) -> User | None:
     try:
-        address = normal_email(email)
-    except AccountError as error:
-        raise SignInError(WRONG) from error
-    user = find_local(session, address)
+        return find_local(session, normal_email(email))
+    except AccountError:
+        return None
+
+
+def sign_in(session: Session, email: str, password: str, address: str | None) -> User:
     moment = now()
-    if user is not None and user.locked_until is not None and user.locked_until > moment:
+    place = address or ""
+    typed = email.strip().lower()[:NAME_LENGTH]
+    throttle.forget_old(session, moment)
+    throttle.check_address(session, place, moment)
+    attempt = throttle.record(session, place, typed, moment)
+    locked = throttle.lock_ends(session, place, typed, moment)
+    if locked is not None:
         verify_password(password, None)
-        minutes = max(1, round((user.locked_until - moment).total_seconds() / 60))
-        raise SignInError(f"Too many failed sign-ins. Try again in {minutes} minutes.")
+        raise SignInError(f"Too many failed sign-ins. Try again in {throttle.minutes_until(moment, locked)} minutes.")
+    user = local_for(session, email)
     if not verify_password(password, user.password_hash if user is not None else None) or user is None:
-        if user is not None:
-            user.failed_sign_ins += 1
-            if user.failed_sign_ins >= LOCK_AFTER:
-                user.locked_until = moment + LOCK_LIFETIME
-                user.failed_sign_ins = 0
+        attempt.failed = True
         raise SignInError(WRONG)
     if user.disabled:
         raise SignInError(TURNED_OFF)
-    user.failed_sign_ins = 0
-    user.locked_until = None
+    throttle.forget_failures(session, typed, place)
     return user
 
 
@@ -248,9 +249,9 @@ def set_password(session: Session, user: User, password: str) -> None:
     user.password_hash = hash_password(password)
     user.reset_hash = None
     user.reset_expires_at = None
-    user.failed_sign_ins = 0
-    user.locked_until = None
     user.updated_at = now()
+    if user.email:
+        throttle.forget_failures(session, user.email)
     end_sessions(session, user)
 
 
@@ -315,7 +316,6 @@ def external_user(
         role=None,
         groups=groups,
         disabled=False,
-        failed_sign_ins=0,
     )
     session.add(user)
     try:

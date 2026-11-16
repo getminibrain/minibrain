@@ -504,7 +504,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 
 ## Security
 - **Sign-in** · partial · admin
-  Sign in with local accounts, OIDC or trusted proxy headers.
+  Local accounts, OIDC or proxy headers; password guesses throttled per address.
   UI: Sign-in page · API: GET /api/auth/session, POST /api/auth/login, POST /api/auth/logout, GET /api/auth/oidc/start, GET /api/auth/oidc/callback · Config: auth.oidc, auth.proxy, MINIBRAIN_OIDC_CLIENT_SECRET · Roadmap: Accounts and roles
 - **First admin** · shipped · admin
   Create the first admin by one-time link, environment or SSO.

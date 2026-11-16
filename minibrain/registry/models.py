@@ -717,8 +717,6 @@ class User(Base):
     password_hash: Mapped[str | None] = mapped_column(default=None)
     reset_hash: Mapped[str | None] = mapped_column(default=None)
     reset_expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    failed_sign_ins: Mapped[int] = mapped_column(default=0)
-    locked_until: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_sign_in_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
@@ -757,6 +755,21 @@ class PlaygroundSession(Base):
     content: Mapped[str] = mapped_column(default="")
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+
+class SignInAttempt(Base):
+    __tablename__ = "sign_in_attempts"
+    __table_args__ = (
+        Index("ix_sign_in_attempts_address", "address", "at"),
+        Index("ix_sign_in_attempts_email", "email", "at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    address: Mapped[str]
+    email: Mapped[str]
+    failed: Mapped[bool]
+    at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
 
 
 class LoginSession(Base):

@@ -124,6 +124,11 @@ Recovery: `minibrain admin reset-password --email you@example.com` sets a new pa
 a lockout and ends its sessions; `minibrain admin create --email you@example.com` adds another admin. Both ask for the
 password, or read it with `--password-stdin`, and record `command line` as the actor in the audit log.
 
+Password guesses are throttled by client address (the peer, or the address a trusted proxy forwards): one address
+gets 30 sign-in attempts in 5 minutes, then 429 until the oldest ages out, and 10 wrong passwords for one account from
+one address lock that account for 15 minutes from that address only, so guessing from one place cannot lock the admin
+out everywhere. A password reset clears the account's lockouts.
+
 ## Trust zones and ports
 
 | Zone | Holds | Accepts connections from | Ports |

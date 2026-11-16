@@ -12,6 +12,7 @@ from minibrain.app import create_app
 from minibrain.auth.accounts import create_local
 from minibrain.auth.config import AuthConfigError, load_auth
 from minibrain.auth.roles import Role
+from minibrain.auth.throttle import LOCK_AFTER
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
 from tests.conftest import FakeBackend, blank_dataset
@@ -218,6 +219,27 @@ def set_up_admin(proxied: Proxied, client: TestClient) -> None:
         session.commit()
     response = client.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
     assert response.status_code == 200, response.text
+
+
+def test_sign_in_lockout_follows_the_address_the_proxy_vouches_for(proxied: Proxied) -> None:
+    through = proxied.client()
+    set_up_admin(proxied, through)
+    wrong = {"email": ADMIN, "password": "guess guess guess"}
+    for spoofed in range(LOCK_AFTER):
+        stranger = proxied.client(STRANGER)
+        assert (
+            stranger.post("/api/auth/login", json=wrong, headers={"X-Forwarded-For": f"192.0.2.{spoofed}"}).status_code
+            == 401
+        )
+    still = proxied.client(STRANGER).post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
+    assert "Too many failed sign-ins" in still.json()["detail"]
+    for _ in range(LOCK_AFTER):
+        assert (
+            through.post("/api/auth/login", json=wrong, headers={"X-Forwarded-For": "203.0.113.5"}).status_code == 401
+        )
+    right = {"email": ADMIN, "password": PASSWORD}
+    assert "Too many" in through.post("/api/auth/login", json=right, headers={"X-Forwarded-For": "203.0.113.5"}).text
+    assert through.post("/api/auth/login", json=right, headers={"X-Forwarded-For": "203.0.113.6"}).status_code == 200
 
 
 def test_local_accounts_still_work_behind_the_proxy(proxied: Proxied) -> None:

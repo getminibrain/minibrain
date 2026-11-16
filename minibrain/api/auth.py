@@ -164,7 +164,7 @@ def current_session(request: Request, session: SessionDep, found: IdentityDep) -
 @router.post("/login", dependencies=[Depends(public)], summary="Sign in with a password")
 def login(body: SignInBody, request: Request, response: Response, session: SessionDep) -> SessionInfo:
     try:
-        user = sign_in(session, body.email, body.password)
+        user = sign_in(session, body.email, body.password, peer_address())
     except SignInError as error:
         typed = body.email.strip().lower()[:FAILED_ACTOR_LENGTH] or "unknown"
         detail = {"sign_in": LOCAL, "reason": str(error)}

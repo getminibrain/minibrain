@@ -60,6 +60,7 @@ from minibrain.auth.config import load_auth
 from minibrain.auth.first_run import SetupTokenError
 from minibrain.auth.oidc import OidcClient
 from minibrain.auth.passwords import PasswordError
+from minibrain.auth.throttle import TooManyAttempts
 from minibrain.base_models import BaseModelSpec
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
@@ -134,6 +135,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     AccountError: 422,
     PasswordError: 422,
     SignInError: 401,
+    TooManyAttempts: 429,
     SetupTokenError: 403,
     EncryptionError: 422,
     KeyUnavailableError: 503,

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain import cli
 from minibrain.app import create_app
-from minibrain.auth.accounts import LOCK_AFTER, SESSION_COOKIE
+from minibrain.auth.accounts import SESSION_COOKIE
 from minibrain.auth.addresses import loopback_name
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.first_run import (
@@ -27,8 +27,9 @@ from minibrain.auth.first_run import (
     setup_pending,
 )
 from minibrain.auth.passwords import hash_password, verify_password
+from minibrain.auth.throttle import ADDRESS_LIMIT, LOCK_AFTER, LOCK_LIFETIME
 from minibrain.registry.db import make_sessions, migrate
-from minibrain.registry.models import ApiKey, AuditEvent, LoginSession, Setting, User, now
+from minibrain.registry.models import ApiKey, AuditEvent, LoginSession, Setting, SignInAttempt, User, now
 from minibrain.settings import Settings
 from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, blank_dataset
 
@@ -42,8 +43,8 @@ class Install:
     sessions: sessionmaker[Session]
     settings: Settings
 
-    def browser(self, base_url: str = "https://testserver") -> TestClient:
-        return TestClient(self.client.app, base_url=base_url)
+    def browser(self, base_url: str = "https://testserver", address: str = "testclient") -> TestClient:
+        return TestClient(self.client.app, base_url=base_url, client=(address, 50000))
 
     def events(self, prefix: str) -> list[AuditEvent]:
         with self.sessions() as session:
@@ -266,10 +267,43 @@ def test_repeated_failures_lock_the_account_for_a_while(install: Install) -> Non
         )
     locked = browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
     assert locked.status_code == 401 and "Too many failed sign-ins" in locked.json()["detail"]
-    with install.sessions() as session:
-        session.execute(update(User).values(locked_until=now() - timedelta(seconds=1)))
-        session.commit()
+    age(install, LOCK_LIFETIME)
     assert browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
+
+
+def age(install: Install, by: timedelta) -> None:
+    with install.sessions() as session:
+        for attempt in session.scalars(select(SignInAttempt)):
+            attempt.at -= by
+        session.commit()
+
+
+def guess(client: TestClient, email: str = ADMIN) -> int:
+    return client.post("/api/auth/login", json={"email": email, "password": "guess guess guess"}).status_code
+
+
+def test_failures_from_one_address_lock_the_account_only_there(install: Install) -> None:
+    set_up(install, install.browser())
+    attacker = install.browser(address="203.0.113.9")
+    for _ in range(LOCK_AFTER):
+        assert guess(attacker) == 401
+    locked = attacker.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
+    assert "Too many failed sign-ins" in locked.json()["detail"]
+    admin = install.browser(address="198.51.100.4")
+    assert admin.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
+
+
+def test_one_address_gets_a_limited_number_of_attempts(install: Install) -> None:
+    set_up(install, install.browser())
+    sprayer = install.browser(address="203.0.113.9")
+    for number in range(ADDRESS_LIMIT):
+        assert guess(sprayer, f"person{number}@example.com") == 401
+    refused = sprayer.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
+    assert refused.status_code == 429 and "from this address" in refused.json()["detail"]
+    elsewhere = install.browser(address="198.51.100.4")
+    assert elsewhere.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
+    age(install, timedelta(minutes=6))
+    assert sprayer.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
 
 
 def test_an_unknown_email_costs_one_password_check_like_a_known_one(
@@ -478,16 +512,16 @@ def test_reset_password_on_the_command_line(
     for install in start(home):
         browser = install.browser()
         assert browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
-        with install.sessions() as session:
-            session.execute(update(User).values(locked_until=now() + timedelta(minutes=10)))
-            session.commit()
+        stranger = install.browser(address="203.0.113.9")
+        for _ in range(LOCK_AFTER):
+            assert guess(stranger) == 401
         reset = ("admin", "reset-password", "--email", " ADA@example.com ", "--password-stdin")
         run_cli(monkeypatch, *reset, stdin="a brand new passphrase\n")
         assert "Set a new password for ada@example.com" in capsys.readouterr().out
         assert browser.get("/api/models").status_code == 401
         old = install.browser().post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
         assert old.status_code == 401
-        new = install.browser().post("/api/auth/login", json={"email": ADMIN, "password": "a brand new passphrase"})
+        new = stranger.post("/api/auth/login", json={"email": ADMIN, "password": "a brand new passphrase"})
         assert new.status_code == 200
         [changed] = install.events("account.password")
         assert (changed.actor, changed.target, changed.detail["via"]) == ("command line", ADMIN, "command line")
