@@ -169,13 +169,21 @@ function RanOnText({ place }: { place: RanOn | null }) {
 }
 
 function useTrainedRows(version: VersionInfo): number | null {
-    const data = useDatasetVersions(version.dataset_slug ?? "", version.kind === "lora");
+    const recipe = recipeOf(version);
+    const measured = Number(recipe.examples);
+    const data = useDatasetVersions(
+        version.dataset_slug ?? "",
+        version.kind === "lora" && !(measured > 0),
+    );
+    if (measured > 0) {
+        return measured;
+    }
     const found = data.data?.find((item) => item.id === version.dataset_version_id);
     const rows = found?.counts.train;
     if (rows === undefined) {
         return null;
     }
-    const cap = Number(recipeOf(version).max_rows);
+    const cap = Number(recipe.max_rows);
     return cap > 0 ? Math.min(rows, cap) : rows;
 }
 
