@@ -1,8 +1,10 @@
 import threading
 from datetime import datetime, timedelta
 
+from sqlalchemy.dialects import postgresql
+
 from minibrain.jobs.policy import LEASE
-from minibrain.jobs.queue import WorkerInfo, enqueue
+from minibrain.jobs.queue import WorkerInfo, enqueue, expirable
 from minibrain.registry.models import Job, JobKind, now
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset, finish
@@ -227,6 +229,11 @@ def test_time_limit_counts_from_the_current_attempt(harness: Harness) -> None:
     harness.queue.expire()
     detail = job(harness, second["job_id"])
     assert (detail["status"], detail["error"]) == ("failed", "ran past its time limit")
+
+
+def test_lease_expiry_locks_the_rows_it_reads() -> None:
+    sql = str(expirable().compile(dialect=postgresql.dialect()))
+    assert sql.endswith("FOR UPDATE SKIP LOCKED")
 
 
 def test_restart_grace_keeps_running_jobs(harness: Harness) -> None:

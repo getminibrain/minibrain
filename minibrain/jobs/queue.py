@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import Select, func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.jobs.output import EVENT, STATE
@@ -199,6 +199,10 @@ def refuse_rerun(session: Session, job: Job) -> None:
     active = same_work_active(session, job)
     if active is not None:
         raise JobStateError(f"job {active.id} is already doing this work ({active.status})")
+
+
+def expirable() -> Select[Job]:
+    return select(Job).where(Job.status == JobStatus.RUNNING).with_for_update(skip_locked=True)
 
 
 def same_error_twice(job: Job, error: str) -> bool:
@@ -416,9 +420,8 @@ class SqlJobQueue:
     def expire(self) -> int:
         with self.lock, self.sessions() as session:
             moment = self.clock()
-            running = list(session.scalars(select(Job).where(Job.status == JobStatus.RUNNING)))
             expired = 0
-            for job in running:
+            for job in list(session.scalars(expirable())):
                 over_time = moment - self.current_attempt(job).started_at > policy(job.kind).max_runtime
                 lost = job.lease_expires_at is not None and job.lease_expires_at < moment
                 if not (lost or over_time):
