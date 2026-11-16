@@ -175,7 +175,10 @@ function VersionPick({
     onPick: (number: number) => void;
 }) {
     const choices = [...versions]
-        .filter((version) => version.score !== null && version.number !== other)
+        .filter(
+            (version) =>
+                version.number === value || (version.score !== null && version.number !== other),
+        )
         .sort((x, y) => y.number - x.number);
     return (
         <Select value={String(value)} onValueChange={(next) => onPick(Number(next))}>
