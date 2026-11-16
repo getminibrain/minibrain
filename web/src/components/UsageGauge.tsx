@@ -126,6 +126,22 @@ function paint(color: string, planned: boolean | undefined): CSSProperties {
     };
 }
 
+function paintBar(color: string, planned: boolean | undefined): CSSProperties {
+    if (!planned) {
+        return { background: color };
+    }
+    return {
+        background: `color-mix(in oklab, ${color} 35%, transparent)`,
+        boxShadow: `inset 0 0 0 1px ${color}`,
+    };
+}
+
+const STATE_TEXT: Record<State, string> = {
+    ok: "text-foreground",
+    low: "text-warning",
+    over: "text-destructive",
+};
+
 function used(segments: GaugeSegment[]): number {
     return segments.reduce((sum, segment) => sum + Math.max(0, segment.bytes), 0);
 }
@@ -154,8 +170,10 @@ export function UsageGauge({
     legend = true,
     free = true,
     basis,
+    size = "md",
     className,
 }: {
+    size?: "md" | "sm";
     label: string;
     capacity: number;
     segments: GaugeSegment[];
@@ -173,45 +191,60 @@ export function UsageGauge({
     const shown = segments.filter((segment) => segment.bytes > 0);
     return (
         <div className={cn("flex min-w-0 flex-col gap-2", className)}>
-            <div
-                role="meter"
-                aria-label={basis ? `${label}, ${BASIS_LABELS[basis].toLowerCase()}` : label}
-                aria-valuemin={0}
-                aria-valuemax={Math.max(capacity, 1)}
-                aria-valuenow={Math.min(total, capacity)}
-                aria-valuetext={gaugeSummary(segments, capacity)}
-                className="relative"
-            >
-                <div className="flex h-2 w-full gap-0.5 overflow-hidden rounded-sm">
-                    {shown.map((segment) => (
-                        <Tooltip key={segment.key}>
-                            <TooltipTrigger asChild>
-                                <span
-                                    className="block h-full min-w-0.5 rounded-xs"
-                                    style={{
-                                        flex: `0 1 ${share(segment.bytes, scale)}%`,
-                                        ...paint(
-                                            colorOf(segment, state, anyPlanned),
-                                            segment.planned,
-                                        ),
-                                    }}
-                                />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <span className="tabular-nums">
-                                    {`${segment.label}${segment.planned ? " (planned)" : ""} · ${bytes(segment.bytes)} · ${Math.round(share(segment.bytes, capacity))}%`}
-                                </span>
-                            </TooltipContent>
-                        </Tooltip>
-                    ))}
-                    <span className="block h-full min-w-0 flex-1 rounded-xs bg-secondary" />
+            <div className="flex items-center gap-3">
+                <div
+                    role="meter"
+                    aria-label={basis ? `${label}, ${BASIS_LABELS[basis].toLowerCase()}` : label}
+                    aria-valuemin={0}
+                    aria-valuemax={Math.max(capacity, 1)}
+                    aria-valuenow={Math.min(total, capacity)}
+                    aria-valuetext={gaugeSummary(segments, capacity)}
+                    className={cn(
+                        "relative min-w-0 flex-1 rounded-sm bg-secondary",
+                        size === "md" ? "h-5" : "h-2",
+                    )}
+                >
+                    <div className="flex h-full w-full overflow-hidden rounded-sm">
+                        {shown.map((segment) => (
+                            <Tooltip key={segment.key}>
+                                <TooltipTrigger asChild>
+                                    <span
+                                        className="block h-full min-w-[3px] border-r border-card"
+                                        style={{
+                                            flex: `0 1 ${share(segment.bytes, scale)}%`,
+                                            ...paintBar(
+                                                colorOf(segment, state, anyPlanned),
+                                                segment.planned,
+                                            ),
+                                        }}
+                                    />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <span className="tabular-nums">
+                                        {`${segment.label}${segment.planned ? " (planned)" : ""} · ${bytes(segment.bytes)} · ${Math.round(share(segment.bytes, capacity))}%`}
+                                    </span>
+                                </TooltipContent>
+                            </Tooltip>
+                        ))}
+                    </div>
+                    {total > capacity && (
+                        <span
+                            aria-hidden
+                            className="absolute -inset-y-1 w-0.5 bg-foreground"
+                            style={{ left: `${share(capacity, scale)}%` }}
+                        />
+                    )}
                 </div>
-                {total > capacity && (
+                {size === "md" && free && (
                     <span
                         aria-hidden
-                        className="absolute -inset-y-1 w-0.5 bg-foreground"
-                        style={{ left: `${share(capacity, scale)}%` }}
-                    />
+                        className={cn(
+                            "w-12 shrink-0 text-right font-medium tabular-nums",
+                            STATE_TEXT[state],
+                        )}
+                    >
+                        {`${capacity > 0 ? Math.round((total / capacity) * 100) : 0}%`}
+                    </span>
                 )}
             </div>
             {legend && (

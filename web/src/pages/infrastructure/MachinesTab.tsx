@@ -207,6 +207,7 @@ function MemoryCell({ row }: { row: MachineRow }) {
                 label={`${row.node.host} memory`}
                 legend={false}
                 basis={view.basis}
+                size="sm"
                 className="w-14 shrink-0"
             />
             <span className="text-sm whitespace-nowrap text-muted-foreground tabular-nums">
