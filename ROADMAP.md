@@ -1900,6 +1900,10 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - Version diff (scores; the data diff is done)
 - Notifications bell in the top bar: failed jobs, results ready to review, models that need examples, missing
   files
+- Global search (⌘K) in the top bar, built with it, projects and notifications: jump to models, versions, datasets,
+  sources, jobs, settings and pages, and run actions (Add model, Upload data, Create key, Deploy vN). One `/api/search`
+  returns only what the caller's role may see; logs match by title, ID and status, never by content. Page searches
+  (Models list, Data tree) stay and filter in place. The palette is an obp-ui component.
 - Batch jobs (Run → Batch jobs): run a version over a file, dataset version or SQL query in the background, on the job
   worker; resumable, with progress; results as CSV or Parquet with inputs, outputs and the version; OpenAI-compatible
   `/v1/files` and `/v1/batches`

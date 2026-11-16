@@ -632,6 +632,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Notifications** · planned · product, admin
   A bell for failed jobs, results to review and missing files.
   Roadmap: v2
+- **Global search** · planned · product
+  ⌘K search for models, data, jobs, settings and actions.
+  Roadmap: v2
 
 ## Settings
 - **Appearance** · shipped · product
