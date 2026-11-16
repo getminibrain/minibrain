@@ -35,7 +35,7 @@ export type AvatarStyle = {
 export const TEXT_FLOOR = 4.5;
 export const GRAPHIC_FLOOR = 3;
 const LICENCE = "CC0 1.0";
-const TINT_WEIGHT = 0.14;
+const TINT_WEIGHT = 0.2;
 const LADDER_STEP = 0.05;
 const RING_WEIGHT = 0.5;
 const RING_GAP = 3;
@@ -93,8 +93,17 @@ function letters(palette: Palette, tone: string): string {
     return towardFloor(tone, palette.foreground, tint(palette, tone), TEXT_FLOOR);
 }
 
+function inkOnTint(palette: Palette, tone: string): string {
+    return towardFloor(tone, palette.foreground, tint(palette, tone), GRAPHIC_FLOOR);
+}
+
 function ringInk(palette: Palette, tone: string): string {
-    return mixHex(tone, palette.foreground, RING_WEIGHT);
+    return towardFloor(
+        mixHex(tone, palette.foreground, RING_WEIGHT),
+        palette.foreground,
+        tint(palette, tone),
+        GRAPHIC_FLOOR,
+    );
 }
 
 function cutRings(svg: string, palette: Palette, tone: string, px: number): string {
@@ -108,7 +117,7 @@ function cutRings(svg: string, palette: Palette, tone: string, px: number): stri
         if (thickened && index > 1) {
             return "";
         }
-        return `<ellipse ${attributes}stroke="${palette.background}" stroke-width="${drawn + RING_GAP}"/><ellipse ${attributes}stroke="${ring}" stroke-width="${drawn}"/>`;
+        return `<ellipse ${attributes}stroke="${tint(palette, tone)}" stroke-width="${drawn + RING_GAP}"/><ellipse ${attributes}stroke="${ring}" stroke-width="${drawn}"/>`;
     });
 }
 
@@ -152,21 +161,26 @@ export const AVATAR_STYLES: AvatarStyle[] = [
         licence: LICENCE,
         seeded: true,
         frame: { x: -5, y: -5, size: PLANET_FRAME },
-        tile: () => null,
+        tile: tint,
         options: (palette, tone) => ({
             backgroundColor: [],
             starProbability: 0,
             shadeVariant: "hard",
-            planetColor: [tone],
+            planetColor: [inkOnTint(palette, tone)],
             moonColor: [ringInk(palette, tone)],
         }),
         paint: cutRings,
         pairs: (palette, tone) => [
-            { label: "Planet on page", fg: tone, bg: palette.background, floor: GRAPHIC_FLOOR },
             {
-                label: "Rings on page",
+                label: "Planet on tint",
+                fg: inkOnTint(palette, tone),
+                bg: tint(palette, tone),
+                floor: GRAPHIC_FLOOR,
+            },
+            {
+                label: "Rings on tint",
                 fg: ringInk(palette, tone),
-                bg: palette.background,
+                bg: tint(palette, tone),
                 floor: GRAPHIC_FLOOR,
                 mark: `stroke="${ringInk(palette, tone)}"`,
             },
@@ -198,14 +212,19 @@ export const AVATAR_STYLES: AvatarStyle[] = [
         licence: LICENCE,
         seeded: true,
         frame: { x: 8, y: 12.2, size: 84 },
-        tile: () => null,
-        options: (_palette, tone) => ({
+        tile: tint,
+        options: (palette, tone) => ({
             backgroundColor: [],
-            glowColor: [tone],
+            glowColor: [inkOnTint(palette, tone)],
         }),
         paint: (svg) => svg.replace(PIXEL_GRID_PATTERN, ""),
         pairs: (palette, tone) => [
-            { label: "Face on page", fg: tone, bg: palette.background, floor: GRAPHIC_FLOOR },
+            {
+                label: "Face on tint",
+                fg: inkOnTint(palette, tone),
+                bg: tint(palette, tone),
+                floor: GRAPHIC_FLOOR,
+            },
         ],
     },
 ];

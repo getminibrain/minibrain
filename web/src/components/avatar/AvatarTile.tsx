@@ -12,7 +12,7 @@ const AVATAR_TILE: Record<AvatarSize, string> = {
     lg: "size-12",
     field: "size-16",
     xl: "size-24",
-    hero: "size-[calc(3rem*var(--hero-scale))] rounded-[calc((var(--radius)_-_2px)*var(--hero-scale))] border-[length:calc(1px*var(--hero-scale))]",
+    hero: "size-[calc(3rem*var(--hero-scale))] rounded-[calc((var(--radius)_-_2px)*var(--hero-scale))]",
     fill: "size-full",
 };
 
@@ -63,7 +63,7 @@ export function AvatarTile({
         <span
             aria-hidden="true"
             className={cn(
-                "flex shrink-0 overflow-hidden rounded-md border bg-background",
+                "flex shrink-0 overflow-hidden rounded-md",
                 AVATAR_TILE[size],
                 className,
             )}

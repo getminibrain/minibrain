@@ -35,7 +35,7 @@ function LetterTile({ name, size }: { name: string; size: Size }) {
     return (
         <span
             aria-hidden="true"
-            className={`flex ${SIZES[size].tile} shrink-0 items-center justify-center rounded-md border bg-background`}
+            className={`flex ${SIZES[size].tile} shrink-0 items-center justify-center rounded-md bg-muted`}
         >
             <span className="text-sm font-semibold text-muted-foreground">
                 {name.trim().charAt(0).toUpperCase()}
@@ -77,7 +77,7 @@ export function PublisherLogo({
         return (
             <span
                 aria-hidden="true"
-                className={`flex ${tile} shrink-0 items-center justify-center rounded-md border bg-background`}
+                className={`flex ${tile} shrink-0 items-center justify-center`}
             >
                 <ProviderLogo id={id} className={logo} />
             </span>
