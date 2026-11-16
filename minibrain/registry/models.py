@@ -854,3 +854,20 @@ class Teardown(Base):
 
     model: Mapped[Model | None] = relationship(viewonly=True)
     base_model: Mapped[BaseModel | None] = relationship(viewonly=True)
+
+
+class JoinToken(Base):
+    __tablename__ = "join_tokens"
+    __table_args__ = (Index("ix_join_tokens_pool", "pool"), {"sqlite_autoincrement": True})
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pool: Mapped[str]
+    role: Mapped[str]
+    prefix: Mapped[str]
+    digest: Mapped[str] = mapped_column(unique=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    created_by: Mapped[str]
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    last_host: Mapped[str | None] = mapped_column(default=None)

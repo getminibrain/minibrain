@@ -226,7 +226,8 @@ hardware and the model's weight format:
 - `--engine` overrides the choice. An automatic choice that fails to load falls back to `transformers`.
 - Engines of different kinds serve at the same time: a Mac engine on MLX and a rack engine on SGLang can be replicas of
   one model.
-- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0` pulls adapters from `main`
+- Remote engines: `minibrain engine --model KEY --main-url URL --pool NAME --host 0.0.0.0`, with an engine join token
+  for that pool in `MINIBRAIN_JOIN_TOKEN` (Infrastructure › Add machine, role Engine or Both), pulls adapters from `main`
   and base weights from wherever Storage keeps them, never from Hugging Face, and announces its URL, engine and
   hardware every 10 s. With a bucket, `main` hands out a presigned link and the data key per file and the engine reads
   the bucket directly; with the folder, it reads the files from `main`. Either way it keeps a working copy in
@@ -265,7 +266,7 @@ on a move, `from_pool`.
 | Any other | A worker in that pool (`minibrain worker --pool NAME`) runs `minibrain engine` as its child |
 
 - Each worker in a pool other than `local` asks `main` every 10 s which engines to run (`POST
-  /internal/worker/engines`, worker token) and starts or stops children to match. The answer carries an engine
+  /internal/worker/engines`, with the pool's join token) and starts or stops children to match. The answer carries an engine
   token for that pool (`engine.<pool>.<HMAC-SHA256 of the pool>`, keyed by `<home>/secrets/engine_token` on main),
   handed to the engines as `MINIBRAIN_ENGINE_TOKEN`, so a worker needs only its own token and never sees the gateway
   token. An engine token reaches only what an engine needs: announcing engines in its own pool, base weights and

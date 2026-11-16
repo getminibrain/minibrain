@@ -15,6 +15,7 @@ from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
 from minibrain.auth.engine_tokens import engine_token
+from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_of, admit, bearer, checked
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
@@ -35,14 +36,18 @@ CLAIM_POLL_SECONDS = 0.5
 MAX_CLAIM_WAIT_SECONDS = 30.0
 
 
-def worker_token(request: Request, authorization: Annotated[str, Header()] = "") -> None:
-    expected = request.app.state.settings.secret("worker_token")
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not hmac.compare_digest(token.strip(), expected):
+def worker_caller(request: Request, session: SessionDep, authorization: Annotated[str, Header()] = "") -> Caller:
+    token = bearer(authorization)
+    if token and hmac.compare_digest(token, request.app.state.settings.secret(LOCAL_KEY_FILE)):
+        return Caller(LOCAL_POOL)
+    found = checked(session, token, WORKER, address_of(request))
+    if found is None:
         raise HTTPException(status_code=401, detail="invalid worker token")
+    return Caller(found.pool, found)
 
 
-router = APIRouter(prefix="/internal/worker", include_in_schema=False, dependencies=[Depends(worker_token)])
+WorkerCaller = Annotated[Caller, Depends(worker_caller)]
+router = APIRouter(prefix="/internal/worker", include_in_schema=False, dependencies=[Depends(worker_caller)])
 
 
 class WorkerBody(pydantic.BaseModel):
@@ -156,14 +161,29 @@ def report_worker(session: SessionDep, body: WorkerBody) -> None:
     session.commit()
 
 
+def admitted(session: SessionDep, request: Request, caller: Caller, body: WorkerBody) -> None:
+    admit(session, caller, body.pool, body.host, WORKER, address_of(request))
+
+
 @router.post("/register", status_code=204)
-def register_worker(body: WorkerBody, queue: QueueDep, session: SessionDep) -> None:
+def register_worker(
+    body: WorkerBody, request: Request, caller: WorkerCaller, queue: QueueDep, session: SessionDep
+) -> None:
+    admitted(session, request, caller, body)
     queue.register(body.info())
     report_worker(session, body)
 
 
 @router.post("/claim", response_model=None)
-def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: SettingsDep) -> ClaimResponse | Response:
+def claim(
+    body: ClaimRequest,
+    request: Request,
+    caller: WorkerCaller,
+    queue: QueueDep,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> ClaimResponse | Response:
+    admitted(session, request, caller, body.worker)
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
     worker = body.worker.info()
     queue.register(worker)
@@ -188,9 +208,15 @@ def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: Se
 
 @router.post("/engines")
 def hosted_engines(
-    body: EnginesRequest, request: Request, queue: QueueDep, session: SessionDep, settings: SettingsDep
+    body: EnginesRequest,
+    request: Request,
+    caller: WorkerCaller,
+    queue: QueueDep,
+    session: SessionDep,
+    settings: SettingsDep,
 ) -> EnginesResponse:
     worker = body.worker
+    admitted(session, request, caller, worker)
     queue.register(worker.info())
     report_worker(session, worker)
     config = request.app.state.gateway_config.current()

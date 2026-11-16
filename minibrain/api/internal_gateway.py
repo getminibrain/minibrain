@@ -12,6 +12,7 @@ from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
 from minibrain.auth.engine_tokens import engine_pool
+from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, checked
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import CHAT_KIND, LogEntry, database_sink
@@ -28,27 +29,29 @@ MAX_WAIT_SECONDS = 30.0
 ENGINE_ONLY = "an engine token reaches only what engines need: announcing themselves, base weights and adapters"
 
 
-def caller_pool(request: Request, authorization: Annotated[str, Header()] = "") -> str | None:
+def engine_caller(request: Request, session: SessionDep, authorization: Annotated[str, Header()] = "") -> Caller | None:
     settings = request.app.state.settings
-    scheme, _, given = authorization.partition(" ")
-    token = given.strip() if scheme.lower() == "bearer" else ""
+    token = bearer(authorization)
     if token and hmac.compare_digest(token, settings.secret("gateway_token")):
         return None
+    joined = checked(session, token, ENGINE, address_of(request))
+    if joined is not None:
+        return Caller(joined.pool, joined)
     pool = engine_pool(settings, token) if token else None
     if pool is None:
         raise HTTPException(status_code=401, detail="invalid gateway token")
-    return pool
+    return Caller(pool, name="engine token")
 
 
-CallerPool = Annotated[str | None, Depends(caller_pool)]
+EngineCaller = Annotated[Caller | None, Depends(engine_caller)]
 
 
-def gateway_token(pool: CallerPool) -> None:
-    if pool is not None:
+def gateway_token(caller: EngineCaller) -> None:
+    if caller is not None:
         raise HTTPException(status_code=403, detail=ENGINE_ONLY)
 
 
-router = APIRouter(prefix="/internal/gateway", include_in_schema=False, dependencies=[Depends(caller_pool)])
+router = APIRouter(prefix="/internal/gateway", include_in_schema=False, dependencies=[Depends(engine_caller)])
 GatewayOnly = [Depends(gateway_token)]
 
 
@@ -115,9 +118,9 @@ class GatewayBody(BaseModel):
 
 
 @router.post("/engines", status_code=204)
-def register_engine(body: EngineBody, session: SessionDep, pool: CallerPool) -> None:
-    if pool is not None and body.pool != pool:
-        raise HTTPException(status_code=403, detail=f"this engine token announces engines in pool {pool} only")
+def register_engine(body: EngineBody, request: Request, session: SessionDep, caller: EngineCaller) -> None:
+    if caller is not None:
+        admit(session, caller, body.pool, body.host, ENGINE, address_of(request))
     record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code"})))
     if body.state == "failed":
         record_load_failure(session, body.base_model, body.code, body.error, body.host)
@@ -172,9 +175,9 @@ def feedback(body: FeedbackBody, session: SessionDep) -> FeedbackStored:
 
 
 @router.get("/artifacts/{artifact_id}")
-def artifact(artifact_id: str, store: StoreDep, session: SessionDep, pool: CallerPool) -> StreamingResponse:
-    found = session.get(Artifact, artifact_id) if pool is not None else None
-    hidden = pool is not None and (found is None or found.kind != ArtifactKind.ADAPTER)
+def artifact(artifact_id: str, store: StoreDep, session: SessionDep, caller: EngineCaller) -> StreamingResponse:
+    found = session.get(Artifact, artifact_id) if caller is not None else None
+    hidden = caller is not None and (found is None or found.kind != ArtifactKind.ADAPTER)
     if hidden or not is_artifact_id(artifact_id) or not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")

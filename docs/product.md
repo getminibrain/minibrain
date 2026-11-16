@@ -506,7 +506,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
 - **Remote workers** · shipped · admin
   Join GPU machines that run training and scoring jobs.
-  CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_WORKER_TOKEN
+  CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_JOIN_TOKEN
+- **Join tokens** · shipped · admin
+  Per-pool tokens for workers and engines, with expiry and revoke.
+  API: GET /api/compute/join-tokens, POST /api/compute/join-tokens, DELETE /api/compute/join-tokens/{token_id} · Config: MINIBRAIN_JOIN_TOKEN
 - **Artifact storage** · shipped · admin
   Keep artifacts in a local folder or an S3-compatible bucket.
   UI: Settings › Storage · API: GET /api/settings/storage, PUT /api/settings/storage, POST /api/settings/storage/test · Config: storage, MINIBRAIN_STORAGE_S3_SECRET

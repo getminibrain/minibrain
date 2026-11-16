@@ -53,11 +53,12 @@ Other roles, same package:
 
 | Command | Runs |
 |---|---|
-| `minibrain worker --api-url http://main:8000` | A worker on another machine; it pulls jobs from main over HTTP |
+| `minibrain worker --api-url http://main:8000 --pool gpu` | A worker on another machine; it pulls jobs from main over HTTP |
 | `minibrain gateway --main-url http://main:8000 --port 8100` | A standalone `/v1` gateway that serves from a cached config and keeps answering while main restarts |
 
-Remote workers and gateways need the tokens in `~/.minibrain/secrets` (or `MINIBRAIN_WORKER_TOKEN` and
-`MINIBRAIN_GATEWAY_TOKEN`).
+A remote worker or engine needs a join token for its pool in `MINIBRAIN_JOIN_TOKEN`: an admin creates one under
+Infrastructure › Add machine, which also shows the command to run. A standalone gateway needs the gateway token from
+`~/.minibrain/secrets` (or `MINIBRAIN_GATEWAY_TOKEN`).
 
 OpenTelemetry export to your own collector, a Prometheus `/metrics` endpoint and JSON logs are all off by default:
 [`docs/observability.md`](docs/observability.md).

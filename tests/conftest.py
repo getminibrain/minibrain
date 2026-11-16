@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.app import create_app
 from minibrain.artifacts import ArtifactStore
+from minibrain.auth import join_tokens
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
 from minibrain.auth.roles import Role
 from minibrain.data.splits import read_split
@@ -80,6 +81,7 @@ class Harness:
     backend: FakeBackend
     sessions: sessionmaker[Session]
     store_kind: str = FOLDER
+    joins: dict[tuple[str, str], str] = field(default_factory=dict)
 
     @property
     def queue(self) -> SqlJobQueue:
@@ -115,8 +117,19 @@ class Harness:
         config = self.worker_config(kinds)
         return Worker(config, client=MainClient(config, http=self.client), modules=modules)
 
+    def join_token(self, pool: str, role: str = join_tokens.BOTH) -> str:
+        if pool == "local":
+            return self.token
+        if (pool, role) not in self.joins:
+            with self.sessions() as session:
+                _, raw = join_tokens.create(session, pool, role, None, "pytest")
+                session.commit()
+            self.joins[pool, role] = raw
+        return self.joins[pool, role]
+
     def internal(self, path: str, body: dict[str, Any]) -> Any:
-        headers = {"Authorization": f"Bearer {self.token}"}
+        worker = body.get("worker", body)
+        headers = {"Authorization": f"Bearer {self.join_token(str(worker.get('pool', 'local')))}"}
         return self.client.post(f"/internal/worker{path}", json=body, headers=headers)
 
     def claim(self, kinds: list[str], worker_id: str = "test-worker", pool: str = "local") -> dict[str, Any] | None:

@@ -147,10 +147,21 @@ out everywhere. A password reset clears the account's lockouts.
 
 - GPU boxes need no internet access: engines and workers pull adapters and dataset versions from `main`, and base weights
   from `main` or, when Storage is S3, from the bucket on links `main` signs. They never hold bucket keys.
-- Workers and engines hold a shared token (`MINIBRAIN_WORKER_TOKEN`, `MINIBRAIN_GATEWAY_TOKEN`), never database
-  credentials. The worker token reaches `/internal/worker/*` only. Engines a worker starts in a pool get a narrower
-  engine token for that pool (announce in that pool, base weights, adapters; [serving](serving.md#deployments-on-a-pool)),
-  never the gateway token, whose config carries routes and API key digests.
+- Workers and engines on other machines hold a join token for their pool (`MINIBRAIN_JOIN_TOKEN`), never database
+  credentials. An admin creates one under Infrastructure › Add machine for one pool and one role (worker, engine or
+  both), with an optional expiry. It is 256 random bits after `mbj_`, shown once; the database keeps its SHA-256 and
+  its first 12 characters. A worker token reaches `/internal/worker/*` only, and registering, claiming or asking for
+  engines in another pool answers 403; an engine token reaches only what engines need on `/internal/gateway/*` and
+  announces engines in its pool only. A revoked or expired token answers 401, and the worker stops with the reason.
+  Creating, revoking, a machine first joining with a token and every refusal (wrong pool, wrong role, revoked,
+  expired; one event per token, pool and address in 10 minutes) are audit events (`join_token.*`). Revoke tokens
+  under Infrastructure › Machines › Join tokens.
+- The worker main starts on its own machine uses `<home>/secrets/worker_token`, which joins the `local` pool only;
+  there is no shared token for other pools.
+- Engines a worker starts in a pool get a narrower engine token for that pool (announce in that pool, base weights,
+  adapters; [serving](serving.md#deployments-on-a-pool)), never the gateway token, whose config carries routes and API
+  key digests. Engine tokens derive from `<home>/secrets/engine_token` and outlive a revoked join token; the worker
+  that holds them stops on the revocation and stops its engines with it.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM
@@ -300,8 +311,9 @@ wiped at any time. A worker's outputs are encrypted the moment main stores them.
 
 With Storage on S3, base model files stay sealed in the bucket and machines read them from there, not through main:
 
-1. A worker or engine asks main over its authenticated channel (`GET /internal/worker/bases/<key>` with the worker
-   token, `/internal/gateway/bases/<key>` with the gateway token or a pool's engine token).
+1. A worker or engine asks main over its authenticated channel (`GET /internal/worker/bases/<key>` with the worker's
+   token, `/internal/gateway/bases/<key>` with the gateway token, a pool's engine token or an engine join
+   token).
 2. Main answers, with `Cache-Control: no-store`, each file's path, size and SHA-256, a presigned GET link (SigV4,
    valid 15 minutes, for the configured endpoint and nothing else) and the file's data key: main reads the object's
    4 KiB header with its own bucket credentials and unwraps the data key with the master key, through the same

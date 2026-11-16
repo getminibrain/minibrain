@@ -24,9 +24,13 @@ MPS_FALLBACK_ENV = "PYTORCH_ENABLE_MPS_FALLBACK"
 STARTUP_FAILURE = 3
 REPEAT_SIGNAL_SECONDS = 2.0
 RULE = "-" * 78
+JOIN_KEY_ENV = "MINIBRAIN_JOIN_TOKEN"
+REFUSED_STATUSES = (401, 403)
 
 if TYPE_CHECKING:
     from types import FrameType
+
+    import httpx
 
     from minibrain.auth.first_run import FirstRun
     from minibrain.registry.audit_chain import ChainReport
@@ -106,7 +110,7 @@ def serve(host: str, port: int, with_worker: bool, browser: bool) -> None:
     api_url = local_url(host, port)
     os.environ["MINIBRAIN_MAIN_URL"] = api_url
     found = first_start(settings)
-    env = os.environ | {"MINIBRAIN_WORKER_TOKEN": settings.secret("worker_token")}
+    env = os.environ | {JOIN_KEY_ENV: settings.secret("worker_token")}
     command = [sys.executable, "-m", "minibrain.cli", "worker", "--api-url", api_url, "--parent", str(os.getpid())]
     command += ["--kinds", *LOCAL_KINDS]
     worker = Supervisor("worker", command, env) if with_worker else None
@@ -194,7 +198,8 @@ def engine(args: argparse.Namespace) -> None:
     from minibrain.settings import load_settings
 
     settings = load_settings()
-    given = os.environ.get("MINIBRAIN_ENGINE_TOKEN") or os.environ.get("MINIBRAIN_GATEWAY_TOKEN")
+    given = os.environ.get("MINIBRAIN_ENGINE_TOKEN") or os.environ.get(JOIN_KEY_ENV)
+    given = given or os.environ.get("MINIBRAIN_GATEWAY_TOKEN")
     token = given or settings.secret("gateway_token")
     client = httpx.Client(base_url=args.main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     if args.spec:
@@ -233,7 +238,16 @@ def gateway(main_url: str, host: str, port: int) -> None:
     uvicorn.run(create_gateway_app(main_url, token, settings.home / "gateway"), host=host, port=port)
 
 
+def refusal(response: "httpx.Response") -> str:
+    try:
+        return str(response.json().get("detail") or response.text)
+    except ValueError:
+        return response.text
+
+
 def worker(args: argparse.Namespace) -> None:
+    import httpx
+
     from minibrain.models.hardware import LOCAL_POOL, report
     from minibrain.serve.host import AdvertiseError, EngineHost, advertise_address
     from minibrain.settings import load_settings
@@ -242,7 +256,7 @@ def worker(args: argparse.Namespace) -> None:
     api_url, kinds, gpus, parent, pool = args.api_url, args.kinds, args.gpus, args.parent, args.pool
 
     settings = load_settings()
-    token = os.environ.get("MINIBRAIN_WORKER_TOKEN") or settings.secret("worker_token")
+    token = os.environ.get(JOIN_KEY_ENV) or settings.secret("worker_token")
     config = WorkerConfig(
         api_url=api_url,
         token=token,
@@ -270,6 +284,10 @@ def worker(args: argparse.Namespace) -> None:
         threading.Thread(target=host.forever, args=(stop,), daemon=True).start()
     try:
         Worker(config).run_forever(stop)
+    except httpx.HTTPStatusError as error:
+        if error.response.status_code not in REFUSED_STATUSES:
+            raise
+        raise SystemExit(f"minibrain worker: main refused this machine: {refusal(error.response)}") from error
     finally:
         stop.set()
         if host is not None:

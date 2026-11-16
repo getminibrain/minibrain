@@ -43,7 +43,10 @@ def on_main(harness: Harness, node: NodeReport) -> None:
 
 def host(harness: Harness, body: dict[str, Any]) -> tuple[EngineHost, list[str]]:
     config = WorkerConfig(
-        api_url="http://testserver", token=harness.token, home=harness.settings.home / body["id"], pool=body["pool"]
+        api_url="http://testserver",
+        token=harness.join_token(body["pool"]),
+        home=harness.settings.home / body["id"],
+        pool=body["pool"],
     )
     config.id, config.host, config.hardware = body["id"], body["host"], body["hardware"]
     started: list[str] = []

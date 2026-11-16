@@ -1654,6 +1654,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/compute/join-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List join tokens
+         * @description Tokens not revoked, newest first.
+         */
+        get: operations["list_join_tokens_api_compute_join_tokens_get"];
+        put?: never;
+        /**
+         * Create a join token
+         * @description A token a worker or engine presents to join one pool. The answer is the only time it is shown.
+         */
+        post: operations["create_join_token_api_compute_join_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/compute/join-tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a join token */
+        delete: operations["revoke_join_token_api_compute_join_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policies": {
         parameters: {
             query?: never;
@@ -6384,6 +6425,99 @@ export interface components {
             /** Size Bytes */
             size_bytes?: number | null;
             training?: components["schemas"]["TrainingSetup"] | null;
+        };
+        /** JoinTokenCreate */
+        JoinTokenCreate: {
+            /** Pool */
+            pool: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "worker" | "engine" | "both";
+            /** Expires In Days */
+            expires_in_days?: number | null;
+        };
+        /** JoinTokenCreated */
+        JoinTokenCreated: {
+            /** Id */
+            id: number;
+            /** Pool */
+            pool: string;
+            /**
+             * Role
+             * @description worker, engine or both.
+             */
+            role: string;
+            /**
+             * Prefix
+             * @description The token's first characters, to tell tokens apart.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Expired */
+            expired: boolean;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Last Host
+             * @description The machine that last joined with this token.
+             */
+            last_host: string | null;
+            /**
+             * Secret
+             * @description The token itself; shown only in this answer.
+             */
+            secret: string;
+            /**
+             * Env
+             * @description The environment variable workers and engines read it from.
+             * @default MINIBRAIN_JOIN_TOKEN
+             */
+            env?: string;
+        };
+        /** JoinTokenInfo */
+        JoinTokenInfo: {
+            /** Id */
+            id: number;
+            /** Pool */
+            pool: string;
+            /**
+             * Role
+             * @description worker, engine or both.
+             */
+            role: string;
+            /**
+             * Prefix
+             * @description The token's first characters, to tell tokens apart.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Expired */
+            expired: boolean;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Last Host
+             * @description The machine that last joined with this token.
+             */
+            last_host: string | null;
         };
         /** JudgeInfo */
         JudgeInfo: {
@@ -13596,6 +13730,99 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DevicePricesInfo"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_join_tokens_api_compute_join_tokens_get: {
+        parameters: {
+            query?: {
+                pool?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinTokenInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_join_token_api_compute_join_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinTokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinTokenCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_join_token_api_compute_join_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

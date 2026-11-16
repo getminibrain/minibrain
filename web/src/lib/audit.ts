@@ -74,6 +74,10 @@ const ACTIONS: Record<string, string> = {
     "dataset_folder.move": "Dataset folder moved",
     "dataset_folder.rename": "Dataset folder renamed",
     "job.cancel": "Job cancelled",
+    "join_token.create": "Join token created",
+    "join_token.joined": "Machine joined",
+    "join_token.refused": "Join token refused",
+    "join_token.revoke": "Join token revoked",
     "job.retry": "Job retried",
     "key.create": "API key created",
     "key.revoke": "API key revoked",
@@ -108,6 +112,8 @@ const ACTIONS: Record<string, string> = {
 const KEY_LABELS: Record<string, string> = {
     adapters: "Adapters",
     artifacts: "Stored files",
+    address: "Address",
+    asked: "Asked for pool",
     attempt: "Attempt",
     budget_bytes: "Budget",
     cascade: "Models deleted with it",
@@ -179,6 +185,7 @@ const CATEGORIES: Record<string, string> = {
     encryption: "Encryption",
     feedback: "Feedback",
     job: "Jobs",
+    join_token: "Join tokens",
     key: "API keys",
     model: "Models",
     policy: "Policies",
@@ -234,7 +241,7 @@ export function resultOf(event: AuditEvent): Result {
     if (event.action === "safety.block") {
         return { label: "Blocked", failed: true };
     }
-    if (event.action.endsWith("_failed")) {
+    if (event.action.endsWith("_failed") || event.action.endsWith(".refused")) {
         return { label: "Refused", failed: true };
     }
     if (detail.outcome === "failed") {
