@@ -48,6 +48,13 @@ export function machineHref(node: NodeInfo): string {
     return `/infrastructure/machines?machine=${encodeURIComponent(node.id)}`;
 }
 
+export function rejoinHint(node: NodeInfo): string {
+    const token = node.roles.includes("worker")
+        ? "the worker token in MINIBRAIN_WORKER_TOKEN"
+        : "the gateway token in MINIBRAIN_GATEWAY_TOKEN";
+    return `Run this on ${node.host}, with ${token}:`;
+}
+
 export function rejoinCommand(node: NodeInfo, pool: string, origin: string): string {
     if (node.roles.includes("worker")) {
         return `minibrain worker --api-url ${origin} --pool ${pool}`;
@@ -63,7 +70,7 @@ function offlineIssue(node: NodeInfo, pool: string, origin: string): Issue {
         text: `Pool ${pool}: ${node.host} is offline (last seen ${seen})`,
         fix: (
             <>
-                <span>{`Run this on ${node.host}, with the worker token in MINIBRAIN_WORKER_TOKEN:`}</span>
+                <span>{rejoinHint(node)}</span>
                 <Command
                     value={rejoinCommand(node, pool, origin)}
                     label={`Copy the command that rejoins ${node.host}`}

@@ -21,7 +21,7 @@ import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref } from "~/lib/modelLinks";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
-import { Command, rejoinCommand } from "./NeedsALook";
+import { Command, rejoinCommand, rejoinHint } from "./NeedsALook";
 import {
     MEMORY_LABELS,
     engineLabel,
@@ -336,7 +336,7 @@ function ConnectionBlock({ row }: { row: MachineRow }) {
             />
             {!node.online && (
                 <div className="flex min-w-0 flex-col items-start gap-1.5 text-sm text-muted-foreground">
-                    <span>{`Run this on ${node.host}, with the worker token in MINIBRAIN_WORKER_TOKEN:`}</span>
+                    <span>{rejoinHint(node)}</span>
                     <Command
                         value={rejoinCommand(node, pool.name, window.location.origin)}
                         label={`Copy the command that rejoins ${node.host}`}
