@@ -12,11 +12,12 @@ import { CopyButton } from "~/components/CopyButton";
 import { type Crumb, PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import type { Tone } from "~/components/models/StatusText";
-import { modelPageHref } from "~/lib/modelLinks";
+import { ProgressBar, type Tone } from "~/components/models/StatusText";
+import { jobHref, modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted, busyTearingDown, setDeployed } from "~/lib/teardown";
 import type { Confirmation } from "../dialogs";
+import { variantLine } from "../list/model";
 import { parametersText } from "./facts";
 
 export type Fact = ReactElement | null | false;
@@ -112,9 +113,32 @@ export function ModelAvatar({ row, size = "md" }: { row: ModelRow; size?: "sm" |
     );
 }
 
-type Shown = { tone: Tone; label: string; href?: string; pool?: string; joiner?: string };
+type Shown = {
+    tone: Tone;
+    label: string;
+    href?: string;
+    pool?: string;
+    joiner?: string;
+    progress?: number | null;
+};
 
-function deploymentShown(row: ModelRow): Shown {
+function transferShown(row: ModelRow): Shown | null {
+    if (row.kind !== "base") {
+        return null;
+    }
+    const line = variantLine(row);
+    if (line.kind !== "transfer") {
+        return null;
+    }
+    return {
+        tone: "info",
+        label: line.text,
+        href: line.job ? jobHref(line.job) : undefined,
+        progress: line.progress,
+    };
+}
+
+function deploymentShown(row: ModelRow, brief = false): Shown {
     const version =
         row.kind === "custom" && row.current_version !== null ? ` v${row.current_version}` : "";
     const job = row.teardown?.jobs?.[0];
@@ -143,7 +167,7 @@ function deploymentShown(row: ModelRow): Shown {
         case "stop_failed":
             return { tone: "destructive", label: "Undeploy failed", href: jobLink };
         default:
-            return { tone: "neutral", label: "Not deployed" };
+            return (!brief && transferShown(row)) || { tone: "neutral", label: "Not deployed" };
     }
 }
 
@@ -156,7 +180,7 @@ const STATUS_ICONS: Record<Tone, { icon: LucideIcon; className: string }> = {
 };
 
 export function DeploymentStatus({ row, brief = false }: { row: ModelRow; brief?: boolean }) {
-    const shown = deploymentShown(row);
+    const shown = deploymentShown(row, brief);
     const { icon: Icon, className } = STATUS_ICONS[shown.tone];
     const text = (
         <span
@@ -188,6 +212,13 @@ export function DeploymentStatus({ row, brief = false }: { row: ModelRow; brief?
                     <span className="tabular-nums">{` · ${row.deployment.replicas} replicas`}</span>
                 )}
             </span>
+            {shown.progress !== undefined && (
+                <ProgressBar
+                    value={shown.progress}
+                    label={`${row.name} transfer`}
+                    className="w-16"
+                />
+            )}
         </span>
     );
     return shown.href ? (
