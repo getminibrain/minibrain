@@ -30,8 +30,8 @@ import { type DatasetSummary, api, succeed, unwrap } from "~/api/client";
 import { type DatasetFolder, dataKeys } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
 import { ErrorLine, Stat } from "~/components/Section";
+import { When } from "~/components/When";
 import { count } from "~/lib/format";
-import { relativeTime } from "~/lib/time";
 import {
     DATASETS_GROUP,
     type FolderIndex,
@@ -472,7 +472,7 @@ const CONTENT_COLUMNS: ColumnDef<ContentRow, unknown>[] = [
         id: "updated",
         header: "Updated",
         accessorKey: "updated",
-        cell: ({ row }) => (row.original.updated ? relativeTime(row.original.updated) : "–"),
+        cell: ({ row }) => <When value={row.original.updated} />,
     },
 ];
 

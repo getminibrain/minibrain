@@ -52,6 +52,7 @@ import { api, unwrap } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
+import { When } from "~/components/When";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
 import { relativeTime } from "~/lib/time";
 import { ACCOUNTS } from "~/pages/settings/settingsIndex";
@@ -429,12 +430,7 @@ function columns(): ColumnDef<AccountInfo, unknown>[] {
             header: "Last sign-in",
             id: "last",
             accessorFn: (row) => row.last_sign_in_at ?? "",
-            cell: ({ row }) =>
-                row.original.last_sign_in_at ? (
-                    relativeTime(row.original.last_sign_in_at)
-                ) : (
-                    <span className="text-muted-foreground">Never</span>
-                ),
+            cell: ({ row }) => <When value={row.original.last_sign_in_at} empty="Never" />,
         },
         {
             header: "Status",

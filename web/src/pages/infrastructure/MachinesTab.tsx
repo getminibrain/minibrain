@@ -29,7 +29,7 @@ import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { useScrollToHash } from "~/lib/scrollToHash";
-import { relativeTime } from "~/lib/time";
+import { timeText } from "~/lib/time";
 import { MachineSheet } from "./MachineSheet";
 import { LOCAL_POOL, PoolJoinControls } from "./PoolJoin";
 import { ENGINE_DOING, jobLink, jobSubject, memoryView, servedHref, versioned } from "./activity";
@@ -91,7 +91,7 @@ function seenText(row: MachineRow): string {
     if (row.node.online) {
         return "now";
     }
-    return row.node.seen_at ? relativeTime(row.node.seen_at) : "never";
+    return row.node.seen_at ? timeText(row.node.seen_at) : "never";
 }
 
 function ProblemBadge({ problems }: { problems: Problem[] }) {

@@ -1,9 +1,9 @@
 import type { ModelRow, VersionInfo } from "~/api/client";
 import type { Tone } from "~/components/models/StatusText";
-import { count } from "~/lib/format";
+import { count, points } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { isDeployed } from "./header";
-import { liveOf, points } from "./makeLive";
+import { liveOf } from "./makeLive";
 import { cancelling, finishedBeforeCancel, isCancelled } from "./versions";
 
 export type Phase =

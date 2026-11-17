@@ -5,12 +5,13 @@ import type { JobDetail, JobMetrics, ModelVersionRow, VersionInfo } from "~/api/
 import { isActiveJob, useAllModels, useVersions } from "~/api/queries";
 import { Facts } from "~/components/Facts";
 import { ErrorLine, PanelSection, Stat } from "~/components/Section";
+import { When } from "~/components/When";
 import { ProgressBar } from "~/components/models/StatusText";
 import { PromotionDecision } from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
 import { count, percent, pointsSize } from "~/lib/format";
 import { metricName, metricOf } from "~/lib/metrics";
-import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { bytes } from "~/lib/time";
 import { DeployButton, usePromote } from "../EvaluationsPage";
 import { trainingFacts } from "./TrainingPanel";
 
@@ -86,17 +87,6 @@ function kindFacts(job: JobDetail, metrics: JobMetrics | undefined): Fact[] {
     return countedFacts(job, metrics);
 }
 
-function When({ value }: { value: string | null | undefined }) {
-    if (!value) {
-        return <span className="text-muted-foreground">Not yet</span>;
-    }
-    return (
-        <time dateTime={value} title={exactTime(value)} className="tabular-nums">
-            {relativeTime(value)}
-        </time>
-    );
-}
-
 function quietNote(job: JobDetail, facts: Fact[]): string | null {
     if (facts.length > 0) {
         return null;
@@ -137,7 +127,7 @@ export function ProgressSection({
                     items={[
                         ...facts,
                         ["Queued", <When key="queued" value={job.created_at} />],
-                        ["Started", <When key="started" value={job.started_at} />],
+                        ["Started", <When key="started" value={job.started_at} empty="Not yet" />],
                     ]}
                 />
             </div>

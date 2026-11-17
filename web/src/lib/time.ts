@@ -19,6 +19,25 @@ export function relativeTime(value: string, now: number = Date.now()): string {
     return "just now";
 }
 
+const RECENT_MS = 7 * 24 * 3600 * 1000;
+const DAY_TIME: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+};
+const THIS_YEAR = new Intl.DateTimeFormat(undefined, DAY_TIME);
+const OTHER_YEAR = new Intl.DateTimeFormat(undefined, { ...DAY_TIME, year: "numeric" });
+
+export function timeText(value: string, now: number = Date.now()): string {
+    const at = new Date(value);
+    if (Math.abs(at.getTime() - now) < RECENT_MS) {
+        return relativeTime(value, now);
+    }
+    const format = at.getFullYear() === new Date(now).getFullYear() ? THIS_YEAR : OTHER_YEAR;
+    return format.format(at);
+}
+
 export function exactTime(value: string): string {
     return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }

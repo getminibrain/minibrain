@@ -16,8 +16,8 @@ import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { ThemeChoice } from "~/components/ThemeChoice";
+import { When } from "~/components/When";
 import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
-import { exactTime, relativeTime } from "~/lib/time";
 import { deviceName } from "~/lib/userAgent";
 import { YOUR_ACCOUNT } from "~/pages/settings/settingsIndex";
 
@@ -247,12 +247,12 @@ function SessionRow({ row }: { row: SignInSession }) {
                 <span className="text-sm text-muted-foreground">
                     <span className="font-mono">{row.ip ?? "Unknown address"}</span>
                     {" · "}
-                    <span title={exactTime(row.created_at)}>
-                        {`Signed in ${relativeTime(row.created_at)}`}
+                    <span>
+                        Signed in <When value={row.created_at} />
                     </span>
                     {" · "}
-                    <span title={exactTime(row.last_seen_at)}>
-                        {`Last active ${relativeTime(row.last_seen_at)}`}
+                    <span>
+                        Last active <When value={row.last_seen_at} />
                     </span>
                 </span>
                 <ErrorLine error={end.error} />

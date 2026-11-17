@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import type { ModelUsage } from "~/api/client";
+import { When } from "~/components/When";
 import { count } from "~/lib/format";
-import { relativeTime } from "~/lib/time";
 
 function recentDays(total: number): string[] {
     const today = new Date();
@@ -148,12 +148,7 @@ export function Requests({
 }
 
 export function LastUsed({ usage }: { usage: ModelUsage | null | undefined }) {
-    if (!usage?.last_at) {
-        return <span className="text-muted-foreground">Never</span>;
-    }
-    return (
-        <span title={new Date(usage.last_at).toLocaleString()}>{relativeTime(usage.last_at)}</span>
-    );
+    return <When value={usage?.last_at} empty="Never" />;
 }
 
 export function Latency({ usage }: { usage: ModelUsage | null | undefined }) {

@@ -27,7 +27,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useChats, useDeleteChat, useSaveChat } from "~/api/playgroundQueries";
 import { ErrorLine } from "~/components/Section";
 import type { ChatSummary } from "~/lib/playground";
-import { relativeTime } from "~/lib/time";
+import { timeText } from "~/lib/time";
 
 const PLACEHOLDERS = ["first", "second", "third", "fourth"];
 
@@ -148,7 +148,7 @@ function ChatRow({
             >
                 <span className="truncate">{chat.title}</span>
                 <span className="truncate text-sm text-muted-foreground">
-                    {`${relativeTime(chat.updated_at)} · `}
+                    {`${timeText(chat.updated_at)} · `}
                     <span className="font-mono">{chat.model}</span>
                 </span>
             </button>

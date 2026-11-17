@@ -285,7 +285,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Raw or smoothed training loss, remembered per browser.
   UI: Models › model › Versions › version › Loss, Training › job › Loss · API: GET /api/jobs/{job_id}/metrics
 - **Training list** · shipped · product, ml
-  Every training run across models, filtered by model, status and method.
+  Every run with score change, base and data, GPU-hours and ETA.
   UI: Training · API: GET /api/jobs, GET /api/jobs/facets
 - **Bulk job actions** · shipped · product, ml
   Tick jobs to cancel, retry or delete them together, each one audited.

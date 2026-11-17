@@ -37,11 +37,13 @@ import { TRAINING_PATH, jobHref, modelPageHref, trainHref } from "~/lib/modelLin
 import { JobPage } from "../jobs/JobPage";
 import {
     ATTEMPT_COLUMN,
+    DEVICE_HOURS_COLUMN,
     DURATION_COLUMN,
     ID_COLUMN,
     SCORE_COLUMN,
     STARTED_COLUMN,
     STATUS_COLUMN,
+    TRAINED_ON_COLUMN,
     jobRowLabel,
     methodText,
     orderFrom,
@@ -100,14 +102,16 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
     },
     STATUS_COLUMN,
     SCORE_COLUMN,
+    TRAINED_ON_COLUMN,
+    DEVICE_HOURS_COLUMN,
+    DURATION_COLUMN,
+    STARTED_COLUMN,
     {
         id: "method",
         header: "Method",
         accessorFn: methodText,
         cell: ({ row }) => <span className="tabular-nums">{methodText(row.original)}</span>,
     },
-    DURATION_COLUMN,
-    STARTED_COLUMN,
     ATTEMPT_COLUMN,
 ]);
 
@@ -335,7 +339,7 @@ function Runs() {
                         </p>
                     )
                 }
-                minWidth="min-w-[860px]"
+                minWidth="min-w-[1160px]"
             />
         </>
     );

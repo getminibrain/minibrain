@@ -17,20 +17,13 @@ import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { count, deltaPoints, percent } from "~/lib/format";
+import { count, deltaPoints, percent, points } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
 import { modelCompareHref, versionNumberOf, versionPlaygroundHref } from "~/lib/modelLinks";
 import { datasetVersionDiffHref } from "../../data/versionData";
 import { baseNameOf, isDeployed, modelCrumbs } from "./header";
-import {
-    DeployVersionDialog,
-    canGoLive,
-    liveBlock,
-    liveOf,
-    points,
-    versionLabel,
-} from "./makeLive";
+import { DeployVersionDialog, canGoLive, liveBlock, liveOf, versionLabel } from "./makeLive";
 import { SCHEDULERS } from "./train/recipe";
 import { ExampleList, useAnswers, verdictOf } from "./versionChanges";
 import { recipeText } from "./versions";

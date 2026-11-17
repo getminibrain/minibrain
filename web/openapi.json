@@ -20802,6 +20802,51 @@
             ],
             "title": "Rank"
           },
+          "trained_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainedOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base model and dataset version, on job lists."
+          },
+          "compared_with": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version the score is compared with: live, else v0; on job lists."
+          },
+          "device_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Device time of a finished run, on job lists."
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds",
+            "description": "Time left a running training run reports."
+          },
           "attempts": {
             "items": {
               "$ref": "#/components/schemas/AttemptInfo"
@@ -21204,6 +21249,51 @@
               }
             ],
             "title": "Rank"
+          },
+          "trained_on": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrainedOn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Base model and dataset version, on job lists."
+          },
+          "compared_with": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version the score is compared with: live, else v0; on job lists."
+          },
+          "device_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Device time of a finished run, on job lists."
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Seconds",
+            "description": "Time left a running training run reports."
           }
         },
         "type": "object",
@@ -28282,6 +28372,30 @@
         ],
         "title": "ScoreInfo"
       },
+      "ScoreReference": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live",
+            "description": "True for the live version; false for the v0 baseline."
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "score",
+          "live"
+        ],
+        "title": "ScoreReference"
+      },
       "ServeOnlyInfo": {
         "properties": {
           "format": {
@@ -30932,6 +31046,54 @@
           "step"
         ],
         "title": "TrainPoint"
+      },
+      "TrainedOn": {
+        "properties": {
+          "base_model": {
+            "type": "string",
+            "title": "Base Model",
+            "description": "Key of the base model the version trained from."
+          },
+          "base_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Model Name"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset",
+            "description": "Slug of the dataset the version trained on."
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_model"
+        ],
+        "title": "TrainedOn"
       },
       "TrainingDefaults": {
         "properties": {

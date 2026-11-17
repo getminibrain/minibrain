@@ -12,10 +12,11 @@ import {
 } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
 import { ErrorLine, Section } from "~/components/Section";
+import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
-import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { bytes, relativeTime } from "~/lib/time";
 import {
     SampleOffer,
     type SampleRequest,
@@ -261,14 +262,7 @@ const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
         id: "taken",
         header: "Saved",
         accessorFn: (datasetVersion) => takenAt(datasetVersion),
-        cell: ({ row }) => (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span className="tabular-nums">{relativeTime(takenAt(row.original))}</span>
-                </TooltipTrigger>
-                <TooltipContent>{exactTime(takenAt(row.original))}</TooltipContent>
-            </Tooltip>
-        ),
+        cell: ({ row }) => <When value={takenAt(row.original)} />,
     },
     {
         id: "rows",

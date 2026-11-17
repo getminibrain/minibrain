@@ -46,9 +46,10 @@ import {
 } from "~/api/client";
 import { useJobs } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
+import { When } from "~/components/When";
 import { StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
-import { percent } from "~/lib/format";
+import { percent, points } from "~/lib/format";
 import { durationText, jobSeconds } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
 import {
@@ -58,7 +59,6 @@ import {
     modelVersionHref,
     trainHref,
 } from "~/lib/modelLinks";
-import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed } from "./header";
 import {
@@ -67,7 +67,6 @@ import {
     isBaseline,
     liveBlock,
     liveOf,
-    points,
     ruleReason,
     versionLabel,
 } from "./makeLive";
@@ -466,7 +465,7 @@ function VersionRow({
             </TableCell>
             <TableCell className="whitespace-nowrap">{trainingText(version)}</TableCell>
             <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                {relativeTime(job?.started_at ?? version.created_at)}
+                <When value={job?.started_at ?? version.created_at} />
             </TableCell>
             <TableCell className="text-right whitespace-nowrap tabular-nums">
                 {durationOf(job)}

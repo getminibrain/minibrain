@@ -17,6 +17,14 @@ export function pointsSize(delta: number): string {
     return Math.abs(percentNumber(delta)).toFixed(1);
 }
 
+export function points(delta: number): string {
+    const value = pointsSize(delta);
+    if (Number(value) === 0) {
+        return "±0";
+    }
+    return `${delta > 0 ? "+" : "−"}${value}`;
+}
+
 export function deltaPoints(delta: number): string {
     return `${percentNumber(delta).toFixed(1)} pts`;
 }

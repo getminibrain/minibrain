@@ -516,6 +516,26 @@ class DatasetVersionUsage(BaseModel):
     keep: int
 
 
+class DeviceTime(BaseModel):
+    kind: Literal["gpu", "cpu"] = Field(description="gpu for any accelerator; cpu when training ran on the CPU.")
+    devices: int = Field(description="Accelerators the training process used.")
+    seconds: float = Field(description="Wall time the training process ran.")
+    hours: float = Field(description="Device-hours: wall time times devices.")
+
+
+class TrainedOn(BaseModel):
+    base_model: str = Field(description="Key of the base model the version trained from.")
+    base_model_name: str | None = None
+    dataset: str | None = Field(default=None, description="Slug of the dataset the version trained on.")
+    dataset_version: int | None = None
+
+
+class ScoreReference(BaseModel):
+    version: int
+    score: float
+    live: bool = Field(description="True for the live version; false for the v0 baseline.")
+
+
 class JobInfo(BaseModel):
     id: int
     model: str | None
@@ -545,6 +565,12 @@ class JobInfo(BaseModel):
     method: str | None = Field(default=None, description="Training method: sft for supervised fine-tuning.")
     strategy: str | None = Field(default=None, description="lora or qlora once the run is planned.")
     rank: int | None = None
+    trained_on: TrainedOn | None = Field(default=None, description="Base model and dataset version, on job lists.")
+    compared_with: ScoreReference | None = Field(
+        default=None, description="Version the score is compared with: live, else v0; on job lists."
+    )
+    device_time: DeviceTime | None = Field(default=None, description="Device time of a finished run, on job lists.")
+    eta_seconds: float | None = Field(default=None, description="Time left a running training run reports.")
 
 
 class JobPage(BaseModel):
@@ -781,13 +807,6 @@ class VersionFiles(BaseModel):
     artifact_id: str | None = Field(description="SHA-256 of the packed adapter; none for a prompt-only version.")
     size: int | None
     files: list[PackedFileInfo]
-
-
-class DeviceTime(BaseModel):
-    kind: Literal["gpu", "cpu"] = Field(description="gpu for any accelerator; cpu when training ran on the CPU.")
-    devices: int = Field(description="Accelerators the training process used.")
-    seconds: float = Field(description="Wall time the training process ran.")
-    hours: float = Field(description="Device-hours: wall time times devices.")
 
 
 class VersionOrigin(BaseModel):

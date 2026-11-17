@@ -5,8 +5,8 @@ import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger, useToa
 import { useState } from "react";
 import { type FeedbackInfo, useRemoveTestExample, useTestExamples } from "~/api/feedbackQueries";
 import { ErrorLine, errorMessage } from "~/components/Section";
+import { When } from "~/components/When";
 import { feedbackHref } from "~/lib/feedback";
-import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
 
 function lastMessage(item: FeedbackInfo): string {
@@ -55,7 +55,8 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
         header: "Saved",
         cell: ({ row }) => (
             <span className="block max-w-56 truncate">
-                {`${relativeTime(row.original.reviewed_at ?? row.original.created_at)} by ${row.original.reviewed_by ?? "someone"}`}
+                <When value={row.original.reviewed_at ?? row.original.created_at} />
+                {` by ${row.original.reviewed_by ?? "someone"}`}
             </span>
         ),
     },

@@ -1,14 +1,15 @@
 import type { ColumnDef, SortingState } from "@tanstack/react-table";
-import { Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import type { JobOrder } from "~/api/jobQueries";
 import { ModelName, withDeleted } from "~/components/ModelName";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { When } from "~/components/When";
 import { StatusText, type Tone } from "~/components/models/StatusText";
-import { percent } from "~/lib/format";
-import { jobDuration, jobSeconds, kindNoun } from "~/lib/jobs";
-import { jobHref } from "~/lib/modelLinks";
-import { exactTime, relativeTime } from "~/lib/time";
+import { percent, points } from "~/lib/format";
+import { deviceHoursText, durationText, jobDuration, jobSeconds, kindNoun } from "~/lib/jobs";
+import { jobHref, modelPageHref } from "~/lib/modelLinks";
+import { datasetHref } from "~/pages/models/list/cells";
 
 type JobColumn = ColumnDef<JobInfo, unknown>;
 
@@ -68,10 +69,13 @@ export function JobState({ job }: { job: JobInfo }) {
             waiting={job.status === "queued"}
             progress={running && job.progress > 0 ? job.progress * 100 : null}
         >
-            {state.label}
-            {running && job.progress > 0 && (
-                <span className="tabular-nums">{` · ${Math.round(job.progress * 100)}%`}</span>
-            )}
+            <span className="tabular-nums">
+                {state.label}
+                {running && job.progress > 0 && ` · ${Math.round(job.progress * 100)}%`}
+                {running && job.eta_seconds ? (
+                    <span className="text-sm text-muted-foreground">{` · ETA ${durationText(job.eta_seconds)}`}</span>
+                ) : null}
+            </span>
         </StatusText>
     );
     if (job.status === "failed" && job.error) {
@@ -100,14 +104,6 @@ export function JobOwner({ job }: { job: JobInfo }) {
             />
             <ModelName name={ownerName(job)} deleted={job.deleted} className="truncate" />
         </span>
-    );
-}
-
-function When({ value }: { value: string }) {
-    return (
-        <time dateTime={value} title={exactTime(value)} className="tabular-nums">
-            {relativeTime(value)}
-        </time>
     );
 }
 
@@ -168,11 +164,114 @@ export const ATTEMPT_COLUMN: JobColumn = {
     ),
 };
 
+function changeTone(delta: number, text: string): string {
+    if (text === "±0") {
+        return "text-muted-foreground";
+    }
+    return delta > 0 ? "text-success" : "text-destructive";
+}
+
+function JobScore({ job }: { job: JobInfo }) {
+    const reference = job.compared_with;
+    if (job.score === null || job.score === undefined) {
+        return <span className="text-muted-foreground">–</span>;
+    }
+    if (!reference) {
+        return <span className="tabular-nums">{percent(job.score)}</span>;
+    }
+    const delta = job.score - reference.score;
+    const change = points(delta);
+    const label = `${reference.live ? "live " : ""}v${reference.version}`;
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap tabular-nums">
+                    {percent(job.score)}
+                    <span className={cn("text-sm", changeTone(delta, change))}>{change}</span>
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{`vs ${label} · ${percent(reference.score)}`}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 export const SCORE_COLUMN: JobColumn = {
     id: "score",
     header: "Score",
     accessorFn: (job) => job.score ?? -1,
-    cell: ({ row }) => <span className="tabular-nums">{percent(row.original.score)}</span>,
+    cell: ({ row }) => <JobScore job={row.original} />,
+};
+
+function Muted() {
+    return <span className="text-muted-foreground">–</span>;
+}
+
+function TrainedOn({ job }: { job: JobInfo }) {
+    const on = job.trained_on;
+    if (!on) {
+        return <Muted />;
+    }
+    const data =
+        on.dataset_version === null || on.dataset_version === undefined
+            ? on.dataset
+            : `${on.dataset} v${on.dataset_version}`;
+    return (
+        <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
+            <Link
+                href={modelPageHref(on.base_model)}
+                className="max-w-40 truncate text-foreground hover:underline"
+            >
+                {on.base_model_name ?? on.base_model}
+            </Link>
+            {on.dataset && (
+                <>
+                    <span aria-hidden="true" className="text-muted-foreground">
+                        ·
+                    </span>
+                    <Link
+                        href={datasetHref(on.dataset)}
+                        className="max-w-40 truncate text-foreground tabular-nums hover:underline"
+                    >
+                        {data}
+                    </Link>
+                </>
+            )}
+        </span>
+    );
+}
+
+export const TRAINED_ON_COLUMN: JobColumn = {
+    id: "trained_on",
+    header: "Trained on",
+    accessorFn: (job) => job.trained_on?.base_model_name ?? job.trained_on?.base_model ?? "",
+    cell: ({ row }) => <TrainedOn job={row.original} />,
+};
+
+function DeviceHours({ job }: { job: JobInfo }) {
+    const time = job.device_time;
+    if (!time) {
+        return <Muted />;
+    }
+    const cpu = time.kind === "cpu";
+    const where = cpu ? "the CPU" : time.devices > 1 ? `${time.devices} GPUs` : "1 GPU";
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="whitespace-nowrap tabular-nums">
+                    {deviceHoursText(time)}
+                    {cpu && <span className="text-muted-foreground"> CPU</span>}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{`${durationText(time.seconds)} of wall time on ${where}`}</TooltipContent>
+        </Tooltip>
+    );
+}
+
+export const DEVICE_HOURS_COLUMN: JobColumn = {
+    id: "gpu_hours",
+    header: "GPU-hours",
+    accessorFn: (job) => job.device_time?.hours ?? -1,
+    cell: ({ row }) => <DeviceHours job={row.original} />,
 };
 
 export function sortedById(columns: JobColumn[]): JobColumn[] {

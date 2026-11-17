@@ -13,8 +13,8 @@ import {
 import { type ReactNode, useState } from "react";
 import { usePerson } from "~/api/authQueries";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, succeed } from "~/api/client";
+import { When } from "~/components/When";
 import { useCan } from "~/lib/access";
-import { exactTime, relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
 import { KeyDialog, type KeyEditing, useRefreshKeys } from "./KeyDialog";
 import { NewSecret } from "./NewSecret";
@@ -79,17 +79,6 @@ function KeyMenu({
     );
 }
 
-function Moment({ value, empty }: { value: string | null | undefined; empty: string }) {
-    if (!value) {
-        return <span className="text-muted-foreground">{empty}</span>;
-    }
-    return (
-        <time dateTime={value} title={exactTime(value)} className="tabular-nums">
-            {relativeTime(value)}
-        </time>
-    );
-}
-
 function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyInfo, unknown>[] {
     return [
         {
@@ -131,21 +120,21 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
             id: "created",
             accessorFn: (key) => key.created_at,
             size: 120,
-            cell: ({ row }) => <Moment value={row.original.created_at} empty="" />,
+            cell: ({ row }) => <When value={row.original.created_at} empty="" />,
         },
         {
             header: "Last used",
             id: "used",
             accessorFn: (key) => key.last_used_at ?? "",
             size: 120,
-            cell: ({ row }) => <Moment value={row.original.last_used_at} empty="Never" />,
+            cell: ({ row }) => <When value={row.original.last_used_at} empty="Never" />,
         },
         {
             header: "Expires",
             id: "expires",
             accessorFn: (key) => key.expires_at ?? "~",
             size: 120,
-            cell: ({ row }) => <Moment value={row.original.expires_at} empty="Never" />,
+            cell: ({ row }) => <When value={row.original.expires_at} empty="Never" />,
         },
         {
             header: "Status",

@@ -17,7 +17,7 @@ import { FormRow, FormRows } from "~/components/FormRows";
 import { type PickOption, PickSelect } from "~/components/PickSelect";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { percent, pointsSize } from "~/lib/format";
+import { percent, points } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
 import {
     PoolRow,
@@ -27,14 +27,6 @@ import {
     resolvedPool,
     startingReplicas,
 } from "./poolPicker";
-
-export function points(delta: number): string {
-    const value = pointsSize(delta);
-    if (Number(value) === 0) {
-        return "±0";
-    }
-    return `${delta > 0 ? "+" : "−"}${value}`;
-}
 
 export function liveOf(versions: VersionInfo[] | undefined): VersionInfo | undefined {
     return versions?.find((version) => version.current);

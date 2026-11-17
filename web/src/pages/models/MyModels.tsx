@@ -1,8 +1,8 @@
-import { Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { Link } from "obp-ui";
 import type { ModelRow } from "~/api/client";
+import { When } from "~/components/When";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { deploymentPageHref, modelPageHref } from "~/lib/modelLinks";
-import { exactTime, relativeTime } from "~/lib/time";
 
 const DEPLOYMENT_TONES: Record<string, Tone> = {
     running: "success",
@@ -42,17 +42,5 @@ export function Deployment({ row, short = false }: { row: ModelRow; short?: bool
 }
 
 export function Updated({ value }: { value: string }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button
-                    type="button"
-                    className="whitespace-nowrap rounded-sm tabular-nums text-muted-foreground"
-                >
-                    <time dateTime={value}>{relativeTime(value)}</time>
-                </button>
-            </TooltipTrigger>
-            <TooltipContent>{exactTime(value)}</TooltipContent>
-        </Tooltip>
-    );
+    return <When value={value} className="text-muted-foreground" />;
 }

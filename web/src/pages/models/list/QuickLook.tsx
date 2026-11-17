@@ -14,12 +14,13 @@ import { api, unwrap } from "~/api/client";
 import { useModelPage } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { Sparkline } from "~/components/Sparkline";
+import { When } from "~/components/When";
 import { Requests } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
 import type { Abilities } from "~/lib/access";
 import { playgroundHref, trainHref } from "~/lib/modelLinks";
 import { REQUESTS_PATH, STATUS_TONES } from "~/lib/requests";
-import { bytes, relativeTime } from "~/lib/time";
+import { bytes } from "~/lib/time";
 import { LiveStatus, ModelAvatar, Muted, StatusLineText } from "./cells";
 import {
     type ListModel,
@@ -166,7 +167,8 @@ function Latest({ model }: { model: ListModel }) {
                             </span>
                         </span>
                         <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
-                            {`${Math.round(row.latency_ms)} ms · ${relativeTime(row.at)}`}
+                            {`${Math.round(row.latency_ms)} ms · `}
+                            <When value={row.at} />
                         </span>
                     </Link>
                 </li>

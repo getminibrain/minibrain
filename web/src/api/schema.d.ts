@@ -6354,6 +6354,17 @@ export interface components {
             strategy?: string | null;
             /** Rank */
             rank?: number | null;
+            /** @description Base model and dataset version, on job lists. */
+            trained_on?: components["schemas"]["TrainedOn"] | null;
+            /** @description Version the score is compared with: live, else v0; on job lists. */
+            compared_with?: components["schemas"]["ScoreReference"] | null;
+            /** @description Device time of a finished run, on job lists. */
+            device_time?: components["schemas"]["DeviceTime"] | null;
+            /**
+             * Eta Seconds
+             * @description Time left a running training run reports.
+             */
+            eta_seconds?: number | null;
             /** Attempts */
             attempts: components["schemas"]["AttemptInfo"][];
             /** Result */
@@ -6504,6 +6515,17 @@ export interface components {
             strategy?: string | null;
             /** Rank */
             rank?: number | null;
+            /** @description Base model and dataset version, on job lists. */
+            trained_on?: components["schemas"]["TrainedOn"] | null;
+            /** @description Version the score is compared with: live, else v0; on job lists. */
+            compared_with?: components["schemas"]["ScoreReference"] | null;
+            /** @description Device time of a finished run, on job lists. */
+            device_time?: components["schemas"]["DeviceTime"] | null;
+            /**
+             * Eta Seconds
+             * @description Time left a running training run reports.
+             */
+            eta_seconds?: number | null;
         };
         /** JobMetrics */
         JobMetrics: {
@@ -8879,6 +8901,18 @@ export interface components {
             /** Value */
             value: number;
         };
+        /** ScoreReference */
+        ScoreReference: {
+            /** Version */
+            version: number;
+            /** Score */
+            score: number;
+            /**
+             * Live
+             * @description True for the live version; false for the v0 baseline.
+             */
+            live: boolean;
+        };
         /** ServeOnlyInfo */
         ServeOnlyInfo: {
             /**
@@ -9785,6 +9819,23 @@ export interface components {
             memory_bytes?: number | null;
             /** Elapsed Seconds */
             elapsed_seconds?: number | null;
+        };
+        /** TrainedOn */
+        TrainedOn: {
+            /**
+             * Base Model
+             * @description Key of the base model the version trained from.
+             */
+            base_model: string;
+            /** Base Model Name */
+            base_model_name?: string | null;
+            /**
+             * Dataset
+             * @description Slug of the dataset the version trained on.
+             */
+            dataset?: string | null;
+            /** Dataset Version */
+            dataset_version?: number | null;
         };
         /** TrainingDefaults */
         TrainingDefaults: {

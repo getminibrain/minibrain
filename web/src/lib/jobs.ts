@@ -104,6 +104,15 @@ export function durationText(seconds: number): string {
     return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
 }
 
+const SMALLEST_HOURS = 0.01;
+
+export function deviceHoursText(time: { hours: number }): string {
+    if (time.hours < SMALLEST_HOURS) {
+        return `< ${SMALLEST_HOURS}`;
+    }
+    return time.hours.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 export function jobDuration(job: JobInfo): string {
     const seconds = jobSeconds(job);
     return seconds < 0 ? "—" : durationText(seconds);

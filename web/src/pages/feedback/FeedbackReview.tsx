@@ -26,6 +26,7 @@ import {
 } from "~/api/feedbackQueries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { ErrorLine } from "~/components/Section";
+import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import {
     feedbackHref,
@@ -117,9 +118,7 @@ function Related({ items }: { items: FeedbackInfo[] }) {
                         <Badge variant={feedbackStatusVariant(other.status)}>
                             {feedbackStatusLabel(other.status)}
                         </Badge>
-                        <span className="text-sm text-muted-foreground tabular-nums">
-                            {relativeTime(other.created_at)}
-                        </span>
+                        <When value={other.created_at} className="text-sm text-muted-foreground" />
                     </li>
                 ))}
             </ul>

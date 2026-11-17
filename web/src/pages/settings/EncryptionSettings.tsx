@@ -20,8 +20,8 @@ import type { components } from "~/api/schema";
 import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine } from "~/components/Section";
 import { SettingsSection } from "~/components/SettingsSection";
+import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
-import { exactTime, relativeTime } from "~/lib/time";
 import { SECURITY, policyAnchor } from "~/pages/settings/settingsIndex";
 
 type EncryptionStatus = components["schemas"]["EncryptionStatus"];
@@ -342,11 +342,8 @@ function Files({ status }: { status: EncryptionStatus }) {
                 <p className="tabular-nums">
                     {countsText(last.counts)}
                     {last.finished_at && (
-                        <span
-                            className="ml-1 text-muted-foreground"
-                            title={exactTime(last.finished_at)}
-                        >
-                            Checked {relativeTime(last.finished_at)}.
+                        <span className="ml-1 text-muted-foreground">
+                            Checked <When value={last.finished_at} />.
                         </span>
                     )}
                 </p>
@@ -425,8 +422,8 @@ function Keys({ status }: { status: EncryptionStatus }) {
                     <span className="text-muted-foreground tabular-nums">
                         {key.files !== null && key.files !== undefined && `${key.files} files · `}
                         {key.created_at && (
-                            <span title={exactTime(key.created_at)}>
-                                made {relativeTime(key.created_at)}
+                            <span>
+                                made <When value={key.created_at} />
                             </span>
                         )}
                     </span>

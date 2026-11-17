@@ -25,9 +25,10 @@ import { useEffect, useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
 import { useDatasets } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
+import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { fileSize, relativeTime } from "~/lib/time";
+import { fileSize } from "~/lib/time";
 import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
 import {
     type ItemRef,
@@ -96,7 +97,7 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
         id: "added",
         header: "Added",
         accessorKey: "created_at",
-        cell: ({ row }) => relativeTime(row.original.created_at),
+        cell: ({ row }) => <When value={row.original.created_at} />,
     },
 ];
 

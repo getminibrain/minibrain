@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from minibrain.api.access import builder, facts_of, sees_rows, still_allowed, viewer
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
+from minibrain.api.job_rows import list_extras
 from minibrain.api.owners import custom_owned, custom_token, split_token
 from minibrain.api.schemas import (
     JobActionResult,
@@ -41,10 +42,12 @@ from minibrain.registry.models import (
     AuditEvent,
     BaseModel,
     CatalogVariant,
+    DatasetVersion,
     Job,
     JobEvent,
     JobKind,
     Model,
+    Version,
     Worker,
 )
 from minibrain.registry.service import NotFoundError
@@ -165,7 +168,8 @@ def list_jobs(
     newest = order == "newest"
     loads = (
         joinedload(Job.model),
-        joinedload(Job.version),
+        joinedload(Job.version).joinedload(Version.dataset_version).joinedload(DatasetVersion.dataset),
+        joinedload(Job.version).joinedload(Version.dataset_version).joinedload(DatasetVersion.base),
         joinedload(Job.base_model).joinedload(BaseModel.variant).joinedload(CatalogVariant.model),
     )
     query = select(Job).options(*loads).where(*where)
@@ -175,8 +179,10 @@ def list_jobs(
     jobs = list(session.scalars(query))
     shown = jobs[:size]
     more = len(jobs) > size
+    infos = [job_info(job) for job in shown]
+    extras = list_extras(session, shown, {info.id: info.score for info in infos})
     return JobPage(
-        items=[job_info(job) for job in shown],
+        items=[info.model_copy(update=extras[info.id]) for info in infos],
         next_cursor=str(shown[-1].id) if more else None,
         total=count_jobs(session, where),
     )

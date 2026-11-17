@@ -35,6 +35,7 @@ import {
 } from "obp-ui";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
+import { When } from "~/components/When";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { Requests } from "~/components/models/ModelMetrics";
 import type { Abilities } from "~/lib/access";
@@ -46,7 +47,7 @@ import {
     trainHref,
 } from "~/lib/modelLinks";
 import { RETRY_LABELS, REVIEW_LABEL, busyTearingDown, needsReview } from "~/lib/teardown";
-import { bytes, relativeTime } from "~/lib/time";
+import { bytes } from "~/lib/time";
 import type { Entry } from "../entries";
 import {
     CostCell,
@@ -886,9 +887,10 @@ export function VersionLine({
                     >
                         <VersionName version={version} />
                     </Link>
-                    <span className="min-w-0 truncate text-sm text-muted-foreground">
-                        {relativeTime(version.created_at)}
-                    </span>
+                    <When
+                        value={version.created_at}
+                        className="min-w-0 truncate text-sm text-muted-foreground"
+                    />
                 </span>
             </div>
             <Cells

@@ -29,8 +29,9 @@ import { PoolLink } from "~/components/PoolLink";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SoftwareMark } from "~/components/SoftwareMark";
+import { When } from "~/components/When";
 import { count } from "~/lib/format";
-import { bytes, exactTime, relativeTime } from "~/lib/time";
+import { bytes, relativeTime } from "~/lib/time";
 import { INSTALL, type Setting } from "~/pages/settings/settingsIndex";
 
 type InstallInfo = components["schemas"]["InstallInfo"];
@@ -327,16 +328,7 @@ function Catalogue({ info }: { info: InstallInfo }) {
 }
 
 function TimeText({ value }: { value: string }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button type="button" className="rounded-sm tabular-nums">
-                    {relativeTime(value)}
-                </button>
-            </TooltipTrigger>
-            <TooltipContent>{exactTime(value)}</TooltipContent>
-        </Tooltip>
-    );
+    return <When value={value} />;
 }
 
 function Compute({ info }: { info: InstallInfo }) {

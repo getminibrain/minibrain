@@ -16,6 +16,7 @@ import { type ReactNode, useRef } from "react";
 import { Facts } from "~/components/Facts";
 import { PoolLink } from "~/components/PoolLink";
 import { UsageGauge } from "~/components/UsageGauge";
+import { When } from "~/components/When";
 import { StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
@@ -286,9 +287,10 @@ function RunningBlock({ row }: { row: MachineRow }) {
                                         {`${kindNoun(job.kind)} ${jobSubject(job)}`}
                                     </Link>
                                 </span>
-                                <span className="text-sm text-muted-foreground">
-                                    {relativeTime(job.finished_at)}
-                                </span>
+                                <When
+                                    value={job.finished_at}
+                                    className="text-sm text-muted-foreground"
+                                />
                             </li>
                         );
                     })}

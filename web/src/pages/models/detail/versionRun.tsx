@@ -27,7 +27,7 @@ import { ErrorLine, PanelSection } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
-import { durationText, jobDuration } from "~/lib/jobs";
+import { deviceHoursText, durationText, jobDuration } from "~/lib/jobs";
 import {
     jobHref,
     jobLogsHref,
@@ -181,17 +181,6 @@ function changedText(
     return parts.length === 0
         ? `Same settings and data as ${label}`
         : `vs ${label}: ${parts.join(", ")}`;
-}
-
-type DeviceTime = NonNullable<VersionInfo["device_time"]>;
-
-const SMALLEST_HOURS = 0.01;
-
-function deviceHoursText(time: DeviceTime): string {
-    if (time.hours < SMALLEST_HOURS) {
-        return `< ${SMALLEST_HOURS}`;
-    }
-    return time.hours.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function DeviceHours({ version }: { version: VersionInfo }) {
