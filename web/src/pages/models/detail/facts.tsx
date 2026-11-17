@@ -99,15 +99,13 @@ export function Fact({
     label,
     children,
     edit,
-    wide = false,
 }: {
     label: string;
     children: ReactNode;
     edit?: ReactNode;
-    wide?: boolean;
 }) {
     return (
-        <div className={cn("group/row flex min-w-0 flex-col gap-0.5", wide && "col-span-full")}>
+        <div className="group/row flex min-w-0 flex-col gap-0.5">
             <dt className="truncate text-sm text-muted-foreground">{label}</dt>
             <dd className="flex h-6 min-w-0 items-center gap-1 tabular-nums">
                 {children}
@@ -133,6 +131,15 @@ export function Row({
                 {children}
                 {edit}
             </dd>
+        </div>
+    );
+}
+
+export function GroupColumns({ left, right }: { left: ReactNode; right: ReactNode }) {
+    return (
+        <div className="grid divide-y @5xl:grid-cols-2 @5xl:divide-x @5xl:divide-y-0">
+            <div className="@container flex min-w-0 flex-col divide-y">{left}</div>
+            <div className="@container flex min-w-0 flex-col divide-y">{right}</div>
         </div>
     );
 }

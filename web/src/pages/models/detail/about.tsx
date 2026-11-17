@@ -40,7 +40,7 @@ import {
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import { splitTags, useModelsRefresh } from "../dialogs";
-import { Clipped, Fact, Group, Mono, Muted, Row, parametersText } from "./facts";
+import { Clipped, Fact, Group, GroupColumns, Mono, Muted, Row, parametersText } from "./facts";
 import { baseNameOf, isDeployed } from "./header";
 import { liveOf, versionLabel } from "./makeLive";
 import { useTrafficRange } from "./usage";
@@ -163,11 +163,12 @@ function useEdit(row: ModelRow) {
     return (kind: EditKind) => (allowed ? <EditPencil row={row} kind={kind} /> : undefined);
 }
 
-function AboutSection({ children }: { children: ReactNode }) {
+function AboutSection({ children, notes }: { children: ReactNode; notes: ReactNode }) {
     return (
         <PanelSection icon={IconInfoCircle} title="About">
-            <div className="@container">
+            <div className="@container flex flex-col gap-3">
                 <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>
+                <dl className="flex flex-col border-t pt-2">{notes}</dl>
             </div>
         </PanelSection>
     );
@@ -294,7 +295,25 @@ export function About({
     const data = detail?.dataset_version;
     const tags = userTags(row);
     return (
-        <AboutSection>
+        <AboutSection
+            notes={
+                <>
+                    <Row label="Live version note">
+                        {live?.note ? (
+                            <Clipped
+                                text={live.note}
+                                href={modelVersionHref(row.key, live.number)}
+                            />
+                        ) : (
+                            <Muted>{live ? "No note" : "Not deployed"}</Muted>
+                        )}
+                    </Row>
+                    <Row label="Description" edit={edit("description")}>
+                        {row.description ? <Clipped text={row.description} /> : <Muted>None</Muted>}
+                    </Row>
+                </>
+            }
+        >
             <Fact label="Task">
                 <Clipped text={taskText(detail, preset?.label)} href={evaluationHref(row.key)} />
             </Fact>
@@ -344,16 +363,6 @@ export function About({
             </Fact>
             <Fact label="Updated">
                 <Clipped text={relativeTime(row.updated_at)} />
-            </Fact>
-            <Fact label="Live version note" wide>
-                {live?.note ? (
-                    <Clipped text={live.note} href={modelVersionHref(row.key, live.number)} />
-                ) : (
-                    <Muted>{live ? "No note" : "Not deployed"}</Muted>
-                )}
-            </Fact>
-            <Fact label="Description" edit={edit("description")} wide>
-                {row.description ? <Clipped text={row.description} /> : <Muted>None</Muted>}
             </Fact>
         </AboutSection>
     );
@@ -420,88 +429,117 @@ export function Details({
             title="Current setup"
             description="Used by the next version. Each version page shows what it was trained with."
         >
-            <Group title="Task setup">
-                <Row label="Labels">
-                    {labels.length > 0 ? (
-                        <Clipped text={labels.join(", ")} className="font-mono text-sm" />
-                    ) : (
-                        <Muted>Free text</Muted>
-                    )}
-                </Row>
-                <Row
-                    label="Instructions"
-                    edit={editLink(`${trainHref(row.key)}#instructions`, "Edit instructions")}
-                >
-                    {firstLine ? (
-                        <Clipped
-                            text={`${instructions.replace(/\n+/g, " ")}${detail.instructions ? "" : " (default)"}`}
-                        />
-                    ) : (
-                        <Muted>None</Muted>
-                    )}
-                </Row>
-                <Row label="Graders" edit={editLink(evaluationHref(row.key), "Edit graders")}>
-                    <Clipped text={gradersText(detail)} />
-                </Row>
-                <Row
-                    label="Deploy rule"
-                    edit={editLink(evaluationHref(row.key), "Edit deploy rule")}
-                >
-                    <Clipped text={ruleText(detail.promotion)} />
-                </Row>
-            </Group>
-            <Group title="Data">
-                <Row label="Splits">
-                    {splits ? <Clipped text={splits} /> : <Muted>No data yet</Muted>}
-                </Row>
-                <Row label="Feedback waiting">
-                    <Clipped
-                        text={`${count(summary.data?.pending ?? 0)} to review · ${count(summary.data?.accepted ?? 0)} accepted`}
-                        href={`/feedback?model=${encodeURIComponent(row.key)}`}
-                    />
-                </Row>
-                {can.build && (
-                    <Row label="Test examples">
-                        <Clipped
-                            text={count(examples.data?.length ?? 0)}
-                            href={evaluationHref(row.key, "test-examples")}
-                        />
-                    </Row>
-                )}
-            </Group>
-            <Group title="Serving">
-                <Row label="Safety">{safety ? <Clipped text={safety} /> : <Muted>None</Muted>}</Row>
-                <Row label="Inputs and answers">
-                    <Clipped
-                        text={detail.request_bodies.kept ? "Kept in request logs" : "Not kept"}
-                        href={`${modelPageHref(row.key, "api")}#request-bodies`}
-                    />
-                </Row>
-                <Row label="Pool">
-                    {places.length > 0 ? <PoolPlaces places={places} /> : <Muted>None</Muted>}
-                </Row>
-            </Group>
-            <Group title="Lineage">
-                <Row label="Created from">
-                    {copied ? (
-                        <Clipped
-                            text={`Copy of ${copied.name} v${copied.number}`}
-                            href={modelPageHref(copied.slug)}
-                        />
-                    ) : (
-                        <Clipped text="New" />
-                    )}
-                </Row>
-                <Row label="Base switches">
-                    <Clipped text={switched > 0 ? count(switched) : "None"} />
-                </Row>
-                <Row label="Versions">
-                    <Clipped
-                        text={`${count(versions.length)}${failed > 0 ? ` · ${failed} failed` : ""}`}
-                        href={versionsHref}
-                    />
-                </Row>
-            </Group>
+            <GroupColumns
+                left={
+                    <>
+                        <Group title="Task setup">
+                            <Row label="Labels">
+                                {labels.length > 0 ? (
+                                    <Clipped
+                                        text={labels.join(", ")}
+                                        className="font-mono text-sm"
+                                    />
+                                ) : (
+                                    <Muted>Free text</Muted>
+                                )}
+                            </Row>
+                            <Row
+                                label="Instructions"
+                                edit={editLink(
+                                    `${trainHref(row.key)}#instructions`,
+                                    "Edit instructions",
+                                )}
+                            >
+                                {firstLine ? (
+                                    <Clipped
+                                        text={`${instructions.replace(/\n+/g, " ")}${detail.instructions ? "" : " (default)"}`}
+                                    />
+                                ) : (
+                                    <Muted>None</Muted>
+                                )}
+                            </Row>
+                            <Row
+                                label="Graders"
+                                edit={editLink(evaluationHref(row.key), "Edit graders")}
+                            >
+                                <Clipped text={gradersText(detail)} />
+                            </Row>
+                            <Row
+                                label="Deploy rule"
+                                edit={editLink(evaluationHref(row.key), "Edit deploy rule")}
+                            >
+                                <Clipped text={ruleText(detail.promotion)} />
+                            </Row>
+                        </Group>
+                        <Group title="Data">
+                            <Row label="Splits">
+                                {splits ? <Clipped text={splits} /> : <Muted>No data yet</Muted>}
+                            </Row>
+                            <Row label="Feedback waiting">
+                                <Clipped
+                                    text={`${count(summary.data?.pending ?? 0)} to review · ${count(summary.data?.accepted ?? 0)} accepted`}
+                                    href={`/feedback?model=${encodeURIComponent(row.key)}`}
+                                />
+                            </Row>
+                            {can.build && (
+                                <Row label="Test examples">
+                                    <Clipped
+                                        text={count(examples.data?.length ?? 0)}
+                                        href={evaluationHref(row.key, "test-examples")}
+                                    />
+                                </Row>
+                            )}
+                        </Group>
+                    </>
+                }
+                right={
+                    <>
+                        <Group title="Serving">
+                            <Row label="Safety">
+                                {safety ? <Clipped text={safety} /> : <Muted>None</Muted>}
+                            </Row>
+                            <Row label="Inputs and answers">
+                                <Clipped
+                                    text={
+                                        detail.request_bodies.kept
+                                            ? "Kept in request logs"
+                                            : "Not kept"
+                                    }
+                                    href={`${modelPageHref(row.key, "api")}#request-bodies`}
+                                />
+                            </Row>
+                            <Row label="Pool">
+                                {places.length > 0 ? (
+                                    <PoolPlaces places={places} />
+                                ) : (
+                                    <Muted>None</Muted>
+                                )}
+                            </Row>
+                        </Group>
+                        <Group title="Lineage">
+                            <Row label="Created from">
+                                {copied ? (
+                                    <Clipped
+                                        text={`Copy of ${copied.name} v${copied.number}`}
+                                        href={modelPageHref(copied.slug)}
+                                    />
+                                ) : (
+                                    <Clipped text="New" />
+                                )}
+                            </Row>
+                            <Row label="Base switches">
+                                <Clipped text={switched > 0 ? count(switched) : "None"} />
+                            </Row>
+                            <Row label="Versions">
+                                <Clipped
+                                    text={`${count(versions.length)}${failed > 0 ? ` · ${failed} failed` : ""}`}
+                                    href={versionsHref}
+                                />
+                            </Row>
+                        </Group>
+                    </>
+                }
+            />
             <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
                 <Row label="Live adapter">
                     {adapter.data?.artifact_id ? (
@@ -544,7 +582,13 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
         .filter(Boolean)
         .join(" · ");
     return (
-        <AboutSection>
+        <AboutSection
+            notes={
+                <Row label="Description" edit={edit("description")}>
+                    {row.description ? <Clipped text={row.description} /> : <Muted>None</Muted>}
+                </Row>
+            }
+        >
             <Fact label="Publisher">
                 <Clipped text={base?.publisher ?? row.publisher ?? "–"} />
             </Fact>
@@ -589,9 +633,6 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
             <Fact label="Last used">
                 <Clipped text={base?.last_used_at ? relativeTime(base.last_used_at) : "Never"} />
             </Fact>
-            <Fact label="Description" edit={edit("description")} wide>
-                {row.description ? <Clipped text={row.description} /> : <Muted>None</Muted>}
-            </Fact>
         </AboutSection>
     );
 }
@@ -617,47 +658,57 @@ export function BaseDetails({ row, base }: { row: ModelRow; base: BaseModelDetai
     const serveOnly = base.serve_only ?? row.serve_only;
     return (
         <DetailsSection>
-            <Group title="Serving">
-                <Row label="Pool">
-                    {places.length > 0 ? <PoolPlaces places={places} /> : <Muted>None</Muted>}
-                </Row>
-                <Row label="Training">
-                    <Clipped text={serveOnly ? `Serve-only: ${serveOnly.reason}` : "LoRA, QLoRA"} />
-                </Row>
-                <Row label="Updates">
-                    {base.update_available ? (
+            <GroupColumns
+                left=<Group title="Serving">
+                    <Row label="Pool">
+                        {places.length > 0 ? <PoolPlaces places={places} /> : <Muted>None</Muted>}
+                    </Row>
+                    <Row label="Training">
                         <Clipped
-                            text={`Newer revision ${(base.latest_revision ?? "").slice(0, 12)} published; this pin stays until you choose`}
+                            text={serveOnly ? `Serve-only: ${serveOnly.reason}` : "LoRA, QLoRA"}
                         />
-                    ) : (
-                        <Muted>Pinned revision is current</Muted>
-                    )}
-                </Row>
-            </Group>
-            <Group title="Source">
-                <Row label="From">
-                    <Clipped text={sourceText(base)} className="font-mono text-sm" />
-                </Row>
-                <Row label="Stored in">
-                    {base.store === "s3" ? (
-                        <Clipped text={base.store_label ?? base.storage_path} />
-                    ) : (
-                        <span className="flex min-w-0 items-baseline gap-1">
-                            <span className="shrink-0">
-                                {base.store_label ?? "Main server disk"} in
-                            </span>
-                            <PoolLink name="local" />
-                        </span>
-                    )}
-                </Row>
-            </Group>
-            {children.length > 0 && (
-                <Group title="Lineage">
-                    <Row label="Built on it">
-                        <Clipped text={children.map((child) => child.name).join(", ")} />
+                    </Row>
+                    <Row label="Updates">
+                        {base.update_available ? (
+                            <Clipped
+                                text={`Newer revision ${(base.latest_revision ?? "").slice(0, 12)} published; this pin stays until you choose`}
+                            />
+                        ) : (
+                            <Muted>Pinned revision is current</Muted>
+                        )}
                     </Row>
                 </Group>
-            )}
+                right={
+                    <>
+                        <Group title="Source">
+                            <Row label="From">
+                                <Clipped text={sourceText(base)} className="font-mono text-sm" />
+                            </Row>
+                            <Row label="Stored in">
+                                {base.store === "s3" ? (
+                                    <Clipped text={base.store_label ?? base.storage_path} />
+                                ) : (
+                                    <span className="flex min-w-0 items-baseline gap-1">
+                                        <span className="shrink-0">
+                                            {base.store_label ?? "Main server disk"} in
+                                        </span>
+                                        <PoolLink name="local" />
+                                    </span>
+                                )}
+                            </Row>
+                        </Group>
+                        {children.length > 0 && (
+                            <Group title="Lineage">
+                                <Row label="Built on it">
+                                    <Clipped
+                                        text={children.map((child) => child.name).join(", ")}
+                                    />
+                                </Row>
+                            </Group>
+                        )}
+                    </>
+                }
+            />
             <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
                 <Row label="Weights">
                     {base.content_hash ? (
