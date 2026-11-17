@@ -6,6 +6,7 @@ import {
     IconPackage,
     IconRadar,
     IconServer,
+    IconShieldCheck,
     IconWorld,
 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
@@ -371,7 +372,10 @@ function NetworkSection({ info }: { info: InstallInfo }) {
             description="Where this install may connect."
             actions={
                 <Button variant="outline" asChild>
-                    <Link href="/settings/security">Change in Security</Link>
+                    <Link href="/settings/security">
+                        <IconShieldCheck />
+                        Change in Security
+                    </Link>
                 </Button>
             }
         >
@@ -448,7 +452,10 @@ function Observability({ info }: { info: InstallInfo }) {
             description="Metrics, traces and logs for your own monitoring."
             actions={
                 <Button variant="outline" asChild>
-                    <Link href="/settings/security">OpenTelemetry in Security</Link>
+                    <Link href="/settings/security">
+                        <IconShieldCheck />
+                        OpenTelemetry in Security
+                    </Link>
                 </Button>
             }
         >
