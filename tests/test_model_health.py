@@ -14,7 +14,7 @@ from minibrain.base_models import BaseModelSpec
 from minibrain.models.files import Progress
 from minibrain.models.health import content_hash
 from minibrain.models.transfer import fetch
-from minibrain.registry.models import AuditEvent, BaseModel, CatalogModel, CatalogVariant
+from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, CatalogModel, CatalogVariant
 from minibrain.serve.engine import create_engine_app, load_failure
 from minibrain.serve.select import NoEngineError
 from minibrain.settings import Settings
@@ -307,3 +307,26 @@ def test_gguf_without_llama_cpp_offers_to_add_the_safetensors_variant(settings: 
     assert [(item.kind, item.label) for item in found.actions] == [("pick_variant", "View details")]
     ready = HealthContext(settings=settings, hub_ok=True, engines=frozenset({"llamacpp"}))
     assert capability(model, ready) is None
+
+
+def test_deploy_refuses_a_version_whose_base_is_gone(harness: Harness, hub: Path) -> None:
+    installed(harness)
+    train_on(harness, "tiny")
+    deploy(harness, 1)
+    add_version(harness, "lora")
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.95)
+    deploy(harness, 2)
+    add_version(harness, "lora")
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.97)
+    with harness.sessions() as session:
+        model = session.get(BaseModel, "tiny")
+        assert model is not None
+        model.status = BaseModelStatus.FAILED
+        session.commit()
+    for number in (3, 1, 2):
+        refused = harness.client.post(f"/api/models/{SLUG}/versions/{number}/promote")
+        assert refused.status_code == 409
+        assert refused.json()["detail"] == "tiny is no longer on this install"
+    assert [item["number"] for item in row(harness, SLUG)["versions"] if item["live"]] == [2]

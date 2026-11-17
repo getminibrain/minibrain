@@ -127,6 +127,15 @@ def start_version(
     return version
 
 
+def require_base_present(session: Session, settings: Settings, key: str) -> None:
+    readiness = base_readiness(session, key)
+    if readiness == "pending":
+        raise ConflictError(f"{key} is still being imported or downloaded; try once it is available")
+    if readiness == "missing":
+        raise ConflictError(f"{key} is no longer on this install")
+    require_usable(session, settings, key)
+
+
 def job_pool(body: VersionCreate, found: Plan) -> str | None:
     if body.pool is not None:
         return body.pool
@@ -224,12 +233,7 @@ def add_version(
     if base is not None:
         require_idle(base.teardown, base.name)
     kind = VersionKind(body.kind)
-    readiness = base_readiness(session, model.base_model)
-    if readiness == "pending":
-        raise ConflictError(f"{model.base_model} is still being imported or downloaded; try once it is available")
-    if readiness == "missing":
-        raise ConflictError(f"{model.base_model} is no longer on this install")
-    require_usable(session, settings, model.base_model)
+    require_base_present(session, settings, model.base_model)
     if kind == VersionKind.LORA:
         require_trainable(session, settings, model)
     if body.from_version is not None:
@@ -386,6 +390,7 @@ def promote_version(
     refusal = other_base(session, model, version)
     if refusal is not None and not already:
         raise ConflictError(refusal)
+    require_base_present(session, settings, version.base_model)
     mismatch = base_changed(
         f"{name}@{number}", version.base_model, version.base_hash, base_hash(session, version.base_model)
     )
