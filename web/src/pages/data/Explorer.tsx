@@ -763,19 +763,6 @@ export function DataExplorer() {
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."
-                    actions={
-                        <AddMenu
-                            adder={adder}
-                            picked={pickedSources.length}
-                            onAdd={add}
-                            onNewDataset={newDataset}
-                            onNewFolder={() =>
-                                setAction({ kind: "new-folder", parentId: currentFolder() })
-                            }
-                            onFromSources={fromSources}
-                            startOpen={startAdding}
-                        />
-                    }
                 />
                 <ErrorLine error={adder.error} />
                 {adder.picker}
@@ -791,13 +778,27 @@ export function DataExplorer() {
                     }
                 >
                     <div className="flex flex-col gap-1 border-b p-2">
-                        <SearchInput
-                            aria-label="Search data"
-                            placeholder="Search names, columns, tags"
-                            value={query}
-                            onValueChange={setQuery}
-                            onKeyDown={focusTree}
-                        />
+                        <div className="flex items-center gap-1">
+                            <SearchInput
+                                aria-label="Search data"
+                                placeholder="Search names, columns"
+                                value={query}
+                                onValueChange={setQuery}
+                                onKeyDown={focusTree}
+                                className="min-w-0 flex-1"
+                            />
+                            <AddMenu
+                                adder={adder}
+                                picked={pickedSources.length}
+                                onAdd={add}
+                                onNewDataset={newDataset}
+                                onNewFolder={() =>
+                                    setAction({ kind: "new-folder", parentId: currentFolder() })
+                                }
+                                onFromSources={fromSources}
+                                startOpen={startAdding}
+                            />
+                        </div>
                         {text && (
                             <p
                                 className="px-1 text-sm text-muted-foreground tabular-nums"

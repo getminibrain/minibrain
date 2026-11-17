@@ -3,6 +3,7 @@ import {
     IconArrowRight,
     IconFolderPlus,
     IconLayoutGridAdd,
+    IconLoader2,
     IconPlus,
 } from "@tabler/icons-react";
 import { useRouter } from "@tanstack/react-router";
@@ -205,14 +206,38 @@ export function AddMenu({
         adder.pending === "upload" ? "Uploading…" : adder.pending === "demo" ? "Adding…" : "Add";
     return (
         <DropdownMenu open={open && idle} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild data-slot="button">
-                <Button disabled={!idle} aria-keyshortcuts="n">
-                    <IconPlus />
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={!idle}
+                            aria-label={label}
+                            aria-keyshortcuts="n"
+                            className="shrink-0"
+                        >
+                            {idle ? (
+                                <IconPlus />
+                            ) : (
+                                <IconLoader2 className="animate-spin motion-reduce:animate-none" />
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent className="flex items-center gap-2">
                     {label}
-                    {idle && <Kbd aria-hidden="true">N</Kbd>}
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+                    {idle && (
+                        <Kbd
+                            aria-hidden="true"
+                            className="border-current/30 bg-transparent text-current"
+                        >
+                            N
+                        </Kbd>
+                    )}
+                </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-80">
                 <DropdownMenuGroup>
                     <DropdownMenuLabel>Dataset</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={onNewDataset}>
