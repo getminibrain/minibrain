@@ -298,6 +298,24 @@ function JudgeModel() {
     );
 }
 
+const RECIPE_LABELS: Record<string, string> = {
+    max_rows: "Max rows",
+    epochs: "Epochs",
+    rank: "LoRA rank",
+    alpha: "LoRA alpha",
+    learning_rate: "Learning rate",
+    warmup: "Warmup",
+    scheduler: "Scheduler",
+    dropout: "Dropout",
+    weight_decay: "Weight decay",
+    batch: "Batch size",
+};
+
+function recipeLabel(key: string): string {
+    const words = key.replaceAll("_", " ");
+    return RECIPE_LABELS[key] ?? `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
 export function SettingsPage() {
     const { data, error } = useInstallSettings();
     const can = useCan();
@@ -321,7 +339,7 @@ export function SettingsPage() {
                         {Object.entries(data?.recipe ?? {}).map(([key, value]) => (
                             <Stat
                                 key={key}
-                                label={key.replaceAll("_", " ")}
+                                label={recipeLabel(key)}
                                 value={<span className="font-mono">{String(value)}</span>}
                             />
                         ))}
