@@ -148,16 +148,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Score history, a week of traffic and the next step.
   UI: Models › Quick look · API: GET /api/models/{name}/overview, GET /api/requests
 - **Model page** · shipped · product, ml, admin
-  One page per model: Overview, Versions, Monitoring, API keys and Settings.
+  Overview, Versions, Evaluation, Monitoring, API keys, Activity and Settings tabs.
   UI: Models › model · API: GET /api/models/{name}/overview, GET /api/models/{name}, PATCH /api/models/{name}
 - **Model overview** · shipped · product, ml
-  Usage by version, its facts, details and activity.
-  UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic
+  A usage strip, the last five versions, facts and current setup.
+  UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions
 - **Model activity** · shipped · product, ml, admin
   Who changed or trained this model, by day, with bursts folded.
-  UI: Models › model › Overview › Activity · API: GET /api/models/{name}/activity
+  UI: Models › model › Activity · API: GET /api/models/{name}/activity
 - **Model monitoring** · shipped · engineer, admin
-  Traffic, latency, errors, versions, callers and requests of one model.
+  Four traffic charts, recent requests, latency, errors, versions and callers.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
 - **Version page** · shipped · product, ml
   One fixed layout in every state: summary, training, evaluation.
@@ -167,7 +167,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Versions › version · API: GET /api/models/{name}/versions
 - **Version note** · shipped · product, ml, admin
   One line on why a version exists, audited and on its card.
-  UI: Models › model › Versions › version, Models › model › Versions, Models › model › Overview › About · API: PUT /api/models/{name}/versions/{number}/note, GET /api/models/{name}/versions/{number}/card
+  UI: Models › model › Versions › version, Models › model › Versions, Models › model › Overview › Versions, Models › model › Overview › About · API: PUT /api/models/{name}/versions/{number}/note, GET /api/models/{name}/versions/{number}/card
 - **Started-from lineage** · shipped · product, ml, admin
   Each run records the version its settings came from.
   UI: Models › model › Train, Models › model › Versions › version · API: POST /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/card, GET /api/models/{name}/versions/{number}/aibom.json

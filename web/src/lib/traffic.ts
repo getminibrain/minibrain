@@ -26,7 +26,7 @@ export const METRICS: { key: TrafficMetric; label: string }[] = [
     { key: "requests", label: "Requests" },
     { key: "p95", label: "p95 latency" },
     { key: "errors", label: "Errors" },
-    { key: "cost", label: "Cost" },
+    { key: "cost", label: "Cost / 1M tokens" },
 ];
 
 export const SPAN: Record<TrafficRange, string> = {
@@ -106,17 +106,24 @@ export function formatOf(metric: TrafficMetric): (value: number) => string {
     return gpu;
 }
 
-export function headline(metric: TrafficMetric, totals: TrafficStats): string {
+export function metricText(metric: TrafficMetric, totals: TrafficStats): string {
     if (metric === "requests") {
-        return `${count(totals.requests)} ${totals.requests === 1 ? "request" : "requests"}`;
+        return count(totals.requests);
+    }
+    if (totals.requests === 0) {
+        return "–";
     }
     if (metric === "p95") {
-        return `p95 ${ms(totals.p95_ms)}`;
+        return ms(totals.p95_ms);
     }
     if (metric === "errors") {
-        return `${rate(totals.error_rate ?? 0)} errors`;
+        return rate(totals.error_rate ?? 0);
     }
-    return gpu(totals.device_seconds);
+    return gpu(gpuPerMillionTokens(totals));
+}
+
+export function priced(totals: TrafficStats): boolean {
+    return totals.tokens > 0 && totals.device_seconds > 0;
 }
 
 const AXIS_NUMBER = new Intl.NumberFormat(undefined, {
@@ -154,7 +161,7 @@ export function metricValue(stats: TrafficStats, metric: TrafficMetric): number 
     if (metric === "errors") {
         return stats.errors / stats.requests;
     }
-    return stats.device_seconds;
+    return gpuPerMillionTokens(stats);
 }
 
 export function bucketEnd(report: TrafficReport, index: number): number {
@@ -291,7 +298,7 @@ export function usageOf(
         const row: LineRow = { step: bucketEnd(report, index) };
         for (const item of series) {
             const found = groups.get(item.key)?.get(index);
-            const empty = metric === "requests" || metric === "cost" ? 0 : null;
+            const empty = metric === "requests" ? 0 : null;
             row[item.key] = found ? metricValue(merged(found), metric) : empty;
         }
         return row;

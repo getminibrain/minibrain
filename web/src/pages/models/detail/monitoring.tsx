@@ -9,6 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
     Badge,
+    DataGrid,
     Link,
     Table,
     TableBody,
@@ -18,7 +19,7 @@ import {
     TableRow,
     cn,
 } from "obp-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
 import { useModel, useModelPage } from "~/api/queries";
@@ -32,7 +33,8 @@ import {
     modelVersionHref,
     requestLogHref,
 } from "~/lib/modelLinks";
-import { STATUS_TONES, clockTime, modelLabel } from "~/lib/requests";
+import { modelLabel } from "~/lib/requests";
+import { exactTime } from "~/lib/time";
 import {
     PERIOD,
     SPAN,
@@ -51,10 +53,12 @@ import {
     relativeChange,
     xFormat,
 } from "~/lib/traffic";
+import { RequestDialog } from "~/pages/monitor/RequestDetail";
+import { REQUEST_COLUMNS } from "~/pages/monitor/RequestsTab";
 import { isDeployed } from "./header";
-import { TrafficChart, useTrafficRange } from "./usage";
+import { RangeSwitch, TrafficCharts, useTrafficRange } from "./usage";
 
-const LOG_ROWS = 8;
+const RECENT_ROWS = 20;
 
 function Figure({
     label,
@@ -83,17 +87,31 @@ function Figure({
     );
 }
 
-function fullPeriod(report: TrafficReport, createdAt: string | null | undefined): boolean {
-    if (!createdAt) {
+function fullPeriod(
+    report: TrafficReport | undefined,
+    createdAt: string | null | undefined,
+): boolean {
+    if (!report || !createdAt) {
         return true;
     }
     const span = Date.parse(report.until) - Date.parse(report.since);
     return Date.parse(createdAt) <= Date.parse(report.since) - span;
 }
 
-function SummaryStrip({ report, full }: { report: TrafficReport; full: boolean }) {
-    const now = report.totals;
-    const before = report.previous;
+const NO_TRAFFIC: TrafficStats = {
+    requests: 0,
+    errors: 0,
+    error_rate: null,
+    p50_ms: null,
+    p95_ms: null,
+    p99_ms: null,
+    device_seconds: 0,
+    tokens: 0,
+};
+
+function SummaryStrip({ report, full }: { report: TrafficReport | undefined; full: boolean }) {
+    const now = report?.totals ?? NO_TRAFFIC;
+    const before = report?.previous;
     const empty = now.requests === 0;
     const compare =
         full && before !== null && before !== undefined && before.requests > 0 && !empty;
@@ -104,7 +122,7 @@ function SummaryStrip({ report, full }: { report: TrafficReport; full: boolean }
           : before
             ? "No earlier traffic"
             : "No earlier period";
-    const usual = report.usual_error_rate;
+    const usual = report?.usual_error_rate;
     const change = (pick: (stats: TrafficStats) => number | null) =>
         compare && before ? relativeChange(pick(now), pick(before)) : none;
     return (
@@ -390,27 +408,32 @@ function CallersSection({
 
 function useLatestRequests(slug: string) {
     return useQuery({
-        queryKey: ["requests", "latest", slug],
+        queryKey: ["requests", "latest", slug, RECENT_ROWS],
         queryFn: () =>
             unwrap(
-                api.GET("/api/requests", { params: { query: { model: [slug], limit: LOG_ROWS } } }),
+                api.GET("/api/requests", {
+                    params: { query: { model: [slug], limit: RECENT_ROWS } },
+                }),
             ),
         refetchInterval: 10000,
     });
 }
 
-function RequestLogSection({ row }: { row: ModelRow }) {
+function RecentRequests({ row }: { row: ModelRow }) {
     const latest = useLatestRequests(row.key);
     const items = latest.data?.items ?? [];
     const detail = useModel(row.kind === "custom" ? row.key : "");
     const kept = detail.data?.request_bodies.kept ?? true;
+    const [open, setOpen] = useState<number | null>(null);
     return (
         <PanelSection
             icon={IconLogs}
-            title="Request log"
+            title="Recent requests"
             tip="Prompts and answers stay on this install."
             description={
-                kept ? undefined : (
+                kept ? (
+                    `The last ${RECENT_ROWS} requests to this model.`
+                ) : (
                     <>
                         {"Inputs and answers are not kept · "}
                         <Link
@@ -427,59 +450,34 @@ function RequestLogSection({ row }: { row: ModelRow }) {
                     href={requestLogHref({ model: row.key })}
                     className="text-sm text-primary hover:underline"
                 >
-                    Full log in Monitor →
+                    All requests
                 </Link>
             }
-            flush
+            bare
         >
             <ErrorLine error={latest.error} onRetry={latest.refetch} />
-            {items.length === 0 ? (
-                <p className="p-panel text-muted-foreground">No requests yet.</p>
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="pl-panel">Time</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Key</TableHead>
-                            <TableHead className="text-right">Latency</TableHead>
-                            <TableHead className="text-right">Tokens</TableHead>
-                            <TableHead className="pr-panel">Status</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {items.map((item) => (
-                            <TableRow key={item.id}>
-                                <TableCell className="pl-panel font-mono text-sm whitespace-nowrap text-muted-foreground">
-                                    <Link
-                                        href={`${requestLogHref({ model: row.key })}&request=${item.id}`}
-                                        className="hover:underline"
-                                    >
-                                        {clockTime(item.at)}
-                                    </Link>
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                    {modelLabel(item)}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">
-                                    {item.key_name ?? "–"}
-                                </TableCell>
-                                <TableCell className="text-right whitespace-nowrap">
-                                    {ms(item.latency_ms)}
-                                </TableCell>
-                                <TableCell className="text-right whitespace-nowrap">
-                                    {`${count(item.prompt_tokens)} → ${count(item.completion_tokens)}`}
-                                </TableCell>
-                                <TableCell className="pr-panel">
-                                    <StatusText tone={STATUS_TONES[item.status_class]}>
-                                        <span className="tabular-nums">{item.status}</span>
-                                    </StatusText>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
+            <DataGrid
+                columns={REQUEST_COLUMNS}
+                rows={items}
+                getRowId={(item) => String(item.id)}
+                loading={latest.isLoading}
+                sortable={false}
+                storageKey="minibrain.model-requests.columns"
+                columnPicker
+                hiddenColumns={["kind", "finish", "response"]}
+                onOpen={(item) => setOpen(item.id)}
+                rowLabel={(item) =>
+                    `Request ${item.id}, ${modelLabel(item)}, status ${item.status}, ${exactTime(item.at)}`
+                }
+                empty={<p className="text-muted-foreground">No requests yet.</p>}
+                maxHeight="24rem"
+                className="h-96"
+            />
+            <RequestDialog
+                id={open}
+                loaded={items.find((item) => item.id === open)}
+                onClose={() => setOpen(null)}
+            />
         </PanelSection>
     );
 }
@@ -506,39 +504,38 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                     title="Traffic"
                     tip={`Changes compare with ${PERIOD[range]}.`}
                     actions={
-                        <Link
-                            href={`/monitor?model=${encodeURIComponent(row.key)}`}
-                            className="text-sm text-primary hover:underline"
-                        >
-                            All models in Monitoring
-                        </Link>
+                        <>
+                            <Link
+                                href={`/monitor?model=${encodeURIComponent(row.key)}`}
+                                className="text-sm text-primary hover:underline"
+                            >
+                                All models in Monitoring
+                            </Link>
+                            <RangeSwitch range={range} onRange={setRange} />
+                        </>
                     }
                 >
                     <div className="flex flex-col gap-6">
-                        {report && !empty && (
-                            <SummaryStrip
-                                report={report}
-                                full={fullPeriod(report, page.data?.created_at)}
-                            />
-                        )}
-                        <TrafficChart
+                        <SummaryStrip
+                            report={report}
+                            full={fullPeriod(report, page.data?.created_at)}
+                        />
+                        <TrafficCharts
                             row={row}
                             versions={versions}
                             report={report}
                             range={range}
-                            onRange={setRange}
-                            height={300}
                             emptyHint={emptyText(row, range)}
                         />
                     </div>
                 </PanelSection>
+                <RecentRequests row={row} />
                 {report && !empty && (
                     <>
                         <LatencySection row={row} report={report} range={range} />
                         <ErrorsSection row={row} report={report} range={range} />
                         {row.kind === "custom" && <VersionsSection row={row} report={report} />}
                         <CallersSection row={row} report={report} range={range} />
-                        <RequestLogSection row={row} />
                     </>
                 )}
             </PanelSections>

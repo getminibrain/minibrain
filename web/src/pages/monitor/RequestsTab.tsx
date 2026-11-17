@@ -108,7 +108,7 @@ function FeedbackMark({ row }: { row: RequestRow }) {
     );
 }
 
-const COLUMNS: ColumnDef<RequestRow, unknown>[] = [
+export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
     {
         id: "at",
         header: "Time",
@@ -397,7 +397,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
             />
             <ErrorLine error={list.error ?? facets.error ?? summary.error} />
             <DataGrid
-                columns={COLUMNS}
+                columns={REQUEST_COLUMNS}
                 rows={list.rows}
                 getRowId={(row) => String(row.id)}
                 loading={list.isLoading}

@@ -1,21 +1,18 @@
 import { IconChartLine } from "@tabler/icons-react";
-import {
-    CheckboxSelect,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "obp-ui";
-import { useState, useSyncExternalStore } from "react";
+import { Link, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "obp-ui";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
 import { PoolPlaces } from "~/components/PoolLink";
 import { ErrorLine, PanelSection } from "~/components/Section";
+import { type SparkPoint, Sparkline } from "~/components/Sparkline";
 import { LineChart } from "~/components/charts/LineChart";
 import { ChartLegend } from "~/components/charts/TimeChart";
+import { count } from "~/lib/format";
+import { modelPageHref } from "~/lib/modelLinks";
 import {
     EMPTY_DOMAIN,
+    LAST,
     METRICS,
     RANGES,
     SPAN,
@@ -23,11 +20,12 @@ import {
     type TrafficRange,
     type TrafficReport,
     axisFormatOf,
+    bucketEnd,
     formatOf,
-    headline,
     markersOf,
-    ms,
-    rate,
+    metricText,
+    metricValue,
+    priced,
     readoutNotes,
     readoutTitle,
     usageOf,
@@ -97,16 +95,6 @@ export function RangeSwitch({
     return <Choice label="Time range" options={RANGES} value={range} onValue={onRange} />;
 }
 
-export function MetricSwitch({
-    metric,
-    onMetric,
-}: {
-    metric: TrafficMetric;
-    onMetric: (metric: TrafficMetric) => void;
-}) {
-    return <Choice label="Metric" options={METRICS} value={metric} onValue={onMetric} />;
-}
-
 function MetricChart({
     row,
     report,
@@ -114,7 +102,6 @@ function MetricChart({
     metric,
     colors,
     height,
-    title,
 }: {
     row: ModelRow;
     report: TrafficReport | undefined;
@@ -122,7 +109,6 @@ function MetricChart({
     metric: TrafficMetric;
     colors: Map<number, string>;
     height: number;
-    title?: boolean;
 }) {
     const custom = row.kind === "custom";
     const label = METRICS.find((item) => item.key === metric)?.label ?? "";
@@ -133,18 +119,12 @@ function MetricChart({
             : zeroUsage(report, range, label);
     return (
         <div className="flex min-w-0 flex-col gap-2">
-            {title && (
-                <p className="flex items-baseline justify-between gap-3">
-                    <span className="text-muted-foreground">{label}</span>
-                    <span className="tabular-nums">
-                        {!report
-                            ? "–"
-                            : metric === "p95"
-                              ? ms(report.totals.p95_ms)
-                              : headline(metric, report.totals)}
-                    </span>
-                </p>
-            )}
+            <p className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="tabular-nums">
+                    {report ? metricText(metric, report.totals) : "–"}
+                </span>
+            </p>
             <LineChart
                 rows={usage.rows}
                 series={usage.series}
@@ -185,30 +165,35 @@ export function TrafficCharts({
     versions,
     report,
     range,
-    metrics,
+    emptyHint,
 }: {
     row: ModelRow;
     versions: VersionInfo[];
     report: TrafficReport | undefined;
     range: TrafficRange;
-    metrics: TrafficMetric[];
+    emptyHint: string;
 }) {
     const colors = versionColors(versions);
-    const single = metrics.length === 1;
+    const empty = !report || report.totals.requests === 0;
     return (
         <div className="flex min-w-0 flex-col gap-4">
-            <VersionLegend row={row} report={report} colors={colors} />
-            <div className={single ? "flex flex-col" : "grid gap-x-8 gap-y-6 @2xl:grid-cols-2"}>
-                {metrics.map((metric) => (
+            <div className="flex h-5 min-w-0 items-center">
+                {empty ? (
+                    <p className="truncate text-muted-foreground">{emptyHint}</p>
+                ) : (
+                    <VersionLegend row={row} report={report} colors={colors} />
+                )}
+            </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                {METRICS.map((item) => (
                     <MetricChart
-                        key={metric}
+                        key={item.key}
                         row={row}
                         report={report}
                         range={range}
-                        metric={metric}
+                        metric={item.key}
                         colors={colors}
-                        height={single ? 200 : 140}
-                        title
+                        height={160}
                     />
                 ))}
             </div>
@@ -216,44 +201,83 @@ export function TrafficCharts({
     );
 }
 
-export function TrafficChart({
-    row,
-    versions,
+function sparkValue(
+    bucket: TrafficReport["buckets"][number],
+    metric: TrafficMetric,
+): number | null {
+    if (metric === "requests") {
+        return bucket.requests;
+    }
+    if (bucket.requests === 0) {
+        return metric === "errors" ? 0 : null;
+    }
+    return metricValue(bucket, metric);
+}
+
+function sparkPoints(report: TrafficReport | undefined, metric: TrafficMetric): SparkPoint[] {
+    const buckets = report?.buckets ?? [];
+    const title = report ? readoutTitle(report) : () => "";
+    const found = buckets.flatMap((bucket, index) => {
+        const value = sparkValue(bucket, metric);
+        const end = report ? bucketEnd(report, index) : 0;
+        return value === null ? [] : [{ key: bucket.at, label: title(end), value }];
+    });
+    return found.length > 1
+        ? found
+        : [
+              { key: "start", label: "", value: 0 },
+              { key: "end", label: "", value: 0 },
+          ];
+}
+
+const FLAT: [number, number] = [0, 1];
+
+function useWidth<T extends HTMLElement>() {
+    const ref = useRef<T>(null);
+    const [width, setWidth] = useState(0);
+    useLayoutEffect(() => {
+        const element = ref.current;
+        if (!element) {
+            return;
+        }
+        const observer = new ResizeObserver(([entry]) =>
+            setWidth(Math.floor(entry.contentRect.width)),
+        );
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
+    return [ref, width] as const;
+}
+
+function StripCell({
+    metric,
     report,
-    range,
-    onRange,
-    height = 200,
-    emptyHint,
 }: {
-    row: ModelRow;
-    versions: VersionInfo[];
+    metric: TrafficMetric;
     report: TrafficReport | undefined;
-    range: TrafficRange;
-    onRange?: (range: TrafficRange) => void;
-    height?: number;
-    emptyHint?: string | null;
 }) {
-    const [metric, setMetric] = useState<TrafficMetric>("requests");
-    const colors = versionColors(versions);
-    const empty = !report || report.totals.requests === 0;
+    const [ref, width] = useWidth<HTMLDivElement>();
+    const label = METRICS.find((item) => item.key === metric)?.label ?? "";
+    const points = sparkPoints(report, metric);
+    const flat = points.every((point) => point.value === points[0].value);
     return (
-        <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <VersionLegend row={row} report={report} colors={colors} />
-                <div className="ml-auto flex items-center gap-2">
-                    <MetricSwitch metric={metric} onMetric={setMetric} />
-                    {onRange && <RangeSwitch range={range} onRange={onRange} />}
-                </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 px-4 py-3">
+            <span className="truncate text-sm text-muted-foreground">{label}</span>
+            <span className="truncate text-lg tabular-nums">
+                {report ? metricText(metric, report.totals) : "–"}
+            </span>
+            <div ref={ref} className="h-6">
+                {width > 0 && (
+                    <Sparkline
+                        points={points}
+                        width={width}
+                        height={24}
+                        label={label}
+                        format={formatOf(metric)}
+                        domain={flat ? FLAT : undefined}
+                    />
+                )}
             </div>
-            <MetricChart
-                row={row}
-                report={report}
-                range={range}
-                metric={metric}
-                colors={colors}
-                height={height}
-            />
-            {empty && emptyHint && <p className="text-muted-foreground">{emptyHint}</p>}
         </div>
     );
 }
@@ -264,12 +288,9 @@ function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefi
     if (quiet && !isDeployed(row)) {
         return "Not deployed yet · deploy it to start receiving requests";
     }
-    const lead = quiet
-        ? "No traffic"
-        : `p95 ${ms(report.totals.p95_ms)} · ${rate(report.totals.error_rate ?? 0)} errors`;
     return (
         <>
-            {`${lead} · ${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}`}
+            {`${quiet ? "No traffic" : `${count(report.totals.tokens)} tokens`} · ${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}`}
             {replicas.length > 0 && (
                 <>
                     {" in "}
@@ -280,50 +301,44 @@ function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefi
     );
 }
 
-const ALL_METRICS = METRICS.map((item) => item.key);
-
-export function UsagePanel({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
+export function UsagePanel({ row }: { row: ModelRow }) {
     const [range, setRange] = useTrafficRange();
-    const [metrics, setMetrics] = useState<TrafficMetric[]>(ALL_METRICS);
     const traffic = useModelTraffic(row.key, range);
-    const shown = ALL_METRICS.filter((metric) => metrics.includes(metric));
+    const report = traffic.data;
+    const shown = METRICS.map((item) => item.key).filter(
+        (metric) => metric !== "cost" || (report !== undefined && priced(report.totals)),
+    );
     return (
         <PanelSection
             icon={IconChartLine}
             title="Usage"
-            description={
-                row.kind === "base"
-                    ? "Requests to this model."
-                    : "Requests to the live model, by version."
-            }
+            description={`${LAST[range]}${row.kind === "base" ? "." : ", all versions."}`}
             actions={
                 <>
-                    <CheckboxSelect
-                        label="Metrics"
-                        allLabel="All metrics"
-                        noun="metrics"
-                        options={METRICS.map((item) => ({ value: item.key, label: item.label }))}
-                        value={metrics}
-                        onValueChange={(next) =>
-                            setMetrics(next.length > 0 ? (next as TrafficMetric[]) : ALL_METRICS)
-                        }
-                    />
                     <RangeSwitch range={range} onRange={setRange} />
+                    <Link
+                        href={modelPageHref(row.key, "monitoring")}
+                        className="text-sm text-primary hover:underline"
+                    >
+                        Open Monitoring
+                    </Link>
                 </>
             }
+            flush
         >
-            <div className="@container flex min-w-0 flex-col gap-4">
-                <TrafficCharts
-                    row={row}
-                    versions={versions}
-                    report={traffic.data}
-                    range={range}
-                    metrics={shown}
-                />
-                <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
-                <p className="text-sm text-muted-foreground tabular-nums">
-                    <Footer row={row} report={traffic.data} />
-                </p>
+            <div className="flex divide-x">
+                {shown.map((metric) => (
+                    <StripCell key={metric} metric={metric} report={report} />
+                ))}
+            </div>
+            <div className="flex h-9 items-center gap-3 border-t px-4 text-sm text-muted-foreground tabular-nums">
+                {traffic.error ? (
+                    <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
+                ) : (
+                    <span className="min-w-0 truncate">
+                        <Footer row={row} report={report} />
+                    </span>
+                )}
             </div>
         </PanelSection>
     );

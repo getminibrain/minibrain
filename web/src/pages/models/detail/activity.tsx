@@ -10,13 +10,13 @@ import {
 import { useState } from "react";
 import type { ModelRow } from "~/api/client";
 import { type ModelActivityEvent, useModelActivity } from "~/api/modelPageQueries";
-import { ErrorLine, PanelSection } from "~/components/Section";
+import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { auditHref, jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 
-const PAGE = 10;
+const PAGE = 25;
 const BURST = 3;
 const DAY_MS = 86400000;
 
@@ -355,54 +355,56 @@ function Timeline({ row, shown }: { row: ModelRow; shown: Entry[] }) {
     );
 }
 
-export function ActivityPanel({ row }: { row: ModelRow }) {
+export function ActivityTab({ row }: { row: ModelRow }) {
     const can = useCan();
-    const activity = useModelActivity(row.key);
+    const activity = useModelActivity(row.key, 200);
     const [limit, setLimit] = useState(PAGE);
     const all = entries(activity.data?.events ?? []);
     const shown = all.slice(0, limit);
     const more = all.length > shown.length;
     return (
-        <PanelSection
-            icon={IconHistory}
-            title="Activity"
-            description="Who changed what, newest first."
-        >
-            <div className="flex min-w-0 flex-col gap-3">
-                <ErrorLine error={activity.error} onRetry={activity.refetch} />
-                {activity.isLoading ? (
-                    <p className="text-muted-foreground">Loading…</p>
-                ) : shown.length === 0 ? (
-                    <p className="text-muted-foreground">
-                        Nothing yet. Training, deploys and keys show here.
-                    </p>
-                ) : (
-                    <Timeline row={row} shown={shown} />
-                )}
-                {shown.length > 0 && (more || can.admin) && (
-                    <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-                        {more ? (
-                            <button
-                                type="button"
-                                onClick={() => setLimit(limit + PAGE)}
-                                className="text-muted-foreground hover:text-foreground"
-                            >
-                                Show more
-                            </button>
-                        ) : (
-                            <span />
-                        )}
-                        {can.admin && (
-                            <Link
-                                href={auditHref(row.key)}
-                                className="text-primary hover:underline"
-                            >
-                                All activity →
-                            </Link>
-                        )}
-                    </div>
-                )}
-            </div>
-        </PanelSection>
+        <PanelSections>
+            <PanelSection
+                icon={IconHistory}
+                title="Activity"
+                description="Who changed what, newest first."
+            >
+                <div className="flex min-w-0 flex-col gap-3">
+                    <ErrorLine error={activity.error} onRetry={activity.refetch} />
+                    {activity.isLoading ? (
+                        <p className="text-muted-foreground">Loading…</p>
+                    ) : shown.length === 0 ? (
+                        <p className="text-muted-foreground">
+                            Nothing yet. Training, deploys and keys show here.
+                        </p>
+                    ) : (
+                        <Timeline row={row} shown={shown} />
+                    )}
+                    {shown.length > 0 && (more || can.admin) && (
+                        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                            {more ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setLimit(limit + PAGE)}
+                                    className="text-muted-foreground hover:text-foreground"
+                                >
+                                    Show more
+                                </button>
+                            ) : (
+                                <span />
+                            )}
+                            {can.admin && (
+                                <Link
+                                    href={auditHref(row.key)}
+                                    className="text-primary hover:underline"
+                                >
+                                    All activity →
+                                </Link>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </PanelSection>
+        </PanelSections>
     );
 }

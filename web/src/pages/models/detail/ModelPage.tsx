@@ -18,7 +18,7 @@ import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
 import type { Entry } from "../entries";
 import { useHealthActions } from "../healthActions";
 import { About, BaseAbout, BaseDetails, Details } from "./about";
-import { ActivityPanel } from "./activity";
+import { ActivityTab } from "./activity";
 import { CompareView } from "./compare";
 import { ModelActions } from "./deploy";
 import { EvaluationTab } from "./evaluation/EvaluationTab";
@@ -27,6 +27,7 @@ import { ModelHeader, baseNameOf } from "./header";
 import { KeysTab } from "./keys";
 import { liveOf } from "./makeLive";
 import { MonitoringTab } from "./monitoring";
+import { VersionsPanel } from "./overviewVersions";
 import { HealthNotice, TeardownNotice } from "./parts";
 import { SettingsTab } from "./settings";
 import { TAB_LABELS, tabsFor, useModelTab } from "./tabs";
@@ -82,10 +83,13 @@ function Missing({ lookup }: { lookup: Lookup }) {
     );
 }
 
-function OverviewLayout({ main, side }: { main: ReactNode; side: ReactNode }) {
+function OverviewLayout({ main, side }: { main: ReactNode; side?: ReactNode }) {
+    if (!side) {
+        return <PanelSections>{main}</PanelSections>;
+    }
     return (
         <div className="@container">
-            <div className="grid items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="min-w-0">
                     <PanelSections>{main}</PanelSections>
                 </div>
@@ -174,7 +178,7 @@ function Overview({
         <OverviewLayout
             main={
                 <>
-                    <UsagePanel row={row} versions={versions} />
+                    <UsagePanel row={row} />
                     {row.kind === "base" ? (
                         <>
                             <BaseAbout row={row} base={base} />
@@ -188,7 +192,9 @@ function Overview({
                     )}
                 </>
             }
-            side={<ActivityPanel row={row} />}
+            side={
+                row.kind === "custom" ? <VersionsPanel row={row} versions={versions} /> : undefined
+            }
         />
     );
 }
@@ -284,6 +290,7 @@ function Loaded({ row }: { row: ModelRow }) {
                     )}
                     {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
                     {tab === "api" && <KeysTab row={row} />}
+                    {tab === "activity" && <ActivityTab row={row} />}
                     {tab === "settings" && <SettingsTab row={row} detail={modelDetail} />}
                 </div>
             )}

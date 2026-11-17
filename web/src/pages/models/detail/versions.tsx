@@ -11,10 +11,11 @@ import {
 } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
     Badge,
     Button,
-    Checkbox,
+    DataGrid,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -24,18 +25,12 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Link,
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
     useToast,
 } from "obp-ui";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
     type JobInfo,
     type ModelDetail,
@@ -389,13 +384,11 @@ function RowMenu({
     );
 }
 
-function VersionRow({
+function VersionActions({
     row,
     version,
     versions,
     job,
-    picked,
-    onPick,
     onLive,
     onDelete,
 }: {
@@ -403,8 +396,6 @@ function VersionRow({
     version: VersionInfo;
     versions: VersionInfo[];
     job: JobInfo | undefined;
-    picked: boolean;
-    onPick: (on: boolean) => void;
     onLive: () => void;
     onDelete: () => void;
 }) {
@@ -426,81 +417,134 @@ function VersionRow({
     const failed = version.status === "failed";
     const live = canGoLive(row, version);
     const blocked = live ? liveBlock(row, version) : null;
-    const data = version.dataset_version_number;
     return (
-        <TableRow data-state={picked ? "selected" : undefined}>
-            <TableCell className="w-10 pl-4">
-                <Checkbox
-                    aria-label={`Select v${version.number}`}
-                    checked={picked}
-                    onCheckedChange={(value) => onPick(value === true)}
-                />
-            </TableCell>
-            <TableCell className="whitespace-nowrap">
-                <Tip tip={version.note}>
-                    <Link
-                        href={modelVersionHref(row.key, version.number)}
-                        className="font-medium tabular-nums hover:underline"
-                    >
-                        {versionLabel(version)}
-                    </Link>
-                </Tip>
-                {isBaseline(version) && (
-                    <span className="ml-2 text-sm text-muted-foreground">untrained</span>
-                )}
-            </TableCell>
-            <TableCell>
-                <RunStatus row={row} version={version} />
-            </TableCell>
-            <TableCell className="text-right">
-                <span className="inline-flex items-center justify-end gap-2 tabular-nums">
-                    <ScoreBadge row={row} version={version} versions={versions} />
-                    {version.score === null ? "–" : percent(version.score)}
+        <>
+            {can.build && failed && (
+                <Button variant="outline" disabled={again.isPending} onClick={() => again.mutate()}>
+                    <IconRotate aria-hidden="true" />
+                    Retry
+                </Button>
+            )}
+            {can.build && live && !blocked && (
+                <Button variant="outline" onClick={onLive}>
+                    <IconRocket aria-hidden="true" />
+                    {`Deploy v${version.number}`}
+                </Button>
+            )}
+            <RowMenu
+                row={row}
+                version={version}
+                versions={versions}
+                job={job}
+                onDelete={onDelete}
+            />
+        </>
+    );
+}
+
+function versionColumns(
+    row: ModelRow,
+    versions: VersionInfo[],
+    jobs: JobInfo[],
+    metric: string,
+): ColumnDef<VersionInfo, unknown>[] {
+    return [
+        {
+            id: "version",
+            header: "Version",
+            accessorFn: (version) => version.number,
+            enableHiding: false,
+            cell: ({ row: { original: version } }) => (
+                <span className="whitespace-nowrap">
+                    <Tip tip={version.note}>
+                        <Link
+                            href={modelVersionHref(row.key, version.number)}
+                            className="relative z-10 font-medium tabular-nums hover:underline"
+                        >
+                            {versionLabel(version)}
+                        </Link>
+                    </Tip>
+                    {isBaseline(version) && (
+                        <span className="ml-2 text-sm text-muted-foreground">untrained</span>
+                    )}
                 </span>
-            </TableCell>
-            <TableCell className="tabular-nums">
-                {data === null || data === undefined ? (
+            ),
+        },
+        {
+            id: "status",
+            header: "Status",
+            accessorFn: (version) => versionStatus(row, version).label,
+            cell: ({ row: { original: version } }) => <RunStatus row={row} version={version} />,
+        },
+        {
+            id: "score",
+            header: metric,
+            accessorFn: (version) => version.score ?? -1,
+            cell: ({ row: { original: version } }) => (
+                <span className="inline-flex items-center gap-2 tabular-nums">
+                    {version.score === null ? "–" : percent(version.score)}
+                    <ScoreBadge row={row} version={version} versions={versions} />
+                </span>
+            ),
+        },
+        {
+            id: "note",
+            header: "Note",
+            accessorFn: (version) => version.note ?? "",
+            cell: ({ row: { original: version } }) =>
+                version.note ? (
+                    <span className="block max-w-64 truncate text-muted-foreground">
+                        {version.note}
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">–</span>
+                ),
+        },
+        {
+            id: "data",
+            header: "Data",
+            accessorFn: (version) => version.dataset_version_number ?? -1,
+            cell: ({ row: { original: version } }) => {
+                const data = version.dataset_version_number;
+                return data === null || data === undefined ? (
                     <span className="text-muted-foreground">–</span>
                 ) : (
-                    `v${data}`
-                )}
-            </TableCell>
-            <TableCell className="whitespace-nowrap">{trainingText(version)}</TableCell>
-            <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                <When value={job?.started_at ?? version.created_at} />
-            </TableCell>
-            <TableCell className="text-right whitespace-nowrap tabular-nums">
-                {durationOf(job)}
-            </TableCell>
-            <TableCell className="pr-4 text-right">
-                <span className="inline-flex items-center gap-1">
-                    {can.build && failed && (
-                        <Button
-                            variant="outline"
-                            disabled={again.isPending}
-                            onClick={() => again.mutate()}
-                        >
-                            <IconRotate aria-hidden="true" />
-                            Retry
-                        </Button>
-                    )}
-                    {can.build && live && !blocked && (
-                        <Button variant="outline" onClick={onLive}>
-                            <IconRocket aria-hidden="true" />
-                            {`Deploy v${version.number}`}
-                        </Button>
-                    )}
-                    <RowMenu
-                        row={row}
-                        version={version}
-                        versions={versions}
-                        job={job}
-                        onDelete={onDelete}
-                    />
+                    <span className="tabular-nums">{`v${data}`}</span>
+                );
+            },
+        },
+        {
+            id: "training",
+            header: "Training",
+            accessorFn: trainingText,
+            cell: ({ row: { original: version } }) => (
+                <span className="whitespace-nowrap">{trainingText(version)}</span>
+            ),
+        },
+        {
+            id: "started",
+            header: "Started",
+            accessorFn: (version) => runJob(version, jobs)?.started_at ?? version.created_at,
+            cell: ({ row: { original: version } }) => (
+                <span className="text-muted-foreground">
+                    <When value={runJob(version, jobs)?.started_at ?? version.created_at} />
                 </span>
-            </TableCell>
-        </TableRow>
-    );
+            ),
+        },
+        {
+            id: "duration",
+            header: "Duration",
+            accessorFn: (version) => {
+                const job = runJob(version, jobs);
+                return job ? jobSeconds(job) : -1;
+            },
+            cell: ({ row: { original: version } }) => (
+                <span className="whitespace-nowrap tabular-nums">
+                    {durationOf(runJob(version, jobs))}
+                </span>
+            ),
+        },
+    ];
 }
 
 function deleteVersions(row: ModelRow, numbers: number[]) {
@@ -534,14 +578,11 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     const deletable = chosen.filter(
         (version) => version.number !== liveNumber && version.number !== 0,
     );
-    const every = ordered.length > 0 && ordered.every((version) => picked.includes(version.number));
     const metric = metricName(versions.find((version) => version.main_metric)?.main_metric);
-    const pick = (number: number, on: boolean) =>
-        setPicked(
-            on
-                ? [...picked.filter((n) => n !== number), number]
-                : picked.filter((n) => n !== number),
-        );
+    const columns = useMemo(
+        () => versionColumns(row, versions, jobs.data ?? [], metric),
+        [row, versions, jobs.data, metric],
+    );
     const keptText = (doomed: VersionInfo[]) => {
         const kept = chosen
             .filter((version) => !doomed.includes(version))
@@ -633,56 +674,32 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                     </>
                 )
             }
-            flush
+            bare
         >
-            {versions.length === 0 ? (
-                <p className="p-panel text-muted-foreground">No versions yet.</p>
-            ) : (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-10 pl-4">
-                                <Checkbox
-                                    aria-label="Select every version"
-                                    checked={every}
-                                    onCheckedChange={(value) =>
-                                        setPicked(
-                                            value === true
-                                                ? ordered.map((version) => version.number)
-                                                : [],
-                                        )
-                                    }
-                                />
-                            </TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">{metric}</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Training</TableHead>
-                            <TableHead>Started</TableHead>
-                            <TableHead className="text-right">Duration</TableHead>
-                            <TableHead className="pr-4">
-                                <span className="sr-only">Actions</span>
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {ordered.map((version) => (
-                            <VersionRow
-                                key={version.number}
-                                row={row}
-                                version={version}
-                                versions={versions}
-                                job={runJob(version, jobs.data ?? [])}
-                                picked={picked.includes(version.number)}
-                                onPick={(on) => pick(version.number, on)}
-                                onLive={() => setPromoting(version.number)}
-                                onDelete={() => remove([version], false)}
-                            />
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
+            <DataGrid
+                columns={columns}
+                rows={ordered}
+                getRowId={(version) => String(version.number)}
+                initialSort={[{ id: "version", desc: true }]}
+                storageKey="minibrain.model-versions.columns"
+                columnPicker
+                hiddenColumns={["note", "training", "duration"]}
+                selectedIds={picked.map(String)}
+                onSelectedIdsChange={(ids) => setPicked(ids.map(Number))}
+                onOpen={(version) => router.history.push(modelVersionHref(row.key, version.number))}
+                rowLabel={(version) => versionLabel(version)}
+                rowActions={(version) => (
+                    <VersionActions
+                        row={row}
+                        version={version}
+                        versions={versions}
+                        job={runJob(version, jobs.data ?? [])}
+                        onLive={() => setPromoting(version.number)}
+                        onDelete={() => remove([version], false)}
+                    />
+                )}
+                empty={<p className="text-muted-foreground">No versions yet.</p>}
+            />
             <DeployVersionDialog
                 row={row}
                 versions={versions}

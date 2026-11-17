@@ -173,9 +173,22 @@ function AboutSection({ children }: { children: ReactNode }) {
     );
 }
 
-function DetailsSection({ children }: { children: ReactNode }) {
+function DetailsSection({
+    title = "Details",
+    description,
+    children,
+}: {
+    title?: string;
+    description?: string;
+    children: ReactNode;
+}) {
     return (
-        <PanelSection icon={IconAdjustmentsHorizontal} title="Details" flush>
+        <PanelSection
+            icon={IconAdjustmentsHorizontal}
+            title={title}
+            description={description}
+            flush
+        >
             <div className="@container flex flex-col divide-y py-1">{children}</div>
         </PanelSection>
     );
@@ -403,7 +416,10 @@ export function Details({
     const splits = splitsText(detail);
     const safety = safetyText(detail);
     return (
-        <DetailsSection>
+        <DetailsSection
+            title="Current setup"
+            description="Used by the next version. Each version page shows what it was trained with."
+        >
             <Group title="Task setup">
                 <Row label="Labels">
                     {labels.length > 0 ? (

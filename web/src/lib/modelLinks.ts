@@ -72,6 +72,7 @@ export type ModelTab =
     | "evaluation"
     | "monitoring"
     | "api"
+    | "activity"
     | "settings"
     | "files";
 

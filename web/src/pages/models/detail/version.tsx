@@ -1,5 +1,4 @@
 import {
-    IconBook,
     IconChevronDown,
     IconCopy,
     IconDots,
@@ -264,12 +263,6 @@ function VersionMenu({
                         <span>
                             Copy <span className="font-mono">{callable}</span>
                         </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onSelect={() => router.history.push(modelCardHref(row.key, version.number))}
-                    >
-                        <IconBook />
-                        Model card
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         disabled={!exportable || !can.build}
