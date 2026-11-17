@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge, Button, CheckboxSelect, DataGrid, EmptyState, Link, SearchInput } from "obp-ui";
+import { Badge, Button, CheckboxSelect, DataGrid, EmptyState, Link, SearchInput, cn } from "obp-ui";
 import { useMemo } from "react";
 import {
     type FeedbackInfo,
@@ -30,8 +30,25 @@ const ASSIGNEES = [
     { value: "none", label: "No one" },
 ];
 
+const STATUS_WIDTH = 264;
+
 function Muted({ children }: { children: string }) {
     return <span className="text-muted-foreground">{children}</span>;
+}
+
+function TextCell({ text, wide = false }: { text: string; wide?: boolean }) {
+    return (
+        <span
+            className={cn(
+                "grid",
+                wide ? "grid-cols-[minmax(10rem,1fr)]" : "grid-cols-[minmax(8rem,1fr)]",
+            )}
+        >
+            <span className="max-w-[32rem] truncate" title={text}>
+                {text}
+            </span>
+        </span>
+    );
 }
 
 function ReviewHeader({ id, back }: { id: number; back: string }) {
@@ -61,12 +78,14 @@ export function FeedbackStatusBadge({ item }: { item: FeedbackInfo }) {
 function StatusCell({ item }: { item: FeedbackInfo }) {
     const signal = signalLabel(item.signal);
     return (
-        <span className="flex items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2" title={signal ?? undefined}>
             <FeedbackStatusBadge item={item} />
             {signal && (
-                <StatusText tone={item.signal === "conflict" ? "warning" : "info"}>
-                    {signal}
-                </StatusText>
+                <span className="min-w-0 truncate">
+                    <StatusText tone={item.signal === "conflict" ? "warning" : "info"}>
+                        {signal}
+                    </StatusText>
+                </span>
             )}
         </span>
     );
@@ -79,11 +98,8 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             header: "Input",
             enableHiding: false,
             cell: ({ row }) => (
-                <Link
-                    href={href(row.original)}
-                    className="block max-w-72 truncate font-semibold text-foreground"
-                >
-                    {row.original.input}
+                <Link href={href(row.original)} className="font-semibold text-foreground">
+                    <TextCell text={row.original.input} wide />
                 </Link>
             ),
         },
@@ -92,7 +108,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             header: "Model's answer",
             cell: ({ row }) =>
                 row.original.output ? (
-                    <span className="block max-w-40 truncate">{row.original.output}</span>
+                    <TextCell text={row.original.output} />
                 ) : (
                     <Muted>Not sent</Muted>
                 ),
@@ -102,7 +118,7 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
             header: "Suggested answer",
             cell: ({ row }) =>
                 row.original.suggestion ? (
-                    <span className="block max-w-40 truncate">{row.original.suggestion}</span>
+                    <TextCell text={row.original.suggestion} />
                 ) : (
                     <Muted>None given</Muted>
                 ),
@@ -110,6 +126,8 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
         {
             id: "status",
             header: "Status",
+            size: STATUS_WIDTH,
+            enableResizing: false,
             cell: ({ row }) => <StatusCell item={row.original} />,
         },
         {
