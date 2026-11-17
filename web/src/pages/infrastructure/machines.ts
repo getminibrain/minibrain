@@ -1,21 +1,13 @@
 import type { Tone } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
-import { differences, lowDiskText, lowSpace, lowStores } from "./NeedsALook";
-import type { InfrastructureInfo, NodeInfo, PoolInfo, ReplicaInfo, StoreInfo } from "./parts";
+import type { NodeInfo, PoolInfo, ReplicaInfo } from "./parts";
+
+const COMPARED = ["minibrain", "torch", "transformers", "peft"];
 
 export type MachineRow = {
     node: NodeInfo;
     pool: PoolInfo;
     engines: ReplicaInfo[];
-};
-
-export type ProblemKind = "versions" | "engine" | "disk";
-
-export type Problem = {
-    kind: ProblemKind;
-    tone: "warning" | "destructive";
-    label: string;
-    reason: string;
 };
 
 export type MachineFilters = {
@@ -31,8 +23,6 @@ export const STATUSES = [
     { value: "draining", label: "Draining" },
     { value: "offline", label: "Offline" },
 ];
-
-export type LowDisk = { key: string; name: string; mount: string | null; free_bytes: number };
 
 export type MachineStatus = { label: string; tone: Tone; active?: boolean };
 
@@ -123,63 +113,16 @@ export function matches(row: MachineRow, filters: MachineFilters): boolean {
     );
 }
 
+function release(value: string): string {
+    return value.split("+")[0];
+}
+
+function differences(versions: Record<string, string>, main: Record<string, string>): string[] {
+    return COMPARED.filter(
+        (name) => versions[name] && main[name] && release(versions[name]) !== release(main[name]),
+    ).map((name) => `${name} ${versions[name]} (main has ${main[name]})`);
+}
+
 export function versionDrift(node: NodeInfo, main: Record<string, string>): string[] {
     return node.roles.includes("main") ? [] : differences(node.versions ?? {}, main);
-}
-
-export function failedEngines(row: MachineRow): ReplicaInfo[] {
-    return row.engines.filter((engine) => engine.state === "failed");
-}
-
-export function lowDiskOf(node: NodeInfo, info: InfrastructureInfo | undefined): LowDisk[] {
-    if (node.roles.includes("main")) {
-        return lowStores(info).map((store: StoreInfo) => ({
-            key: store.name,
-            name: store.name,
-            mount: store.mount ?? null,
-            free_bytes: store.free_bytes ?? 0,
-        }));
-    }
-    return (node.disks ?? [])
-        .filter((disk) => lowSpace(disk.free_bytes, disk.total_bytes))
-        .map((disk) => ({
-            key: disk.path,
-            name: disk.path,
-            mount: disk.mount ?? disk.path,
-            free_bytes: disk.free_bytes ?? 0,
-        }));
-}
-
-export function problemsOf(
-    row: MachineRow,
-    main: Record<string, string>,
-    info: InfrastructureInfo | undefined,
-): Problem[] {
-    const drift = versionDrift(row.node, main);
-    const failed = failedEngines(row);
-    const low = lowDiskOf(row.node, info);
-    return [
-        ...failed.map((engine) => ({
-            kind: "engine" as const,
-            tone: "destructive" as const,
-            label: "Engine failed",
-            reason: `The engine for ${engine.base_model} failed`,
-        })),
-        ...(drift.length > 0
-            ? [
-                  {
-                      kind: "versions" as const,
-                      tone: "warning" as const,
-                      label: "Versions differ",
-                      reason: `Versions differ from main: ${drift.join("; ")}`,
-                  },
-              ]
-            : []),
-        ...low.map((store) => ({
-            kind: "disk" as const,
-            tone: "warning" as const,
-            label: "Low disk",
-            reason: lowDiskText(store),
-        })),
-    ];
 }

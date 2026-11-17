@@ -19,7 +19,6 @@ import { count } from "~/lib/format";
 import { JOBS_PATH, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import { datasetHref } from "~/pages/models/list/cells";
-import { lowSpace } from "./NeedsALook";
 import {
     type InfrastructureInfo,
     MachineName,
@@ -108,6 +107,13 @@ function commonFolder(paths: string[]): string {
         shared.push(part);
     }
     return shared.join("/") || "/";
+}
+
+const LOW_FREE_SHARE = 0.1;
+const LOW_FREE_BYTES = 10 * 1024 ** 3;
+
+function lowSpace(free: number, total: number): boolean {
+    return total > 0 && (free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE);
 }
 
 type DiskView = {

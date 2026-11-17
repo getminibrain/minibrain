@@ -21,6 +21,7 @@ import {
 } from "obp-ui";
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useState } from "react";
 import { type PoolToken, useJoinTokens } from "~/api/joinTokenQueries";
+import { type Problem, problemsOfMachine, useProblems } from "~/api/problemQueries";
 import { PoolLink } from "~/components/PoolLink";
 import { BASIS_LABELS, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
@@ -36,7 +37,6 @@ import { ENGINE_DOING, jobLink, jobSubject, memoryView, servedHref, versioned } 
 import {
     type MachineFilters,
     type MachineRow,
-    type Problem,
     ROLES,
     STATUSES,
     acceleratorOf,
@@ -44,7 +44,6 @@ import {
     machineRows,
     machineStatus,
     matches,
-    problemsOf,
     statusOf,
 } from "./machines";
 import {
@@ -98,8 +97,8 @@ function ProblemBadge({ problems }: { problems: Problem[] }) {
     if (problems.length === 0) {
         return null;
     }
-    const label = problems.map((problem) => problem.label).join(", ");
-    const tone = problems.some((problem) => problem.tone === "destructive")
+    const label = problems.map((problem) => problem.text).join(", ");
+    const tone = problems.some((problem) => problem.severity === "critical")
         ? "destructive"
         : "warning";
     return (
@@ -115,7 +114,7 @@ function ProblemBadge({ problems }: { problems: Problem[] }) {
             <TooltipContent className="max-w-sm whitespace-normal">
                 <ul className="flex flex-col gap-1">
                     {problems.map((problem) => (
-                        <li key={problem.reason}>{problem.reason}</li>
+                        <li key={problem.id}>{problem.text}</li>
                     ))}
                 </ul>
             </TooltipContent>
@@ -408,6 +407,7 @@ export function MachinesTab({
     const [grouped, setGrouped] = useGrouped();
     const can = useCan();
     const tokens = useJoinTokens({ enabled: can.admin });
+    const problems = useProblems({ scope: "infrastructure" }).data;
     useScrollToHash(!loading);
     const filters: MachineFilters = {
         status: splitList(search.status),
@@ -435,7 +435,7 @@ export function MachinesTab({
             key={row.node.id}
             row={row}
             grouped={grouped}
-            problems={problemsOf(row, main, info)}
+            problems={problemsOfMachine(problems, row.node.id)}
             anchor={!grouped && firstOfPool.has(row.node.id) ? `pool-${row.pool.name}` : undefined}
             onOpen={openRow}
         />
@@ -530,7 +530,7 @@ export function MachinesTab({
                 row={selected}
                 main={main}
                 info={info}
-                problems={selected ? problemsOf(selected, main, info) : []}
+                problems={selected ? problemsOfMachine(problems, selected.node.id) : []}
                 onClose={() => update({ machine: "" })}
             />
         </div>

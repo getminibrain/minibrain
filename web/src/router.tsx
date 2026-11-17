@@ -112,6 +112,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/infrastructure", InfrastructurePage),
     globalPage("/infrastructure/machines", InfrastructurePage),
     globalPage("/infrastructure/storage", InfrastructurePage),
+    globalPage("/infrastructure/setup", InfrastructurePage),
     globalPage(API_KEYS_PATH, guarded("builder", ApiKeysPage)),
     globalPage("/monitor", MonitorPage),
     globalPage(

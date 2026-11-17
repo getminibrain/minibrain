@@ -20,7 +20,6 @@ import { type PoolTokenIssued, useIssueJoinToken, useJoinTokens } from "~/api/jo
 import { FormRows } from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
-import { Command, JOIN_ENV, machineHref, workerCommand } from "./NeedsALook";
 import {
     IssuedCommand,
     type PoolChoice,
@@ -31,6 +30,7 @@ import {
     firstChoice,
     poolNames,
 } from "./PoolJoin";
+import { Command, JOIN_ENV, machineHref, workerCommand } from "./commands";
 import type { PoolInfo } from "./parts";
 
 const WATCH_MS = 3000;

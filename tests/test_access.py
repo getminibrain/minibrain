@@ -132,6 +132,7 @@ ROUTE_ROLES = {
     ("GET", "/api/catalog/settings"): "viewer",
     ("PUT", "/api/catalog/settings"): "admin",
     ("GET", "/api/compute/pools"): "viewer",
+    ("GET", "/api/problems"): "viewer",
     ("GET", "/api/compute/prices"): "viewer",
     ("PUT", "/api/compute/prices"): "admin",
     ("GET", "/api/compute/join-tokens"): "admin",

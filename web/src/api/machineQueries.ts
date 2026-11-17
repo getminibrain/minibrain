@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, succeed, unwrap } from "./client";
+import { PROBLEMS_KEY } from "./problemQueries";
 
 export type MachineAction = "drain" | "undrain" | "remove";
 
@@ -22,6 +23,7 @@ export function useMachineAction(pool: string, host: string) {
         mutationFn: (action: MachineAction) => request(action, pool, host),
         onSettled: async () => {
             await client.invalidateQueries({ queryKey: ["compute", "pools"] });
+            await client.invalidateQueries({ queryKey: PROBLEMS_KEY });
             await client.invalidateQueries({ queryKey: ["audit"] });
         },
     });

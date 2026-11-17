@@ -1722,6 +1722,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List what needs attention */
+        get: operations["list_problems_api_problems_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/compute/join-tokens": {
         parameters: {
             query?: never;
@@ -7685,6 +7702,12 @@ export interface components {
              * @default []
              */
             recent?: components["schemas"]["RecentJob"][];
+            /**
+             * Joined
+             * @description How it joined: main itself, the local token, a pool token or approval.
+             * @enum {string}
+             */
+            joined: "main" | "local" | "token" | "approval";
         };
         /** NodeJob */
         NodeJob: {
@@ -8264,6 +8287,81 @@ export interface components {
             version: number;
             /** Same Data */
             same_data: boolean;
+        };
+        /** Problem */
+        Problem: {
+            /**
+             * Id
+             * @description Stable while the condition lasts.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model_down" | "engine_failed" | "disk_low" | "version_mismatch" | "training_failed" | "machine_offline";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "critical" | "warning" | "info";
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "machine" | "pool" | "engine" | "storage" | "model" | "job";
+            /**
+             * Subject
+             * @description The machine, disk, model or job it is about, as a short name.
+             */
+            subject: string;
+            /**
+             * Text
+             * @description One line that says what is wrong.
+             */
+            text: string;
+            /**
+             * Href
+             * @description The page that fixes it.
+             */
+            href: string;
+            /**
+             * Since
+             * @description When the condition started, when known.
+             */
+            since: string | null;
+            /** Pool */
+            pool?: string | null;
+            /**
+             * Machine
+             * @description The machine involved, as pool/host.
+             */
+            machine?: string | null;
+            /**
+             * Models
+             * @description Keys of the models it affects.
+             * @default []
+             */
+            models?: string[];
+            /**
+             * Actions
+             * @default []
+             */
+            actions?: components["schemas"]["ProblemAction"][];
+        };
+        /** ProblemAction */
+        ProblemAction: {
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "remove_machine";
+            /** Label */
+            label: string;
+            /** Pool */
+            pool: string;
+            /** Host */
+            host: string;
         };
         /** Profile */
         Profile: {
@@ -14253,6 +14351,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DevicePricesInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_problems_api_problems_get: {
+        parameters: {
+            query?: {
+                scope?: ("infrastructure" | "model") | null;
+                model?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"][];
                 };
             };
             /** @description Validation Error */

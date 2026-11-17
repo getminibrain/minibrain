@@ -11,7 +11,7 @@ from minibrain.api.access import admin, viewer
 from minibrain.api.deps import LocalNodeDep, MetricsDep, SessionDep
 from minibrain.api.job_facts import TRAIN_START
 from minibrain.auth.identity import current_actor
-from minibrain.auth.join_requests import revoke_machine
+from minibrain.auth.join_requests import approved_machines, revoke_machine
 from minibrain.jobs.metrics import latest_data
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, needed_bytes
 from minibrain.models.machine_metrics import (
@@ -49,6 +49,7 @@ router = APIRouter(prefix="/api/compute")
 MAX_HOURLY_PRICE = 1_000_000
 RECENT_PER_NODE = 5
 RECENT_SCAN = 500
+Joined = Literal["main", "local", "token", "approval"]
 PoolName = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 HourlyPrice = Annotated[float, Field(ge=0, le=MAX_HOURLY_PRICE)]
 
@@ -129,6 +130,7 @@ class NodeInfo(BaseModel):
     versions: dict[str, str] = {}
     jobs: list[NodeJob]
     recent: list[RecentJob] = Field(default=[], description="The last jobs this machine finished, newest first.")
+    joined: Joined = Field(description="How it joined: main itself, the local token, a pool token or approval.")
 
 
 class ServedModel(BaseModel):
@@ -331,8 +333,21 @@ def node_disks(metrics: MetricsHistory, item: PoolNode) -> list[NodeDisk]:
     return [NodeDisk(reported_at=at, **disk.model_dump()) for disk in disks]
 
 
+def joined_by(item: PoolNode, pool: str, approved: set[tuple[str, str]]) -> Joined:
+    if "main" in item.roles:
+        return "main"
+    if pool == LOCAL_POOL:
+        return "local"
+    return "approval" if (pool, item.host) in approved else "token"
+
+
 def node_info(
-    item: PoolNode, jobs: list[NodeJob], recent: list[RecentJob], sample: Sampled | None, disks: list[NodeDisk]
+    item: PoolNode,
+    jobs: list[NodeJob],
+    recent: list[RecentJob],
+    sample: Sampled | None,
+    disks: list[NodeDisk],
+    joined: Joined,
 ) -> NodeInfo:
     fields = {key: value for key, value in item.report.as_dict().items() if key != "host"}
     fields |= {
@@ -346,6 +361,7 @@ def node_info(
         "jobs": jobs,
         "recent": recent,
         "disks": disks,
+        "joined": joined,
     }
     return NodeInfo.model_validate(fields)
 
@@ -362,6 +378,7 @@ def pool_info(
     recent: dict[str, list[RecentJob]],
     served: dict[tuple[str, str], list[ServedModel]],
     metrics: MetricsHistory,
+    approved: set[tuple[str, str]],
 ) -> PoolInfo:
     engines = [replica_info(session, replica, served) for replica in pool.engines]
     nodes: list[NodeInfo] = []
@@ -369,7 +386,8 @@ def pool_info(
     for item in pool.nodes:
         sample = latest_sample(metrics, item)
         disks = node_disks(metrics, item)
-        nodes.append(node_info(item, jobs.get(item.id, []), recent.get(item.id, []), sample, disks))
+        joined = joined_by(item, pool.name, approved)
+        nodes.append(node_info(item, jobs.get(item.id, []), recent.get(item.id, []), sample, disks, joined))
         here = [engine for engine in engines if engine.host == item.host]
         free = free_of(item, sample[0] if sample else None, here, jobs.get(item.id, []))
         if item.online and item.state == ACTIVE and free is not None:
@@ -389,7 +407,8 @@ def list_pools(session: SessionDep, node: LocalNodeDep, metrics: MetricsDep) -> 
     jobs = running_jobs(session)
     recent = recent_jobs(session)
     served = served_models(session)
-    return [pool_info(session, pool, jobs, recent, served, metrics) for pool in pools(session, node)]
+    approved = approved_machines(session)
+    return [pool_info(session, pool, jobs, recent, served, metrics, approved) for pool in pools(session, node)]
 
 
 def machine_of(session: Session, local: str, pool: str, host: str) -> Node:

@@ -20,7 +20,7 @@ import { type PoolToken, type PoolTokenIssued, useIssueJoinToken } from "~/api/j
 import { CopyButton } from "~/components/CopyButton";
 import { FormRow } from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
-import { Command, tokenCommand, workerCommand } from "./NeedsALook";
+import { Command, tokenCommand, workerCommand } from "./commands";
 
 export const LOCAL_POOL = "local";
 const NEW_POOL = "__new__";

@@ -1881,6 +1881,12 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       release file built; signing first runs for real on the first tag)
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
+- [ ] Problems (added 2026-11-17): `GET /api/problems` computes what needs attention from current state on each request
+      (no table, no per-user state), filtered by role and by scope (`infrastructure`, `model`, one model): live models
+      with no running replica and failed engines (critical), then low disk on main and on machines, library versions
+      that differ from main, training that failed in the last 24 hours and offline machines (warnings; past a day,
+      admins get Remove). One Needs attention component shows it, same-kind problems grouped on one line, four lines
+      then Show all. Done on Infrastructure › Machines; the model page and Home are next
 - [x] Hash-chained audit log with SIEM export; encryption at rest: hash chain sealed by the leader, prune anchors,
       verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP; every stored file
       under its own AES-256-GCM data key wrapped by a local key file, Vault Transit, a PKCS#11 HSM or AWS KMS, with
@@ -1896,7 +1902,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 Each page gets a review pass (layout, empty, loading and error states, light and dark at 1024–1440px) and the fixes
 it finds:
 
-- [ ] Infrastructure: Overview, Machines, Storage
+- [ ] Infrastructure: Machines, Storage, Setup
 - [ ] Data: catalogue, sources, datasets, versions
 - [ ] Monitoring: the global page and each model's Monitoring tab
 - [ ] Feedback page
@@ -1929,8 +1935,9 @@ it finds:
 - One-click retrain on new data (dlt incremental)
 - Automatic retrain when feedback since the last version crosses a threshold
 - Version diff (scores; the data diff is done)
-- Notifications bell in the top bar: failed jobs, results ready to review, models that need examples, missing
-  files
+- Notifications: an inbox and a bell in the top bar over the v1 problems (`GET /api/problems`) plus failed jobs,
+  results ready to review, models that need examples and missing files; read and unread, snooze and acknowledge per
+  person, history of what was raised and cleared, and delivery by email (SMTP) and webhooks
 - Global search (⌘K) in the top bar, built with it, projects and notifications: jump to models, versions, datasets,
   sources, jobs, settings and pages, and run actions (Add model, Upload data, Create key, Deploy vN). One `/api/search`
   returns only what the caller's role may see; logs match by title, ID and status, never by content. Page searches

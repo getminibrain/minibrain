@@ -5269,6 +5269,79 @@
         }
       }
     },
+    "/api/problems": {
+      "get": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "List what needs attention",
+        "operationId": "list_problems_api_problems_get",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "infrastructure",
+                    "model"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Problem"
+                  },
+                  "title": "Response List Problems Api Problems Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/join-tokens": {
       "get": {
         "tags": [
@@ -24877,6 +24950,17 @@
             "title": "Recent",
             "description": "The last jobs this machine finished, newest first.",
             "default": []
+          },
+          "joined": {
+            "type": "string",
+            "enum": [
+              "main",
+              "local",
+              "token",
+              "approval"
+            ],
+            "title": "Joined",
+            "description": "How it joined: main itself, the local token, a pool token or approval."
           }
         },
         "type": "object",
@@ -24895,7 +24979,8 @@
           "usable_bytes",
           "gpus",
           "engines",
-          "jobs"
+          "jobs",
+          "joined"
         ],
         "title": "NodeInfo"
       },
@@ -26546,6 +26631,157 @@
           "same_data"
         ],
         "title": "PreviousTraining"
+      },
+      "Problem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Stable while the condition lasts."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model_down",
+              "engine_failed",
+              "disk_low",
+              "version_mismatch",
+              "training_failed",
+              "machine_offline"
+            ],
+            "title": "Kind"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning",
+              "info"
+            ],
+            "title": "Severity"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "machine",
+              "pool",
+              "engine",
+              "storage",
+              "model",
+              "job"
+            ],
+            "title": "Scope"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "The machine, disk, model or job it is about, as a short name."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "One line that says what is wrong."
+          },
+          "href": {
+            "type": "string",
+            "title": "Href",
+            "description": "The page that fixes it."
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since",
+            "description": "When the condition started, when known."
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
+          },
+          "machine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Machine",
+            "description": "The machine involved, as pool/host."
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models",
+            "description": "Keys of the models it affects.",
+            "default": []
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ProblemAction"
+            },
+            "type": "array",
+            "title": "Actions",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "scope",
+          "subject",
+          "text",
+          "href",
+          "since"
+        ],
+        "title": "Problem"
+      },
+      "ProblemAction": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "remove_machine",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "pool",
+          "host"
+        ],
+        "title": "ProblemAction"
       },
       "Profile": {
         "properties": {

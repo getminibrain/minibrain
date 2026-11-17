@@ -1,8 +1,9 @@
 import { IconSitemap } from "@tabler/icons-react";
-import { cn } from "obp-ui";
+import { Link, cn } from "obp-ui";
 import type { ReactNode } from "react";
+import { poolHref } from "~/components/PoolLink";
 import { PanelSection } from "~/components/Section";
-import { type InfrastructureInfo, OnlineCount, type PoolInfo, fleetAnchor, plural } from "./parts";
+import { type InfrastructureInfo, OnlineCount, type PoolInfo, plural } from "./parts";
 
 const SETUPS: Record<InfrastructureInfo["setup"], { title: string; body: string }> = {
     one_machine: {
@@ -62,8 +63,8 @@ function Connector({ label }: { label: string }) {
 function PoolBox({ pool }: { pool: PoolInfo }) {
     return (
         <li className="relative py-1 pl-6 before:absolute before:top-1/2 before:left-0 before:h-px before:w-6 before:bg-border after:absolute after:top-0 after:bottom-0 after:left-0 after:w-px after:bg-border first:after:top-1/2 last:after:bottom-1/2 only:after:hidden">
-            <a
-                href={`#${fleetAnchor(pool.name)}`}
+            <Link
+                href={poolHref(pool.name)}
                 className="flex min-w-0 flex-col gap-0.5 rounded-lg border bg-card px-3 py-2 hover:bg-accent"
             >
                 <span className="truncate font-medium">{pool.name}</span>
@@ -71,7 +72,7 @@ function PoolBox({ pool }: { pool: PoolInfo }) {
                     <OnlineCount nodes={pool.nodes} />
                     <span>{plural(pool.engines.length, "engine")}</span>
                 </span>
-            </a>
+            </Link>
         </li>
     );
 }

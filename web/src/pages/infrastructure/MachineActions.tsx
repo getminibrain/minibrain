@@ -1,6 +1,7 @@
 import { Button, ConfirmDialog } from "obp-ui";
 import { useMachineAction } from "~/api/machineQueries";
 import { BlockedButton } from "~/components/BlockedButton";
+import { RemoveMachineDialog } from "~/components/RemoveMachine";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { type MachineRow, busyOf } from "./machines";
@@ -17,10 +18,6 @@ function workLeft(row: MachineRow): string {
 
 function drainText(row: MachineRow): string {
     return `Jobs running on ${row.node.host} finish; no new job starts there. Each engine keeps serving until another machine in pool ${row.pool.name} has its model ready, then stops. A model no other machine can take keeps serving here. Undrain to take work again.`;
-}
-
-function removeText(row: MachineRow): string {
-    return `${row.node.host} leaves pool ${row.pool.name}. If its worker still runs, it stops at its next heartbeat; run minibrain worker there again to rejoin. Its finished jobs keep their history.`;
 }
 
 function removeBlock(row: MachineRow): string | null {
@@ -85,12 +82,10 @@ export function MachineActions({ row }: { row: MachineRow }) {
                         Remove from pool
                     </BlockedButton>
                 ) : (
-                    <ConfirmDialog
+                    <RemoveMachineDialog
+                        pool={row.pool.name}
+                        host={row.node.host}
                         trigger={<Button variant="outline">Remove from pool</Button>}
-                        title={`Remove ${row.node.host} from pool ${row.pool.name}?`}
-                        description={removeText(row)}
-                        confirmLabel="Remove"
-                        destructive
                         onConfirm={() => run("remove")}
                     />
                 )}

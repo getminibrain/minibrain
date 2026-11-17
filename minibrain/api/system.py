@@ -239,25 +239,31 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
 
 
+def main_stores(
+    session: Session, settings: Settings, store: ArtifactStore, usage: DatasetVersionUsage
+) -> list[StoreInfo]:
+    kept = (ArtifactKind.DATASET_VERSION, WEIGHTS)
+    artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind.not_in(kept)))
+    return [
+        database_store(settings),
+        model_store(session, settings, store),
+        artifact_store("Dataset versions", settings, store, usage.size),
+        artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
+    ]
+
+
 @router.get("/system/infrastructure", dependencies=[Depends(viewer)], summary="List servers, devices and engines")
 def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
-    database = database_store(settings)
-    kept = (ArtifactKind.DATASET_VERSION, WEIGHTS)
-    artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind.not_in(kept)))
     usage = dataset_version_usage(session)
+    stores = main_stores(session, settings, store, usage)
     return InfrastructureInfo(
-        setup=setup_of(session, node, database),
+        setup=setup_of(session, node, stores[0]),
         host=node.host,
         home=str(settings.home),
         web=str(settings.web_dist),
-        stores=[
-            database,
-            model_store(session, settings, store),
-            artifact_store("Dataset versions", settings, store, usage.size),
-            artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
-        ],
+        stores=stores,
         dataset_versions=usage,
         largest=largest_items(session),
         reclaimable=reclaimable(session),

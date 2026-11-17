@@ -14,10 +14,6 @@ export function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
-export function fleetAnchor(pool: string): string {
-    return `fleet-${pool}`;
-}
-
 export function roomText(room: PoolRoom): string {
     const serve =
         room.serve_size && room.serve_count > 0

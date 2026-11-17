@@ -4,20 +4,20 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, TabNav, type TabNavItem } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
+import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { AddMachine } from "./infrastructure/AddMachine";
-import { FleetBoard } from "./infrastructure/FleetBoard";
 import { JoinRequests } from "./infrastructure/JoinRequests";
 import { MachinesTab } from "./infrastructure/MachinesTab";
-import { NeedsALook } from "./infrastructure/NeedsALook";
 import { SetupDiagram } from "./infrastructure/SetupDiagram";
 import { StorageTab } from "./infrastructure/StorageTab";
 import type { InfrastructureInfo, PoolInfo } from "./infrastructure/parts";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
+type SystemInfo = components["schemas"]["SystemInfo"];
 
 const LOOPS: Record<string, string> = {
     single: "Runs here",
@@ -53,28 +53,70 @@ function gigabytes(megabytes: number | null | undefined): string {
         : `${(megabytes / 1024).toFixed(1)} GB`;
 }
 
+const MACHINES = "/infrastructure";
+const STORAGE = "/infrastructure/storage";
+const SETUP = "/infrastructure/setup";
+
 const SECTIONS: TabNavItem[] = [
-    { label: "Overview", href: "/infrastructure" },
-    { label: "Machines", href: "/infrastructure/machines" },
-    { label: "Storage", href: "/infrastructure/storage" },
+    { label: "Machines", href: MACHINES },
+    { label: "Storage", href: STORAGE },
+    { label: "Setup", href: SETUP },
 ];
 
-function Overview({
+function sectionOf(pathname: string): string {
+    return (
+        SECTIONS.find((item) => item.href !== MACHINES && item.href === pathname)?.href ?? MACHINES
+    );
+}
+
+function SetupTab({
     info,
     pools,
-    loops,
-    main,
+    system,
 }: {
     info: InfrastructureInfo | undefined;
     pools: PoolInfo[];
-    loops: string | undefined;
-    main: Record<string, string>;
+    system: SystemInfo | undefined;
 }) {
+    const device = system?.device;
     return (
         <PanelSections>
-            <NeedsALook pools={pools} main={main} info={info} />
-            <FleetBoard pools={pools} />
-            <SetupDiagram info={info} pools={pools} loops={loops} />
+            <SetupDiagram info={info} pools={pools} loops={system?.loops} />
+            <PanelSection
+                icon={IconCpu}
+                title="This main process"
+                description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
+            >
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                    <Stat
+                        label="Inference"
+                        value={<span className="font-mono">{device?.inference ?? "–"}</span>}
+                    />
+                    <Stat
+                        label="Training"
+                        value={<span className="font-mono">{device?.training ?? "–"}</span>}
+                    />
+                    <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
+                    <Stat
+                        label="GPU memory used"
+                        value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
+                    />
+                    <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                    <Stat label="Background loops" value={LOOPS[system?.loops ?? "single"]} />
+                </div>
+            </PanelSection>
+            <PanelSection
+                bare
+                icon={IconMemory}
+                title="Loaded in memory"
+                description="Base models and adapters the serving process holds right now."
+            >
+                <DataGrid
+                    columns={LOADED_COLUMNS}
+                    rows={system?.loaded ?? []}
+                    empty="Nothing loaded yet; the first request loads the base model."
+                />
+            </PanelSection>
         </PanelSections>
     );
 }
@@ -84,13 +126,12 @@ export function InfrastructurePage() {
     const { data, error } = useSystem();
     const pools = usePools();
     const infrastructure = useInfrastructure();
-    const device = data?.device;
     const main =
         (pools.data ?? []).flatMap((pool) => pool.nodes).find((node) => node.roles.includes("main"))
             ?.versions ?? {};
-    const active = SECTIONS.find((item) => item.href === pathname)?.href ?? "/infrastructure";
+    const active = sectionOf(pathname);
     const can = useCan();
-    const adds = can.admin && active !== "/infrastructure/storage";
+    const adds = can.admin && active === MACHINES;
     return (
         <Page wide>
             <PageHeader
@@ -100,16 +141,9 @@ export function InfrastructurePage() {
             />
             <TabNav label="Infrastructure pages" tabs={SECTIONS} />
             <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
-            {active === "/infrastructure" && (
-                <Overview
-                    info={infrastructure.data}
-                    pools={pools.data ?? []}
-                    loops={data?.loops}
-                    main={main}
-                />
-            )}
-            {active === "/infrastructure/machines" && (
+            {active === MACHINES && (
                 <PanelSections>
+                    <NeedsAttention scope="infrastructure" />
                     {can.admin && <JoinRequests pools={pools.data ?? []} />}
                     <MachinesTab
                         pools={pools.data ?? []}
@@ -117,47 +151,13 @@ export function InfrastructurePage() {
                         info={infrastructure.data}
                         loading={pools.isLoading}
                     />
-                    <PanelSection
-                        icon={IconCpu}
-                        title="This main process"
-                        description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
-                    >
-                        <div className="flex flex-wrap gap-x-8 gap-y-4">
-                            <Stat
-                                label="Inference"
-                                value={
-                                    <span className="font-mono">{device?.inference ?? "–"}</span>
-                                }
-                            />
-                            <Stat
-                                label="Training"
-                                value={<span className="font-mono">{device?.training ?? "–"}</span>}
-                            />
-                            <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
-                            <Stat
-                                label="GPU memory used"
-                                value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
-                            />
-                            <Stat label="CPU cores" value={count(device?.cpu_count)} />
-                            <Stat label="Background loops" value={LOOPS[data?.loops ?? "single"]} />
-                        </div>
-                    </PanelSection>
-                    <PanelSection
-                        bare
-                        icon={IconMemory}
-                        title="Loaded in memory"
-                        description="Base models and adapters the serving process holds right now."
-                    >
-                        <DataGrid
-                            columns={LOADED_COLUMNS}
-                            rows={data?.loaded ?? []}
-                            empty="Nothing loaded yet; the first request loads the base model."
-                        />
-                    </PanelSection>
                 </PanelSections>
             )}
-            {active === "/infrastructure/storage" && (
+            {active === STORAGE && (
                 <StorageTab info={infrastructure.data} pools={pools.data ?? []} />
+            )}
+            {active === SETUP && (
+                <SetupTab info={infrastructure.data} pools={pools.data ?? []} system={data} />
             )}
         </Page>
     );

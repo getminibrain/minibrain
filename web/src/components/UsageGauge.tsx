@@ -295,7 +295,7 @@ function legendItems(
     return items;
 }
 
-export function GaugeLegend({
+function GaugeLegend({
     items,
     short = null,
 }: {
@@ -322,13 +322,4 @@ export function GaugeLegend({
             )}
         </ul>
     );
-}
-
-export function kindLegend(kinds: GaugeKind[], free = true): LegendItem[] {
-    const items: LegendItem[] = kinds.map((kind) => ({
-        key: kind,
-        label: GAUGE_KINDS[kind].label,
-        swatch: { background: GAUGE_KINDS[kind].color },
-    }));
-    return free ? [...items, { key: "free", label: "Free", swatch: null }] : items;
 }

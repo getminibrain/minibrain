@@ -1,4 +1,7 @@
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     Link,
     Sheet,
     SheetContent,
@@ -13,6 +16,7 @@ import {
     TableRow,
 } from "obp-ui";
 import { type ReactNode, useRef } from "react";
+import type { Problem } from "~/api/problemQueries";
 import { Facts } from "~/components/Facts";
 import { PoolLink } from "~/components/PoolLink";
 import { UsageGauge } from "~/components/UsageGauge";
@@ -20,11 +24,10 @@ import { When } from "~/components/When";
 import { StatusText, type Tone, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
-import { jobHref, modelPageHref } from "~/lib/modelLinks";
+import { jobHref } from "~/lib/modelLinks";
 import { bytes, exactTime, relativeTime } from "~/lib/time";
 import { MachineActions } from "./MachineActions";
 import { LiveMetrics } from "./MachineLive";
-import { Command, lowDiskText, rejoinCommand, rejoinHint } from "./NeedsALook";
 import {
     MEMORY_LABELS,
     type MemoryView,
@@ -36,15 +39,8 @@ import {
     servedHref,
     versioned,
 } from "./activity";
-import {
-    type MachineRow,
-    type Problem,
-    failedEngines,
-    hardwareText,
-    lowDiskOf,
-    machineStatus,
-    versionDrift,
-} from "./machines";
+import { RestartFix } from "./commands";
+import { type MachineRow, hardwareText, machineStatus, versionDrift } from "./machines";
 import type { InfrastructureInfo, NodeInfo, ReplicaInfo } from "./parts";
 
 const ENGINE_STATES: Record<string, { label: string; tone: Tone }> = {
@@ -383,90 +379,90 @@ function ConnectionBlock({ row }: { row: MachineRow }) {
                     ["Last heartbeat", heartbeat],
                 ]}
             />
-            {!node.online && (
-                <div className="flex min-w-0 flex-col items-start gap-1.5 text-sm text-muted-foreground">
-                    <span>{rejoinHint(node)}</span>
-                    <Command
-                        value={rejoinCommand(node, pool.name, window.location.origin)}
-                        label={`Copy the command that rejoins ${node.host}`}
-                    />
-                </div>
-            )}
         </Block>
     );
 }
 
-function ProblemsBlock({
-    row,
-    main,
-    info,
-    problems,
-}: {
-    row: MachineRow;
-    main: Record<string, string>;
-    info: InfrastructureInfo | undefined;
-    problems: Problem[];
-}) {
+const TONES: Record<Problem["severity"], Tone> = {
+    critical: "destructive",
+    warning: "warning",
+    info: "info",
+};
+
+function DiskFix({ problem, node }: { problem: Problem; node: NodeInfo }) {
+    if (node.roles.includes("main")) {
+        return (
+            <span>
+                {"See what takes the space and remove what you no longer need: "}
+                <Link href="/infrastructure/storage" className={LINK}>
+                    Storage
+                </Link>
+            </span>
+        );
+    }
+    const disk = (node.disks ?? []).find((item) => problem.id.endsWith(`:${item.path}`));
+    return (
+        <span>
+            {disk?.minibrain_bytes
+                ? `Free up space on ${node.host}: minibrain keeps ${bytes(disk.minibrain_bytes)} in ${disk.path}.`
+                : `Free up space on ${node.host}.`}
+        </span>
+    );
+}
+
+function Fix({ problem, row }: { problem: Problem; row: MachineRow }) {
+    if (problem.kind === "machine_offline") {
+        return <RestartFix node={row.node} pool={row.pool.name} />;
+    }
+    if (problem.kind === "version_mismatch") {
+        return (
+            <>
+                <span>{`Install the versions main runs on ${row.node.host}, then restart it.`}</span>
+                <RestartFix node={row.node} pool={row.pool.name} />
+            </>
+        );
+    }
+    if (problem.kind === "disk_low") {
+        return <DiskFix problem={problem} node={row.node} />;
+    }
+    return (
+        <span>
+            {"Check the model's deployment and its weights: "}
+            <Link href={problem.href} className={LINK}>
+                Open the model
+            </Link>
+        </span>
+    );
+}
+
+function ProblemsBlock({ row, problems }: { row: MachineRow; problems: Problem[] }) {
     if (problems.length === 0) {
         return null;
     }
-    const drift = versionDrift(row.node, main);
-    const fixes: { key: string; tone: Problem["tone"]; text: string; fix: ReactNode }[] = [
-        ...failedEngines(row).map((engine) => {
-            const served = engine.serves[0];
-            return {
-                key: `engine-${engine.id}`,
-                tone: "destructive" as const,
-                text: `The engine for ${engine.base_model} failed`,
-                fix: (
-                    <span>
-                        {"Check the model's deployment and its weights: "}
-                        <Link
-                            href={modelPageHref(served ? served.model : engine.base_model)}
-                            className={LINK}
-                        >
-                            {served ? served.name : engine.base_model}
-                        </Link>
-                    </span>
-                ),
-            };
-        }),
-        ...(drift.length > 0
-            ? [
-                  {
-                      key: "versions",
-                      tone: "warning" as const,
-                      text: "Library versions differ from main",
-                      fix: (
-                          <span>{`Install the versions main runs, then restart it: ${drift.join("; ")}.`}</span>
-                      ),
-                  },
-              ]
-            : []),
-        ...lowDiskOf(row.node, info).map((store) => ({
-            key: `disk-${store.key}`,
-            tone: "warning" as const,
-            text: lowDiskText(store),
-            fix: (
-                <span>
-                    {"See what takes the space and remove what you no longer need: "}
-                    <Link href="/infrastructure/storage" className={LINK}>
-                        Storage
-                    </Link>
-                </span>
-            ),
-        })),
-    ];
     return (
         <section aria-label="Problems" className="flex flex-col gap-3 rounded-md border p-3">
-            {fixes.map((item) => (
-                <div key={item.key} className="flex flex-col gap-1">
-                    <StatusText tone={item.tone} className="whitespace-normal">
-                        {item.text}
-                    </StatusText>
-                    <span className="text-sm text-muted-foreground">{item.fix}</span>
-                </div>
+            {problems.map((problem) => (
+                <StatusText
+                    key={problem.id}
+                    tone={TONES[problem.severity]}
+                    className="whitespace-normal"
+                >
+                    {problem.text}
+                </StatusText>
             ))}
+            <Collapsible>
+                <CollapsibleTrigger>How to fix</CollapsibleTrigger>
+                <CollapsibleContent className="flex flex-col gap-3 pt-3">
+                    {problems.map((problem) => (
+                        <div
+                            key={problem.id}
+                            className="flex min-w-0 flex-col items-start gap-1.5 text-sm text-muted-foreground"
+                        >
+                            <Fix problem={problem} row={row} />
+                        </div>
+                    ))}
+                </CollapsibleContent>
+            </Collapsible>
         </section>
     );
 }
@@ -501,7 +497,7 @@ export function MachineSheet({
                                 <span>{`· ${row.node.roles.join(", ")} · ${hardwareText(row.node)}`}</span>
                             </SheetDescription>
                         </SheetHeader>
-                        <ProblemsBlock row={row} main={main} info={info} problems={problems} />
+                        <ProblemsBlock row={row} problems={problems} />
                         <HardwareBlock row={row} info={info} />
                         <RunningBlock row={row} />
                         <Block title="Live">

@@ -88,8 +88,8 @@ MONITORING = Section(
 KEYS = Section("Keys", "API keys for the OpenAI-compatible API and the models they cover.", ("/api/keys",))
 INFRASTRUCTURE = Section(
     "Infrastructure",
-    "Compute pools, device prices, the install and its servers.",
-    ("/api/compute", "/api/system"),
+    "Compute pools, device prices, the install and its servers, and what needs attention.",
+    ("/api/compute", "/api/system", "/api/problems"),
 )
 SETTINGS = Section(
     "Settings",

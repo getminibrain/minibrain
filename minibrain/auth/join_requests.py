@@ -149,6 +149,13 @@ def decided(session: Session, row: JoinRequest, action: str, actor: str) -> None
     session.add(AuditEvent(actor=actor, action=action, target=row.code, detail=detail))
 
 
+def approved_machines(session: Session) -> set[tuple[str, str]]:
+    live = select(JoinRequest.pool, JoinRequest.host).where(
+        JoinRequest.state == APPROVED, JoinRequest.revoked_at.is_(None), JoinRequest.pool.is_not(None)
+    )
+    return {(str(pool), host) for pool, host in session.execute(live)}
+
+
 def revoke_machine(session: Session, pool: str, host: str, actor: str) -> None:
     live = select(JoinRequest).where(
         JoinRequest.state == APPROVED,

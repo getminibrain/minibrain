@@ -496,8 +496,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Start UI, API, gateway, worker and engines with one command.
   CLI: minibrain serve · Config: MINIBRAIN_HOME, MINIBRAIN_UI_URL, MINIBRAIN_WEB_DIST
 - **Compute pools** · shipped · admin
-  See each machine's memory use, current work and issues with fixes.
-  UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
+  See each machine's memory use, current work and the setup.
+  UI: Infrastructure › Machines, Infrastructure › Setup · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
+- **Needs attention** · shipped · admin
+  What is wrong now, worst first, each with its fix.
+  UI: Infrastructure › Machines › Needs attention · API: GET /api/problems
 - **Machine list** · shipped · admin
   Filter every machine, spot its problems and open its details.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
@@ -506,13 +509,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Infrastructure › Machines · API: GET /api/compute/pools
 - **Live machine metrics** · shipped · admin
   See measured GPU memory, GPU and CPU load, and the last hour.
-  UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/compute/pools/{pool}/machines/{host}/metrics
+  UI: Infrastructure › Machines · API: GET /api/compute/pools, GET /api/compute/pools/{pool}/machines/{host}/metrics
 - **Drain and remove machines** · shipped · admin
   Drain a machine of new work, undrain it, or remove it.
   UI: Infrastructure › Machines · API: POST /api/compute/pools/{pool}/machines/{host}/drain, POST /api/compute/pools/{pool}/machines/{host}/undrain, DELETE /api/compute/pools/{pool}/machines/{host}
 - **Room per pool** · shipped · admin
   See how many more models fit and the largest that trains.
-  UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools
+  UI: Infrastructure › Machines · API: GET /api/compute/pools
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
@@ -521,7 +524,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_JOIN_TOKEN
 - **Add machine** · shipped · admin
   Pick a pool, copy the one command, watch it join.
-  UI: Infrastructure › Overview, Infrastructure › Machines · API: POST /api/compute/join-tokens, GET /api/compute/join-tokens
+  UI: Infrastructure › Machines · API: POST /api/compute/join-tokens, GET /api/compute/join-tokens
 - **Pool join tokens** · shipped · admin
   One token per pool; rotating it cuts off the old one.
   UI: Infrastructure › Machines · API: GET /api/compute/join-tokens, POST /api/compute/join-tokens · Config: MINIBRAIN_JOIN_TOKEN
@@ -681,7 +684,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Publish wheels to PyPI through Trusted Publishing.
   Roadmap: v1 scope
 - **Notifications** · planned · product, admin
-  A bell for failed jobs, results to review and missing files.
+  An inbox with read, snooze and history, sent by email or webhook.
   Roadmap: v2
 - **Global search** · planned · product
   ⌘K search for models, data, jobs, settings and actions.
