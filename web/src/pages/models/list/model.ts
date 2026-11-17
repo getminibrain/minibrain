@@ -341,7 +341,7 @@ function customLine(model: ListModel): StatusLine {
     if (best) {
         return {
             kind: "candidate",
-            text: `v${best.number} beats live ${points(deltaOf(model, best) ?? 0)}`,
+            text: `v${best.number} ${points(deltaOf(model, best) ?? 0)} vs live`,
             tone: "success",
             version: best.number,
             row,

@@ -233,7 +233,10 @@ function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
         [live ? `Live v${headline.number}` : `v${headline.number}, not live`, headline.score],
         ...(better ? ([[`Best v${better.number}`, better.score]] as [string, number][]) : []),
         ...(showBaseline
-            ? ([[`Prompt only v${showBaseline.number}`, showBaseline.score]] as [string, number][])
+            ? ([[`Baseline v${showBaseline.number}, prompt only`, showBaseline.score]] as [
+                  string,
+                  number,
+              ][])
             : []),
     ];
     return (
@@ -254,7 +257,7 @@ function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
                         {pct(headline.score)}
                     </span>
                     {showBaseline?.score != null && (
-                        <ScoreGain value={headline.score - showBaseline.score} versus="prompt" />
+                        <ScoreGain value={headline.score - showBaseline.score} versus="baseline" />
                     )}
                 </button>
             </TooltipTrigger>

@@ -229,7 +229,7 @@ export function ScoreBadge({ model, version }: { model: ListModel; version: Mode
         return null;
     }
     if (note.kind === "beats") {
-        return <Badge variant="success">{`beats live ${points(note.delta)}`}</Badge>;
+        return <Badge variant="success">{`${points(note.delta)} vs live`}</Badge>;
     }
     return (
         <Tooltip>

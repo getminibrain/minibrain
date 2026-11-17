@@ -168,7 +168,7 @@ def promote_status(model: Model) -> ModelStatus | None:
     live = live_version(model)
     live_score = held_out_score(live) if live is not None else None
     if live is not None and score is not None and live_score is not None:
-        text = f"v{number} beats live by {points(score - live_score)}"
+        text = f"v{number} {points(score - live_score)} vs live"
     else:
         text = f"v{number} ready · {share(score)}" if score is not None else f"v{number} ready"
     return ModelStatus(

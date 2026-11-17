@@ -68,7 +68,7 @@ def test_the_next_step_follows_the_model(harness: Harness) -> None:
     add_version(harness, "prompt")
     assert page(harness)["next"] is None
     finish(harness, "eval", accuracy=1.0)
-    assert page(harness)["next"]["label"] == "v1 beats live, deploy it"
+    assert page(harness)["next"]["label"] == "v1 is better than live, deploy it"
     harness.client.post(f"/api/models/{SLUG}/versions/1/promote")
     body = {"input": "I was charged twice", "output": "billing", "rating": "down", "correction": "account"}
     assert harness.client.post(f"/api/models/{SLUG}/feedback", json=body).status_code == 201

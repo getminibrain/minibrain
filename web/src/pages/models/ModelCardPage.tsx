@@ -101,7 +101,7 @@ function Summary({ card, live }: { card: ModelCard; live: boolean }) {
                     value={percent(card.evaluation.held_out?.accuracy)}
                 />
                 <Stat
-                    label={baseline ? `vs prompt-only v${baseline.number}` : "vs prompt-only"}
+                    label={baseline ? `vs baseline v${baseline.number}` : "vs baseline"}
                     value={<Change value={baseline?.accuracy_change} />}
                 />
                 <Stat label="Created" value={<Updated value={version.created_at} />} />

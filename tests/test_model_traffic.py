@@ -167,7 +167,7 @@ def test_a_better_version_is_put_against_live(harness: Harness) -> None:
     add_version(harness, "prompt")
     finish(harness, "eval", accuracy=1.0)
     better = status_of(harness)
-    assert better["tone"] == "info" and better["text"].startswith("v1 beats live by +")
+    assert better["tone"] == "info" and better["text"].startswith("v1 +")
     assert better["action"]["kind"] == "promote" and better["action"]["version"] == 1
 
 
@@ -192,7 +192,7 @@ def test_a_worse_version_rolled_back_from_is_not_put_against_live(harness: Harne
     for number in (2, 1):
         assert harness.client.post(f"/api/models/{SLUG}/versions/{number}/promote").status_code == 200
     found = page(harness)
-    assert "beats live" not in found["status"]["text"]
+    assert "vs live" not in found["status"]["text"]
     assert found["next"] is None or found["next"]["kind"] != "promote"
 
 

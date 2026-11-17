@@ -135,7 +135,7 @@ def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | No
         return None
     candidate = passing_candidate(model)
     if candidate is not None:
-        label = f"v{candidate} beats live, deploy it" if live_version(model) else f"Deploy v{candidate}"
+        label = f"v{candidate} is better than live, deploy it" if live_version(model) else f"Deploy v{candidate}"
         return NextAction(kind="promote", label=label, version=candidate)
     if not model.deployed:
         return undeployed_next(model, limit)

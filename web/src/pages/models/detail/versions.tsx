@@ -259,9 +259,7 @@ export function ScoreBadge({
         );
     }
     if (live && live.score !== null && version.score > live.score) {
-        return (
-            <Badge variant="success">{`beats live ${points(version.score - live.score)}`}</Badge>
-        );
+        return <Badge variant="success">{`${points(version.score - live.score)} vs live`}</Badge>;
     }
     return null;
 }

@@ -345,7 +345,7 @@ function rulesText(detail: ModelDetail): string {
             `${metricName(item.metric)} ${item.op} ${item.value <= 1 ? percent(item.value) : item.value}`,
     );
     if (detail.promotion.beats_live) {
-        parts.push("beats live");
+        parts.push("better than live");
     }
     return parts.length > 0 ? parts.join(", ") : "None";
 }
