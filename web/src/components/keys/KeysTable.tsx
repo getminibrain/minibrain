@@ -88,11 +88,18 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
             accessorFn: (key) => key.name.toLowerCase(),
             size: 220,
             cell: ({ row }) => (
-                <span className="flex min-w-0 items-baseline gap-2">
-                    <span className="truncate font-medium">{row.original.name}</span>
-                    <span className="shrink-0 font-mono text-sm text-muted-foreground">
-                        {`${row.original.prefix}…`}
-                    </span>
+                <span className="block max-w-56 truncate font-medium" title={row.original.name}>
+                    {row.original.name}
+                </span>
+            ),
+        },
+        {
+            header: "Key ID",
+            id: "prefix",
+            accessorFn: (key) => key.prefix,
+            cell: ({ row }) => (
+                <span className="font-mono text-sm whitespace-nowrap text-muted-foreground">
+                    {`${row.original.prefix}…`}
                 </span>
             ),
         },
@@ -179,7 +186,7 @@ export function KeysTable({
             loading={loading}
             storageKey={storageKey}
             empty={empty}
-            minWidth="min-w-[1080px]"
+            minWidth="min-w-[900px]"
             rowActions={(key) => (
                 <KeyMenu
                     item={key}
