@@ -408,6 +408,17 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     );
 }
 
+function splitsNote(dataset: DatasetSummary): string {
+    const latest = dataset.dataset_version;
+    if (!latest) {
+        return "The first version sets the splits.";
+    }
+    if (Object.keys(latest.counts ?? {}).length === 0) {
+        return `Version ${latest.number ?? "–"} has too few rows to split into training and test rows; add rows before training.`;
+    }
+    return "Splits are unknown since the change.";
+}
+
 function DatasetStats({
     dataset,
     preview,
@@ -442,13 +453,7 @@ function DatasetStats({
                     </>
                 )}
             </Stats>
-            {!splits && (
-                <p className="text-sm text-muted-foreground">
-                    {dataset.dataset_version
-                        ? "Splits are unknown since the change."
-                        : "The first version sets the splits."}
-                </p>
-            )}
+            {!splits && <p className="text-sm text-muted-foreground">{splitsNote(dataset)}</p>}
         </div>
     );
 }
