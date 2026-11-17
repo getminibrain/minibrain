@@ -607,13 +607,18 @@ IN_PROGRESS: dict[str, VersionState] = {
 }
 
 
+def deployable(model: Model, version: Version) -> bool:
+    same_base = version.base_model == model.base_model
+    return version.status == VersionStatus.READY and same_base and decision(model, version).passed
+
+
 def state_of(model: Model, version: Version) -> VersionState:
     live = live_version(model)
     if live is not None and live.id == version.id:
         return "live"
     if version.status in IN_PROGRESS:
         return IN_PROGRESS[version.status]
-    return "ready_to_deploy" if is_scored(version) and decision(model, version).passed else "not_deployed"
+    return "ready_to_deploy" if deployable(model, version) else "not_deployed"
 
 
 def card_labels(version: Version) -> list[str]:

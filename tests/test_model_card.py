@@ -10,7 +10,7 @@ from minibrain.tasks.contracts import label_set
 from minibrain.tasks.examples import Example, single
 from minibrain.tasks.graders import LabelAccuracy, grade
 from tests.conftest import LABELS, Harness, fake_adapter, scored_answers
-from tests.test_flow import SLUG, TIMING, create_on_data, store_metrics
+from tests.test_flow import SLUG, TIMING, create_model, create_on_data, store_metrics
 
 CARD = f"/api/models/{SLUG}/versions"
 
@@ -301,3 +301,18 @@ def test_the_card_states_where_the_version_stands_in_product_words(harness: Harn
     text = harness.client.get(f"{CARD}/1/card.md").text
     assert "· Live ·" in text
     assert "promot" not in text.lower()
+
+
+def test_ready_to_deploy_on_the_card_is_the_versions_deploy_rule_and_not_live(harness: Harness) -> None:
+    create_model(harness)
+    versions = harness.client.get(CARD).json()
+    assert [(item["number"], item["status"], item["promotion"]["passed"]) for item in versions] == [(0, "ready", True)]
+    card = harness.client.get(f"{CARD}/0/card").json()["card"]
+    assert card["evaluation"]["scored"] is False
+    assert card["version"]["state"] == "ready_to_deploy"
+    with harness.sessions() as session:
+        model = session.scalar(select(Model).where(Model.slug == SLUG))
+        assert model is not None
+        model.base_model = "another-base"
+        session.commit()
+    assert harness.client.get(f"{CARD}/0/card").json()["card"]["version"]["state"] == "not_deployed"
