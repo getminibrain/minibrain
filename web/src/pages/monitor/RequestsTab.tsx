@@ -33,7 +33,7 @@ import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count, milliseconds, percent } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
-import { sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
+import { isDefaultSort, sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
 import {
     DEFAULT_RANGE,
     RANGES,
@@ -231,11 +231,22 @@ function useDebounced(value: string, onSettle: (value: string) => void) {
     return [draft, setDraft] as const;
 }
 
-export function LiveControl({ paused, onToggle }: { paused: boolean; onToggle: () => void }) {
+export function useRequestsHeld(): string | undefined {
+    const { search } = useListSearch(REQUESTS_PATH, REQUEST_KEYS);
+    const sort = sortFrom(REQUEST_SORTS, NEWEST_REQUESTS, search);
+    return isDefaultSort(sort, NEWEST_REQUESTS) ? undefined : "Paused while sorted";
+}
+
+export function LiveControl({
+    paused,
+    held,
+    onToggle,
+}: { paused: boolean; held?: string; onToggle: () => void }) {
+    const live = !paused && !held;
     return (
         <div className="flex items-center gap-3">
-            <StatusText tone={paused ? "neutral" : "info"} active={!paused}>
-                {paused ? "Paused" : "Live"}
+            <StatusText tone={live ? "info" : "neutral"} active={live}>
+                {paused ? "Paused" : (held ?? "Live")}
             </StatusText>
             <Button variant="outline" onClick={onToggle} aria-pressed={paused}>
                 {paused ? "Resume" : "Pause"}

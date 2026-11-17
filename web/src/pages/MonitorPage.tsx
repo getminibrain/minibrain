@@ -5,7 +5,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page } from "~/components/Section";
 import { OVERVIEW_PATH, REQUESTS_PATH } from "~/lib/requests";
 import { OverviewTab } from "./monitor/OverviewTab";
-import { LiveControl, RequestsTab } from "./monitor/RequestsTab";
+import { LiveControl, RequestsTab, useRequestsHeld } from "./monitor/RequestsTab";
 
 const TABS: TabNavItem[] = [
     { label: "Overview", href: OVERVIEW_PATH },
@@ -26,13 +26,18 @@ export function MonitorPage() {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const tab = tabOf(pathname);
     const [paused, setPaused] = useState(false);
+    const sortHeld = useRequestsHeld();
     return (
         <Page wide>
             <PageHeader
                 title="Monitoring"
                 caption={CAPTIONS[tab]}
                 actions={
-                    <LiveControl paused={paused} onToggle={() => setPaused((value) => !value)} />
+                    <LiveControl
+                        paused={paused}
+                        held={tab === REQUESTS_PATH ? sortHeld : undefined}
+                        onToggle={() => setPaused((value) => !value)}
+                    />
                 }
             />
             <TabNav label="Monitoring pages" tabs={TABS} />

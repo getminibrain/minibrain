@@ -660,7 +660,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Chart requests, errors, latency and tokens per model, live.
   UI: Monitoring › Overview · API: GET /api/requests/overview
 - **Request log** · shipped · engineer, admin
-  Browse every /v1 call live, filtered, with its kept input.
+  Filter every /v1 call with its kept input; live while newest first.
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Sortable tables** · shipped · product, ml, engineer, admin
   Sort any table; previews sort by column type, long lists server-side.
