@@ -21,7 +21,6 @@ import { FORMAT_LABELS } from "./Folders";
 import { LakehouseFacts } from "./Lakehouse";
 import {
     type ItemRef,
-    TABLE_FORMATS,
     groupOf,
     itemHref,
     plural,
@@ -41,11 +40,6 @@ import {
 } from "./parts";
 
 const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
-const CONNECTED_LABELS: Record<string, string> = {
-    s3: "S3 path",
-    database: "Database",
-};
-
 const ENCODING_LABELS: Record<string, string> = {
     "utf-8": "UTF-8",
     "windows-1252": "Windows-1252",
@@ -247,37 +241,7 @@ export function FileDetail({
                 icon={
                     source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined
                 }
-                detail={
-                    format ? (
-                        <>
-                            {`${TABLE_FORMATS[format].label} table · ${format === "iceberg" ? (source.connection ?? "no connection") : "folder on this server"} · table `}
-                            <span className="font-mono">{source.table}</span>
-                            {` · added ${relativeTime(source.created_at)}`}
-                        </>
-                    ) : CONNECTED_LABELS[source.kind] ? (
-                        <>
-                            {`${CONNECTED_LABELS[source.kind]} · ${source.connection ?? "no connection"} · table `}
-                            <span className="font-mono">{source.table}</span>
-                            {` · added ${relativeTime(source.created_at)}`}
-                        </>
-                    ) : source.kind === "folder" ? (
-                        <>
-                            {"Folder · "}
-                            <span className="font-mono">{source.path}</span>
-                            {" · table "}
-                            <span className="font-mono">{source.table}</span>
-                            {` · added ${relativeTime(source.created_at)}`}
-                        </>
-                    ) : (
-                        <>
-                            {`${groupOf(source.kind).label} · `}
-                            <span className="font-mono">{source.filename}</span>
-                            {" · table "}
-                            <span className="font-mono">{source.table}</span>
-                            {` · added ${relativeTime(source.created_at)}`}
-                        </>
-                    )
-                }
+                detail={`Added ${relativeTime(source.created_at)}`}
                 trail={
                     <Trail
                         current="source"
