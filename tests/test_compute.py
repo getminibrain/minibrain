@@ -203,6 +203,23 @@ def test_pools_say_what_each_machine_is_doing(harness: Harness) -> None:
     assert by_name(harness)["local"]["nodes"][0]["jobs"] == []
 
 
+def test_pools_list_deployed_models_without_an_engine(harness: Harness) -> None:
+    join_rack(harness)
+    serve_on_rack(harness)
+    rack = by_name(harness)["rack"]
+    assert rack["engines"] == []
+    assert rack["deployed"] == [
+        {
+            "model": "triage",
+            "name": "Ticket Triage",
+            "version": 4,
+            "adapter_bytes": 64 * 1024**2,
+            "base_model": "qwen3-0.6b",
+        }
+    ]
+    assert by_name(harness)["local"]["deployed"] == []
+
+
 def test_storage_groups_stores_by_disk(harness: Harness) -> None:
     info = harness.client.get("/api/system/infrastructure").json()
     disks = {store["disk"] for store in info["stores"] if store["kind"] in ("folder", "sqlite")}

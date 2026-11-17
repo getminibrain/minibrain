@@ -17568,6 +17568,54 @@
         ],
         "title": "DeployRequest"
       },
+      "DeployedModel": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "adapter_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adapter Bytes"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model",
+            "description": "The base its engines load."
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "name",
+          "version",
+          "adapter_bytes",
+          "base_model"
+        ],
+        "title": "DeployedModel"
+      },
       "Deployment": {
         "properties": {
           "state": {
@@ -26611,6 +26659,15 @@
               }
             ],
             "description": "What still fits on the online machines that take work."
+          },
+          "deployed": {
+            "items": {
+              "$ref": "#/components/schemas/DeployedModel"
+            },
+            "type": "array",
+            "title": "Deployed",
+            "description": "Models deployed on this pool, whether or not an engine runs them yet.",
+            "default": []
           }
         },
         "type": "object",

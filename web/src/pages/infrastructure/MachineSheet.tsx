@@ -32,6 +32,7 @@ import {
     MEMORY_LABELS,
     type MemoryView,
     engineLabel,
+    engineState,
     estimatedView,
     jobLink,
     jobSubject,
@@ -42,13 +43,6 @@ import {
 import { RestartFix } from "./commands";
 import { type MachineRow, hardwareText, machineStatus, versionDrift } from "./machines";
 import type { InfrastructureInfo, NodeInfo, ReplicaInfo } from "./parts";
-
-const ENGINE_STATES: Record<string, { label: string; tone: Tone }> = {
-    ready: { label: "Ready", tone: "success" },
-    loading: { label: "Loading", tone: "info" },
-    fetching: { label: "Fetching weights", tone: "info" },
-    failed: { label: "Failed", tone: "destructive" },
-};
 
 const OUTCOMES: Record<string, { label: string; tone: Tone }> = {
     succeeded: { label: "Done", tone: "success" },
@@ -162,7 +156,7 @@ function MachineState({ row }: { row: MachineRow }) {
 }
 
 function EngineItem({ engine }: { engine: ReplicaInfo }) {
-    const state = ENGINE_STATES[engine.state] ?? ENGINE_STATES.loading;
+    const state = engineState(engine.state);
     return (
         <li className="flex min-w-0 flex-col gap-1 py-2">
             <span className="flex flex-wrap items-baseline justify-between gap-x-3">

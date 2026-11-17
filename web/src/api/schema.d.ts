@@ -5223,6 +5223,22 @@ export interface components {
              */
             replicas?: number | null;
         };
+        /** DeployedModel */
+        DeployedModel: {
+            /** Model */
+            model: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number | null;
+            /** Adapter Bytes */
+            adapter_bytes: number | null;
+            /**
+             * Base Model
+             * @description The base its engines load.
+             */
+            base_model: string;
+        };
         /** Deployment */
         Deployment: {
             /**
@@ -8258,6 +8274,12 @@ export interface components {
             engines: components["schemas"]["ReplicaInfo"][];
             /** @description What still fits on the online machines that take work. */
             room?: components["schemas"]["PoolRoom"] | null;
+            /**
+             * Deployed
+             * @description Models deployed on this pool, whether or not an engine runs them yet.
+             * @default []
+             */
+            deployed?: components["schemas"]["DeployedModel"][];
         };
         /** PoolPlacement */
         PoolPlacement: {

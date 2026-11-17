@@ -140,6 +140,10 @@ class ServedModel(BaseModel):
     adapter_bytes: int | None
 
 
+class DeployedModel(ServedModel):
+    base_model: str = Field(description="The base its engines load.")
+
+
 class ReplicaInfo(BaseModel):
     id: str
     base_model: str
@@ -169,6 +173,9 @@ class PoolInfo(BaseModel):
     nodes: list[NodeInfo]
     engines: list[ReplicaInfo]
     room: PoolRoom | None = Field(default=None, description="What still fits on the online machines that take work.")
+    deployed: list[DeployedModel] = Field(
+        default=[], description="Models deployed on this pool, whether or not an engine runs them yet."
+    )
 
 
 def planned_peak(session: Session, job: Job) -> int | None:
@@ -371,6 +378,15 @@ def latest_sample(metrics: MetricsHistory, item: PoolNode) -> Sampled | None:
     return (point.sample, point.at) if point is not None else None
 
 
+def deployed_on(pool: str, served: dict[tuple[str, str], list[ServedModel]]) -> list[DeployedModel]:
+    return [
+        DeployedModel(base_model=base, **item.model_dump())
+        for (name, base), items in served.items()
+        if name == pool
+        for item in items
+    ]
+
+
 def pool_info(
     session: Session,
     pool: Pool,
@@ -399,6 +415,7 @@ def pool_info(
         nodes=nodes,
         engines=engines,
         room=PoolRoom.model_validate(room.__dict__) if room is not None else None,
+        deployed=deployed_on(pool.name, served),
     )
 
 

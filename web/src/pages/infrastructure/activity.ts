@@ -1,4 +1,5 @@
 import type { GaugeBasis, GaugeSegment } from "~/components/UsageGauge";
+import type { Tone } from "~/components/models/StatusText";
 import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import type { NodeInfo, ReplicaInfo } from "./parts";
 
@@ -26,6 +27,31 @@ export const ENGINE_DOING: Record<string, string> = {
     fetching: "Fetching weights for",
     failed: "Engine failed for",
 };
+
+export type EngineState = { label: string; tone: Tone; active: boolean };
+
+const ENGINE_STATES: Record<string, EngineState> = {
+    ready: { label: "Ready", tone: "success", active: false },
+    loading: { label: "Loading", tone: "info", active: true },
+    fetching: { label: "Fetching weights", tone: "info", active: true },
+    failed: { label: "Failed", tone: "destructive", active: false },
+    fetch_failed: { label: "Fetch failed", tone: "destructive", active: false },
+};
+
+const STATE_RANK = ["failed", "fetch_failed", "fetching", "loading", "ready"];
+
+export function engineState(state: string): EngineState {
+    return ENGINE_STATES[state] ?? ENGINE_STATES.loading;
+}
+
+export function worstKey(engines: ReplicaInfo[]): string {
+    const states = engines.map((engine) => engine.state);
+    return STATE_RANK.find((state) => states.includes(state)) ?? states[0] ?? "loading";
+}
+
+export function worstState(engines: ReplicaInfo[]): EngineState {
+    return engineState(worstKey(engines));
+}
 
 export function engineLabel(engine: string): string {
     return ENGINE_LABELS[engine] ?? engine;

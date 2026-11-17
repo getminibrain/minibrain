@@ -513,6 +513,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Machine list** · shipped · admin
   Filter every machine, spot its problems and open its details.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
+- **Machines by pool or model** · shipped · admin
+  Group machines by pool, or by the models they serve.
+  UI: Infrastructure › Machines › Group by · API: GET /api/compute/pools
 - **Machine versions** · shipped · admin
   Compare each machine's libraries, CUDA and NVIDIA driver with main.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
