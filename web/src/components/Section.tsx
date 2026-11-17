@@ -162,7 +162,7 @@ export function pageFrame(width: PageWidth): string {
 
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
     return (
-        <div className={cn(pageFrame(wide ? "wide" : "normal"), "flex flex-col gap-4 pb-6")}>
+        <div className={cn(pageFrame(wide ? "wide" : "normal"), "flex flex-col gap-4 pb-12")}>
             {children}
         </div>
     );
