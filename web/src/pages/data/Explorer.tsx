@@ -785,7 +785,7 @@ export function DataExplorer() {
 
     return (
         <div className="@container flex min-h-0 flex-1 flex-col">
-            <div className={pageFrame(true)}>
+            <div className={pageFrame("full")}>
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."

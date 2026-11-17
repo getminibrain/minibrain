@@ -148,10 +148,22 @@ export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => 
     );
 }
 
-export function pageFrame(wide: boolean): string {
-    return cn("mx-auto w-full px-6 pt-8", wide ? "max-w-[96rem]" : "max-w-6xl");
+type PageWidth = "normal" | "wide" | "full";
+
+const PAGE_WIDTH: Record<PageWidth, string> = {
+    normal: "max-w-6xl",
+    wide: "max-w-[96rem]",
+    full: "",
+};
+
+export function pageFrame(width: PageWidth): string {
+    return cn("mx-auto w-full px-6 pt-8", PAGE_WIDTH[width]);
 }
 
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-    return <div className={cn(pageFrame(wide), "flex flex-col gap-4 pb-6")}>{children}</div>;
+    return (
+        <div className={cn(pageFrame(wide ? "wide" : "normal"), "flex flex-col gap-4 pb-6")}>
+            {children}
+        </div>
+    );
 }
