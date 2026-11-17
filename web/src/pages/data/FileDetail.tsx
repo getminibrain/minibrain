@@ -1,6 +1,5 @@
 import { IconPencil, IconTags } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     ConfirmDialog,
@@ -16,7 +15,6 @@ import { useMemo, useState } from "react";
 import {
     type ColumnStats,
     type DatasetSummary,
-    type QueryResponse,
     type SourceSummary,
     api,
     succeed,
@@ -53,6 +51,7 @@ import {
     Stats,
     useDataRefresh,
 } from "./parts";
+import { resultColumns } from "./resultColumns";
 
 const ENCODING_LABELS: Record<string, string> = {
     "utf-8": "UTF-8",
@@ -171,22 +170,6 @@ function Schema({ source }: { source: SourceSummary }) {
     );
 }
 
-function rowColumns(result: QueryResponse): ColumnDef<(string | null)[], unknown>[] {
-    return result.columns.map((name, index) => ({
-        id: `${index}:${name}`,
-        header: () => <span className="font-mono">{name}</span>,
-        accessorFn: (row) => row[index] ?? "",
-        cell: (info) => {
-            const value = info.getValue() as string;
-            return value === "" ? (
-                <span className="text-muted-foreground">–</span>
-            ) : (
-                <span className="line-clamp-2 max-w-sm whitespace-normal">{value}</span>
-            );
-        },
-    }));
-}
-
 function SourcePreview({ source }: { source: SourceSummary }) {
     const rows = useSourceRows(source.id);
     const records = useMemo(() => {
@@ -208,7 +191,7 @@ function SourcePreview({ source }: { source: SourceSummary }) {
             note="as stored"
             table={
                 <DataGrid
-                    columns={rows.data ? rowColumns(rows.data) : []}
+                    columns={rows.data ? resultColumns(rows.data) : []}
                     rows={rows.data?.rows ?? []}
                     loading={rows.isLoading}
                     maxHeight="100%"

@@ -365,7 +365,8 @@ def apply_mapping(
 
 def query_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> QueryResponse:
     result = run_query(tables, sql, QUERY_ROWS, aliases, as_text=True)
-    return QueryResponse(columns=result.columns, rows=[[to_text(value) for value in row] for row in result.rows])
+    rows = [[to_text(value) for value in row] for row in result.rows]
+    return QueryResponse(columns=result.columns, types=result.types, rows=rows)
 
 
 def chat_example(messages: str | None, expected: str | None) -> list[ChatMessage]:

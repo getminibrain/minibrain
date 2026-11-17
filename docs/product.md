@@ -660,8 +660,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Browse every /v1 call live, filtered, with its kept input.
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Sortable tables** · shipped · product, ml, engineer, admin
-  Sort any table by its columns; long lists sort on the server.
-  UI: Jobs, Training, Monitoring › Requests, Settings › Audit log · API: GET /api/jobs, GET /api/requests, GET /api/audit
+  Sort any table; previews sort by column type, long lists server-side.
+  UI: Jobs, Training, Monitoring › Requests, Settings › Audit log, Data › source › Preview › Table, Data › dataset › Edit query › Write SQL · API: GET /api/jobs, GET /api/requests, GET /api/audit, GET /api/sources/{source_id}/rows, POST /api/query
 - **Jobs** · shipped · ml, admin
   Every job by status and pool; cancel, retry or delete.
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}

@@ -69,6 +69,7 @@ def test_queries_must_be_one_select_over_known_sources(harness: Harness) -> None
         assert message in response.json()["detail"]
     ran = harness.client.post("/api/query", json={"sql": "SELECT category, count(*) AS n FROM tickets GROUP BY 1"})
     assert ran.status_code == 200 and len(ran.json()["rows"]) == 4
+    assert ran.json()["types"] == ["VARCHAR", "BIGINT"]
 
 
 def test_a_dataset_suggests_the_output_its_answers_hold(harness: Harness) -> None:

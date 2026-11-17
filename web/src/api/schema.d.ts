@@ -8630,6 +8630,8 @@ export interface components {
         QueryResponse: {
             /** Columns */
             columns: string[];
+            /** Types */
+            types: string[];
             /** Rows */
             rows: (string | null)[][];
         };

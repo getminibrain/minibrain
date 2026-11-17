@@ -997,6 +997,7 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     columns: list[str]
+    types: list[str]
     rows: list[list[str | None]]
 
 

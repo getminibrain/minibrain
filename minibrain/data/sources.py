@@ -67,6 +67,7 @@ class ColumnSummary:
 class QueryResult:
     columns: list[str]
     rows: list[list[Any]]
+    types: list[str] = field(default_factory=list)
 
 
 class Remote(Protocol):
@@ -337,27 +338,30 @@ def is_nested(type_name: str) -> bool:
     return type_name.endswith("]") or type_name.startswith(NESTED_TYPES)
 
 
-def as_text_query(connection: duckdb.DuckDBPyConnection, query: str) -> str:
+def as_text_query(connection: duckdb.DuckDBPyConnection, query: str) -> tuple[str, list[str]]:
     found = connection.execute(f"DESCRIBE {query}").fetchall()
     parts = []
+    types = []
     for name, type_name, *_ in found:
         column = quote_identifier(name)
         value = f"to_json({column})" if is_nested(type_name) else column
         parts.append(f"{value}::VARCHAR AS {column}")
-    return f"SELECT {', '.join(parts)} FROM ({query})" if parts else query
+        types.append(str(type_name))
+    return (f"SELECT {', '.join(parts)} FROM ({query})" if parts else query), types
 
 
 def run_query(
     tables: Sequence[Table], sql: str, limit: int | None, aliases: dict[str, str] | None = None, as_text: bool = False
 ) -> QueryResult:
     query = wrapped(sql, limit)
+    types: list[str] = []
     with sandbox(tables, aliases) as connection:
         if as_text:
-            query = as_text_query(connection, query)
+            query, types = as_text_query(connection, query)
         cursor = connection.execute(query)
         columns = [description[0] for description in cursor.description or []]
         rows = [list(row) for row in cursor.fetchall()]
-    return QueryResult(columns=columns, rows=rows)
+    return QueryResult(columns=columns, rows=rows, types=types)
 
 
 def output_columns(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> list[Column]:

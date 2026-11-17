@@ -34,6 +34,7 @@ import { sqlProblem } from "~/lib/sqlError";
 import { DataExplorer } from "./data/Explorer";
 import { SampleNote, SampleOffer, type SampleRequest, useOverLimit } from "./data/SampleOffer";
 import { itemHref } from "./data/catalogue";
+import { naturalSort, resultColumns } from "./data/resultColumns";
 
 type Row = { input: string | null; label: string | null };
 
@@ -48,6 +49,7 @@ const ROW_COLUMNS: ColumnDef<Row, unknown>[] = [
         header: "Label",
         id: "label",
         accessorFn: (row) => row.label ?? undefined,
+        sortingFn: naturalSort(),
         sortUndefined: "last",
         cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
     },
@@ -141,18 +143,7 @@ function ColumnSelect({
 }
 
 function QueryResult({ result }: { result: QueryResponse }) {
-    const columns: ColumnDef<string[], unknown>[] = result.columns.map((name, index) => ({
-        id: name,
-        header: name,
-        accessorFn: (row) => row[index],
-        cell: (info) => <Clamp text={info.getValue()} />,
-    }));
-    return (
-        <DataGrid
-            columns={columns}
-            rows={result.rows.map((row) => row.map((cell) => cell ?? ""))}
-        />
-    );
+    return <DataGrid columns={resultColumns(result)} rows={result.rows} />;
 }
 
 type MappingBody = { input_column?: string; label_column?: string; sql?: string };
@@ -330,6 +321,7 @@ const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
     {
         header: "Label",
         accessorKey: "expected",
+        sortingFn: naturalSort(),
         cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
 ];

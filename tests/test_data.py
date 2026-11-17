@@ -61,6 +61,7 @@ def test_rows_as_text_keep_nested_values_as_json(staging: list[Table]) -> None:
     sql = "SELECT 1 AS id, [{'role': 'user', 'content': 'hi \"there\"'}] AS messages, NULL::INTEGER[] AS empty"
     result = run_query(staging, sql, None, as_text=True)
     assert result.columns == ["id", "messages", "empty"]
+    assert result.types == ["INTEGER", "STRUCT(\"role\" VARCHAR, \"content\" VARCHAR)[]", "INTEGER[]"]
     assert result.rows == [["1", '[{"role":"user","content":"hi \\"there\\""}]', None]]
 
 

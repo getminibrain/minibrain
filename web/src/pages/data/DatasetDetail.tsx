@@ -74,6 +74,7 @@ import {
     useDataRefresh,
     useModelNames,
 } from "./parts";
+import { naturalSort } from "./resultColumns";
 
 const SPLITS: [string, string][] = [
     ["train", "Training"],
@@ -458,7 +459,10 @@ const PREVIEW_COLUMNS: ColumnDef<PreviewRow, unknown>[] = [
     { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
     {
         header: "Label",
-        accessorKey: "label",
+        id: "label",
+        accessorFn: (row) => row.label ?? undefined,
+        sortingFn: naturalSort(),
+        sortUndefined: "last",
         cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
     },
 ];

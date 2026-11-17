@@ -16,6 +16,7 @@ import type { components } from "~/api/schema";
 import { ErrorLine, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { exactTime } from "~/lib/time";
+import { naturalSort } from "./resultColumns";
 
 type Schemas = components["schemas"];
 type VersionDiff = Schemas["DatasetVersionDiff"];
@@ -57,6 +58,7 @@ const ROW_COLUMNS: ColumnDef<DiffRow, unknown>[] = [
     {
         header: "Label",
         accessorKey: "label",
+        sortingFn: naturalSort(),
         cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
 ];
@@ -71,11 +73,13 @@ const RELABEL_COLUMNS: ColumnDef<RelabelInfo, unknown>[] = [
     {
         header: "Was",
         accessorKey: "before",
+        sortingFn: naturalSort(),
         cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
     {
         header: "Now",
         accessorKey: "after",
+        sortingFn: naturalSort(),
         cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
 ];

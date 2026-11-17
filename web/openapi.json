@@ -27604,6 +27604,13 @@
             "type": "array",
             "title": "Columns"
           },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Types"
+          },
           "rows": {
             "items": {
               "items": {
@@ -27625,6 +27632,7 @@
         "type": "object",
         "required": [
           "columns",
+          "types",
           "rows"
         ],
         "title": "QueryResponse"

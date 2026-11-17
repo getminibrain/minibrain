@@ -1,5 +1,4 @@
 import { useMutation } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     DataGrid,
@@ -19,6 +18,7 @@ import { ErrorLine } from "~/components/Section";
 import { sqlProblem } from "~/lib/sqlError";
 import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
 import { typeWord } from "./columnTypes";
+import { resultColumns } from "./resultColumns";
 
 export type MappingBody = {
     source_id?: number;
@@ -44,15 +44,9 @@ export function Clamp({ text }: { text: unknown }) {
 }
 
 function QueryResult({ result }: { result: QueryResponse }) {
-    const columns: ColumnDef<(string | null)[], unknown>[] = result.columns.map((name, index) => ({
-        id: `${index}:${name}`,
-        header: () => <span className="font-mono">{name}</span>,
-        accessorFn: (row) => row[index] ?? "",
-        cell: (info) => <Clamp text={info.getValue()} />,
-    }));
     return (
         <DataGrid
-            columns={columns}
+            columns={resultColumns(result)}
             rows={result.rows}
             maxHeight="360px"
             minWidth={result.columns.length > 4 ? "min-w-[960px]" : undefined}
