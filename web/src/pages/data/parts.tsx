@@ -1,4 +1,3 @@
-import { IconChevronRight } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
@@ -12,13 +11,12 @@ import {
     Field,
     FieldGroup,
     Input,
-    Link,
     Textarea,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { LabelCount } from "~/api/client";
 import { dataKeys } from "~/api/dataQueries";
 import { keys, useAllModels, useSources } from "~/api/queries";
@@ -29,8 +27,6 @@ import { splitTags } from "../models/dialogs";
 import { sourceNameProblem } from "./catalogue";
 
 export type Described = { name: string; description: string; tags: string[] };
-
-export type TrailLink = { label: string; href: string };
 
 export function useDataRefresh() {
     const client = useQueryClient();
@@ -59,112 +55,21 @@ export function modelHref(slug: string): string {
     return modelPageHref(slug);
 }
 
-function TrailStep({
-    caption,
-    links,
-    current,
-    empty,
-}: {
-    caption: string;
-    links: TrailLink[];
-    current?: string;
-    empty: string;
-}) {
-    const shown = links.slice(0, 3);
-    const more = links.length - shown.length;
-    return (
-        <li className="flex min-w-0 items-baseline gap-1.5">
-            <span className="text-muted-foreground">{caption}</span>
-            {current !== undefined ? (
-                <span aria-current="page" className="truncate font-semibold">
-                    {current}
-                </span>
-            ) : links.length === 0 ? (
-                <span className="text-muted-foreground">{empty}</span>
-            ) : (
-                <span className="flex min-w-0 flex-wrap gap-x-2">
-                    {shown.map((link) => (
-                        <Link key={link.href} href={link.href} className="truncate text-primary">
-                            {link.label}
-                        </Link>
-                    ))}
-                    {more > 0 && <span className="text-muted-foreground">{`+${more}`}</span>}
-                </span>
-            )}
-        </li>
-    );
-}
-
-export function Trail({
-    sources,
-    datasets,
-    models,
-    current,
-}: {
-    sources: TrailLink[];
-    datasets: TrailLink[];
-    models: TrailLink[];
-    current: "source" | "dataset";
-}) {
-    const steps = [
-        <TrailStep
-            key="source"
-            caption={sources.length === 1 || current === "source" ? "Source" : "Sources"}
-            links={sources}
-            current={current === "source" ? sources[0]?.label : undefined}
-            empty="None yet"
-        />,
-        <TrailStep
-            key="dataset"
-            caption={datasets.length === 1 || current === "dataset" ? "Dataset" : "Datasets"}
-            links={datasets}
-            current={current === "dataset" ? datasets[0]?.label : undefined}
-            empty="None yet"
-        />,
-        <TrailStep
-            key="models"
-            caption={models.length === 1 ? "Model" : "Models"}
-            links={models}
-            empty="None yet"
-        />,
-    ];
-    return (
-        <nav aria-label="Lineage">
-            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                {steps.map((step, index) => (
-                    <Fragment key={step.key}>
-                        {index > 0 && (
-                            <IconChevronRight
-                                aria-hidden="true"
-                                className="size-4 shrink-0 text-muted-foreground"
-                            />
-                        )}
-                        {step}
-                    </Fragment>
-                ))}
-            </ol>
-        </nav>
-    );
-}
-
 export function ItemHeader({
     title,
     icon,
     detail,
-    trail,
     actions,
     about,
 }: {
     title: ReactNode;
     icon?: ReactNode;
     detail?: ReactNode;
-    trail?: ReactNode;
     actions?: ReactNode;
     about?: ReactNode;
 }) {
     return (
         <header className="flex flex-col gap-3">
-            {trail}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="flex min-w-0 items-center gap-2 text-2xl font-semibold">

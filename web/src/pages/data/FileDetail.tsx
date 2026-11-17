@@ -28,16 +28,7 @@ import {
     tableFormat,
 } from "./catalogue";
 import { SourceIcon } from "./icons";
-import {
-    About,
-    DeleteAction,
-    EditDialog,
-    ItemHeader,
-    Trail,
-    modelHref,
-    useDataRefresh,
-    useModelNames,
-} from "./parts";
+import { About, DeleteAction, EditDialog, ItemHeader, useDataRefresh } from "./parts";
 
 const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
 const ENCODING_LABELS: Record<string, string> = {
@@ -222,7 +213,6 @@ export function FileDetail({
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const nameOf = useModelNames();
     const [editing, setEditing] = useState(false);
     const path = { params: { path: { source_id: source.id } } };
     const remove = useMutation({
@@ -232,7 +222,6 @@ export function FileDetail({
             await refresh();
         },
     });
-    const models = [...new Set(datasets.flatMap((dataset) => dataset.models))];
     const format = tableFormat(source.kind);
     return (
         <div className="flex flex-col gap-6">
@@ -242,25 +231,6 @@ export function FileDetail({
                     source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined
                 }
                 detail={`Added ${relativeTime(source.created_at)}`}
-                trail={
-                    <Trail
-                        current="source"
-                        sources={[
-                            {
-                                label: source.name,
-                                href: itemHref({ kind: "source", id: source.id }),
-                            },
-                        ]}
-                        datasets={datasets.map((dataset) => ({
-                            label: dataset.name,
-                            href: itemHref({ kind: "dataset", id: dataset.slug }),
-                        }))}
-                        models={models.map((slug) => ({
-                            label: nameOf(slug),
-                            href: modelHref(slug),
-                        }))}
-                    />
-                }
                 actions={
                     <>
                         <Button onClick={() => onCreating(true)} disabled={creating}>

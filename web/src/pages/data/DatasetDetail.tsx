@@ -42,7 +42,6 @@ import {
     datasetNameProblem,
     datasetsIn,
     freeDatasetName,
-    itemHref,
     stem,
 } from "./catalogue";
 import {
@@ -51,7 +50,6 @@ import {
     EditDialog,
     ItemHeader,
     LabelBalance,
-    Trail,
     modelHref,
     useDataRefresh,
     useModelNames,
@@ -195,7 +193,6 @@ function busyOnData(row: ModelRow): string | null {
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const refresh = useDataRefresh();
     const models = useAllModels();
-    const nameOf = useModelNames();
     const candidates = (models.data ?? []).filter(
         (row) => row.kind === "custom" && !dataset.models.includes(row.key),
     );
@@ -209,6 +206,7 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
             ),
         onSuccess: refresh,
     });
+    const nameOf = useModelNames();
     return (
         <Section
             title="Used by"
@@ -273,7 +271,6 @@ export function DatasetDetail({
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const nameOf = useModelNames();
     const [editing, setEditing] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const folderId = dataset.folder_id ?? null;
@@ -304,25 +301,6 @@ export function DatasetDetail({
                             </>
                         )}
                     </>
-                }
-                trail={
-                    <Trail
-                        current="dataset"
-                        sources={dataset.sources.map((source) => ({
-                            label: source.name,
-                            href: itemHref({ kind: "source", id: source.id }),
-                        }))}
-                        datasets={[
-                            {
-                                label: dataset.name,
-                                href: itemHref({ kind: "dataset", id: dataset.slug }),
-                            },
-                        ]}
-                        models={dataset.models.map((slug) => ({
-                            label: nameOf(slug),
-                            href: modelHref(slug),
-                        }))}
-                    />
                 }
                 actions={
                     <>
