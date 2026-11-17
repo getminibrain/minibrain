@@ -6,6 +6,7 @@ from sqlalchemy import ColumnElement, Float, SQLColumnExpression, String, and_, 
 from sqlalchemy.orm import aliased
 
 from minibrain.api.job_facts import SCORED_KINDS
+from minibrain.api.sort_labels import JOB_KIND_LABELS, label_rank
 from minibrain.api.sorting import Keyset, Order, cursor_anchor, pool_of_node, seconds_between
 from minibrain.registry.models import (
     BaseModel,
@@ -44,7 +45,7 @@ def version_value(column: SQLColumnExpression[Any]) -> SQLColumnExpression[Any]:
 
 def kind_parts() -> tuple[SQLColumnExpression[Any], ...]:
     number = func.coalesce(version_value(Version.number), Job.version_number, MISSING)
-    return (Job.kind, number)
+    return (label_rank(Job.kind, JOB_KIND_LABELS), Job.kind, number)
 
 
 def model_parts() -> tuple[SQLColumnExpression[Any], ...]:

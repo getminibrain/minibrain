@@ -16,6 +16,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from minibrain.api.access import admin
 from minibrain.api.audit_targets import ActorKind, AuditTarget, actor_kind, actor_names, category_of, targets_of
 from minibrain.api.deps import SessionDep
+from minibrain.api.sort_labels import ACTION_LABELS, label_rank
 from minibrain.api.sorting import CURSOR_PATTERN, Keyset, KeysetPage, Order, keyset_rows
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
@@ -212,7 +213,7 @@ def lowered(value: SQLColumnExpression[str]) -> SQLColumnExpression[str]:
 PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
     "at": tuple,
     "actor": lambda: (lowered(AuditEvent.actor),),
-    "action": lambda: (AuditEvent.action,),
+    "action": lambda: (label_rank(AuditEvent.action, ACTION_LABELS), AuditEvent.action),
 }
 
 

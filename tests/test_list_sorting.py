@@ -1,12 +1,15 @@
+import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from itertools import pairwise
+from pathlib import Path
 from typing import Any
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.api.sort_labels import ACTION_LABELS, JOB_KIND_LABELS
 from minibrain.jobs.queue import enqueue
 from minibrain.registry.models import (
     ApiKey,
@@ -45,6 +48,19 @@ JOB_SORTS = [
 ]
 REQUEST_SORTS = ["at", "model", "kind", "key", "status", "latency", "tokens"]
 AUDIT_SORTS = ["at", "actor", "action"]
+WEB_LIB = Path(__file__).resolve().parents[1] / "web" / "src" / "lib"
+
+
+def label_key(code: str, labels: dict[str, str]) -> tuple[int, str, str]:
+    label = labels.get(code)
+    return (1, "", code) if label is None else (0, label.casefold(), code)
+
+
+def ui_labels(file: str, table: str) -> dict[str, str]:
+    text = (WEB_LIB / file).read_text()
+    found = re.search(rf"const {table}: Record<string, string> = \{{(.*?)\n\}};", text, re.S)
+    assert found is not None, table
+    return dict(re.findall(r'^\s*"?([\w.]+)"?: "([^"]+)",$', found.group(1), re.M))
 
 
 def when(text: str | None) -> datetime | None:
@@ -71,7 +87,7 @@ def owner(job: dict[str, Any]) -> str:
 
 JOB_KEYS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "id": lambda job: (),
-    "kind": lambda job: (job["kind"], -1 if job["version"] is None else job["version"]),
+    "kind": lambda job: (*label_key(job["kind"], JOB_KIND_LABELS), -1 if job["version"] is None else job["version"]),
     "model": lambda job: (owner(job),),
     "version": lambda job: (-1 if job["version"] is None else job["version"],),
     "status": lambda job: (STATUS_RANK[job["status"]],),
@@ -159,7 +175,7 @@ def seed_jobs(harness: Harness) -> list[int]:
     beta = new_model(harness, "beta")
     moment = now()
     statuses = [JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.QUEUED, JobStatus.CANCELLED, JobStatus.SUCCEEDED]
-    kinds = [JobKind.TRAIN, JobKind.EVAL, JobKind.DOWNLOAD]
+    kinds = [JobKind.TRAIN, JobKind.EVAL, JobKind.DOWNLOAD, JobKind.EXPORT]
     pools = ["gpu-a", None, "Local", "gpu-a"]
     bases = ["qwen-test", "llama-x", "Mistral"]
     with harness.sessions() as session:
@@ -168,7 +184,7 @@ def seed_jobs(harness: Harness) -> list[int]:
         ids: list[int] = []
         for index in range(31):
             owner = (alpha, beta, None)[index % 3]
-            job = enqueue(session, kinds[(index // 2) % 3], {"n": index}, model_id=owner)
+            job = enqueue(session, kinds[(index // 2) % len(kinds)], {"n": index}, model_id=owner)
             job.status = statuses[index % 5] if index % 7 else JobStatus.SUCCEEDED
             job.pool = pools[index % 4]
             job.created_at = moment - timedelta(minutes=index)
@@ -288,7 +304,7 @@ def test_every_request_sort_pages_in_order_without_gaps_or_duplicates(harness: H
 
 def seed_audit(harness: Harness) -> list[int]:
     actors = ["bob@example.com", "Alice@example.com", "system"]
-    actions = ["key.create", "model.create", "job.cancel", "key.delete"]
+    actions = ["key.create", "model.create", "job.cancel", "aaa.unknown", "version.promote"]
     with harness.sessions() as session:
         events = [
             AuditEvent(actor=actors[index % 3], action=actions[index % 4], target=f"t{index}", detail={})
@@ -302,7 +318,7 @@ def seed_audit(harness: Harness) -> list[int]:
 AUDIT_KEYS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "at": lambda event: (),
     "actor": lambda event: (event["actor"].lower(),),
-    "action": lambda event: (event["action"],),
+    "action": lambda event: label_key(event["action"], ACTION_LABELS),
 }
 
 
@@ -358,3 +374,21 @@ def test_pool_is_where_each_job_ran_after_its_worker_joins_another_pool(harness:
     assert [item["pool"] for item in items] == ["alpha", "beta", "zulu"]
     places = [harness.client.get(f"/api/jobs/{item['id']}").json() for item in items]
     assert [(place["pool"], place["host"]) for place in places] == [("alpha", "box"), ("beta", "box"), ("zulu", "box")]
+
+
+def test_sort_labels_mirror_the_labels_the_ui_shows() -> None:
+    assert ui_labels("jobs.ts", "KIND_NOUNS") == JOB_KIND_LABELS
+    assert ui_labels("audit.ts", "ACTIONS") == ACTION_LABELS
+
+
+def test_kind_and_action_sort_by_label_with_unknown_codes_last(harness: Harness) -> None:
+    with harness.sessions() as session:
+        for kind in ("eval", "unheard_of", "download", "export", "train"):
+            enqueue(session, JobKind.DOWNLOAD, {}).kind = kind
+        for action in ("zz.unknown", "version.promote", "key.create", "model.create"):
+            session.add(AuditEvent(actor="system", action=action, target="sorted", detail={}))
+        session.commit()
+    jobs = walk(harness, "/api/jobs", {"sort": "kind", "order": "asc", "limit": 2})
+    assert [job["kind"] for job in jobs] == ["download", "export", "eval", "train", "unheard_of"]
+    events = walk(harness, "/api/audit", {"sort": "action", "order": "asc", "target": "sorted"}, cursor_name="next")
+    assert [event["action"] for event in events] == ["key.create", "model.create", "version.promote", "zz.unknown"]
