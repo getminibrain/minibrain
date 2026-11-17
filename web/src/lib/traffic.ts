@@ -119,7 +119,7 @@ export function metricText(metric: TrafficMetric, totals: TrafficStats): string 
     if (metric === "errors") {
         return rate(totals.error_rate ?? 0);
     }
-    return gpu(gpuPerMillionTokens(totals));
+    return priced(totals) ? gpu(gpuPerMillionTokens(totals)) : "–";
 }
 
 export function priced(totals: TrafficStats): boolean {

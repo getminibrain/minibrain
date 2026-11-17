@@ -25,7 +25,6 @@ import {
     markersOf,
     metricText,
     metricValue,
-    priced,
     readoutNotes,
     readoutTitle,
     usageOf,
@@ -305,9 +304,6 @@ export function UsagePanel({ row }: { row: ModelRow }) {
     const [range, setRange] = useTrafficRange();
     const traffic = useModelTraffic(row.key, range);
     const report = traffic.data;
-    const shown = METRICS.map((item) => item.key).filter(
-        (metric) => metric !== "cost" || (report !== undefined && priced(report.totals)),
-    );
     return (
         <PanelSection
             icon={IconChartLine}
@@ -327,8 +323,8 @@ export function UsagePanel({ row }: { row: ModelRow }) {
             flush
         >
             <div className="flex divide-x">
-                {shown.map((metric) => (
-                    <StripCell key={metric} metric={metric} report={report} />
+                {METRICS.map((item) => (
+                    <StripCell key={item.key} metric={item.key} report={report} />
                 ))}
             </div>
             <div className="flex h-9 items-center gap-3 border-t px-4 text-sm text-muted-foreground tabular-nums">
