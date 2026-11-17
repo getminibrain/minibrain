@@ -347,12 +347,14 @@ function RowMenu({
     version,
     versions,
     job,
+    onDeploy,
     onDelete,
 }: {
     row: ModelRow;
     version: VersionInfo;
     versions: VersionInfo[];
     job: JobInfo | undefined;
+    onDeploy: (() => void) | null;
     onDelete: () => void;
 }) {
     const can = useCan();
@@ -378,6 +380,12 @@ function RowMenu({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+                {onDeploy && (
+                    <DropdownMenuItem onSelect={onDeploy}>
+                        <IconRocket />
+                        {`Deploy v${version.number}`}
+                    </DropdownMenuItem>
+                )}
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger disabled={!comparable}>
                         <IconGitCompare />
@@ -482,27 +490,28 @@ function VersionActions({
     const blocked = live ? liveBlock(row, version) : null;
     const pinned = pinnedDeploy(row, version, isDeployed(row) ? liveOf(versions) : undefined);
     return (
-        <>
+        <span className="relative z-10 flex items-center justify-end gap-1">
             {can.build && failed && (
-                <Button variant="outline" disabled={again.isPending} onClick={() => again.mutate()}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={again.isPending}
+                    onClick={() => again.mutate()}
+                >
                     <IconRotate aria-hidden="true" />
                     Retry
                 </Button>
             )}
-            {can.build && live && !blocked && !pinned && (
-                <Button variant="outline" onClick={onLive}>
-                    <IconRocket aria-hidden="true" />
-                    {`Deploy v${version.number}`}
-                </Button>
-            )}
+            {can.build && pinned && <DeployNow onDeploy={onLive} />}
             <RowMenu
                 row={row}
                 version={version}
                 versions={versions}
                 job={job}
+                onDeploy={can.build && live && !blocked && !pinned ? onLive : null}
                 onDelete={onDelete}
             />
-        </>
+        </span>
     );
 }
 
@@ -512,7 +521,7 @@ function pinnedDeploy(row: ModelRow, version: VersionInfo, live: VersionInfo | u
 
 function DeployNow({ onDeploy }: { onDeploy: () => void }) {
     return (
-        <Button variant="outline" size="sm" className="relative z-10 -my-1.5" onClick={onDeploy}>
+        <Button variant="outline" size="sm" onClick={onDeploy}>
             <IconRocket aria-hidden="true" />
             Deploy
         </Button>
@@ -524,9 +533,7 @@ function versionColumns(
     versions: VersionInfo[],
     jobs: JobInfo[],
     metric: string,
-    deploy: ((number: number) => void) | null,
 ): ColumnDef<VersionInfo, unknown>[] {
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
     return [
         {
             id: "version",
@@ -553,14 +560,7 @@ function versionColumns(
             id: "status",
             header: "Status",
             accessorFn: (version) => versionStatusRank(row, version),
-            cell: ({ row: { original: version } }) => (
-                <span className="inline-flex items-center gap-3">
-                    <RunStatus row={row} version={version} />
-                    {deploy && pinnedDeploy(row, version, live) && (
-                        <DeployNow onDeploy={() => deploy(version.number)} />
-                    )}
-                </span>
-            ),
+            cell: ({ row: { original: version } }) => <RunStatus row={row} version={version} />,
         },
         {
             id: "score",
@@ -667,9 +667,8 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     );
     const metric = metricName(versions.find((version) => version.main_metric)?.main_metric);
     const columns = useMemo(
-        () =>
-            versionColumns(row, versions, jobs.data ?? [], metric, can.build ? setPromoting : null),
-        [row, versions, jobs.data, metric, can.build],
+        () => versionColumns(row, versions, jobs.data ?? [], metric),
+        [row, versions, jobs.data, metric],
     );
     const keptText = (doomed: VersionInfo[]) => {
         const kept = chosen
@@ -765,7 +764,26 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
             bare
         >
             <DataGrid
-                columns={columns}
+                columns={[
+                    ...columns,
+                    {
+                        id: "actions",
+                        header: "",
+                        enableSorting: false,
+                        enableHiding: false,
+                        enableResizing: false,
+                        cell: ({ row: { original: version } }) => (
+                            <VersionActions
+                                row={row}
+                                version={version}
+                                versions={versions}
+                                job={runJob(version, jobs.data ?? [])}
+                                onLive={() => setPromoting(version.number)}
+                                onDelete={() => remove([version], false)}
+                            />
+                        ),
+                    },
+                ]}
                 rows={ordered}
                 getRowId={(version) => String(version.number)}
                 initialSort={[{ id: "version", desc: true }]}
@@ -776,16 +794,6 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                 onSelectedIdsChange={(ids) => setPicked(ids.map(Number))}
                 onOpen={(version) => router.history.push(modelVersionHref(row.key, version.number))}
                 rowLabel={(version) => versionLabel(version)}
-                rowActions={(version) => (
-                    <VersionActions
-                        row={row}
-                        version={version}
-                        versions={versions}
-                        job={runJob(version, jobs.data ?? [])}
-                        onLive={() => setPromoting(version.number)}
-                        onDelete={() => remove([version], false)}
-                    />
-                )}
                 empty={<p className="text-muted-foreground">No versions yet.</p>}
             />
             <DeployVersionDialog
