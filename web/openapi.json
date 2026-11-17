@@ -6702,6 +6702,129 @@
         }
       }
     },
+    "/api/models/{name}/versions/{number}/exports": {
+      "get": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "List a version's exports",
+        "description": "Merged exports of the version: queued, running, ready to download, or failed.",
+        "operationId": "list_exports_api_models__name__versions__number__exports_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExportInfo"
+                  },
+                  "title": "Response List Exports Api Models  Name  Versions  Number  Exports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "Export a version as a merged model",
+        "description": "Merges the version's adapter into its base model's weights (bf16 on a GPU, fp32 on a CPU or Apple GPU) and packs safetensors, the tokenizer, the generation config and SHA256SUMS into one tar archive. An export already made or running for the same base files is returned instead of starting another.",
+        "operationId": "start_export_api_models__name__versions__number__exports_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ExportRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/presets": {
       "get": {
         "tags": [
@@ -18403,6 +18526,159 @@
           "content"
         ],
         "title": "ExampleTurn"
+      },
+      "ExportInfo": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress",
+            "description": "Share done while the export job runs, from 0 to 1."
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Id",
+            "description": "SHA-256 of the tar archive; download it from /api/artifacts/{id}."
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename",
+            "description": "Name the archive downloads as."
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "Bytes of the archive."
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/PackedFileInfo"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Each file in the archive with its SHA-256, as in SHA256SUMS."
+          },
+          "base_hash": {
+            "type": "string",
+            "title": "Base Hash",
+            "description": "Content hash of the base model files the adapter was merged onto."
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "state",
+          "progress",
+          "job_id",
+          "error",
+          "artifact_id",
+          "filename",
+          "size",
+          "files",
+          "base_hash",
+          "requested_by",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "ExportInfo"
+      },
+      "ExportRequest": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "safetensors",
+            "title": "Format",
+            "description": "safetensors: the base with the adapter merged into its weights.",
+            "default": "safetensors"
+          }
+        },
+        "type": "object",
+        "title": "ExportRequest"
       },
       "ExtensionInfo": {
         "properties": {
@@ -32469,6 +32745,12 @@
             ],
             "title": "Count",
             "description": "Versions of an adapter or dataset; attempts of a job."
+          },
+          "exports": {
+            "type": "integer",
+            "title": "Exports",
+            "description": "Merged exports kept for a model's versions.",
+            "default": 0
           },
           "used_by": {
             "items": {

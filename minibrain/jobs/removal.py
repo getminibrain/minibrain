@@ -19,6 +19,7 @@ from minibrain.registry.models import (
     JobStatus,
     Source,
     Version,
+    VersionExport,
     VersionStatus,
 )
 
@@ -29,6 +30,7 @@ REFERENCES = (
     Source.artifact_id,
     DatasetVersion.artifact_id,
     Version.adapter_artifact_id,
+    VersionExport.artifact_id,
 )
 
 Refusal = Literal["not_found", "in_use", "active", "state"]

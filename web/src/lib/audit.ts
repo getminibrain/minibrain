@@ -118,6 +118,8 @@ const ACTIONS: Record<string, string> = {
     "version.create": "Version created",
     "version.delete": "Version deleted",
     "version.delete_finished": "Version delete finished",
+    "version.export": "Version export started",
+    "version.export_download": "Version export downloaded",
     "version.promote": "Version deployed",
 };
 
@@ -127,6 +129,7 @@ const KEY_LABELS: Record<string, string> = {
     address: "Address",
     asked: "Asked for pool",
     attempt: "Attempt",
+    base_hash: "Base files hash",
     budget_bytes: "Budget",
     cascade: "Models deleted with it",
     cut_hash: "Hash at the cut",
@@ -136,6 +139,7 @@ const KEY_LABELS: Record<string, string> = {
     disabled: "Turned off",
     files: "Files",
     first_admin: "First admin",
+    format: "Format",
     from: "Before",
     intended_use: "Intended use",
     job: "Job",
@@ -149,6 +153,7 @@ const KEY_LABELS: Record<string, string> = {
     name: "Name",
     older_than: "Older than",
     outcome: "Outcome",
+    pool: "Pool",
     removed: "Removed",
     retry: "Attempt",
     role: "Role",
@@ -156,6 +161,7 @@ const KEY_LABELS: Record<string, string> = {
     rows: "Rows",
     seconds: "Seconds",
     seed: "Seed",
+    sha256: "SHA-256",
     sign_in: "Signed in with",
     size_bytes: "Size",
     source: "Source",
@@ -481,6 +487,8 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "model.verify": (detail) => `${plainValue(detail.files)} files`,
     "version.create": (detail) => VERSION_KINDS[String(detail.kind)] ?? "Version",
     "version.delete": (detail) => VERSION_KINDS[String(detail.kind)] ?? "Version",
+    "version.export": (detail) => `Merged ${plainValue(detail.format)}`,
+    "version.export_download": (detail) => `Merged ${plainValue(detail.format)}`,
     "version.promote": (detail) =>
         typeof detail.previous === "number" && detail.was_deployed
             ? `Replaced v${detail.previous}`

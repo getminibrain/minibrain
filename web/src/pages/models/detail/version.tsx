@@ -9,14 +9,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
 import {
-    Badge,
     Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -25,13 +18,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Link,
-    cn,
     useToast,
 } from "obp-ui";
 import { useState } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useJobMetrics } from "~/api/jobPageQueries";
-import { isActiveJob, useJob, useJobs, useVersionFiles, useVersions } from "~/api/queries";
+import { isActiveJob, useJob, useJobs, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
@@ -46,8 +38,9 @@ import {
     versionNumberOf,
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
-import { bytes, relativeTime } from "~/lib/time";
+import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
+import { ExportDialog } from "./exportDialog";
 import { Tip, isDeployed, modelCrumbs } from "./header";
 import { DeployVersionDialog, liveBlock, versionLabel } from "./makeLive";
 import { EvaluationSection } from "./versionEvaluation";
@@ -55,102 +48,6 @@ import { TrainingSection } from "./versionRun";
 import { type Peers, type Phase, peersOf, phaseOf } from "./versionState";
 import { SummarySection } from "./versionSummary";
 import { VersionStatus, runJob } from "./versions";
-
-function artifactHref(id: string): string {
-    return `/api/artifacts/${id}`;
-}
-
-const FORMATS = [
-    {
-        id: "adapter",
-        label: "Adapter only",
-        file: "safetensors",
-        runs: "Loads on the same base in minibrain, vLLM or PEFT.",
-        ready: true,
-    },
-    {
-        id: "merged",
-        label: "Merged full model",
-        file: "safetensors",
-        runs: "The base with the adapter folded in; runs on any server for Hugging Face models.",
-        ready: false,
-    },
-    {
-        id: "gguf",
-        label: "Merged and quantised GGUF",
-        file: "GGUF",
-        runs: "For llama.cpp or Ollama, on a laptop or CPU server.",
-        ready: false,
-    },
-];
-
-function ExportDialog({
-    row,
-    version,
-    open,
-    onOpenChange,
-}: {
-    row: ModelRow;
-    version: VersionInfo;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
-    const files = useVersionFiles(row.key, open ? version.number : null);
-    const sha = files.data?.artifact_id;
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>{`Export v${version.number}`}</DialogTitle>
-                    <DialogDescription>
-                        {`Files of ${row.name} v${version.number} you can run elsewhere. Each carries its SHA-256.`}
-                    </DialogDescription>
-                </DialogHeader>
-                <ul className="flex flex-col divide-y rounded-md border">
-                    {FORMATS.map((item) => (
-                        <li key={item.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
-                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                <span className="flex flex-wrap items-baseline gap-x-3">
-                                    <span
-                                        className={cn(
-                                            "font-medium",
-                                            !item.ready && "text-muted-foreground",
-                                        )}
-                                    >
-                                        {item.label}
-                                    </span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {item.ready && files.data
-                                            ? `${item.file} · ${bytes(files.data.size)}`
-                                            : item.file}
-                                    </span>
-                                </span>
-                                <span className="text-sm text-muted-foreground">{item.runs}</span>
-                            </span>
-                            {item.ready ? (
-                                <Button variant="outline" disabled={!sha} asChild={Boolean(sha)}>
-                                    {sha ? (
-                                        <a href={artifactHref(sha)} download>
-                                            <IconDownload aria-hidden="true" />
-                                            Download
-                                        </a>
-                                    ) : (
-                                        "Download"
-                                    )}
-                                </Button>
-                            ) : (
-                                <Badge variant="neutral">Coming soon</Badge>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-                <DialogFooter>
-                    <Button onClick={() => onOpenChange(false)}>Done</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function shown(versions: VersionInfo[]): VersionInfo[] {
     return versions
@@ -192,7 +89,7 @@ function VersionMenu({
         setConfirmation({
             title: `Delete ${versionLabel(version)} of ${row.name}?`,
             description: (
-                <p>{`${callable} stops answering and its adapter, scores and card are removed.`}</p>
+                <p>{`${callable} stops answering and its adapter, exports, scores and card are removed.`}</p>
             ),
             confirmLabel: "Delete version",
             destructive: true,

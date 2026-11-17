@@ -36,6 +36,7 @@ export const keys = {
     safety: ["settings", "safety"] as const,
     answers: (slug: string, number: number) => ["model", slug, "answers", number] as const,
     versionFiles: (slug: string, number: number) => ["model", slug, "files", number] as const,
+    versionExports: (slug: string, number: number) => ["model", slug, "exports", number] as const,
     modelPage: (name: string) => ["all-models", "page", name] as const,
     placement: (name: string) => ["all-models", "placement", name] as const,
 };
@@ -396,5 +397,20 @@ export function useReservedName(name: string | null) {
             return data ?? null;
         },
         enabled: wanted.length > 0,
+    });
+}
+
+export function useVersionExports(slug: string, number: number | null) {
+    return useQuery({
+        queryKey: keys.versionExports(slug, number ?? -1),
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/models/{name}/versions/{number}/exports", {
+                    params: { path: { name: slug, number: number ?? 0 } },
+                }),
+            ),
+        enabled: number !== null,
+        refetchInterval: (query) =>
+            query.state.data?.some((item) => ACTIVE_JOB.has(item.state)) ? POLL_MS : false,
     });
 }

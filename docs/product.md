@@ -323,9 +323,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Models as code** · planned · ml, engineer
   Keep each model in a minibrain.yaml and rerun it from CI.
   CLI: minibrain run · Roadmap: Config as code
-- **Exports** · partial · ml
-  Download a version's adapter; merged weights and GGUF come later.
-  UI: Models › model › version › Export · API: GET /api/artifacts/{artifact_id} · Roadmap: For ML engineers
+- **Exports** · shipped · ml
+  Download a version's adapter or the base with it merged, as safetensors.
+  UI: Models › model › version › Export · API: POST /api/models/{name}/versions/{number}/exports, GET /api/models/{name}/versions/{number}/exports, GET /api/artifacts/{artifact_id}
+- **GGUF export** · planned · ml
+  Download a version merged and quantised as GGUF for llama.cpp.
+  UI: Models › model › version › Export · Roadmap: v2
 - **Multi-node training** · planned · ml, admin
   Train across GPUs and nodes with Ray.
   Roadmap: v2

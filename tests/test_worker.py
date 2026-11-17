@@ -99,11 +99,11 @@ def test_lease_is_kept_while_the_worker_uploads_the_adapter(harness: Harness, mo
     worker = harness.worker(kinds=["train"], modules=FAKE)
     upload = worker.outputs
 
-    def slow_outputs(kind: str, attempt_dir: Any) -> dict[str, str]:
+    def slow_outputs(claim: dict[str, Any], attempt_dir: Any) -> dict[str, str]:
         for _ in range(15):
             time.sleep(0.2)
             harness.queue.expire()
-        return upload(kind, attempt_dir)
+        return upload(claim, attempt_dir)
 
     monkeypatch.setattr(worker, "outputs", slow_outputs)
     assert worker.run_once()

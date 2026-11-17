@@ -51,6 +51,15 @@ class Adapter:
 
 
 @dataclass(frozen=True)
+class Export:
+    sha256: str
+    size: int | None
+    format: str
+    base_hash: str
+    files: int
+
+
+@dataclass(frozen=True)
 class Refs:
     version: str
     card: str
@@ -68,6 +77,20 @@ def adapter_of(session: Session, version: Version) -> Adapter | None:
         size=artifact.size if artifact is not None else None,
         packing=artifact.packing if artifact is not None else None,
     )
+
+
+def exports_of(session: Session, version: Version) -> list[Export]:
+    found = sorted((item for item in version.exports if item.artifact_id), key=lambda item: item.id)
+    return [
+        Export(
+            sha256=item.artifact_id or "",
+            size=artifact.size if (artifact := session.get(Artifact, item.artifact_id)) is not None else None,
+            format=item.format,
+            base_hash=item.base_hash,
+            files=len(item.files),
+        )
+        for item in found
+    ]
 
 
 def edited_at(session: Session, target: str) -> str | None:
@@ -173,6 +196,33 @@ def adapter_component(card: ModelCard, adapter: Adapter, refs: Refs) -> dict[str
             "description": f"LoRA adapter for {card.base_model.repo or card.base_model.key}",
             "hashes": sha256_hashes(adapter.sha256),
             "properties": props("adapter:", values),
+        }
+    )
+
+
+def export_ref(export: Export) -> str:
+    return f"export:{export.sha256}"
+
+
+def export_component(card: ModelCard, export: Export) -> dict[str, Any]:
+    values: Values = [
+        ("artifact_id", export.sha256),
+        ("format", export.format),
+        ("size", export.size),
+        ("files", export.files),
+        ("base_content_hash", export.base_hash),
+    ]
+    base = card.base_model.repo or card.base_model.key
+    return kept(
+        {
+            "type": "file",
+            "mime-type": MIME_TYPES["tar"],
+            "bom-ref": export_ref(export),
+            "name": f"{card.version.slug}-v{card.version.number}-merged-{export.format}",
+            "version": str(card.version.number),
+            "description": f"{base} with the LoRA adapter merged into its weights, as {export.format}",
+            "hashes": sha256_hashes(export.sha256),
+            "properties": props("export:", values),
         }
     )
 
@@ -394,7 +444,7 @@ def timestamp(card: ModelCard, edited: str | None) -> str:
     return max(moment for moment in moments if moment)
 
 
-def dependencies(card: ModelCard, refs: Refs) -> list[dict[str, Any]]:
+def dependencies(card: ModelCard, refs: Refs, exports: list[Export]) -> list[dict[str, Any]]:
     sources = [source_ref(source) for source in card.training_data.sources]
     adapter = [refs.adapter] if refs.adapter else []
     found = [
@@ -402,19 +452,28 @@ def dependencies(card: ModelCard, refs: Refs) -> list[dict[str, Any]]:
         {"ref": refs.base, "dependsOn": []},
     ]
     found += [{"ref": ref, "dependsOn": [refs.base]} for ref in adapter]
+    found += [{"ref": export_ref(export), "dependsOn": [refs.base, *adapter]} for export in exports]
     found.append({"ref": refs.dataset_version, "dependsOn": sources})
     return found + [{"ref": ref, "dependsOn": []} for ref in sources]
 
 
-def components(card: ModelCard, adapter: Adapter | None, refs: Refs) -> list[dict[str, Any]]:
+def components(card: ModelCard, adapter: Adapter | None, refs: Refs, exports: list[Export]) -> list[dict[str, Any]]:
     found = [base_component(card.base_model, refs)]
     if adapter is not None:
         found.append(adapter_component(card, adapter, refs))
+        found += [export_component(card, export) for export in exports]
     found.append(dataset_version_component(card.training_data, refs))
     return found + [source_component(source) for source in card.training_data.sources]
 
 
-def build_aibom(card: ModelCard, adapter: Adapter | None, edited: str | None, tool_version: str) -> dict[str, Any]:
+def build_aibom(
+    card: ModelCard,
+    adapter: Adapter | None,
+    edited: str | None,
+    tool_version: str,
+    exports: list[Export] | None = None,
+) -> dict[str, Any]:
+    merged = (exports or []) if adapter is not None else []
     refs = refs_of(card, adapter)
     tool = {"type": "application", "name": "minibrain", "version": tool_version}
     metadata = {
@@ -423,7 +482,10 @@ def build_aibom(card: ModelCard, adapter: Adapter | None, edited: str | None, to
         "component": version_component(card, refs),
     }
     head: dict[str, Any] = {"$schema": SCHEMA, "bomFormat": "CycloneDX", "specVersion": SPEC_VERSION}
-    rest: dict[str, Any] = {"components": components(card, adapter, refs), "dependencies": dependencies(card, refs)}
+    rest: dict[str, Any] = {
+        "components": components(card, adapter, refs, merged),
+        "dependencies": dependencies(card, refs, merged),
+    }
     sha256 = digest(head | {"version": 1, "metadata": metadata} | rest)
     sealed = metadata | {
         "properties": [

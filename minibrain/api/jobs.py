@@ -48,6 +48,7 @@ from minibrain.registry.models import (
     JobKind,
     Model,
     Version,
+    VersionExport,
     Worker,
 )
 from minibrain.registry.service import NotFoundError
@@ -440,6 +441,17 @@ def delete_job(
     return Response(status_code=204)
 
 
+def audit_export_download(session: Session, artifact: Artifact) -> None:
+    export = session.scalar(select(VersionExport).where(VersionExport.artifact_id == artifact.id).limit(1))
+    if export is None:
+        return
+    version = export.version
+    facts = {"name": version.model.name, "format": export.format, "sha256": artifact.id, "size_bytes": artifact.size}
+    target = f"{version.model.slug}@{version.number}"
+    session.add(AuditEvent(actor=current_actor(), action="version.export_download", target=target, detail=facts))
+    session.commit()
+
+
 @router.get(
     "/artifacts/{artifact_id}",
     response_class=StreamingResponse,
@@ -450,6 +462,7 @@ def download(artifact_id: str, session: SessionDep, store: StoreDep) -> Streamin
     artifact = session.get(Artifact, artifact_id)
     if artifact is None or not store.has(artifact_id):
         raise NotFoundError(f"artifact {artifact_id} not found")
+    audit_export_download(session, artifact)
     filename = artifact.name if artifact.packing == "file" else f"{artifact.name}.tar"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream", headers=headers)

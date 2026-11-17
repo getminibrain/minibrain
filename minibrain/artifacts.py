@@ -4,6 +4,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import threading
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -51,12 +52,25 @@ def normalized(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
-def tar_bytes(directory: Path) -> bytes:
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w", format=tarfile.PAX_FORMAT) as archive:
+def write_tar(directory: Path, sink: BinaryIO) -> None:
+    with tarfile.open(fileobj=sink, mode="w|", format=tarfile.PAX_FORMAT) as archive:
         for path in sorted(directory.rglob("*")):
             archive.add(path, arcname=str(path.relative_to(directory)), recursive=False, filter=normalized)
-    return buffer.getvalue()
+
+
+class Packer(threading.Thread):
+    def __init__(self, directory: Path, sink: BinaryIO) -> None:
+        super().__init__(daemon=True)
+        self.directory = directory
+        self.sink = sink
+        self.error: BaseException | None = None
+
+    def run(self) -> None:
+        try:
+            with self.sink:
+                write_tar(self.directory, self.sink)
+        except BaseException as error:
+            self.error = error
 
 
 class RemoteBlobs(Protocol):
@@ -188,7 +202,19 @@ class ArtifactStore:
             return self.put_stream(stream)
 
     def put_dir(self, directory: Path) -> Stored:
-        return self.put_stream(io.BytesIO(tar_bytes(directory)))
+        reading, writing = os.pipe()
+        packer = Packer(directory, os.fdopen(writing, "wb"))
+        packer.start()
+        source = os.fdopen(reading, "rb")
+        try:
+            stored = self.put_stream(source)
+        finally:
+            source.close()
+            packer.join()
+        if packer.error is not None:
+            self.delete(stored.id)
+            raise ArtifactError(f"could not pack {directory.name}: {packer.error}") from packer.error
+        return stored
 
     def raw(self, artifact_id: str) -> BinaryIO:
         if self.local(artifact_id):

@@ -110,7 +110,7 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 - Training settings: LoRA rank, learning rate, epochs, sequence length, full fine-tuning, DPO; saved recipes.
 - Everything the UI does through the API and CLI; `minibrain.yaml` per model in git (Config as code); `minibrain train`
   in CI with the promotion rule as the gate.
-- Export adapters or merged weights (safetensors, GGUF), with training logs and metrics.
+- Export adapters or merged weights (safetensors; GGUF in v2), with training logs and metrics.
 
 ### Product priorities
 
@@ -1364,8 +1364,10 @@ keys, and `/v1` stays key-only.
     with…, Copy the name, Model card, Export…, Delete version); then Score (against live and v0 · Baseline), Where it
     differs (better and worse counts from the held-out answers, then the rows), its run's loss (training and held-out
     loss by step, with the previous run behind) and learning rate while or after it trains, Made from (dataset version,
-    method, training preset, settings, the machine, the job), Identifiers, Exports and the job's logs. Export offers the adapter as a download today; merged
-    safetensors and GGUF say Coming soon. Compare (`/models/<name>/compare?a=&b=`) puts two versions in a
+    method, training preset, settings, the machine, the job), Identifiers, Exports and the job's logs. Export offers the adapter as a download and the merged full
+    model as safetensors (an `export` job on a worker whose memory holds the base, bf16 on a GPU and fp32 on a CPU or
+    Apple GPU; QLoRA adapters merge onto the bf16 base; one tar with SHA256SUMS, reused per version and base files,
+    deleted with the version, listed in the AI-BOM); GGUF says Coming soon (v2). Compare (`/models/<name>/compare?a=&b=`) puts two versions in a
     `CompareTable` (scores, latency, data, settings), their differing answers (the answers API takes `against`) and a
     link to the data diff.
   - Train (the header's Train) opens the Train page (`/models/<slug>/train`, Builders): on the left Method (Supervised
@@ -1906,6 +1908,10 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       rotation and in-place encryption of older files (Vault tested on 1.20.4 dev, HSM on SoftHSM 2.7.0, KMS on moto;
       not yet on a production HSM or real AWS KMS; worker, engine and gateway caches stay plain)
 - [x] Model card and validation report per version: in-app page, Markdown and JSON with a SHA-256 of the canonical card, editable intended use and known limits (audited)
+- [x] Export a version as a merged full model (safetensors): an `export` job merges the adapter into the base with
+      PEFT on a worker that fits the base (bf16 on a GPU, fp32 on a CPU or Apple GPU), packs safetensors, the tokenizer,
+      the generation config and SHA256SUMS into one tar uploaded as an artifact; reused per version and base files,
+      deleted with the version, audited when started and downloaded
 - [ ] Reference hardware configs
 - [ ] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`):
       the last step before tagging v1
@@ -1972,6 +1978,9 @@ it finds:
 - [ ] OCI / container registry model sources (Harbor, Quay; KitOps ModelKits)
 - [ ] Catalogue export/import and model bundles for air-gapped sites — only if needed
 - [ ] Import GGUF models (llamacpp backend) and standalone LoRA adapters
+- [ ] Export a version merged and quantised as GGUF via llama.cpp (`convert_hf_to_gguf` and `llama-quantize`),
+      packaged per platform for offline installs; the Export dialog lists it as Coming soon (moved from v1 on
+      2026-11-17)
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
 - Preinstalled appliance
 - [ ] Release a reserved name: an admin frees a deleted model's API name from Settings, with a warning that apps

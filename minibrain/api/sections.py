@@ -29,7 +29,7 @@ MODELS = Section(
 )
 VERSIONS = Section(
     "Versions",
-    "A custom model's versions: add, promote, test, delete, their files and model cards.",
+    "A custom model's versions: add, promote, test, delete, their files, merged exports and model cards.",
     (f"{MODEL}/versions",),
 )
 DATA = Section(

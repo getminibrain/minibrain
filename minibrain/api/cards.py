@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import builder, viewer
-from minibrain.api.aibom import MEDIA_TYPE, adapter_of, build_aibom, edited_at, export_aibom
+from minibrain.api.aibom import MEDIA_TYPE, adapter_of, build_aibom, edited_at, export_aibom, exports_of
 from minibrain.api.card_builder import build_card
 from minibrain.api.card_export import card_data, digest, export_json, export_markdown
 from minibrain.api.card_schemas import ModelCard, ModelCardEdit, ModelCardExport
@@ -88,7 +88,8 @@ def aibom_json(name: str, number: int, session: SessionDep, settings: SettingsDe
     version = get_version(model, number)
     card = card_of(session, settings, model, version)
     edited = edited_at(session, card.version.id)
-    bom = build_aibom(card, adapter_of(session, version), edited, library_version("minibrain") or "unknown")
+    tool = library_version("minibrain") or "unknown"
+    bom = build_aibom(card, adapter_of(session, version), edited, tool, exports_of(session, version))
     return download(export_aibom(bom), MEDIA_TYPE, f"{name}-v{number}-aibom.cdx.json")
 
 

@@ -139,7 +139,7 @@ def errors_status(session: Session, subject: Subject) -> ModelStatus | None:
 
 
 def latest_job(session: Session, version: Version) -> Job | None:
-    query = select(Job).where(Job.version_id == version.id).order_by(Job.id.desc()).limit(1)
+    query = select(Job).where(Job.version_id == version.id, Job.kind != JobKind.EXPORT).order_by(Job.id.desc()).limit(1)
     return session.scalar(query)
 
 

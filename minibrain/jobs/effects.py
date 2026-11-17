@@ -23,6 +23,7 @@ from minibrain.registry.models import (
     now,
 )
 from minibrain.settings import Settings
+from minibrain.tasks.exports import exported, retried
 from minibrain.tasks.judge import REASON_CHARACTERS, judge_of, pending_items
 from minibrain.tasks.rescore import RESCORE
 from minibrain.tasks.service import graded, graders_of, judge_keys, judge_scores, split_examples
@@ -49,6 +50,8 @@ class DomainEffects:
             self.verified(session, job)
         elif job.kind == JobKind.REPAIR:
             self.repaired(session, job)
+        elif job.kind == JobKind.EXPORT:
+            exported(session, store_for(self.settings), job)
 
     def on_failure(self, session: Session, job: Job) -> None:
         version = job.version if job.version is not None and job.version.status != VersionStatus.DELETING else None
@@ -71,6 +74,8 @@ class DomainEffects:
             model.status = BaseModelStatus.DOWNLOADING if job.kind == JobKind.DOWNLOAD else BaseModelStatus.IMPORTING
             model.error = None
             model.updated_at = now()
+        if job.kind == JobKind.EXPORT:
+            retried(session, job)
         if job.version is None:
             return
         if job.kind == JobKind.TRAIN:

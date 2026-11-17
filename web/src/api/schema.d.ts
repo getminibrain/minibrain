@@ -2137,6 +2137,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{name}/versions/{number}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a version's exports
+         * @description Merged exports of the version: queued, running, ready to download, or failed.
+         */
+        get: operations["list_exports_api_models__name__versions__number__exports_get"];
+        put?: never;
+        /**
+         * Export a version as a merged model
+         * @description Merges the version's adapter into its base model's weights (bf16 on a GPU, fp32 on a CPU or Apple GPU) and packs safetensors, the tokenizer, the generation config and SHA256SUMS into one tar archive. An export already made or running for the same base files is returned instead of starting another.
+         */
+        post: operations["start_export_api_models__name__versions__number__exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/presets": {
         parameters: {
             query?: never;
@@ -5565,6 +5589,69 @@ export interface components {
             role: "user" | "assistant";
             /** Content */
             content: string;
+        };
+        /** ExportInfo */
+        ExportInfo: {
+            /** Format */
+            format: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "queued" | "running" | "ready" | "failed" | "cancelled";
+            /**
+             * Progress
+             * @description Share done while the export job runs, from 0 to 1.
+             */
+            progress: number | null;
+            /** Job Id */
+            job_id: number | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Artifact Id
+             * @description SHA-256 of the tar archive; download it from /api/artifacts/{id}.
+             */
+            artifact_id: string | null;
+            /**
+             * Filename
+             * @description Name the archive downloads as.
+             */
+            filename: string | null;
+            /**
+             * Size
+             * @description Bytes of the archive.
+             */
+            size: number | null;
+            /**
+             * Files
+             * @description Each file in the archive with its SHA-256, as in SHA256SUMS.
+             */
+            files: components["schemas"]["PackedFileInfo"][];
+            /**
+             * Base Hash
+             * @description Content hash of the base model files the adapter was merged onto.
+             */
+            base_hash: string;
+            /** Requested By */
+            requested_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /** ExportRequest */
+        ExportRequest: {
+            /**
+             * Format
+             * @description safetensors: the base with the adapter merged into its weights.
+             * @default safetensors
+             * @constant
+             */
+            format?: "safetensors";
         };
         /** ExtensionInfo */
         ExtensionInfo: {
@@ -10295,6 +10382,12 @@ export interface components {
              * @description Versions of an adapter or dataset; attempts of a job.
              */
             count?: number | null;
+            /**
+             * Exports
+             * @description Merged exports kept for a model's versions.
+             * @default 0
+             */
+            exports?: number;
             /**
              * Used By
              * @description Models built on a base model.
@@ -15242,6 +15335,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_exports_api_models__name__versions__number__exports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_export_api_models__name__versions__number__exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportInfo"];
                 };
             };
             /** @description Validation Error */

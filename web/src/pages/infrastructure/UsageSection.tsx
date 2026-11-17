@@ -84,11 +84,14 @@ const KINDS: Record<UsageKind, KindView> = {
         detail: (item) => <BaseUse item={item} />,
     },
     adapters: {
-        label: "Adapters",
+        label: "Adapters and exports",
         icon: IconPuzzle,
         empty: "No model has a trained version yet.",
         name: (item) => <TextLink href={modelPageHref(item.key, "versions")}>{item.name}</TextLink>,
-        detail: (item) => plural(item.count ?? 0, "version"),
+        detail: (item) =>
+            item.exports
+                ? `${plural(item.count ?? 0, "version")} · ${plural(item.exports, "merged export")}`
+                : plural(item.count ?? 0, "version"),
     },
     datasets: {
         label: "Dataset versions",

@@ -810,6 +810,28 @@ class VersionFiles(BaseModel):
     files: list[PackedFileInfo]
 
 
+class ExportRequest(BaseModel):
+    format: Literal["safetensors"] = Field(
+        default="safetensors", description="safetensors: the base with the adapter merged into its weights."
+    )
+
+
+class ExportInfo(BaseModel):
+    format: str
+    state: Literal["queued", "running", "ready", "failed", "cancelled"]
+    progress: float | None = Field(description="Share done while the export job runs, from 0 to 1.")
+    job_id: int | None
+    error: str | None
+    artifact_id: str | None = Field(description="SHA-256 of the tar archive; download it from /api/artifacts/{id}.")
+    filename: str | None = Field(description="Name the archive downloads as.")
+    size: int | None = Field(description="Bytes of the archive.")
+    files: list[PackedFileInfo] = Field(description="Each file in the archive with its SHA-256, as in SHA256SUMS.")
+    base_hash: str = Field(description="Content hash of the base model files the adapter was merged onto.")
+    requested_by: str
+    created_at: datetime
+    finished_at: datetime | None
+
+
 class VersionOrigin(BaseModel):
     slug: str
     name: str
@@ -1381,6 +1403,7 @@ class UsageItem(BaseModel):
     name: str
     size_bytes: int
     count: int | None = Field(default=None, description="Versions of an adapter or dataset; attempts of a job.")
+    exports: int = Field(default=0, description="Merged exports kept for a model's versions.")
     used_by: list[UsageRef] = Field(default_factory=list, description="Models built on a base model.")
     checks: bool = Field(default=False, description="A base model that judges or checks safety.")
     deployed: bool = False

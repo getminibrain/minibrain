@@ -46,6 +46,7 @@ export type ExampleAnswer = Schemas["ExampleAnswer"];
 export type AnswerSide = Schemas["AnswerSide"];
 export type ModelRow = Schemas["ModelRow"];
 export type VersionFiles = Schemas["VersionFiles"];
+export type ExportInfo = Schemas["ExportInfo"];
 export type ModelPageInfo = Schemas["ModelPage"];
 export type NextAction = Schemas["NextAction"];
 export type BaseOptions = Schemas["BaseOptions"];

@@ -629,3 +629,45 @@ def minimum(base: Base, machine: Machine | None) -> Option:
     target = machine if machine is not None and machine.quantizes else None
     reference = target or Machine("An NVIDIA GPU", "cuda", None, None, frozenset({QUANTIZER}))
     return estimate(base, reference, QLORA, True, 1, REFERENCE_SEQ, Settings().rank)
+
+
+@dataclass(frozen=True)
+class MergeFit:
+    machine: Machine
+    needed_bytes: int
+    precision: str
+
+    @property
+    def fits(self) -> bool | None:
+        available = self.machine.available_bytes
+        return None if not available else self.needed_bytes <= available * HEADROOM
+
+
+def merge_bytes(base: Base, machine: Machine) -> int:
+    element = 2 if precision_of(machine) == "bf16" else 4
+    return int(base.params * element * FRAGMENTATION + FIXED_OVERHEAD.get(machine.device, GIB))
+
+
+def merge_fits(base: Base, machines: list[Machine]) -> list[MergeFit]:
+    return [MergeFit(machine, merge_bytes(base, machine), precision_of(machine)) for machine in machines]
+
+
+def merge_refusal(base: Base, fits: list[MergeFit]) -> str | None:
+    if not fits or any(fit.fits is not False for fit in fits):
+        return None
+    largest = max(fits, key=lambda fit: fit.machine.available_bytes or 0)
+    machine = largest.machine
+    return (
+        f"Merging {base.name} needs about {gigabytes(largest.needed_bytes)} of {machine.memory_label} to hold it in "
+        f"{largest.precision}; the largest machine, {machine.place}, has {gigabytes(machine.available_bytes or 0)}. "
+        "Join a machine with more memory to export it."
+    )
+
+
+def merge_pool(fits: list[MergeFit], preferred: str | None) -> str | None:
+    fitting = [fit for fit in fits if fit.fits]
+    if any(fit.machine.pool == preferred for fit in fitting):
+        return preferred
+    if not fitting:
+        return None
+    return max(fitting, key=lambda fit: fit.machine.available_bytes or 0).machine.pool or None

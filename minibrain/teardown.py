@@ -34,6 +34,7 @@ from minibrain.registry.models import (
     TeardownStatus,
     TeardownStep,
     Version,
+    VersionExport,
     VersionKind,
     VersionStatus,
     now,
@@ -41,6 +42,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import ConflictError, adapter_name, reserve_name
 from minibrain.serve.engines import DRAIN_TIMEOUT, drain_engine
 from minibrain.settings import Settings
+from minibrain.tasks.exports import export_artifacts
 from minibrain.tasks.service import serving_base
 from minibrain.worker import HttpClient
 
@@ -61,6 +63,7 @@ KIND_NAMES = {
     "verify": "Verify",
     "repair": "Repair",
     "catalog_sync": "Catalogue sync",
+    "export": "Export",
 }
 
 Cancel = Callable[[Job], None]
@@ -216,9 +219,12 @@ def version_ids_with_jobs(session: Session) -> list[int]:
 
 
 def remove_version(session: Session, settings: Settings, version: Version) -> int:
+    exports = export_artifacts([version])
     session.delete(version)
     session.flush()
-    return cleanup(session, settings)
+    removed = cleanup(session, settings)
+    drop_artifacts(session, settings, exports)
+    return removed
 
 
 def begin(
@@ -472,6 +478,8 @@ def drop_artifacts(session: Session, settings: Settings, candidates: set[str]) -
     for artifact_id in sorted(candidates):
         if session.scalar(select(Version.id).where(Version.adapter_artifact_id == artifact_id).limit(1)) is not None:
             continue
+        if session.scalar(select(VersionExport.id).where(VersionExport.artifact_id == artifact_id).limit(1)):
+            continue
         if (
             session.scalar(select(DatasetVersion.id).where(DatasetVersion.artifact_id == artifact_id).limit(1))
             is not None
@@ -715,6 +723,7 @@ class Teardowns:
             self.finish(session, record)
             return
         adapters = {version.adapter_artifact_id for version in model.versions if version.adapter_artifact_id}
+        adapters |= export_artifacts(model.versions)
         removed = {"versions": len(model.versions), "key_scopes": len(model.key_scopes)}
         kept = keep_custom_history(session, model)
         reserve_name(session, model.slug, "custom", model.name, record.actor)

@@ -20,6 +20,7 @@ from minibrain.registry.models import (
     Model,
     Source,
     Version,
+    VersionExport,
 )
 from minibrain.settings import Settings
 from minibrain.tasks.judges import install_judge
@@ -82,13 +83,30 @@ def adapter_items(session: Session) -> list[UsageItem]:
     )
     sizes: dict[str, dict[str, int]] = defaultdict(dict)
     versions: dict[str, int] = defaultdict(int)
+    exports: dict[str, int] = defaultdict(int)
     names: dict[str, str] = {}
     for slug, name, artifact, size in found:
         sizes[slug][str(artifact)] = int(size or 0)
         versions[slug] += 1
         names[slug] = name
+    merged = session.execute(
+        select(Model.slug, Model.name, VersionExport.artifact_id, Artifact.size)
+        .join(Version, Version.model_id == Model.id)
+        .join(VersionExport, VersionExport.version_id == Version.id)
+        .join(Artifact, Artifact.id == VersionExport.artifact_id)
+    )
+    for slug, name, artifact, size in merged:
+        sizes[slug][str(artifact)] = int(size or 0)
+        exports[slug] += 1
+        names[slug] = name
     return [
-        UsageItem(key=slug, name=names[slug], size_bytes=sum(sizes[slug].values()), count=versions[slug])
+        UsageItem(
+            key=slug,
+            name=names[slug],
+            size_bytes=sum(sizes[slug].values()),
+            count=versions[slug],
+            exports=exports[slug],
+        )
         for slug in sizes
     ]
 

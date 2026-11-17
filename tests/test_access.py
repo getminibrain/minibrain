@@ -178,6 +178,8 @@ ROUTE_ROLES = {
     ("GET", "/api/models/{name}/versions/{number}/card.md"): "viewer",
     ("GET", "/api/models/{name}/versions/{number}/aibom.json"): "viewer",
     ("GET", "/api/models/{name}/versions/{number}/files"): "viewer",
+    ("GET", "/api/models/{name}/versions/{number}/exports"): "viewer",
+    ("POST", "/api/models/{name}/versions/{number}/exports"): "builder",
     ("GET", "/api/models/{name}/overview"): "viewer",
     ("GET", "/api/models/{name}/traffic"): "viewer",
     ("GET", "/api/models/{name}/activity"): "viewer",

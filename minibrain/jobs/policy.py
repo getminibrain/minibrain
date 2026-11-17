@@ -26,6 +26,7 @@ POLICIES: dict[str, KindPolicy] = {
     JobKind.CATALOG_SYNC: KindPolicy(max_attempts=2, max_runtime=timedelta(minutes=10), needs_gpu=False),
     JobKind.VERIFY: KindPolicy(max_attempts=2, max_runtime=timedelta(hours=6), needs_gpu=False),
     JobKind.REPAIR: KindPolicy(max_attempts=3, max_runtime=timedelta(hours=12), needs_gpu=False),
+    JobKind.EXPORT: KindPolicy(max_attempts=2, max_runtime=timedelta(hours=6), needs_gpu=True),
 }
 
 

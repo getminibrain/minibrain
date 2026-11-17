@@ -39,13 +39,15 @@ MODULES: dict[str, str] = {
     JobKind.CATALOG_SYNC: "minibrain.models.sync",
     JobKind.VERIFY: "minibrain.models.verify",
     JobKind.REPAIR: "minibrain.models.repair",
+    JobKind.EXPORT: "minibrain.ml.export",
 }
 PASSTHROUGH_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.CATALOG_SYNC, JobKind.VERIFY, JobKind.REPAIR)
 TRANSFER_KINDS = (JobKind.DOWNLOAD, JobKind.IMPORT, JobKind.REPAIR)
 LEASE_HEADER = "X-Job-Lease"
 WEIGHTS = "weights"
+EXPORTED = "export"
 PRUNE_SECONDS = 600.0
-REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE]
+REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE, JobKind.EXPORT]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
@@ -456,14 +458,25 @@ class Worker:
         if claim["kind"] == JobKind.JUDGE:
             spec |= {key: params[key] for key in ("rubric", "items", "judge", "judge_version")}
             spec["instructions"] = params.get("instructions") or ""
+        if claim["kind"] == JobKind.EXPORT:
+            spec |= {"adapter": self.material(params["adapter"]), "out": str(attempt_dir / "out")}
         return spec
 
-    def outputs(self, kind: str, attempt_dir: Path) -> dict[str, str]:
-        names: dict[str, str] = {JobKind.TRAIN: "adapter"}
-        if kind not in names:
-            return {}
-        stored = self.store.put_dir(attempt_dir / "out")
-        return {names[kind]: self.client.upload(self.store, stored.id, names[kind], Packing.TAR, names[kind])}
+    def outputs(self, claim: dict[str, Any], attempt_dir: Path) -> dict[str, str]:
+        if claim["kind"] == JobKind.TRAIN:
+            stored = self.store.put_dir(attempt_dir / "out")
+            return {"adapter": self.client.upload(self.store, stored.id, "adapter", Packing.TAR, "adapter")}
+        if claim["kind"] == JobKind.EXPORT:
+            return {EXPORTED: self.export(attempt_dir / "out", str(claim["params"]["name"]))}
+        return {}
+
+    def export(self, folder: Path, name: str) -> str:
+        stored = self.store.put_dir(folder)
+        shutil.rmtree(folder, ignore_errors=True)
+        try:
+            return self.client.upload(self.store, stored.id, EXPORTED, Packing.TAR, name)
+        finally:
+            self.store.delete(stored.id)
 
     def upload_log(self, log_path: Path) -> str | None:
         if not log_path.exists():
@@ -501,7 +514,7 @@ class Worker:
                 result = json.loads((attempt_dir / "result.json").read_text())
                 if kind == JobKind.TRAIN:
                     result["device_time"] = device_time(dict(result.get("summary") or {}), seconds)
-                self.client.complete(job_id, token, result, self.outputs(kind, attempt_dir), log)
+                self.client.complete(job_id, token, result, self.outputs(claim, attempt_dir), log)
                 shutil.rmtree(workdir, ignore_errors=True)
             else:
                 error, retryable, code = failure_from(tail, exit_code)

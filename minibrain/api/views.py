@@ -306,7 +306,7 @@ def split_score(metrics: dict | None, key: str) -> SplitScore | None:
 
 
 def latest_job(model: Model, version: Version) -> Job | None:
-    jobs = [job for job in model.jobs if job.version_id == version.id]
+    jobs = [job for job in model.jobs if job.version_id == version.id and job.kind != JobKind.EXPORT]
     return max(jobs, key=lambda job: job.id, default=None)
 
 

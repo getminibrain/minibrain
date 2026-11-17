@@ -49,6 +49,11 @@ class JobKind(StrEnum):
     VERIFY = "verify"
     REPAIR = "repair"
     JUDGE = "judge"
+    EXPORT = "export"
+
+
+class ExportFormat(StrEnum):
+    SAFETENSORS = "safetensors"
 
 
 class BaseModelStatus(StrEnum):
@@ -304,6 +309,31 @@ class Version(Base):
 
     model: Mapped[Model] = relationship(back_populates="versions")
     dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")
+    exports: Mapped[list["VersionExport"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class VersionExport(Base):
+    __tablename__ = "version_exports"
+    __table_args__ = (
+        UniqueConstraint("version_id", "format", "base_hash"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version_id: Mapped[int] = mapped_column(ForeignKey("versions.id", ondelete="CASCADE"))
+    format: Mapped[str]
+    base_hash: Mapped[str] = mapped_column(default="")
+    job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id", ondelete="SET NULL"), default=None)
+    artifact_id: Mapped[str | None] = mapped_column(ForeignKey("artifacts.id"), default=None)
+    files: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    requested_by: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+
+    version: Mapped[Version] = relationship(back_populates="exports")
+    job: Mapped["Job | None"] = relationship()
 
 
 class Worker(Base):
