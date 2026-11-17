@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button, CheckboxSelect, DataGrid, EmptyState } from "obp-ui";
+import { Button, CheckboxSelect, DataGrid } from "obp-ui";
 import { Suspense, lazy, useEffect, useMemo, useRef } from "react";
 import {
     type OverviewFilter,
@@ -26,7 +26,7 @@ import {
     rangeOf,
 } from "~/lib/requests";
 import { exactTime, relativeTime, timeValue } from "~/lib/time";
-import { NothingYet, SummaryStrip } from "./RequestsTab";
+import { NothingYet, RangeSelect, SummaryStrip } from "./RequestsTab";
 
 const SLOT_COLORS = [
     "var(--primary)",
@@ -184,16 +184,11 @@ export function OverviewTab({ paused }: { paused: boolean }) {
     const nothing = data !== undefined && data.models.length === 0;
     const empty =
         filter.model.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-                <p className="text-muted-foreground">No requests from these models.</p>
-                <Button variant="outline" onClick={() => update({ model: "" })}>
-                    Clear filters
-                </Button>
-            </div>
+            <p className="text-muted-foreground">No requests from these models.</p>
         ) : summary.data ? (
             <NothingYet summary={summary.data} range={range} />
         ) : (
-            <EmptyState title="No requests" />
+            <p className="text-muted-foreground">No requests.</p>
         );
     return (
         <>
@@ -206,21 +201,19 @@ export function OverviewTab({ paused }: { paused: boolean }) {
                     value={filter.model}
                     onValueChange={(next) => update({ model: next.join(",") })}
                 />
+                <RangeSelect
+                    range={range}
+                    onRange={(next) => update({ range: next === DEFAULT_RANGE ? "" : next })}
+                />
                 {filter.model.length > 0 && (
                     <Button variant="ghost" onClick={() => update({ model: "" })}>
                         Clear filters
                     </Button>
                 )}
             </div>
-            <SummaryStrip
-                summary={summary.data}
-                range={range}
-                onRange={(next) => update({ range: next === DEFAULT_RANGE ? "" : next })}
-            />
+            <SummaryStrip summary={summary.data} note={nothing ? empty : undefined} />
             <ErrorLine error={overview.error ?? summary.error} />
-            {nothing ? (
-                empty
-            ) : data ? (
+            {nothing ? null : data ? (
                 <Suspense fallback={<ChartsLoading />}>
                     <Charts overview={data} series={series} dimmed={overview.isPlaceholderData} />
                 </Suspense>

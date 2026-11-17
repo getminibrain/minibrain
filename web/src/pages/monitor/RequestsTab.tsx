@@ -3,10 +3,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     Card,
-    CardContent,
     CheckboxSelect,
     DataGrid,
-    EmptyState,
     Link,
     SearchInput,
     Select,
@@ -31,7 +29,7 @@ import {
 } from "~/api/requestQueries";
 import { ModelName, withDeleted } from "~/components/ModelName";
 import { modelOption } from "~/components/PublisherLogo";
-import { ErrorLine, Stat } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count, milliseconds, percent } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
@@ -246,50 +244,61 @@ export function LiveControl({ paused, onToggle }: { paused: boolean; onToggle: (
     );
 }
 
-export function SummaryStrip({
-    summary,
+export function RangeSelect({
     range,
     onRange,
+}: { range: string; onRange: (range: string) => void }) {
+    return (
+        <Select value={range} onValueChange={(next) => onRange(String(next))}>
+            <SelectTrigger aria-label="Time range" className="w-44">
+                <SelectValue>{rangeOf(range).label}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+                {RANGES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function StripStat({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="flex min-w-0 flex-col gap-0.5 px-panel py-3">
+            <dt className="truncate text-sm text-muted-foreground">{label}</dt>
+            <dd className="truncate font-semibold tabular-nums">{children}</dd>
+        </div>
+    );
+}
+
+export function SummaryStrip({
+    summary,
+    note,
 }: {
     summary: RequestSummary | undefined;
-    range: string;
-    onRange: (range: string) => void;
+    note?: ReactNode;
 }) {
     const errors = summary?.errors ?? 0;
     return (
-        <Card>
-            <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4">
-                <Select value={range} onValueChange={(next) => onRange(String(next))}>
-                    <SelectTrigger aria-label="Time range" className="w-44">
-                        <SelectValue>{rangeOf(range).label}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                        {RANGES.map((item) => (
-                            <SelectItem key={item.value} value={item.value}>
-                                {item.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Stat label="Requests" value={count(summary?.requests)} />
-                <Stat
-                    label="Error rate"
-                    value={
-                        <>
-                            {percent(summary?.error_rate)}
-                            {errors > 0 && (
-                                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                                    {`${count(errors)} ${errors === 1 ? "error" : "errors"}`}
-                                </span>
-                            )}
-                        </>
-                    }
-                />
-                <Stat label="Latency p50" value={milliseconds(summary?.p50_ms)} />
-                <Stat label="Latency p95" value={milliseconds(summary?.p95_ms)} />
-                <Stat label="Tokens in" value={count(summary?.prompt_tokens)} />
-                <Stat label="Tokens out" value={count(summary?.completion_tokens)} />
-            </CardContent>
+        <Card className="gap-0 overflow-clip py-0">
+            <dl className="grid grid-cols-6 divide-x">
+                <StripStat label="Requests">{count(summary?.requests)}</StripStat>
+                <StripStat label="Error rate">
+                    {percent(summary?.error_rate)}
+                    {errors > 0 && (
+                        <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                            {`${count(errors)} ${errors === 1 ? "error" : "errors"}`}
+                        </span>
+                    )}
+                </StripStat>
+                <StripStat label="Latency p50">{milliseconds(summary?.p50_ms)}</StripStat>
+                <StripStat label="Latency p95">{milliseconds(summary?.p95_ms)}</StripStat>
+                <StripStat label="Tokens in">{count(summary?.prompt_tokens)}</StripStat>
+                <StripStat label="Tokens out">{count(summary?.completion_tokens)}</StripStat>
+            </dl>
+            {note && <div className="border-t px-panel py-3">{note}</div>}
         </Card>
     );
 }
@@ -297,20 +306,20 @@ export function SummaryStrip({
 export function NothingYet({ summary, range }: { summary: RequestSummary; range: string }) {
     if (summary.last_at) {
         return (
-            <EmptyState title={`No requests ${rangeOf(range).phrase}`}>
-                {`The last one came ${relativeTime(summary.last_at)}. Pick a longer time range to see it.`}
-            </EmptyState>
+            <p className="text-muted-foreground">
+                {`No requests ${rangeOf(range).phrase}. The last one came ${relativeTime(summary.last_at)}; pick a longer time range to see it.`}
+            </p>
         );
     }
     return (
-        <EmptyState title="No requests yet">
-            Calls to <span className="font-mono">/v1/chat/completions</span> show up here within a
-            few seconds. Create an API key on a model's API tab in{" "}
+        <p className="text-muted-foreground">
+            No requests yet. Calls to <span className="font-mono">/v1/chat/completions</span> show
+            up here within seconds; create an API key on a model's API tab in{" "}
             <Link href="/models" className="text-primary hover:underline">
                 Models
-            </Link>{" "}
-            to start.
-        </EmptyState>
+            </Link>
+            .
+        </p>
     );
 }
 
@@ -409,12 +418,12 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                         Clear filters
                     </Button>
                 )}
+                <RangeSelect
+                    range={range}
+                    onRange={(next) => update({ range: next === DEFAULT_RANGE ? "" : next })}
+                />
             </div>
-            <SummaryStrip
-                summary={summary.data}
-                range={range}
-                onRange={(next) => update({ range: next === DEFAULT_RANGE ? "" : next })}
-            />
+            <SummaryStrip summary={summary.data} />
             <ErrorLine error={list.error ?? facets.error ?? summary.error} />
             <DataGrid
                 columns={REQUEST_COLUMNS}
