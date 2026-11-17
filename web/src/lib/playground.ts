@@ -78,12 +78,6 @@ export const DEFAULT_SCHEMA = JSON.stringify(
     2,
 );
 
-export const DEFAULT_PARAMETERS = JSON.stringify(
-    { type: "object", properties: {}, required: [] },
-    null,
-    2,
-);
-
 export const DEFAULT_SETTINGS: Settings = {
     max_tokens: null,
     temperature: null,

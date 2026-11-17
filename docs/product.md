@@ -438,6 +438,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
+- **Playground functions** · shipped · product, engineer
+  Define tools in a form or JSON; paste OpenAI tool definitions.
+  UI: Playground › Functions · API: POST /api/playground/chat/completions
 - **Playground presets** · shipped · product, engineer
   Save, rename and delete named settings, one loading by default.
   UI: Playground › Presets · API: GET /api/playground/presets, POST /api/playground/presets, PUT /api/playground/presets/{preset_id}, DELETE /api/playground/presets/{preset_id}

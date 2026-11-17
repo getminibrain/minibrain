@@ -1,4 +1,4 @@
-import { IconX } from "@tabler/icons-react";
+import { IconPencil, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
 import {
     Button,
     Collapsible,
@@ -19,16 +19,16 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
+import { signature } from "~/lib/functionSchema";
 import {
-    DEFAULT_PARAMETERS,
     type FunctionSpec,
     type ResponseFormat,
     type Settings,
     type Target,
     jsonProblem,
-    newId,
     reasoningOptions,
 } from "~/lib/playground";
+import { FunctionDialog } from "./FunctionDialog";
 import { Presets } from "./Presets";
 
 const MODEL_DEFAULT = "default";
@@ -190,56 +190,48 @@ function FormatControl({
     );
 }
 
-function FunctionEditor({
+function FunctionLine({
     spec,
-    onChange,
+    onEdit,
     onRemove,
 }: {
     spec: FunctionSpec;
-    onChange: (next: FunctionSpec) => void;
+    onEdit: () => void;
     onRemove: () => void;
 }) {
-    const problem = jsonProblem(spec.parameters);
+    const shown = signature(spec.name, spec.parameters);
     return (
-        <div className="flex flex-col gap-2 rounded-md border p-3">
-            <div className="flex items-center gap-2">
-                <Input
-                    aria-label="Function name"
-                    value={spec.name}
-                    placeholder="get_weather"
-                    className="font-mono"
-                    onChange={(event) => onChange({ ...spec, name: event.target.value })}
-                />
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Remove function"
-                            onClick={onRemove}
-                        >
-                            <IconX />
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Remove function</TooltipContent>
-                </Tooltip>
-            </div>
-            <Input
-                aria-label="Function description"
-                value={spec.description}
-                placeholder="What it does, for the model"
-                onChange={(event) => onChange({ ...spec, description: event.target.value })}
-            />
-            <JsonEditor
-                aria-label="Parameters as JSON schema"
-                value={spec.parameters}
-                onValueChange={(parameters) => onChange({ ...spec, parameters })}
-                minLines={4}
-                maxLines={14}
-                aria-invalid={problem !== null}
-            />
-            {problem && <p className="text-sm text-destructive">{problem}</p>}
-        </div>
+        <li className="flex h-8 items-center gap-1 rounded-md border pr-0.5 pl-2.5">
+            <span className="min-w-0 flex-1 truncate font-mono" title={shown}>
+                {shown}
+            </span>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Edit ${spec.name}`}
+                        onClick={onEdit}
+                    >
+                        <IconPencil />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete ${spec.name}`}
+                        onClick={onRemove}
+                    >
+                        <IconTrash />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
+        </li>
     );
 }
 
@@ -248,16 +240,26 @@ function FunctionsControl({
     settings,
     onChange,
 }: { target: Target | undefined; settings: Settings; onChange: Change }) {
+    const [editing, setEditing] = useState<FunctionSpec | "new" | null>(null);
     const unsupported = target !== undefined && target.contract === "text" && !target.tools;
     const locked = target !== undefined && (target.contract !== "text" || !target.tools);
-    const update = (functions: FunctionSpec[]) => {
-        const names = new Set(functions.map((item) => item.name.trim()));
-        const choice =
-            ["auto", "none", "required"].includes(settings.tool_choice) ||
-            names.has(settings.tool_choice);
-        onChange({ functions, tool_choice: choice ? settings.tool_choice : "auto" });
+    const update = (functions: FunctionSpec[], wanted = settings.tool_choice) => {
+        const names = new Set(functions.map((item) => item.name));
+        const kept = ["auto", "none", "required"].includes(wanted) || names.has(wanted);
+        onChange({ functions, tool_choice: kept ? wanted : "auto" });
     };
-    const named = settings.functions.map((item) => item.name.trim()).filter(Boolean);
+    const save = (next: FunctionSpec) => {
+        const before = settings.functions.find((item) => item.id === next.id);
+        const functions = before
+            ? settings.functions.map((item) => (item.id === next.id ? next : item))
+            : [...settings.functions, next];
+        update(functions, before?.name === settings.tool_choice ? next.name : settings.tool_choice);
+        setEditing(null);
+    };
+    const editingId = editing !== null && editing !== "new" ? editing.id : null;
+    const taken = settings.functions
+        .filter((item) => item.id !== editingId)
+        .map((item) => item.name);
     return (
         <Labelled
             id={null}
@@ -267,31 +269,28 @@ function FunctionsControl({
             {unsupported && (
                 <Note>This base has no tool-call format minibrain reads in its chat template.</Note>
             )}
-            {!locked &&
-                settings.functions.map((spec, index) => (
-                    <FunctionEditor
-                        key={spec.id}
-                        spec={spec}
-                        onChange={(next) =>
-                            update(
-                                settings.functions.map((item, at) => (at === index ? next : item)),
-                            )
-                        }
-                        onRemove={() => update(settings.functions.filter((_, at) => at !== index))}
-                    />
-                ))}
+            {!locked && settings.functions.length > 0 && (
+                <ul className="flex flex-col gap-1.5" aria-label="Functions">
+                    {settings.functions.map((spec) => (
+                        <FunctionLine
+                            key={spec.id}
+                            spec={spec}
+                            onEdit={() => setEditing(spec)}
+                            onRemove={() =>
+                                update(settings.functions.filter((item) => item.id !== spec.id))
+                            }
+                        />
+                    ))}
+                </ul>
+            )}
             <Button
                 variant="outline"
                 size="sm"
                 className="w-fit"
                 disabled={locked}
-                onClick={() =>
-                    update([
-                        ...settings.functions,
-                        { id: newId(), name: "", description: "", parameters: DEFAULT_PARAMETERS },
-                    ])
-                }
+                onClick={() => setEditing("new")}
             >
+                <IconPlus />
                 Add function
             </Button>
             {!locked && settings.functions.length > 0 && (
@@ -308,15 +307,21 @@ function FunctionsControl({
                             <SelectItem value="auto">Auto</SelectItem>
                             <SelectItem value="none">None</SelectItem>
                             <SelectItem value="required">Required</SelectItem>
-                            {named.map((name) => (
-                                <SelectItem key={name} value={name}>
-                                    <span className="font-mono">{name}</span>
+                            {settings.functions.map((spec) => (
+                                <SelectItem key={spec.id} value={spec.name}>
+                                    <span className="font-mono">{spec.name}</span>
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
                 </div>
             )}
+            <FunctionDialog
+                editing={editing}
+                taken={taken}
+                onSave={save}
+                onClose={() => setEditing(null)}
+            />
         </Labelled>
     );
 }
