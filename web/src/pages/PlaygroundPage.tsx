@@ -23,6 +23,7 @@ import {
     SheetDescription,
     SheetHeader,
     SheetTitle,
+    cn,
 } from "obp-ui";
 import { ChatComposer, ChatEmptyState, ChatNotice, ChatPanel } from "obp-ui/chat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -102,13 +103,14 @@ function playgroundUrl(model: string | null, chat: number | null): string {
 }
 
 function gridColumns(recent: boolean, settings: boolean): string {
+    const fill = "grid min-h-[32rem] flex-1 grid-rows-[minmax(0,1fr)] gap-4";
     if (recent && settings) {
-        return "grid grid-cols-[16rem_minmax(0,1fr)_22rem] items-start gap-4";
+        return cn(fill, "grid-cols-[16rem_minmax(0,1fr)_22rem]");
     }
     if (recent) {
-        return "grid grid-cols-[16rem_minmax(0,1fr)] items-start gap-4";
+        return cn(fill, "grid-cols-[16rem_minmax(0,1fr)]");
     }
-    return settings ? "grid grid-cols-[minmax(0,1fr)_22rem] items-start gap-4" : "flex flex-col";
+    return cn(fill, settings ? "grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1");
 }
 
 function assistantTurn(json: boolean): AssistantTurn {
@@ -388,7 +390,7 @@ export function PlaygroundPage() {
     const recentColumn = widest && recentPanel;
     const settingsColumn = wide && panel;
     return (
-        <Page wide>
+        <Page wide fill>
             <PageHeader
                 title="Playground"
                 caption="Chat with any of your models or installed bases, with the settings the API takes."
@@ -472,11 +474,11 @@ export function PlaygroundPage() {
             {target && (
                 <div className={gridColumns(recentColumn, settingsColumn)}>
                     {recentColumn && (
-                        <Card className="sticky top-4 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden p-0">
+                        <Card className="flex min-h-0 flex-col overflow-hidden p-0">
                             {recentBody(true)}
                         </Card>
                     )}
-                    <Card className="flex min-h-[32rem] flex-col p-0">
+                    <Card className="flex min-h-0 flex-col overflow-hidden p-0">
                         <ChatPanel
                             variant="inset"
                             busy={busy}
@@ -524,9 +526,7 @@ export function PlaygroundPage() {
                         </ChatPanel>
                     </Card>
                     {settingsColumn && (
-                        <Card className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto p-0">
-                            {panelBody}
-                        </Card>
+                        <Card className="min-h-0 overflow-y-auto p-0">{panelBody}</Card>
                     )}
                 </div>
             )}

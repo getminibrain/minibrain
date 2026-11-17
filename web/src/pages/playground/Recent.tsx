@@ -179,7 +179,7 @@ export function Recent({
     const items = chats.data ?? [];
     const shown = items.filter((chat) => matches(chat, filter));
     return (
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
             {(titled || items.length > 0 || note) && (
                 <div className="flex flex-col gap-3 border-b px-4 py-3">
                     {titled && <h2 className="text-base font-semibold">Recent</h2>}
