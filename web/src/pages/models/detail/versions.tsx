@@ -33,7 +33,6 @@ import {
 import { useMemo, useState } from "react";
 import {
     type JobInfo,
-    type ModelDetail,
     type ModelRow,
     type VersionInfo,
     api,
@@ -66,7 +65,6 @@ import {
     ruleReason,
     versionLabel,
 } from "./makeLive";
-import { ScoredBy } from "./scoredBy";
 import { labelOf, startFrom } from "./train/recipe";
 
 export function isCancelled(version: VersionInfo): boolean {
@@ -810,21 +808,10 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     );
 }
 
-export function VersionsTab({
-    row,
-    detail,
-    versions,
-}: {
-    row: ModelRow;
-    detail: ModelDetail | undefined;
-    versions: VersionInfo[];
-}) {
+export function VersionsTab({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
     return (
-        <>
-            <ScoredBy detail={detail} />
-            <PanelSections>
-                <VersionsTable row={row} versions={versions} />
-            </PanelSections>
-        </>
+        <PanelSections>
+            <VersionsTable row={row} versions={versions} />
+        </PanelSections>
     );
 }
