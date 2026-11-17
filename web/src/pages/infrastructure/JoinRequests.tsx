@@ -125,14 +125,20 @@ function RequestRow({
                     Waiting
                 </StatusText>
             </TableCell>
-            <TableCell className="py-2 font-mono">{request.host}</TableCell>
+            <TableCell className="py-2 font-mono">
+                <span className="block max-w-64 truncate" title={request.host}>
+                    {request.host}
+                </span>
+            </TableCell>
             <TableCell className="max-w-56 py-2 whitespace-normal">
                 {hardwareText(facts(request))}
             </TableCell>
             <TableCell className="py-2 font-mono">{request.code}</TableCell>
             <TableCell className="py-2">
                 {request.pool ? (
-                    <PoolLink name={request.pool} />
+                    <span className="block max-w-40 truncate" title={request.pool}>
+                        <PoolLink name={request.pool} />
+                    </span>
                 ) : (
                     <span className="text-muted-foreground">Any</span>
                 )}
