@@ -226,7 +226,7 @@ export const GENERAL = {
             hourly: onSection(
                 setting(
                     "Price per hour",
-                    "What an hour of each pool's GPU time costs, so scores show cost per 1,000 requests.",
+                    "What an hour of each pool's GPU time costs, so scores show cost per 1M tokens.",
                     ["cost", "pricing", "gpu", "rate", "hourly", "pool", "budget"],
                 ),
             ),

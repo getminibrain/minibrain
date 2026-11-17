@@ -3,7 +3,7 @@ import { percent } from "~/lib/format";
 
 type FullCost = components["schemas"]["EvalCost"];
 
-export type EvalCost = Pick<FullCost, "device" | "device_seconds_per_1k" | "per_1k" | "currency">;
+export type EvalCost = Pick<FullCost, "device" | "device_seconds_per_1m" | "per_1m" | "currency">;
 
 type Side = { number: number; score?: number | null; cost?: EvalCost | null };
 
@@ -42,25 +42,32 @@ export function duration(seconds: number): string {
 
 export function money(amount: number, currency: string): string {
     const digits: Intl.NumberFormatOptions =
-        amount < 1 ? { maximumSignificantDigits: 3 } : { maximumFractionDigits: 2 };
-    return amount.toLocaleString(undefined, { style: "currency", currency, ...digits });
+        amount < 1
+            ? { minimumSignificantDigits: 2, maximumSignificantDigits: 3 }
+            : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+    return amount.toLocaleString(undefined, {
+        style: "currency",
+        currency,
+        currencyDisplay: "narrowSymbol",
+        ...digits,
+    });
 }
 
 export function deviceTime(cost: EvalCost | null | undefined): string {
-    return cost ? `${duration(cost.device_seconds_per_1k)} ${deviceKind(cost.device)}` : NONE;
+    return cost ? `${duration(cost.device_seconds_per_1m)} ${deviceKind(cost.device)}` : NONE;
 }
 
 export function costText(cost: EvalCost | null | undefined): string {
     if (!cost) {
         return NONE;
     }
-    return cost.per_1k !== null && cost.currency
-        ? money(cost.per_1k, cost.currency)
+    return cost.per_1m !== null && cost.currency
+        ? money(cost.per_1m, cost.currency)
         : deviceTime(cost);
 }
 
 export function priced(cost: EvalCost | null | undefined): boolean {
-    return Boolean(cost && cost.per_1k !== null && cost.currency);
+    return Boolean(cost && cost.per_1m !== null && cost.currency);
 }
 
 export function measuredOn(
@@ -75,7 +82,7 @@ export function costSortValue(cost: EvalCost | null | undefined): number {
     if (!cost) {
         return Number.POSITIVE_INFINITY;
     }
-    return cost.per_1k ?? cost.device_seconds_per_1k;
+    return cost.per_1m ?? cost.device_seconds_per_1m;
 }
 
 function timeNoun(base: EvalCost, mine: EvalCost): string {
@@ -84,9 +91,9 @@ function timeNoun(base: EvalCost, mine: EvalCost): string {
 }
 
 function relation(base: EvalCost, mine: EvalCost, number: number): string | null {
-    const priced = base.per_1k !== null && mine.per_1k !== null;
-    const theirs = priced ? base.per_1k : base.device_seconds_per_1k;
-    const ours = priced ? mine.per_1k : mine.device_seconds_per_1k;
+    const priced = base.per_1m !== null && mine.per_1m !== null;
+    const theirs = priced ? base.per_1m : base.device_seconds_per_1m;
+    const ours = priced ? mine.per_1m : mine.device_seconds_per_1m;
     if (!theirs || !ours || theirs <= 0 || ours <= 0) {
         return null;
     }

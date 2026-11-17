@@ -959,13 +959,14 @@ once it matches; only deleting a base removes its files.
   with the task type's metric.
 - Eval decodes the way serving does: a Classify answer is held to the label set, so the score is what apps get and
   "not a label" only counts answers cut off by the token limit.
-- Reported per model: score, p50 / p95 latency, cost per 1,000 requests (GPU time for local models, list price for API
-  teachers). The headline reads like "base 54% → minibrain 91% at 1/20 of the teacher's cost".
+- Reported per model: score, p50 / p95 latency, cost per 1M tokens (GPU time for local models, list price for API
+  teachers): the unit API providers price in, so the saving against an API reads directly. The headline reads like
+  "base 54% → minibrain 91% at 1/20 of the teacher's cost".
 - Local cost: the eval job times the device per batch of 8 held-out rows and records GPU-seconds, requests, tokens in
-  and out, the device and the worker's pool (`metrics.cost`, source `device_time`). Cost per 1,000 requests is that
-  time × the pool's price per hour from Settings → General → Compute prices (one currency per install, audited as
-  `settings.prices`). With no price it shows the GPU time instead; prices are never looked up online. An API teacher
-  will record source `list_price` with its token counts.
+  and out, the device and the worker's pool (`metrics.cost`, source `device_time`). Cost per 1M tokens (prompt and
+  output) is that time × the pool's price per hour from Settings → General → Compute prices (one currency per
+  install, audited as `settings.prices`). With no price it shows the GPU time instead; prices are never looked up
+  online. An API teacher will record source `list_price` with its token counts.
 - Deploy at any step. A custom model can be deployed the moment it exists: with no version live it serves its base
   model. A ready version goes live only when it passes the model's promotion rule (Task types); one that was live before
   can always be rolled back to. Training or scoring never changes what is live.
@@ -1289,27 +1290,26 @@ keys, and `/v1` stays key-only.
   for bases, or the admin lock); otherwise nothing is saved and the Recent list says why in one line. Chats with no
   new message for Log retention (days) are deleted by the leader's hourly purge, with the request logs. No folders,
   sharing or search beyond the filter: that is the staff Chat app's job.
-- Models (`/models`, built 2026-11-11) lists every model in two sticky, collapsible groups, Your models then Base
-  models (title and count only); base models are grouped by catalogue model, one row per catalogue entry with its
-  installed variants. One toolbar line: Search, the active filter chips, then a view-options button and Add model. The
-  view panel filters by status (Deployed, Not deployed, Needs attention, Training, Failed, with live counts), kind and
-  base model, sorts (Needs attention first by default, Name, Score, Requests, Recently updated; within each group)
-  and holds Display: Show versions and the Quality, Requests, Cost and p95 columns; filters and sort stay in the URL
-  (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or avatar, name and base,
-  the live score with a sparkline over versions, then 7-day requests, device time per 1,000 requests and p95 measured
-  as the model page's Monitoring measures them (without traffic, the cost the eval measured, muted), and one status
-  line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from the
-  live engines, Not deployed), then Connect or Try and a menu. A row opens the model page; arrows move, Enter
-  opens, Space opens the quick look. Show versions adds version rows under custom models (status as a dot and text,
-  "beats live +1.4" or "below rule", never on v0 · Baseline, and Make vN live) and variant rows under base models
-  (format, size, trainable or serve-only, API name, Deployed, Update available). Only those child rows tick: versions
-  can be compared (two of one model) or deleted, variants deployed, undeployed or deleted, live ones skipped, through
-  the shared delete dialog. The quick look is a `Sheet`: score over versions, a week of traffic, p95, errors and cost,
-  the latest requests, the model page's next step, and Open model, Make vN live and Playground. `GET /api/models`
-  carries what it needs in a fixed number of queries: versions loaded in one batch, requests, p50, p95, 4xx/5xx and
-  device time from the model page's traffic statistics in one ranked query (so the 7-day numbers match its
-  Monitoring), live replicas per base, and each base's catalogue model, format and trainability. Viewers see no
-  builder actions.
+- Models (`/models`, built 2026-11-11) lists every model in two sticky, collapsible groups, Your models then Base models
+  (title and count only); base models are grouped by catalogue model, one row per catalogue entry with its installed
+  variants. One toolbar line: Search, the active filter chips, then a view-options button and Add model. The view panel
+  filters by status (Deployed, Not deployed, Needs attention, Training, Failed, with live counts), kind and base model,
+  sorts (Needs attention first by default, Name, Score, Requests, Recently updated; within each group) and holds
+  Display: Show versions and the Quality, Requests, Cost and p95 columns (Cost and p95 off by default); filters and sort
+  stay in the URL (`?q=&state=&kind=&base=&sort=`), display choices in the browser. A row shows the logo or avatar, name
+  and base, the live score with a sparkline over versions, then 7-day requests, device time per 1M tokens and p95
+  measured as the model page's Monitoring measures them (without traffic, the cost the eval measured, muted), and one
+  status line ("v5 beats live +1.4 · Make v5 live", "v6 training 45%", "v3 failed", Deployed with "· 2 replicas" from
+  the live engines, Not deployed), then Connect or Try and a menu. A row opens the model page; arrows move, Enter opens,
+  Space opens the quick look. Show versions adds version rows under custom models (status as a dot and text, "beats live
+  +1.4" or "below rule", never on v0 · Baseline, and Make vN live) and variant rows under base models (format, size,
+  trainable or serve-only, API name, Deployed, Update available). Only those child rows tick: versions can be compared
+  (two of one model) or deleted, variants deployed, undeployed or deleted, live ones skipped, through the shared delete
+  dialog. The quick look is a `Sheet`: score over versions, a week of traffic, p95, errors and cost, the latest
+  requests, the model page's next step, and Open model, Make vN live and Playground. `GET /api/models` carries what it
+  needs in a fixed number of queries: versions loaded in one batch, requests, p50, p95, 4xx/5xx and device time from the
+  model page's traffic statistics in one ranked query (so the 7-day numbers match its Monitoring), live replicas per
+  base, and each base's catalogue model, format and trainability. Viewers see no builder actions.
 - A model's page (built 2026-11-06, rebuilt 2026-11-11 from the approved prototype) is one route for both kinds,
   `/models/<name>`: base keys and custom slugs share one namespace with `/v1`, so create and rename refuse a name
   another model holds (409), and create, import and download give the next free API name when the address is held,
@@ -1374,7 +1374,7 @@ keys, and `/v1` stays key-only.
     prompt-only version scored at once, and its summary reads "Scores in ≈ N s on N held-out rows", timed from the
     last prompt-only version's scoring job. A serve-only model (its base cannot train here) opens it in Instructions
     only.
-  - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1,000 against the period
+  - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1M tokens against the period
     before, and the shared chart), Latency (p50, p95, p99), Errors (the rate against the usual one and a table by
     status linking to the request log), By version, Callers (API keys) and the latest requests, all from
     `/api/models/<name>/traffic`, one query per range, so its numbers match the Overview and the Models list.
@@ -1777,7 +1777,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] `response_format` with `json_schema` (built: SGLang gets EBNF or `json_schema`, llama.cpp grammars, MLX and
       `transformers` token tries for labels and finite schemas, every JSON answer checked in the gateway; llama.cpp,
       MLX and `transformers` verified on Qwen3-0.6B, SGLang only against a fake process: verify on a GPU box)
-- [ ] Cost and latency in eval (p50 / p95, GPU time and cost per 1,000 requests priced per pool, and the headline
+- [ ] Cost and latency in eval (p50 / p95, GPU time and cost per 1M tokens priced per pool, and the headline
       against v0 on Evaluations and model cards done; list price for API teachers waits for the teacher pool, and
       "no training needed" for `target.min_score`, which does not exist yet)
 - [ ] `minibrain.yaml` and `minibrain run`
@@ -2058,4 +2058,4 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - MPS dtype and op gaps during local training; Metal GPU hangs in LoRA backward (seen on M1 Pro, macOS 27.0.1).
 - Teacher quality on generated Q&A: track the check-pass drop rate per source.
 - Banking77 on a GPU (`docs/findings.md` has the laptop run): the teacher as version 0, a 4B student on full data,
-  SGLang with runtime adapters, constrained decoding to zero invalid labels, and cost per 1,000 requests.
+  SGLang with runtime adapters, constrained decoding to zero invalid labels, and cost per 1M tokens.

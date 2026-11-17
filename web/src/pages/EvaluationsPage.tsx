@@ -101,7 +101,7 @@ function Change({ line }: { line: Line }) {
 }
 
 const COST_INFO =
-    "Measured GPU time per 1,000 held-out requests, times the pool's price per hour from Settings. Without a price, the GPU time itself.";
+    "Measured GPU time per 1M prompt and output tokens on held-out requests, times the pool's price per hour from Settings. Without a price, the GPU time itself.";
 
 function baselineOf(line: Line): ModelVersionRow | undefined {
     const earlier = (line.model.versions ?? []).filter(
@@ -198,7 +198,7 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
         },
         {
             id: "cost",
-            header: "Cost per 1,000",
+            header: "Cost / 1M tokens",
             meta: { info: COST_INFO },
             accessorFn: (line) => costSortValue(line.version.cost),
             cell: ({ row }) => (
@@ -368,7 +368,7 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                 <Stat label="p50" value={milliseconds(info?.latency_p50_ms)} />
                 <Stat label="p95" value={milliseconds(info?.latency_p95_ms)} />
                 <Stat
-                    label="GPU time per 1,000"
+                    label="GPU time / 1M tokens"
                     value={
                         <span className="inline-flex items-center gap-1">
                             {deviceTime(cost)}
@@ -376,7 +376,7 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                         </span>
                     }
                 />
-                {priced(cost) && <Stat label="Cost per 1,000" value={costText(cost)} />}
+                {priced(cost) && <Stat label="Cost / 1M tokens" value={costText(cost)} />}
                 <Stat label="Prompt tokens" value={count(info?.prompt_tokens)} />
                 <Stat label="Output tokens" value={count(cost?.completion_tokens)} />
             </div>

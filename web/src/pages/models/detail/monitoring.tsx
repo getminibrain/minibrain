@@ -39,10 +39,10 @@ import {
     type TrafficRange,
     type TrafficReport,
     type TrafficStats,
-    costPer1k,
     errorLine,
     fineRate,
     gpu,
+    gpuPerMillionTokens,
     ms,
     percentileLines,
     pointsChange,
@@ -139,9 +139,9 @@ function SummaryStrip({ report, full }: { report: TrafficReport; full: boolean }
                 }
             />
             <Figure
-                label="Cost / 1k requests"
-                value={empty ? "–" : gpu(costPer1k(now))}
-                delta={change(costPer1k)}
+                label="Cost / 1M tokens"
+                value={empty ? "–" : gpu(gpuPerMillionTokens(now))}
+                delta={change(gpuPerMillionTokens)}
             />
         </dl>
     );

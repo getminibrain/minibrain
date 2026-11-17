@@ -80,7 +80,7 @@ function measures(version: VersionInfo, versions: VersionInfo[]): Measure[] {
     if (versions.some((item) => item.cost)) {
         list.push({
             id: "cost",
-            label: "Cost per 1k requests",
+            label: "Cost / 1M tokens",
             better: "lower",
             value: (item) => (item.cost ? costSortValue(item.cost) : null),
             text: (item) => costText(item.cost),

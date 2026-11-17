@@ -782,12 +782,12 @@ class EvalCost(BaseModel):
     device_name: str | None
     batch_size: int | None
     requests: int
-    device_seconds_per_1k: float
+    device_seconds_per_1m: float
     prompt_tokens: float | None
     completion_tokens: float | None
     hourly_price: float | None
     currency: str | None
-    per_1k: float | None
+    per_1m: float | None
 
 
 class Mistake(BaseModel):
@@ -1441,6 +1441,7 @@ class Usage(BaseModel):
     p95_ms: float | None = None
     errors: int = Field(default=0, description="Requests in the last 7 days that ended in a 4xx or 5xx.")
     device_seconds: float = Field(default=0.0, description="Device time spent answering them, as Monitoring counts it.")
+    tokens: int = Field(default=0, description="Prompt and completion tokens in them.")
 
 
 class ServingReplica(BaseModel):

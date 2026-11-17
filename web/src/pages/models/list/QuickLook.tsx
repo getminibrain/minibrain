@@ -265,7 +265,7 @@ function Body({ model, on, can }: { model: ListModel; on: Handlers; can: Abiliti
                     value={usage?.p95_ms != null ? `${Math.round(usage.p95_ms)} ms` : "—"}
                 />
                 <Figure label="Errors" value={errors === null ? "—" : pct(errors)} />
-                <Figure label="Cost / 1k req." value={cost?.text ?? "—"} />
+                <Figure label="Cost / 1M tokens" value={cost?.text ?? "—"} />
             </div>
             <Block title="Latest requests">
                 <Latest model={model} />

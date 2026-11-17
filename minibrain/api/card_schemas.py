@@ -165,12 +165,12 @@ class CardCost(BaseModel):
     device_name: str | None
     batch_size: int | None
     requests: int
-    device_seconds_per_1k: float
+    device_seconds_per_1m: float
     prompt_tokens: float | None
     completion_tokens: float | None
     hourly_price: float | None
     currency: str | None
-    per_1k: float | None
+    per_1m: float | None
 
 
 class CardComparison(BaseModel):

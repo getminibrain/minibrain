@@ -5,7 +5,7 @@ import type { Tone } from "~/components/models/StatusText";
 import { costText } from "~/lib/cost";
 import { percent, pointsSize } from "~/lib/format";
 import { modelPageHref, trainHref } from "~/lib/modelLinks";
-import { gpu } from "~/lib/traffic";
+import { PER_TOKENS, gpu } from "~/lib/traffic";
 
 export type Replica = components["schemas"]["ServingReplica"];
 
@@ -533,6 +533,7 @@ export function usageOf(model: ListModel): ModelUsage | null {
         p50_ms: highest(used.map((usage) => usage.p50_ms)),
         p95_ms: highest(used.map((usage) => usage.p95_ms)),
         device_seconds: total((usage) => usage.device_seconds ?? 0),
+        tokens: total((usage) => usage.tokens ?? 0),
     };
 }
 
@@ -546,8 +547,9 @@ export function costShown(
     usage: ModelUsage | null | undefined,
     cost: ModelVersionRow["cost"],
 ): CostShown {
-    if (usage && usage.total > 0) {
-        return { text: gpu(((usage.device_seconds ?? 0) * 1000) / usage.total), estimated: false };
+    const tokens = usage?.tokens ?? 0;
+    if (usage && tokens > 0) {
+        return { text: gpu(((usage.device_seconds ?? 0) * PER_TOKENS) / tokens), estimated: false };
     }
     return cost ? { text: costText(cost), estimated: true } : null;
 }

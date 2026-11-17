@@ -293,7 +293,7 @@ function rowsOf(pair: ModelVersionRow[]): CompareRow[] {
         ),
         {
             id: "cost",
-            label: "Cost / 1k req.",
+            label: "Cost / 1M tokens",
             cells: pair.map((version, index) => (
                 <span key={`cost-${index === 0 ? "a" : "b"}`} className="tabular-nums">
                     {costText(version.cost)}

@@ -44,6 +44,7 @@ def test_traffic_splits_requests_by_version_and_bucket(harness: Harness) -> None
     totals = day["totals"]
     assert (totals["requests"], totals["errors"], totals["p99_ms"]) == (5, 2, 900.0)
     assert totals["device_seconds"] == round((10 + 20 + 900 + 50 + 100) / 1000, 3)
+    assert totals["tokens"] == 5 * (12 + 2)
     assert [(item["version"], item["requests"], item["live"]) for item in day["versions"]] == [
         (1, 2, False),
         (0, 3, True),

@@ -12867,9 +12867,9 @@
             "type": "integer",
             "title": "Requests"
           },
-          "device_seconds_per_1k": {
+          "device_seconds_per_1m": {
             "type": "number",
-            "title": "Device Seconds Per 1K"
+            "title": "Device Seconds Per 1M"
           },
           "prompt_tokens": {
             "anyOf": [
@@ -12915,7 +12915,7 @@
             ],
             "title": "Currency"
           },
-          "per_1k": {
+          "per_1m": {
             "anyOf": [
               {
                 "type": "number"
@@ -12924,7 +12924,7 @@
                 "type": "null"
               }
             ],
-            "title": "Per 1K"
+            "title": "Per 1M"
           }
         },
         "type": "object",
@@ -12935,12 +12935,12 @@
           "device_name",
           "batch_size",
           "requests",
-          "device_seconds_per_1k",
+          "device_seconds_per_1m",
           "prompt_tokens",
           "completion_tokens",
           "hourly_price",
           "currency",
-          "per_1k"
+          "per_1m"
         ],
         "title": "CardCost"
       },
@@ -18010,9 +18010,9 @@
             "type": "integer",
             "title": "Requests"
           },
-          "device_seconds_per_1k": {
+          "device_seconds_per_1m": {
             "type": "number",
-            "title": "Device Seconds Per 1K"
+            "title": "Device Seconds Per 1M"
           },
           "prompt_tokens": {
             "anyOf": [
@@ -18058,7 +18058,7 @@
             ],
             "title": "Currency"
           },
-          "per_1k": {
+          "per_1m": {
             "anyOf": [
               {
                 "type": "number"
@@ -18067,7 +18067,7 @@
                 "type": "null"
               }
             ],
-            "title": "Per 1K"
+            "title": "Per 1M"
           }
         },
         "type": "object",
@@ -18078,12 +18078,12 @@
           "device_name",
           "batch_size",
           "requests",
-          "device_seconds_per_1k",
+          "device_seconds_per_1m",
           "prompt_tokens",
           "completion_tokens",
           "hourly_price",
           "currency",
-          "per_1k"
+          "per_1m"
         ],
         "title": "EvalCost"
       },
@@ -30438,6 +30438,10 @@
             "type": "number",
             "title": "Device Seconds"
           },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
           "at": {
             "type": "string",
             "format": "date-time",
@@ -30453,6 +30457,7 @@
           "p95_ms",
           "p99_ms",
           "device_seconds",
+          "tokens",
           "at"
         ],
         "title": "TrafficBucket"
@@ -30651,6 +30656,10 @@
             "type": "number",
             "title": "Device Seconds"
           },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
           "bucket": {
             "type": "integer",
             "title": "Bucket"
@@ -30676,6 +30685,7 @@
           "p95_ms",
           "p99_ms",
           "device_seconds",
+          "tokens",
           "bucket",
           "version"
         ],
@@ -30766,6 +30776,10 @@
           "device_seconds": {
             "type": "number",
             "title": "Device Seconds"
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
           }
         },
         "type": "object",
@@ -30776,7 +30790,8 @@
           "p50_ms",
           "p95_ms",
           "p99_ms",
-          "device_seconds"
+          "device_seconds",
+          "tokens"
         ],
         "title": "TrafficStats"
       },
@@ -30867,6 +30882,10 @@
             "type": "number",
             "title": "Device Seconds"
           },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens"
+          },
           "version": {
             "anyOf": [
               {
@@ -30892,6 +30911,7 @@
           "p95_ms",
           "p99_ms",
           "device_seconds",
+          "tokens",
           "version",
           "live"
         ],
@@ -31981,6 +32001,12 @@
             "title": "Device Seconds",
             "description": "Device time spent answering them, as Monitoring counts it.",
             "default": 0.0
+          },
+          "tokens": {
+            "type": "integer",
+            "title": "Tokens",
+            "description": "Prompt and completion tokens in them.",
+            "default": 0
           }
         },
         "type": "object",

@@ -222,7 +222,7 @@ function ComputePrices() {
             icon={IconCoins}
             anchor={PRICES.anchor}
             title={PRICES.title}
-            description="Scoring measures GPU time per request. A price per hour turns it into cost per 1,000 requests; without one, Evaluations and model cards show the time."
+            description="Scoring measures GPU time per request. A price per hour turns it into cost per 1M tokens; without one, Evaluations and model cards show the time."
         >
             <ErrorLine error={prices.error} onRetry={prices.refetch} />
             <SettingsGroup>

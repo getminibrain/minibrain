@@ -87,8 +87,10 @@ export function gpu(seconds: number | null | undefined): string {
     return `${seconds.toFixed(seconds < 10 ? 2 : 1)} GPU·s`;
 }
 
-export function costPer1k(stats: TrafficStats): number | null {
-    return stats.requests > 0 ? (stats.device_seconds * 1000) / stats.requests : null;
+export const PER_TOKENS = 1_000_000;
+
+export function gpuPerMillionTokens(stats: TrafficStats): number | null {
+    return stats.tokens > 0 ? (stats.device_seconds * PER_TOKENS) / stats.tokens : null;
 }
 
 export function formatOf(metric: TrafficMetric): (value: number) => string {
@@ -207,7 +209,7 @@ export function versionColors(versions: VersionRef[]): Map<number, string> {
     return new Map(everLive.map((number, index) => [number, SERIES_COLORS[index]]));
 }
 
-type Acc = { requests: number; errors: number; p95: number; seconds: number };
+type Acc = { requests: number; errors: number; p95: number; seconds: number; tokens: number };
 
 function merged(stats: TrafficStats[]): TrafficStats {
     const acc = stats.reduce<Acc>(
@@ -216,8 +218,9 @@ function merged(stats: TrafficStats[]): TrafficStats {
             errors: total.errors + item.errors,
             p95: total.p95 + (item.p95_ms ?? 0) * item.requests,
             seconds: total.seconds + item.device_seconds,
+            tokens: total.tokens + item.tokens,
         }),
-        { requests: 0, errors: 0, p95: 0, seconds: 0 },
+        { requests: 0, errors: 0, p95: 0, seconds: 0, tokens: 0 },
     );
     return {
         requests: acc.requests,
@@ -227,6 +230,7 @@ function merged(stats: TrafficStats[]): TrafficStats {
         p95_ms: acc.requests > 0 ? acc.p95 / acc.requests : null,
         p99_ms: null,
         device_seconds: acc.seconds,
+        tokens: acc.tokens,
     };
 }
 

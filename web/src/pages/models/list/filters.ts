@@ -49,11 +49,11 @@ export const COLUMNS: { id: Column; label: string; min: number; roomy?: number }
     { id: "data", label: "Data", min: 6 },
     { id: "quality", label: "Quality", min: 9.5 },
     { id: "requests", label: "Requests, 7 days", min: 7, roomy: 9.75 },
-    { id: "cost", label: "Cost / 1k req.", min: 6 },
+    { id: "cost", label: "Cost / 1M tokens", min: 7.5 },
     { id: "p95", label: "p95", min: 4 },
 ];
 
-export const DEFAULT_COLUMNS: Column[] = ["data", "quality", "requests", "cost"];
+export const DEFAULT_COLUMNS: Column[] = ["data", "quality", "requests"];
 
 const MODEL_MIN = 15;
 const STATUS_MIN = 8.5;

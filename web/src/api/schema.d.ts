@@ -3756,8 +3756,8 @@ export interface components {
             batch_size: number | null;
             /** Requests */
             requests: number;
-            /** Device Seconds Per 1K */
-            device_seconds_per_1k: number;
+            /** Device Seconds Per 1M */
+            device_seconds_per_1m: number;
             /** Prompt Tokens */
             prompt_tokens: number | null;
             /** Completion Tokens */
@@ -3766,8 +3766,8 @@ export interface components {
             hourly_price: number | null;
             /** Currency */
             currency: string | null;
-            /** Per 1K */
-            per_1k: number | null;
+            /** Per 1M */
+            per_1m: number | null;
         };
         /** CardData */
         CardData: {
@@ -5451,8 +5451,8 @@ export interface components {
             batch_size: number | null;
             /** Requests */
             requests: number;
-            /** Device Seconds Per 1K */
-            device_seconds_per_1k: number;
+            /** Device Seconds Per 1M */
+            device_seconds_per_1m: number;
             /** Prompt Tokens */
             prompt_tokens: number | null;
             /** Completion Tokens */
@@ -5461,8 +5461,8 @@ export interface components {
             hourly_price: number | null;
             /** Currency */
             currency: string | null;
-            /** Per 1K */
-            per_1k: number | null;
+            /** Per 1M */
+            per_1m: number | null;
         };
         /** EvalPoint */
         EvalPoint: {
@@ -9649,6 +9649,8 @@ export interface components {
             p99_ms: number | null;
             /** Device Seconds */
             device_seconds: number;
+            /** Tokens */
+            tokens: number;
             /**
              * At
              * Format: date-time
@@ -9717,6 +9719,8 @@ export interface components {
             p99_ms: number | null;
             /** Device Seconds */
             device_seconds: number;
+            /** Tokens */
+            tokens: number;
             /** Bucket */
             bucket: number;
             /** Version */
@@ -9749,6 +9753,8 @@ export interface components {
             p99_ms: number | null;
             /** Device Seconds */
             device_seconds: number;
+            /** Tokens */
+            tokens: number;
         };
         /** TrafficStatus */
         TrafficStatus: {
@@ -9780,6 +9786,8 @@ export interface components {
             p99_ms: number | null;
             /** Device Seconds */
             device_seconds: number;
+            /** Tokens */
+            tokens: number;
             /** Version */
             version: number | null;
             /** Live */
@@ -10092,6 +10100,12 @@ export interface components {
              * @default 0
              */
             device_seconds?: number;
+            /**
+             * Tokens
+             * @description Prompt and completion tokens in them.
+             * @default 0
+             */
+            tokens?: number;
         };
         /** ValidationError */
         ValidationError: {

@@ -416,12 +416,12 @@ def cost_card(metrics: dict[str, Any] | None, prices: DevicePrices) -> CardCost 
         device_name=found.device_name,
         batch_size=found.batch_size,
         requests=found.requests,
-        device_seconds_per_1k=rounded(found.device_seconds_per_1k, 3) or 0.0,
+        device_seconds_per_1m=rounded(found.device_seconds_per_1m, 3) or 0.0,
         prompt_tokens=rounded(found.prompt_tokens, 1),
         completion_tokens=rounded(found.completion_tokens, 1),
         hourly_price=rounded(found.hourly_price),
         currency=found.currency,
-        per_1k=rounded(found.per_1k, 6),
+        per_1m=rounded(found.per_1m, 6),
     )
 
 

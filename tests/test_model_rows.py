@@ -264,14 +264,16 @@ def test_usage_reports_p95_and_errors_from_one_pass(harness: Harness) -> None:
         for index in range(20):
             status = 429 if index == 0 else 500 if index == 1 else 200
             latency = float(index + 1) * 10
-            session.add(RequestLog(at=now(), model_id=model.id, model=SLUG, status=status, latency_ms=latency))
+            log = RequestLog(at=now(), model_id=model.id, model=SLUG, status=status, latency_ms=latency)
+            log.prompt_tokens, log.completion_tokens = 30, 5
+            session.add(log)
         session.commit()
     usage = custom_row(harness, SLUG)["usage"]
     assert (usage["total"], usage["errors"], usage["failed"]) == (20, 2, 1)
-    assert (usage["p50_ms"], usage["p95_ms"], usage["device_seconds"]) == (100.0, 190.0, 2.1)
+    assert (usage["p50_ms"], usage["p95_ms"], usage["device_seconds"], usage["tokens"]) == (100.0, 190.0, 2.1, 700)
     week = harness.client.get(f"/api/models/{SLUG}/traffic", params={"range": "7d"}).json()["totals"]
-    listed = (usage["total"], usage["errors"], usage["p95_ms"], usage["device_seconds"])
-    assert listed == (week["requests"], week["errors"], week["p95_ms"], week["device_seconds"])
+    listed = (usage["total"], usage["errors"], usage["p95_ms"], usage["device_seconds"], usage["tokens"])
+    assert listed == (week["requests"], week["errors"], week["p95_ms"], week["device_seconds"], week["tokens"])
 
 
 def announce(harness: Harness, number: int, base: str) -> None:

@@ -208,6 +208,7 @@ def usage_for(
             p95_ms=measured["p95_ms"],
             errors=measured["errors"],
             device_seconds=measured["device_seconds"],
+            tokens=measured["tokens"],
         )
     return found
 

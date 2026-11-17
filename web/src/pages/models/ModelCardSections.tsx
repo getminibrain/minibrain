@@ -624,13 +624,13 @@ function metrics(card: ModelCard): Metric[] {
 function costRow(card: ModelCard, others: Compared[]): CompareRow {
     const costs = [card.evaluation.cost, ...others.map((other) => other.comparison.cost)];
     const currency = costs.find((cost) => cost?.currency)?.currency;
-    const allPriced = Boolean(currency) && costs.every((cost) => cost?.per_1k != null);
+    const allPriced = Boolean(currency) && costs.every((cost) => cost?.per_1m != null);
     const values = costs.map((cost) =>
-        cost ? (allPriced ? cost.per_1k : cost.device_seconds_per_1k) : null,
+        cost ? (allPriced ? cost.per_1m : cost.device_seconds_per_1m) : null,
     );
     return {
         id: "cost",
-        label: allPriced ? "Cost per 1,000" : "GPU time per 1,000",
+        label: allPriced ? "Cost / 1M tokens" : "GPU time / 1M tokens",
         cells: costs.map((cost, index) => (
             <Numeric
                 key={index === 0 ? "this" : others[index - 1]?.id}
@@ -784,9 +784,9 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
                     <Stat label="Test set" value={percent(evaluation.test_set?.accuracy)} />
                     <Stat label="p50" value={milliseconds(evaluation.latency_p50_ms)} />
                     <Stat label="p95" value={milliseconds(evaluation.latency_p95_ms)} />
-                    <Stat label="GPU time per 1,000" value={deviceTime(evaluation.cost)} />
+                    <Stat label="GPU time / 1M tokens" value={deviceTime(evaluation.cost)} />
                     {priced(evaluation.cost) && (
-                        <Stat label="Cost per 1,000" value={costText(evaluation.cost)} />
+                        <Stat label="Cost / 1M tokens" value={costText(evaluation.cost)} />
                     )}
                 </div>
                 {evaluation.cost?.device_name && (

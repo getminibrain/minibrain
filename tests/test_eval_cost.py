@@ -66,7 +66,7 @@ def measured(device_seconds: float, requests: int = 30, pool: str = "local", dev
         "batch_size": 8,
         "requests": requests,
         "device_seconds": device_seconds,
-        "prompt_tokens": 80.0,
+        "prompt_tokens": 98.0,
         "completion_tokens": 2.0,
     }
 
@@ -151,17 +151,19 @@ def test_cost_needs_a_price_for_the_pool_it_was_measured_on() -> None:
     metrics = {"cost": measured(1.6)}
     unpriced = eval_cost(metrics, DevicePrices())
     assert unpriced is not None
-    assert (unpriced.device_seconds_per_1k, unpriced.per_1k, unpriced.currency) == (
-        pytest.approx(53.333, 1e-3),
+    assert (unpriced.device_seconds_per_1m, unpriced.per_1m, unpriced.currency) == (
+        pytest.approx(533.33, 1e-3),
         None,
         None,
     )
     other_pool = eval_cost(metrics, DevicePrices(hourly={"gpu-a": 2.0}))
-    assert other_pool is not None and other_pool.per_1k is None
+    assert other_pool is not None and other_pool.per_1m is None
     priced = eval_cost(metrics, DevicePrices(currency="EUR", hourly={"local": 3.6}))
     assert priced is not None
-    assert (priced.per_1k, priced.hourly_price, priced.currency) == (pytest.approx(0.05333, 1e-3), 3.6, "EUR")
+    assert (priced.per_1m, priced.hourly_price, priced.currency) == (pytest.approx(0.5333, 1e-3), 3.6, "EUR")
     assert eval_cost({"cost": measured(1.6, requests=0)}, DevicePrices()) is None
+    tokenless = measured(1.6) | {"prompt_tokens": None, "completion_tokens": 0}
+    assert eval_cost({"cost": tokenless}, DevicePrices()) is None
     assert eval_cost({"latency": {"p50_ms": 1.0}}, DevicePrices()) is None
 
 
@@ -182,17 +184,17 @@ def test_prices_are_set_per_pool_audited_and_cleared_with_zero(harness: Harness)
     assert [event.detail["to"]["hourly"] for event in events] == [{"local": 2.5, "old": 1.0}, {"local": 2.5}]
 
 
-def test_versions_report_latency_and_cost_per_thousand_requests(harness: Harness) -> None:
+def test_versions_report_latency_and_cost_per_million_tokens(harness: Harness) -> None:
     two_versions(harness)
     row = next(item for item in harness.client.get("/api/models").json() if item["key"] == SLUG)
     trained, prompt = row["versions"]
     assert (trained["latency_p50_ms"], trained["latency_p95_ms"]) == (40.0, 80.0)
-    assert trained["cost"]["device_seconds_per_1k"] == pytest.approx(10.0)
-    assert prompt["cost"]["device_seconds_per_1k"] == pytest.approx(200.0)
-    assert trained["cost"]["per_1k"] is None
+    assert trained["cost"]["device_seconds_per_1m"] == pytest.approx(100.0)
+    assert prompt["cost"]["device_seconds_per_1m"] == pytest.approx(2000.0)
+    assert trained["cost"]["per_1m"] is None
     harness.client.put("/api/compute/prices", json={"hourly": {"local": 3.6}})
     versions = harness.client.get(VERSIONS).json()
-    assert [version["cost"]["per_1k"] for version in versions] == [pytest.approx(0.01), pytest.approx(0.2)]
+    assert [version["cost"]["per_1m"] for version in versions] == [pytest.approx(0.1), pytest.approx(2.0)]
     assert versions[0]["cost"]["currency"] == "USD"
 
 
@@ -208,20 +210,21 @@ def test_card_carries_cost_and_compares_it_with_prompt_only(harness: Harness) ->
         "device_name": "NVIDIA L4",
         "batch_size": 8,
         "requests": 30,
-        "device_seconds_per_1k": 10.0,
-        "prompt_tokens": 80.0,
+        "device_seconds_per_1m": 100.0,
+        "prompt_tokens": 98.0,
         "completion_tokens": 2.0,
         "hourly_price": 3.6,
         "currency": "USD",
-        "per_1k": 0.01,
+        "per_1m": 0.1,
     }
     baseline = evaluation["prompt_only"]
-    assert (baseline["latency_p95_ms"], baseline["cost"]["per_1k"]) == (240.0, 0.2)
+    assert (baseline["latency_p95_ms"], baseline["cost"]["per_1m"]) == (240.0, 2.0)
     first = harness.client.get(f"{VERSIONS}/1/card.json").content
     assert harness.client.get(f"{VERSIONS}/1/card.json").content == first
     markdown = harness.client.get(f"{VERSIONS}/1/card.md").text
-    assert "| Device time per 1,000 requests | 10 s of GPU time | 3 min 20 s of GPU time |" in markdown
-    assert "| Cost per 1,000 requests | 0.01 USD at 3.60 USD per device hour |" in markdown
+    assert "| Device time per 1M tokens | 1 min 40 s of GPU time | 33 min 20 s of GPU time |" in markdown
+    priced = "| Cost per 1M tokens | 0.10 USD at 3.60 USD per device hour | 2.00 USD at 3.60 USD per device hour |"
+    assert priced in markdown
     harness.client.put("/api/compute/prices", json={"hourly": {"local": 0}})
     unpriced = harness.client.get(f"{VERSIONS}/1/card.md").text
-    assert "| Cost per 1,000 requests | No price per hour set for pool local |" in unpriced
+    assert "| Cost per 1M tokens | No price per hour set for pool local |" in unpriced

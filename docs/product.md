@@ -136,7 +136,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Custom and base models with data, score, traffic, cost and status.
   UI: Models · API: GET /api/models
 - **List view options** · shipped · product, ml
-  Filter by status, kind and base, sort, pick columns, reset to default.
+  Filter, sort and pick columns; Cost is off by default.
   UI: Models › View options
 - **Versions and variants in the list** · shipped · product, ml
   Show versions under models and installed formats under base models.
@@ -341,10 +341,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Read free-text answers beside the expected and live ones, worse first.
   UI: Evaluations › version › Answers · API: GET /api/models/{name}/versions/{number}/answers
 - **Cost and latency** · partial · product, admin
-  See p50, p95 and cost per 1,000 requests per version.
+  See p50, p95 and cost per 1M tokens per version.
   UI: Evaluations · Roadmap: Eval and promote
 - **Compute prices** · shipped · admin
-  Price each pool's GPU hour to get cost per request.
+  Price each pool's GPU hour to get cost per 1M tokens.
   UI: Settings › General › Compute prices · API: GET /api/compute/prices, PUT /api/compute/prices · Config: compute
 - **Model card** · shipped · product, admin
   Generate a model card and validation report for each version.

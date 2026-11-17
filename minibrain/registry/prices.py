@@ -9,7 +9,7 @@ from minibrain.registry.settings_store import read, write
 KEY = "compute.prices"
 DEVICE_TIME = "device_time"
 DEFAULT_CURRENCY = "USD"
-PER_REQUESTS = 1000
+PER_TOKENS = 1_000_000
 SECONDS_PER_HOUR = 3600
 
 
@@ -34,12 +34,12 @@ class EvalCost:
     device_name: str | None
     batch_size: int | None
     requests: int
-    device_seconds_per_1k: float
+    device_seconds_per_1m: float
     prompt_tokens: float | None
     completion_tokens: float | None
     hourly_price: float | None
     currency: str | None
-    per_1k: float | None
+    per_1m: float | None
 
 
 def stored_prices(session: Session) -> DevicePrices:
@@ -92,10 +92,13 @@ def optional_float(value: Any) -> float | None:
 def eval_cost(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost | None:
     measured = (metrics or {}).get("cost") or {}
     requests = int(measured.get("requests") or 0)
-    if measured.get("source") != DEVICE_TIME or requests <= 0:
+    prompt = optional_float(measured.get("prompt_tokens"))
+    completion = optional_float(measured.get("completion_tokens"))
+    tokens = requests * ((prompt or 0.0) + (completion or 0.0))
+    if measured.get("source") != DEVICE_TIME or tokens <= 0:
         return None
     pool = measured.get("pool")
-    per_1k = float(measured.get("device_seconds") or 0.0) / requests * PER_REQUESTS
+    per_1m = float(measured.get("device_seconds") or 0.0) / tokens * PER_TOKENS
     hourly = prices.hourly_for(pool)
     return EvalCost(
         source=DEVICE_TIME,
@@ -104,10 +107,10 @@ def eval_cost(metrics: dict[str, Any] | None, prices: DevicePrices) -> EvalCost 
         device_name=measured.get("device_name"),
         batch_size=measured.get("batch_size"),
         requests=requests,
-        device_seconds_per_1k=per_1k,
-        prompt_tokens=optional_float(measured.get("prompt_tokens")),
-        completion_tokens=optional_float(measured.get("completion_tokens")),
+        device_seconds_per_1m=per_1m,
+        prompt_tokens=prompt,
+        completion_tokens=completion,
         hourly_price=hourly,
         currency=prices.currency if hourly else None,
-        per_1k=per_1k / SECONDS_PER_HOUR * hourly if hourly else None,
+        per_1m=per_1m / SECONDS_PER_HOUR * hourly if hourly else None,
     )

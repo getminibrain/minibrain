@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
-from minibrain.api.overview import aligned, bucket_of, failed, integer, partitions, ranked, shared_columns
+from minibrain.api.overview import Partition, aligned, bucket_of, failed, integer, partitions, ranked, shared_columns
 from minibrain.api.request_logs import CLIENT_ERROR, aware
 from minibrain.models.placement import pools_of
 from minibrain.registry.compute import live_engines
@@ -54,6 +54,7 @@ class TrafficStats(BaseModel):
     p95_ms: float | None
     p99_ms: float | None
     device_seconds: float
+    tokens: int
 
 
 class TrafficVersion(TrafficStats):
@@ -173,19 +174,21 @@ def edges_of(start: datetime, until: datetime, step: int) -> list[datetime]:
     return [start + timedelta(seconds=step * index) for index in range(count)]
 
 
-def stats_from(total: int, errors: int, p50: float | None, p95: float | None, p99: float | None, device: float) -> dict:
+def stats_from(part: Partition, device: float) -> dict:
+    total, errors = part.total, part.errors
     return {
         "requests": total,
         "errors": errors,
         "error_rate": errors / total if total else None,
-        "p50_ms": p50,
-        "p95_ms": p95,
-        "p99_ms": p99,
+        "p50_ms": part.p50,
+        "p95_ms": part.p95,
+        "p99_ms": part.p99,
         "device_seconds": round(device / 1000, 3),
+        "tokens": part.prompt + part.completion,
     }
 
 
-EMPTY = stats_from(0, 0, None, None, None, 0.0)
+EMPTY = stats_from(Partition(), 0.0)
 
 
 def grouped_stats(
@@ -202,10 +205,7 @@ def grouped_stats(
 
     device = {key(row): float(row.device or 0) for row in rows}
     found = partitions(rows, key)
-    return {
-        target: stats_from(part.total, part.errors, part.p50, part.p95, part.p99, device.get(target, 0.0))
-        for target, part in found.items()
-    }
+    return {target: stats_from(part, device.get(target, 0.0)) for target, part in found.items()}
 
 
 def overall(session: Session, where: Sequence[ColumnElement[bool]]) -> dict:
