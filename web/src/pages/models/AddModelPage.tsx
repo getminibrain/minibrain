@@ -195,6 +195,8 @@ function DatasetPicker({
                     value: dataset.slug,
                     label: dataset.name,
                     meta: datasetMeta(dataset),
+                    disabled: Boolean(dataset.dataset_version?.too_few_rows),
+                    description: dataset.dataset_version?.too_few_rows ?? undefined,
                 })),
                 {
                     value: UPLOAD_NEW,
@@ -383,7 +385,7 @@ export function AddModelPage() {
             ? "Pick a dataset."
             : datasets.isSuccess && !chosenDataset
               ? `No dataset called ${dataset}. Pick another.`
-              : undefined,
+              : (chosenDataset?.dataset_version?.too_few_rows ?? undefined),
         output: outputProblem(output),
         name: !finalName
             ? "Name the model."

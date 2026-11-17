@@ -72,7 +72,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › dataset, Models › model › Train › Data
 - **Version checks** · shipped · product, ml
   Catch too few rows, duplicates, conflicts, imbalance, leakage and personal data.
-  UI: Data › dataset › Checks · API: PUT /api/datasets/{slug}/checks/{check}/dismissal, DELETE /api/datasets/{slug}/checks/{check}/dismissal · Config: data.checks_off, data.majority_share, data.min_label_rows
+  UI: Data › dataset › Checks, Models › Add model › Dataset · API: PUT /api/datasets/{slug}/checks/{check}/dismissal, DELETE /api/datasets/{slug}/checks/{check}/dismissal · Config: data.checks_off, data.majority_share, data.min_label_rows
 - **Data settings** · shipped · admin
   Set the row limit, version retention and check thresholds.
   UI: Settings › Data · API: GET /api/settings/data, PUT /api/settings/data · Config: data
