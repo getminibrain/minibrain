@@ -67,7 +67,7 @@ function NoteEditor({
                         onDone();
                     }
                 }}
-                className="max-w-2xl"
+                className="h-8"
             />
             <Button type="submit" disabled={save.isPending}>
                 Save
@@ -89,7 +89,7 @@ export function VersionNote({ slug, version }: { slug: string; version: VersionI
     const [editing, setEditing] = useState(false);
     const note = version.note ?? "";
     return (
-        <div className="flex h-8 min-w-0 items-center gap-1">
+        <div className="-my-1 flex h-8 min-w-0 flex-1 items-center gap-1">
             {editing ? (
                 <NoteEditor slug={slug} version={version} onDone={() => setEditing(false)} />
             ) : (
@@ -98,7 +98,7 @@ export function VersionNote({ slug, version }: { slug: string; version: VersionI
                         className={cn("min-w-0 truncate", !note && "text-muted-foreground")}
                         title={note || undefined}
                     >
-                        {note || (can.build ? PLACEHOLDER : "No note on why this version exists")}
+                        {note || (can.build ? "Add a note on why this version exists" : "–")}
                     </span>
                     {can.build && (
                         <Tooltip>

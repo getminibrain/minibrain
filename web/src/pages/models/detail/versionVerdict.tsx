@@ -76,3 +76,40 @@ export function VerdictLine({
         </p>
     );
 }
+
+export function DeployRuleFact({
+    row,
+    version,
+    phase,
+    peers,
+}: {
+    row: ModelRow;
+    version: VersionInfo;
+    phase: Phase;
+    peers: Peers;
+}) {
+    const model = useModel(version.promotion ? row.key : "");
+    const verdict = verdictLine({ version, phase, peers, eta: null, heldOutRows: null });
+    const rule = verdict.rule;
+    if (!rule) {
+        return <span className="text-muted-foreground">–</span>;
+    }
+    if (rule.met === null) {
+        return <span className="text-muted-foreground">No rule set</span>;
+    }
+    const text = model.data ? ruleText(model.data.promotion) : "Loading the rule…";
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="min-w-0 cursor-help">
+                    <StatusText tone={rule.met ? "success" : "destructive"} className="min-w-0">
+                        <span className="truncate">
+                            {rule.met ? "Met" : `Not met${rule.missed ? `: ${rule.missed}` : ""}`}
+                        </span>
+                    </StatusText>
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{text}</TooltipContent>
+        </Tooltip>
+    );
+}

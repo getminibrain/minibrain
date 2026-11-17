@@ -52,11 +52,9 @@ import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed, modelCrumbs } from "./header";
 import { DeployVersionDialog, liveBlock, versionLabel } from "./makeLive";
 import { EvaluationSection } from "./versionEvaluation";
-import { VersionNote } from "./versionNote";
 import { TrainingSection } from "./versionRun";
 import { type Peers, type Phase, peersOf, phaseOf } from "./versionState";
 import { SummarySection } from "./versionSummary";
-import { VerdictLine } from "./versionVerdict";
 import { VersionStatus, runJob } from "./versions";
 
 function artifactHref(id: string): string {
@@ -484,16 +482,6 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                     </>
                 }
             />
-            <div className="flex flex-col gap-1">
-                <VerdictLine
-                    row={row}
-                    version={version}
-                    phase={phase}
-                    peers={peers}
-                    eta={trainMetrics?.training?.eta_seconds}
-                />
-                <VersionNote slug={row.key} version={version} />
-            </div>
             <PanelSections>
                 <SummarySection
                     row={row}

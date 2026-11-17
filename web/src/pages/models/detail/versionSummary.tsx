@@ -12,6 +12,7 @@ import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { datasetHref } from "./about";
 import { Tip, baseNameOf, isDeployed } from "./header";
+import { VersionNote } from "./versionNote";
 import { presetText, ranOn, useAvailableRows } from "./versionRun";
 import {
     INVALID,
@@ -24,6 +25,7 @@ import {
     pendingText,
 } from "./versionScore";
 import type { Peers, Phase } from "./versionState";
+import { DeployRuleFact } from "./versionVerdict";
 
 const LINK = "truncate text-primary hover:underline";
 
@@ -193,6 +195,9 @@ function MadeOf({
         version.dataset_version_number !== null && version.dataset_version_number !== undefined;
     return (
         <FactList>
+            <Fact label="Note">
+                <VersionNote slug={row.key} version={version} />
+            </Fact>
             <Fact label="Base">
                 {baseKey ? (
                     <Link href={modelPageHref(baseKey)} className={LINK}>
@@ -378,6 +383,9 @@ export function SummarySection({
             <div className="grid grid-cols-2 divide-x">
                 <MadeOf row={row} version={version} baseName={baseName} />
                 <FactList>
+                    <Fact label="Deploy rule">
+                        <DeployRuleFact row={row} version={version} phase={phase} peers={peers} />
+                    </Fact>
                     <Fact label="Live">
                         <LiveFact row={row} peers={peers} />
                     </Fact>
