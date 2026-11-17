@@ -15,17 +15,11 @@ import {
     Field,
     Input,
     Link,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
 } from "obp-ui";
 import { ChatBubble, type ChatRole } from "obp-ui/chat";
 import { type ReactNode, useState } from "react";
 import {
     type DatasetSummary,
-    type ModelRow,
     type PreviewResponse,
     type SourceSummary,
     api,
@@ -33,7 +27,7 @@ import {
     unwrap,
 } from "~/api/client";
 import { type DatasetVersionStats, useDatasetVersionStats } from "~/api/dataQueries";
-import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
+import { keys, useDatasetPreview, useDatasets } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
@@ -336,38 +330,10 @@ function TestExampleNote({ count: total }: { count: number }) {
     );
 }
 
-const DATA_JOBS = new Set(["train", "eval"]);
-
-function busyOnData(row: ModelRow): string | null {
-    const { activity } = row;
-    const active = activity.state === "queued" || activity.state === "running";
-    return active && DATA_JOBS.has(activity.kind ?? "")
-        ? `${activity.label}: its dataset changes once that finishes`
-        : null;
-}
-
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
-    const refresh = useDataRefresh();
-    const models = useAllModels();
-    const candidates = (models.data ?? []).filter(
-        (row) => row.kind === "custom" && !dataset.models.includes(row.key),
-    );
-    const assign = useMutation({
-        mutationFn: (slug: string) =>
-            unwrap(
-                api.PUT("/api/models/{name}/dataset", {
-                    params: { path: { name: slug } },
-                    body: { dataset: dataset.slug },
-                }),
-            ),
-        onSuccess: refresh,
-    });
     const nameOf = useModelNames();
     return (
-        <AboutPart
-            title="Used by"
-            tip="Models that train on this dataset. Several models can share one to compare fairly."
-        >
+        <AboutPart title="Used by" tip="Models that train on this dataset.">
             {dataset.models.length === 0 ? (
                 <p className="text-muted-foreground">No model trains on it yet.</p>
             ) : (
@@ -382,33 +348,6 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
                     ))}
                 </ul>
             )}
-            {candidates.length > 0 && (
-                <Select
-                    value=""
-                    onValueChange={(slug) => slug && assign.mutate(String(slug))}
-                    disabled={assign.isPending}
-                >
-                    <SelectTrigger aria-label="Use for a model" className="w-full">
-                        <SelectValue placeholder="Use it for another model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {candidates.map((row) => {
-                            const busy = busyOnData(row);
-                            return (
-                                <SelectItem
-                                    key={row.key}
-                                    value={row.key}
-                                    disabled={Boolean(busy)}
-                                    description={busy ?? undefined}
-                                >
-                                    {row.name}
-                                </SelectItem>
-                            );
-                        })}
-                    </SelectContent>
-                </Select>
-            )}
-            <ErrorLine error={assign.error} />
         </AboutPart>
     );
 }
