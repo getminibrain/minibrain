@@ -6,7 +6,7 @@ type Variant = "success" | "info" | "approval" | "neutral" | "warning" | "destru
 const VERSION_BADGE: Record<string, { variant: Variant; label: string }> = {
     training: { variant: "info", label: "Training" },
     evaluating: { variant: "info", label: "Scoring" },
-    ready: { variant: "approval", label: "Awaiting promote" },
+    ready: { variant: "neutral", label: "Not deployed" },
     failed: { variant: "destructive", label: "Failed" },
     deleting: { variant: "neutral", label: "Deleting" },
 };
