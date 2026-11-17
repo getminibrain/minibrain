@@ -129,7 +129,7 @@ function MetricChart({
                 rows={usage.rows}
                 series={usage.series}
                 format={formatOf(metric)}
-                axisFormat={axisFormatOf(metric)}
+                axisFormat={axisFormatOf(metric, report)}
                 integer={metric === "requests"}
                 label={`${label} for ${row.name} ${SPAN[range]}${custom ? ", by version" : ""}`}
                 height={height}

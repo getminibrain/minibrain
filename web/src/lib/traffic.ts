@@ -131,12 +131,25 @@ const AXIS_NUMBER = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 1,
 });
 
-export function axisFormatOf(metric: TrafficMetric): (value: number) => string {
+function costPeak(report: TrafficReport | undefined): number {
+    const values = (report?.points ?? []).map((point) => gpuPerMillionTokens(point) ?? 0);
+    return Math.max(0, ...values);
+}
+
+export function axisFormatOf(
+    metric: TrafficMetric,
+    report?: TrafficReport,
+): (value: number) => string {
     if (metric === "p95") {
         return (value) => `${AXIS_NUMBER.format(value)} ms`;
     }
     if (metric === "errors") {
         return (value) => `${Math.round(value * 100)}%`;
+    }
+    if (metric === "cost") {
+        return costPeak(report) >= 3600
+            ? (value) => `${AXIS_NUMBER.format(value / 3600)} h`
+            : (value) => `${AXIS_NUMBER.format(value)} s`;
     }
     return (value) => AXIS_NUMBER.format(value);
 }
