@@ -545,7 +545,17 @@ function Extensions() {
             icon={IconPuzzle}
             anchor={CONNECTIONS.extensions.anchor}
             title={CONNECTIONS.extensions.title}
-            description="S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
+            description={
+                <>
+                    {
+                        "S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them while running; an admin installs them with "
+                    }
+                    <span className="font-mono">minibrain extensions install</span>
+                    {" (online) or "}
+                    <span className="font-mono">--from &lt;folder&gt;</span>
+                    {" (offline)."}
+                </>
+            }
         >
             <ErrorLine error={extensions.error} onRetry={extensions.refetch} />
             {data && (

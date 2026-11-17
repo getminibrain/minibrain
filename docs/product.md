@@ -35,7 +35,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Name buckets and databases once, with write-only encrypted secrets.
   UI: Settings › Connections · API: GET /api/connections, POST /api/connections, PUT /api/connections/{connection_id}, DELETE /api/connections/{connection_id}, POST /api/connections/test, POST /api/connections/{connection_id}/test, GET /api/connections/{connection_id}/tables · Config: connections
 - **Offline DuckDB extensions** · shipped · admin
-  Install the S3, database and lakehouse readers without internet.
+  Install the S3, database and lakehouse readers online or from a folder.
   UI: Settings › Connections › DuckDB extensions · API: GET /api/extensions · CLI: minibrain extensions status, minibrain extensions install, minibrain extensions download · Config: MINIBRAIN_DUCKDB_EXTENSIONS, MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY
 - **Source catalogue** · shipped · product, ml
   Find sources by name, column or tag; read stats and schema.
