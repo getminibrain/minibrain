@@ -1,11 +1,12 @@
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import ColumnElement, Float, SQLColumnExpression, String, and_, case, func, literal, select
 from sqlalchemy.orm import aliased
 
 from minibrain.api.job_facts import SCORED_KINDS
-from minibrain.api.sorting import Keyset, Order, seconds_between
+from minibrain.api.sorting import Keyset, Order, cursor_anchor, seconds_between
 from minibrain.registry.models import (
     BaseModel,
     Dataset,
@@ -71,8 +72,8 @@ def started_parts() -> tuple[SQLColumnExpression[Any], ...]:
     return (func.coalesce(Job.started_at, Job.created_at),)
 
 
-def duration_parts() -> tuple[SQLColumnExpression[Any], ...]:
-    end = func.coalesce(Job.finished_at, literal(now(), Job.finished_at.type))
+def duration_parts(moment: datetime) -> tuple[SQLColumnExpression[Any], ...]:
+    end = func.coalesce(Job.finished_at, literal(moment, Job.finished_at.type))
     return (
         case((Job.started_at.is_(None), literal(float(MISSING), Float)), else_=seconds_between(Job.started_at, end)),
     )
@@ -128,12 +129,14 @@ PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
     "status": status_parts,
     "pool": pool_parts,
     "started": started_parts,
-    "duration": duration_parts,
     "score": score_parts,
     "trained_on": trained_on_parts,
     "gpu_hours": gpu_hours_parts,
 }
 
 
-def job_keyset(sort: JobSort, order: Order) -> Keyset:
-    return Keyset(columns=(*PARTS[sort](), Job.id), descending=order == "desc")
+def job_keyset(sort: JobSort, order: Order, cursor: str | None = None) -> Keyset:
+    if sort != "duration":
+        return Keyset(columns=(*PARTS[sort](), Job.id), descending=order == "desc")
+    moment = cursor_anchor(cursor) or now()
+    return Keyset(columns=(*duration_parts(moment), Job.id), descending=order == "desc", anchor=moment)

@@ -308,3 +308,23 @@ def test_every_audit_sort_pages_both_ways(harness: Harness, descending: bool) ->
         for earlier, later in pairwise(pages):
             back = harness.client.get("/api/audit", params=params | {"prev": later["prev_cursor"]}).json()
             assert back["events"] == earlier["events"] and back["start"] == earlier["start"]
+
+
+@pytest.mark.parametrize("descending", [True, False])
+def test_duration_pages_hold_running_jobs_still_while_the_clock_moves(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, descending: bool
+) -> None:
+    start = now()
+    with harness.sessions() as session:
+        for index in range(12):
+            job = enqueue(session, JobKind.DOWNLOAD, {"n": index})
+            job.status = JobStatus.RUNNING if index % 2 else JobStatus.SUCCEEDED
+            began = start - timedelta(minutes=10 * index)
+            job.started_at = began
+            job.finished_at = None if index % 2 else began + timedelta(minutes=5 * index)
+        session.commit()
+    ticks = iter(start + timedelta(hours=hour) for hour in range(100))
+    monkeypatch.setattr("minibrain.api.job_sorting.now", lambda: next(ticks))
+    items = walk(harness, "/api/jobs", {"sort": "duration", "order": "desc" if descending else "asc", "limit": 3})
+    assert len(items) == 12
+    assert len({item["id"] for item in items}) == 12

@@ -174,7 +174,7 @@ def list_jobs(
         joinedload(Job.version).joinedload(Version.dataset_version).joinedload(DatasetVersion.base),
         joinedload(Job.base_model).joinedload(BaseModel.variant).joinedload(CatalogVariant.model),
     )
-    keyset = job_keyset(sort, order)
+    keyset = job_keyset(sort, order, cursor)
     found = keyset_rows(session, select(Job).options(*loads).where(*where), keyset, cursor, size)
     shown: list[Job] = [row[0] for row in found.rows]
     infos = [job_info(job) for job in shown]

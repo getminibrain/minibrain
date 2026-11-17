@@ -83,10 +83,28 @@ def parsed(value: Any, kind: type) -> Any:
     raise bad_cursor()
 
 
+def raw_values(cursor: str) -> list[Any]:
+    try:
+        values = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+    except (binascii.Error, UnicodeDecodeError, ValueError) as error:
+        raise bad_cursor() from error
+    if not isinstance(values, list):
+        raise bad_cursor()
+    return values
+
+
+def cursor_anchor(cursor: str | None) -> datetime | None:
+    if cursor is None:
+        return None
+    values = raw_values(cursor)
+    return parsed(values[0], datetime) if values else None
+
+
 @dataclass(frozen=True)
 class Keyset:
     columns: tuple[SQLColumnExpression[Any], ...]
     descending: bool
+    anchor: datetime | None = None
 
     def order_by(self, reverse: bool = False) -> list[SQLColumnExpression[Any]]:
         down = self.descending != reverse
@@ -105,15 +123,17 @@ class Keyset:
         return clause
 
     def encode(self, values: Sequence[Any]) -> str:
-        text = json.dumps([plain(value) for value in values], separators=(",", ":"))
+        pinned = [] if self.anchor is None else [self.anchor]
+        text = json.dumps([plain(value) for value in [*pinned, *values]], separators=(",", ":"))
         return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
     def decode(self, cursor: str) -> list[Any]:
-        try:
-            values = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
-        except (binascii.Error, UnicodeDecodeError, ValueError) as error:
-            raise bad_cursor() from error
-        if not isinstance(values, list) or len(values) != len(self.columns):
+        values = raw_values(cursor)
+        if self.anchor is not None:
+            if not values or parsed(values[0], datetime) != self.anchor:
+                raise bad_cursor()
+            values = values[1:]
+        if len(values) != len(self.columns):
             raise bad_cursor()
         return [parsed(value, expected_type(column)) for value, column in zip(values, self.columns, strict=True)]
 
