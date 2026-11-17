@@ -171,7 +171,8 @@ function Schema({ source }: { source: SourceSummary }) {
 }
 
 function SourcePreview({ source }: { source: SourceSummary }) {
-    const rows = useSourceRows(source.id);
+    const [limit, setLimit] = useState(50);
+    const rows = useSourceRows(source.id, limit);
     const records = useMemo(() => {
         if (!rows.data) {
             return [];
@@ -188,7 +189,10 @@ function SourcePreview({ source }: { source: SourceSummary }) {
             error={rows.error}
             onRetry={rows.refetch}
             empty="The source has no rows."
-            note="as stored"
+            onMore={
+                limit < 500 ? () => setLimit((current) => Math.min(500, current + 100)) : undefined
+            }
+            loadingMore={rows.isPlaceholderData}
             table={
                 <DataGrid
                     columns={rows.data ? resultColumns(rows.data) : []}

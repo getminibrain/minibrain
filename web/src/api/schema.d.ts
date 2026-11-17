@@ -12527,7 +12527,9 @@ export interface operations {
     };
     source_rows_api_sources__source_id__rows_get: {
         parameters: {
-            query?: never;
+            query?: {
+                rows?: number;
+            };
             header?: never;
             path: {
                 source_id: number;
@@ -12858,7 +12860,9 @@ export interface operations {
     };
     dataset_preview_api_datasets__slug__preview_get: {
         parameters: {
-            query?: never;
+            query?: {
+                rows?: number;
+            };
             header?: never;
             path: {
                 slug: string;

@@ -493,7 +493,8 @@ function TrainingExample({ data }: { data: PreviewResponse | undefined }) {
 
 function DatasetPreview({ dataset }: { dataset: DatasetSummary }) {
     const mapped = Boolean(dataset.mapping.sql);
-    const preview = useDatasetPreview(dataset.slug, mapped);
+    const [limit, setLimit] = useState(20);
+    const preview = useDatasetPreview(dataset.slug, mapped, limit);
     const empty = mapped
         ? "The query returned no rows."
         : "No query yet. Use Edit query to pick the columns.";
@@ -507,7 +508,10 @@ function DatasetPreview({ dataset }: { dataset: DatasetSummary }) {
             marked={["label"]}
             summary={rowSummary}
             empty={empty}
-            note="as a model sees them"
+            onMore={
+                limit < 500 ? () => setLimit((current) => Math.min(500, current + 100)) : undefined
+            }
+            loadingMore={preview.isPlaceholderData}
             table={
                 <DataGrid
                     columns={PREVIEW_COLUMNS}

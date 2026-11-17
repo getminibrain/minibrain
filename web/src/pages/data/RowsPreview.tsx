@@ -1,4 +1,4 @@
-import { RecordList, RecordListToggle, SegmentedTabs } from "obp-ui";
+import { Button, RecordList, RecordListToggle, SegmentedTabs } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { ErrorLine, FLUSH_GRID } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -22,7 +22,8 @@ export function RowsPreview({
     marked,
     summary,
     empty,
-    note,
+    onMore,
+    loadingMore = false,
 }: {
     records: unknown[];
     total: number | null | undefined;
@@ -34,7 +35,8 @@ export function RowsPreview({
     marked?: string[];
     summary?: (record: unknown) => ReactNode;
     empty: string;
-    note: string;
+    onMore?: () => void;
+    loadingMore?: boolean;
 }) {
     const [view, setView] = useState<View>("records");
     const [open, setOpen] = useState<number[]>([0]);
@@ -43,7 +45,9 @@ export function RowsPreview({
     const whole = total === null || total === undefined || total <= records.length;
     const status = loading
         ? "Loading…"
-        : `Showing ${count(records.length)}${whole ? "" : ` of ${count(total)}`} ${records.length === 1 && whole ? "row" : "rows"} ${note}`;
+        : whole
+          ? `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`
+          : `First ${count(records.length)} of ${count(total)} rows`;
     return (
         <section aria-label="Preview" className="flex min-h-96 min-w-0 flex-1 flex-col">
             <div className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
@@ -88,9 +92,20 @@ export function RowsPreview({
                     )}
                 </div>
             )}
-            <p className="flex h-9 shrink-0 items-center truncate border-t px-3 text-sm text-muted-foreground tabular-nums">
-                {status}
-            </p>
+            <div className="flex h-9 shrink-0 items-center gap-3 border-t px-3 text-sm text-muted-foreground tabular-nums">
+                <span className="truncate">{status}</span>
+                {onMore && !loading && !whole && (
+                    <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0"
+                        disabled={loadingMore}
+                        onClick={onMore}
+                    >
+                        {loadingMore ? "Loading…" : "Show more"}
+                    </Button>
+                )}
+            </div>
         </section>
     );
 }

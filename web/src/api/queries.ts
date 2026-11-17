@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import {
     type BaseModelDetail,
     type JobInfo,
@@ -57,7 +57,6 @@ export function loadAllModels() {
     return unwrap(api.GET("/api/models", {}));
 }
 
-const path = (slug: string) => ({ params: { path: { slug } } });
 const modelPath = (name: string) => ({ params: { path: { name } } });
 
 async function loadDetail(name: string) {
@@ -133,10 +132,16 @@ export function useSources() {
 
 const sourcePath = (id: number) => ({ params: { path: { source_id: id } } });
 
-export function useSourceRows(id: number) {
+export function useSourceRows(id: number, rows?: number) {
     return useQuery({
-        queryKey: keys.sourceRows(id),
-        queryFn: () => unwrap(api.GET("/api/sources/{source_id}/rows", sourcePath(id))),
+        queryKey: [...keys.sourceRows(id), rows ?? null],
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/sources/{source_id}/rows", {
+                    params: { path: { source_id: id }, query: rows ? { rows } : {} },
+                }),
+            ),
+        placeholderData: keepPreviousData,
         retry: false,
     });
 }
@@ -149,10 +154,16 @@ export function useSourceStats(id: number) {
     });
 }
 
-export function useDatasetPreview(slug: string, enabled: boolean) {
+export function useDatasetPreview(slug: string, enabled: boolean, rows?: number) {
     return useQuery({
-        queryKey: keys.datasetPreview(slug),
-        queryFn: () => unwrap(api.GET("/api/datasets/{slug}/preview", path(slug))),
+        queryKey: [...keys.datasetPreview(slug), rows ?? null],
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/datasets/{slug}/preview", {
+                    params: { path: { slug }, query: rows ? { rows } : {} },
+                }),
+            ),
+        placeholderData: keepPreviousData,
         enabled,
         retry: false,
     });

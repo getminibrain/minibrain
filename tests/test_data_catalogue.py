@@ -75,6 +75,16 @@ def test_preview_counts_rows_per_label(harness: Harness) -> None:
     assert counts == [{"label": label, "rows": 50} for label in ("account", "billing", "bug", "feature")]
 
 
+def test_previews_show_more_rows_on_request(harness: Harness) -> None:
+    source = upload(harness)
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
+    assert len(harness.client.get("/api/datasets/tickets/preview").json()["rows"]) == 20
+    assert len(harness.client.get("/api/datasets/tickets/preview?rows=120").json()["rows"]) == 120
+    assert len(harness.client.get(f"/api/sources/{source['id']}/rows").json()["rows"]) == 50
+    assert len(harness.client.get(f"/api/sources/{source['id']}/rows?rows=150").json()["rows"]) == 150
+    assert harness.client.get("/api/datasets/tickets/preview?rows=501").status_code == 422
+
+
 def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})

@@ -3,7 +3,7 @@ from dataclasses import asdict
 from functools import lru_cache
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, Response, UploadFile
+from fastapi import APIRouter, Depends, Query, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
@@ -132,6 +132,7 @@ PREVIEW_ROWS = 20
 OUTPUT_ROWS = 200
 SOURCE_ROWS = "SELECT * FROM source"
 QUERY_ROWS = 50
+MORE_ROWS = 500
 STATS_SAMPLE = 10_000
 LABEL_COUNTS = 200
 NO_ANSWER_COLUMN = "no answer column is picked in the dataset yet"
@@ -365,8 +366,10 @@ def apply_mapping(
     dataset.updated_at = now()
 
 
-def query_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> QueryResponse:
-    result = run_query(tables, sql, QUERY_ROWS, aliases, as_text=True)
+def query_rows(
+    tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None, limit: int = QUERY_ROWS
+) -> QueryResponse:
+    result = run_query(tables, sql, limit, aliases, as_text=True)
     rows = [[to_text(value) for value in row] for row in result.rows]
     return QueryResponse(columns=result.columns, types=result.types, rows=rows)
 
@@ -377,9 +380,11 @@ def chat_example(messages: str | None, expected: str | None) -> list[ChatMessage
     return [*found, ChatMessage(role="assistant", content=expected)] if found and expected else found
 
 
-def preview_of(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> PreviewResponse:
+def preview_of(
+    tables: Sequence[Table], aliases: dict[str, str], sql: str, limit: int = PREVIEW_ROWS
+) -> PreviewResponse:
     quality = assess(tables, sql, aliases)
-    rows = example_rows(tables, sql, aliases, PREVIEW_ROWS)
+    rows = example_rows(tables, sql, aliases, limit)
     counts = label_counts(tables, sql, LABEL_COUNTS, aliases)
     first = next(((messages, expected) for messages, text, expected in rows if text and expected), (None, None))
     return PreviewResponse(
@@ -391,9 +396,11 @@ def preview_of(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> Pr
     )
 
 
-def dataset_preview_of(settings: Settings, store: ArtifactStore, dataset: Dataset) -> PreviewResponse:
+def dataset_preview_of(
+    settings: Settings, store: ArtifactStore, dataset: Dataset, limit: int = PREVIEW_ROWS
+) -> PreviewResponse:
     tables, aliases = dataset_tables(settings, store, dataset)
-    return preview_of(tables, aliases, dataset_sql(dataset))
+    return preview_of(tables, aliases, dataset_sql(dataset), limit)
 
 
 @router.get("/sources", dependencies=[Depends(builder)], summary="List sources")
@@ -520,9 +527,15 @@ def update_source(
 
 
 @router.get("/sources/{source_id}/rows", dependencies=[Depends(builder)], summary="Read a source's rows")
-def source_rows(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
+def source_rows(
+    source_id: int,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    rows: int = Query(QUERY_ROWS, ge=1, le=MORE_ROWS),
+) -> QueryResponse:
     source = get_source(session, source_id)
-    return query_rows([table_of(settings, store, source)], SOURCE_ROWS, aliases_for([source]))
+    return query_rows([table_of(settings, store, source)], SOURCE_ROWS, aliases_for([source]), rows)
 
 
 @router.get("/sources/{source_id}/stats", dependencies=[Depends(builder)], summary="Read a source's column statistics")
@@ -635,8 +648,14 @@ def update_dataset_mapping(
 
 
 @router.get("/datasets/{slug}/preview", dependencies=[Depends(builder)], summary="Preview a dataset's rows")
-def dataset_preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
-    return dataset_preview_of(settings, store, get_dataset(session, slug))
+def dataset_preview(
+    slug: str,
+    session: SessionDep,
+    settings: SettingsDep,
+    store: StoreDep,
+    rows: int = Query(PREVIEW_ROWS, ge=1, le=MORE_ROWS),
+) -> PreviewResponse:
+    return dataset_preview_of(settings, store, get_dataset(session, slug), rows)
 
 
 def dataset_answers(settings: Settings, store: ArtifactStore, dataset: Dataset) -> list[str]:
