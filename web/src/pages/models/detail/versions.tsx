@@ -31,13 +31,7 @@ import {
     useToast,
 } from "obp-ui";
 import { useMemo, useState } from "react";
-import {
-    type JobInfo,
-    type ModelRow,
-    type VersionInfo,
-    api,
-    unwrap,
-} from "~/api/client";
+import { type JobInfo, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useJobs } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { When } from "~/components/When";
