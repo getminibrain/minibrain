@@ -134,3 +134,18 @@ def test_only_admins_manage_join_tokens(harness: Harness) -> None:
     builder = harness.person(Role.BUILDER)
     assert builder.get(TOKENS).status_code == 403
     assert builder.post(TOKENS, json={"pool": "gpu"}, headers=csrf(builder)).status_code == 403
+
+
+def test_each_machine_first_joining_is_audited_once_while_several_share_the_token(harness: Harness) -> None:
+    created = issue(harness)
+    for _ in range(3):
+        for host in ("gpu-a10-3", "gpu-a10-5"):
+            assert register(harness, created["secret"], "gpu", host).status_code == 204
+    with harness.sessions() as session:
+        found = select(AuditEvent).where(
+            AuditEvent.target == created["prefix"], AuditEvent.action == "join_token.joined"
+        )
+        hosts = [event.detail["host"] for event in session.scalars(found.order_by(AuditEvent.id))]
+    assert hosts == ["gpu-a10-3", "gpu-a10-5"]
+    listed = harness.client.get(TOKENS).json()
+    assert [(item["pool"], item["last_host"]) for item in listed] == [("gpu", "gpu-a10-5")]

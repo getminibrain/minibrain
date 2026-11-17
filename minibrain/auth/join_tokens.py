@@ -70,12 +70,17 @@ def lapse(token: JoinToken) -> str | None:
     return "was revoked" if token.revoked_at is not None else None
 
 
+def joined_before(session: Session, token: JoinToken, host: str) -> bool:
+    seen = select(AuditEvent.detail).where(AuditEvent.action == JOINED, AuditEvent.target == token.prefix)
+    return any(detail.get("host") == host for detail in session.scalars(seen))
+
+
 def note_use(session: Session, token: JoinToken, host: str, role: str) -> None:
     moment = now()
     fresh = token.last_used_at is not None and token.last_used_at > moment - NOTE_EVERY
     if fresh and token.last_host == host:
         return
-    if token.last_host != host:
+    if token.last_host != host and not joined_before(session, token, host):
         detail = {"pool": token.pool, "host": host, "role": role}
         session.add(AuditEvent(actor=SYSTEM_ACTOR, action=JOINED, target=token.prefix, detail=detail))
     token.last_used_at = moment
