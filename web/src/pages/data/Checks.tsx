@@ -243,16 +243,30 @@ export function ChecksList({
                 </ul>
             )}
             {passed.length > 0 && (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <p className="flex min-h-8 items-center">
-                            <StatusText tone="success">{`${passed.length} passed`}</StatusText>
-                        </p>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-80">
-                        {passed.map((check) => check.title).join(" · ")}
-                    </TooltipContent>
-                </Tooltip>
+                <p className="flex min-h-8 items-center">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                className="cursor-help rounded-sm underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <StatusText tone="success">{`${passed.length} passed`}</StatusText>
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-96 whitespace-normal">
+                            <ul className="flex flex-col gap-1.5">
+                                {passed.map((check) => (
+                                    <li key={check.check} className="flex flex-col">
+                                        <span className="font-medium">{check.title}</span>
+                                        {check.detail && (
+                                            <span className="opacity-80">{check.detail}</span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </TooltipContent>
+                    </Tooltip>
+                </p>
             )}
             {dismissed.map((check) => (
                 <p key={check.check} className="flex min-h-8 items-center gap-2">
