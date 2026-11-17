@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
+import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { Page, PanelSections } from "~/components/Section";
 import { ModelNotFound } from "~/components/models/ModelNotFound";
@@ -178,6 +179,7 @@ function Overview({
         <OverviewLayout
             main={
                 <>
+                    <NeedsAttention scope="model" model={row.key} />
                     <UsagePanel row={row} />
                     {row.kind === "base" ? (
                         <>

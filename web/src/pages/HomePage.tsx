@@ -3,6 +3,7 @@ import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import { useModels, useRecentJobs } from "~/api/queries";
 import { ModelName } from "~/components/ModelName";
+import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
 import { JobStatus } from "~/components/StatusBadge";
@@ -53,6 +54,7 @@ export function HomePage() {
                 caption="Models of any size, trained on your data and served on an OpenAI-compatible endpoint. Everything runs on your own hardware."
             />
             {can.build && models && <Checklist models={models} />}
+            <NeedsAttention />
             <Section title="Overview">
                 <div className="flex flex-wrap gap-8">
                     <Stat label="Models" value={count(models?.length)} />

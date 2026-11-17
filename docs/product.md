@@ -151,8 +151,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Overview, Versions, Evaluation, Monitoring, API keys, Activity and Settings tabs.
   UI: Models › model · API: GET /api/models/{name}/overview, GET /api/models/{name}, PATCH /api/models/{name}
 - **Model overview** · shipped · product, ml
-  A usage strip, the last five versions, facts and current setup.
-  UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions
+  Problems, a usage strip, the last five versions, facts and setup.
+  UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions, GET /api/problems
 - **Model activity** · shipped · product, ml, admin
   Who changed or trained this model, by day, with bursts folded.
   UI: Models › model › Activity · API: GET /api/models/{name}/activity
@@ -503,7 +503,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Infrastructure › Machines, Infrastructure › Setup · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
 - **Needs attention** · shipped · admin
   What is wrong now, worst first, each with its fix.
-  UI: Infrastructure › Machines › Needs attention · API: GET /api/problems
+  UI: Infrastructure › Machines › Needs attention, Home › Needs attention, Models › model › Overview › Needs attention · API: GET /api/problems
 - **Machine list** · shipped · admin
   Filter every machine, spot its problems and open its details.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
