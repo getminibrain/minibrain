@@ -154,7 +154,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Tabs per kind; the header shows deployment and any training or scoring.
   UI: Models › model · API: GET /api/models/{name}/overview, GET /api/models/{name}, PATCH /api/models/{name}
 - **Model overview** · shipped · product, ml
-  Usage, facts and setup; problems and the last five versions beside them.
+  Next step until first live; usage, facts; problems, last five versions.
   UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions, GET /api/problems
 - **Model activity** · shipped · product, ml, admin
   Who changed or trained this model, by day, with bursts folded.
