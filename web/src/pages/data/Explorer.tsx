@@ -760,6 +760,7 @@ export function DataExplorer() {
                         index={index}
                         creating={creatingFor === selectedKey}
                         onSelect={select}
+                        onNewDataset={creatingFor === selectedKey ? undefined : newDataset}
                     />
                     {creatingFor === selectedKey && (
                         <CreateDataset

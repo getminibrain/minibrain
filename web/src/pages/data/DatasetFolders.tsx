@@ -1,6 +1,8 @@
 import {
     IconFolder,
     IconFolderDown,
+    IconPencil,
+    IconPlus,
     IconStack2,
     IconTable,
     IconTrash,
@@ -18,6 +20,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DropdownMenuItem,
     Field,
     FieldGroup,
     Input,
@@ -48,7 +51,7 @@ import {
     plural,
     siblingNamed,
 } from "./catalogue";
-import { FILL, FILL_GRID, ItemHeader, useDataRefresh } from "./parts";
+import { DeleteMenuItem, FILL, FILL_GRID, ItemHeader, ItemMenu, useDataRefresh } from "./parts";
 
 export type Movable = { kind: "dataset"; id: string } | { kind: "folder"; id: number };
 
@@ -710,15 +713,18 @@ export function FolderDetail({
     index,
     creating,
     onSelect,
+    onNewDataset,
 }: {
     folder: DatasetFolder;
     index: FolderIndex;
     creating: boolean;
     onSelect: (item: ItemRef) => void;
+    onNewDataset?: () => void;
 }) {
     const refresh = useDataRefresh();
     const [renaming, setRenaming] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const subfolders = index.folders.get(folder.id) ?? [];
     const direct = index.datasets.get(folder.id) ?? [];
     const inside = datasetsInside(index, folder.id);
@@ -747,29 +753,31 @@ export function FolderDetail({
                 }
                 actions={
                     <>
-                        <Button variant="outline" onClick={() => setRenaming(true)}>
-                            Rename
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                setMoving({
-                                    item: { kind: "folder", id: folder.id },
-                                    name: folder.name,
-                                    from: folder.parent_id,
-                                })
-                            }
-                        >
-                            Move to…
-                        </Button>
-                        <ConfirmDialog
-                            trigger={<Button variant="outline">Delete</Button>}
-                            title={`Delete ${folder.name}?`}
-                            description={removalText(index, folder)}
-                            confirmLabel="Delete folder"
-                            destructive
-                            onConfirm={() => remove.mutateAsync().catch(() => undefined)}
-                        />
+                        {onNewDataset && (
+                            <Button onClick={onNewDataset}>
+                                <IconPlus />
+                                New dataset
+                            </Button>
+                        )}
+                        <ItemMenu name={folder.name}>
+                            <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                                <IconPencil />
+                                Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    setMoving({
+                                        item: { kind: "folder", id: folder.id },
+                                        name: folder.name,
+                                        from: folder.parent_id,
+                                    })
+                                }
+                            >
+                                <IconFolderDown />
+                                Move to…
+                            </DropdownMenuItem>
+                            <DeleteMenuItem blocked={null} onSelect={() => setDeleting(true)} />
+                        </ItemMenu>
                     </>
                 }
             />
@@ -803,6 +811,15 @@ export function FolderDetail({
                 targets={moving ? [moving] : null}
                 index={index}
                 onOpenChange={(open) => !open && setMoving(null)}
+            />
+            <ConfirmDialog
+                open={deleting}
+                onOpenChange={setDeleting}
+                title={`Delete ${folder.name}?`}
+                description={removalText(index, folder)}
+                confirmLabel="Delete folder"
+                destructive
+                onConfirm={() => remove.mutateAsync().catch(() => undefined)}
             />
         </div>
     );
