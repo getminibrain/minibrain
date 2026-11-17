@@ -40,15 +40,21 @@ def test_hard_stops_block_an_empty_or_single_label_dataset() -> None:
 
 
 def test_too_few_rows_block_with_the_minimum_and_the_count() -> None:
-    rows = [*labelled(60), ("message number 1", "label 1")]
+    rows = [*labelled(6), ("message number 1", "label 1")]
     found = by_check(run_checks(rows, None, CheckLimits()))["empty"]
-    assert (found.status, found.title, found.count) == ("blocked", "Too few rows to train on", 60)
+    assert (found.status, found.title, found.count) == ("blocked", "Too few rows to train on", 6)
     assert found.detail == (
-        "60 rows are left after removing empty and repeated inputs; training and scoring need at least 100."
+        "6 rows are left after removing empty and repeated inputs; training and scoring need at least 10."
     )
     assert blocking([found]) is None
+    assert by_check(run_checks(labelled(150), None, CheckLimits(), examples=9))["empty"].status == "blocked"
+
+
+def test_few_rows_warn_that_scores_are_rough() -> None:
+    found = by_check(run_checks(labelled(60), None, CheckLimits()))["empty"]
+    assert (found.status, found.title, found.count) == ("warning", "Few rows to train on", 60)
+    assert "scores on so few held-out rows are rough" in found.detail
     assert by_check(run_checks(labelled(100), None, CheckLimits()))["empty"].status == "ok"
-    assert by_check(run_checks(labelled(150), None, CheckLimits(), examples=99))["empty"].status == "blocked"
 
 
 def test_duplicates_conflicts_and_lengths_are_counted() -> None:

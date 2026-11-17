@@ -187,17 +187,26 @@ def test_the_row_limit_refuses_large_versions_with_a_way_out(harness: Harness) -
 
 
 def test_too_few_rows_block_training_but_not_saving(harness: Harness) -> None:
-    dataset_with_model(harness, rows=40)
+    dataset_with_model(harness, rows=6)
     latest = versions(harness)[0]
     assert latest["counts"] == {}
-    reason = "The data has 40 rows after removing empty and repeated inputs; training and scoring need at least 100."
+    reason = "The data has 6 rows after removing empty and repeated inputs; training and scoring need at least 10."
     assert latest["too_few_rows"] == reason
     check = next(item for item in latest["checks"] if item["check"] == "empty")
-    assert (check["status"], check["title"], check["count"]) == ("blocked", "Too few rows to train on", 40)
-    assert "40 rows are left" in check["detail"] and "at least 100" in check["detail"]
+    assert (check["status"], check["title"], check["count"]) == ("blocked", "Too few rows to train on", 6)
+    assert "6 rows are left" in check["detail"] and "at least 10" in check["detail"]
     refused = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt"})
     assert refused.status_code == 409 and refused.json()["detail"] == reason
     assert save(harness)["too_few_rows"] == reason
+
+
+def test_a_few_dozen_rows_train_with_a_warning(harness: Harness) -> None:
+    dataset_with_model(harness, rows=40)
+    latest = versions(harness)[0]
+    assert latest["too_few_rows"] is None
+    check = next(item for item in latest["checks"] if item["check"] == "empty")
+    assert (check["status"], check["title"], check["count"]) == ("warning", "Few rows to train on", 40)
+    assert harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt"}).status_code == 201
 
 
 def stored_dataset_versions(harness: Harness) -> list[DatasetVersion]:

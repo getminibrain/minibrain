@@ -626,8 +626,9 @@ trains are the same rows (the `dataset_versions` table, `/api/datasets/<slug>/ve
   in the query (`USING SAMPLE reservoir(… ROWS) REPEATABLE (7)`) or raise the limit; the bound is what keeps saving a
   version quick enough to run in the request.
 - Splits are derived from the version alone and deterministically (empty and repeated inputs dropped, seeded
-  shuffle), so training, evaluation and the gateway's prompt-only context read only the version. Fewer than 100
-  usable rows block training and scoring, not saving.
+  shuffle), so training, evaluation and the gateway's prompt-only context read only the version. Fewer than 10
+  usable rows block training and scoring, not saving; under 100 a warning says scores will be rough (decided
+  2026-11-17: like hosted fine-tuning, small data is allowed).
 - Data changed: every source has a cheap fingerprint (an upload's content hash; for a folder, a hash of its file
   list with sizes and modification times; for a Delta table, its version and newest log file). A version records
   its sources' fingerprints and the query; the dataset, the model page and the Training page say "Sources changed

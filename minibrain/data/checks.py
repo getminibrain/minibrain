@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 
-from minibrain.data.splits import MIN_ROWS
+from minibrain.data.splits import MIN_ROWS, STEADY_ROWS
 from minibrain.tasks.examples import Example
 
 CHECKS = ("duplicates", "conflicts", "balance", "leakage", "length", "personal_data")
@@ -82,6 +82,15 @@ def rows_to_train_on(rows: list[tuple[str, str]], examples: int) -> Finding:
             "Too few rows to train on",
             f"{plural(examples, 'row')} {agree(examples, 'is', 'are')} left after removing empty and repeated "
             f"inputs; training and scoring need at least {MIN_ROWS:,}.",
+            count=examples,
+        )
+    if examples < STEADY_ROWS:
+        return Finding(
+            "empty",
+            "warning",
+            "Few rows to train on",
+            f"{plural(examples, 'row')} with an input and an answer. Training works, but scores on so few "
+            f"held-out rows are rough; {STEADY_ROWS:,} or more give steadier scores.",
             count=examples,
         )
     return Finding("empty", "ok", "Rows to train on", f"{plural(examples, 'row')} with an input and an answer.")
