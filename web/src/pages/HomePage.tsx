@@ -19,6 +19,7 @@ import { useCan } from "~/lib/access";
 import { count, dateTime, percent } from "~/lib/format";
 import { jobTitle } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
+import { isLiveRow } from "~/lib/teardown";
 import { Checklist } from "./home/Checklist";
 
 function jobModelName(job: JobInfo): string {
@@ -80,7 +81,7 @@ export function HomePage() {
     const can = useCan();
     const { data: models } = useModels();
     const { data: jobs } = useRecentJobs(10);
-    const serving = (models ?? []).filter((item) => item.current_version !== null).length;
+    const serving = (models ?? []).filter(isLiveRow).length;
     const running = (models ?? []).reduce((total, item) => total + item.active_jobs, 0);
     return (
         <Page wide>
