@@ -30,7 +30,6 @@ import {
 import {
     type CSSProperties,
     type KeyboardEvent,
-    type PointerEvent,
     type ReactNode,
     useEffect,
     useMemo,
@@ -47,6 +46,7 @@ import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { bytes } from "~/lib/time";
+import { useResizableWidth } from "~/lib/useResizableWidth";
 import { AddMenu, SourceChoices, useSourceBlocks } from "./AddMenu";
 import {
     type AddKind,
@@ -89,11 +89,7 @@ import {
 import { GroupIcon, SourceIcon } from "./icons";
 import { FILL, useDataRefresh } from "./parts";
 
-const WIDTH_KEY = "minibrain.data.treeWidth";
-const DEFAULT_WIDTH = 288;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 520;
-const WIDTH_STEP = 16;
+const TREE_WIDTH = { key: "minibrain.data.treeWidth", initial: 288, min: 200, max: 520 };
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
 function sourceNode(source: SourceSummary): TreeNode {
@@ -116,57 +112,6 @@ function sourceNode(source: SourceSummary): TreeNode {
         textValue: source.name,
         icon: <SourceIcon source={source} />,
     };
-}
-
-function clampWidth(width: number): number {
-    return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)));
-}
-
-function readWidth(): number {
-    try {
-        const stored = Number(window.localStorage.getItem(WIDTH_KEY));
-        return stored ? clampWidth(stored) : DEFAULT_WIDTH;
-    } catch {
-        return DEFAULT_WIDTH;
-    }
-}
-
-function writeWidth(width: number): void {
-    try {
-        window.localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-        return;
-    }
-}
-
-function useTreeWidth() {
-    const [width, setWidth] = useState(readWidth);
-    const commit = (next: number) => {
-        const clamped = clampWidth(next);
-        setWidth(clamped);
-        writeWidth(clamped);
-    };
-    const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-        event.preventDefault();
-        const startX = event.clientX;
-        const startWidth = width;
-        const move = (moved: globalThis.PointerEvent) =>
-            setWidth(clampWidth(startWidth + moved.clientX - startX));
-        const stop = (ended: globalThis.PointerEvent) => {
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerup", stop);
-            commit(startWidth + ended.clientX - startX);
-        };
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", stop);
-    };
-    const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-            event.preventDefault();
-            commit(width + (event.key === "ArrowLeft" ? -WIDTH_STEP : WIDTH_STEP));
-        }
-    };
-    return { width, onPointerDown, onKeyDown, reset: () => commit(DEFAULT_WIDTH) };
 }
 
 function folderNodes(index: FolderIndex, parent: number | null): TreeNode[] {
@@ -376,7 +321,7 @@ export function DataExplorer() {
     const folders = useDatasetFolders();
     const refresh = useDataRefresh();
     const move = useMoveItem();
-    const width = useTreeWidth();
+    const width = useResizableWidth(TREE_WIDTH);
     const [query, setQuery] = useState("");
     const [collapsed, setCollapsed] = useState<string[]>([]);
     const [creatingFor, setCreatingFor] = useState<number | string | null>(null);
@@ -818,7 +763,11 @@ export function DataExplorer() {
                 <aside
                     aria-label="Data catalogue"
                     className="relative flex max-h-80 shrink-0 flex-col border-b @3xl:max-h-none @3xl:w-(--tree-width) @3xl:border-r @3xl:border-b-0"
-                    style={{ "--tree-width": `${width.width}px` } as CSSProperties}
+                    style={
+                        {
+                            "--tree-width": `${width.width ?? TREE_WIDTH.initial}px`,
+                        } as CSSProperties
+                    }
                 >
                     <div className="flex flex-col gap-1 border-b p-2">
                         <SearchInput

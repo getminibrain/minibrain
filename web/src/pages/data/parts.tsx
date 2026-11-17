@@ -21,6 +21,7 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { LabelCount } from "~/api/client";
@@ -29,6 +30,7 @@ import { keys, useAllModels, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { modelPageHref } from "~/lib/modelLinks";
+import { useResizableWidth } from "~/lib/useResizableWidth";
 import { splitTags } from "../models/dialogs";
 import { sourceNameProblem } from "./catalogue";
 
@@ -94,6 +96,8 @@ export function ItemHeader({
     );
 }
 
+const ABOUT_WIDTH = { key: "minibrain.data.aboutWidth", initial: null, min: 280, max: 640 };
+
 export function SplitDetail({
     header,
     about,
@@ -103,16 +107,41 @@ export function SplitDetail({
     about: ReactNode;
     preview: ReactNode;
 }) {
+    const width = useResizableWidth(ABOUT_WIDTH);
     return (
         <div className="@container/detail flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="shrink-0 border-b px-6 py-5">{header}</div>
             <div className="flex min-h-0 flex-1 flex-col @3xl/data:flex-row">
-                <section
-                    aria-label="About"
-                    className="flex shrink-0 flex-col gap-6 border-b p-6 @3xl/data:w-80 @3xl/data:overflow-y-auto @3xl/data:border-r @3xl/data:border-b-0 @min-[54rem]/detail:w-90 @6xl/detail:w-100"
+                <div
+                    className={cn(
+                        "relative flex shrink-0 flex-col border-b @3xl/data:border-r @3xl/data:border-b-0",
+                        width.width === null &&
+                            "@3xl/data:w-80 @min-[54rem]/detail:w-90 @6xl/detail:w-100",
+                    )}
+                    style={width.width === null ? undefined : { width: width.width }}
                 >
-                    {about}
-                </section>
+                    <section
+                        aria-label="About"
+                        className="flex min-h-0 flex-1 flex-col gap-6 p-6 @3xl/data:overflow-y-auto"
+                    >
+                        {about}
+                    </section>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label="Resize About"
+                                onPointerDown={width.onPointerDown}
+                                onKeyDown={width.onKeyDown}
+                                onDoubleClick={width.reset}
+                                className="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary @3xl/data:block"
+                            />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                            Drag to resize, double-click to reset
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
                 {preview}
             </div>
         </div>
