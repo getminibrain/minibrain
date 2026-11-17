@@ -195,7 +195,8 @@ export function NameDialog({
             reset();
         }
     }, [open, initial, reset]);
-    const clash = name.trim() ? problem(name) : null;
+    const settled = save.isPending || save.isSuccess;
+    const clash = name.trim() && !settled ? problem(name) : null;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
