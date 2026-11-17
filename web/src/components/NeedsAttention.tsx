@@ -103,7 +103,9 @@ function RemoveAction({ pool, host }: { pool: string; host: string }) {
 }
 
 function Meta({ children }: { children: ReactNode }) {
-    return <span className="shrink-0 text-sm text-muted-foreground">{children}</span>;
+    return (
+        <span className="hidden shrink-0 text-sm text-muted-foreground @md:inline">{children}</span>
+    );
 }
 
 function ProblemLine({ line }: { line: Line }) {
@@ -180,7 +182,7 @@ function Lines({
     }
     const lines = expanded ? single(problems) : grouped(problems).slice(0, COLLAPSED_LINES);
     return (
-        <ul className="flex flex-col divide-y">
+        <ul className="@container flex flex-col divide-y">
             {lines.map((line) => (
                 <ProblemLine key={line.key} line={line} />
             ))}
@@ -188,14 +190,33 @@ function Lines({
     );
 }
 
+function HealthyLine({ loading }: { loading: boolean }) {
+    return (
+        <p className="flex h-8 items-center gap-2">
+            {loading ? (
+                <span className="text-muted-foreground">Checking…</span>
+            ) : (
+                <>
+                    <StatusDot tone="success" className="shrink-0" />
+                    All healthy
+                </>
+            )}
+        </p>
+    );
+}
+
 export function NeedsAttention({
     scope,
     model,
     title = "Needs attention",
-}: ProblemFilter & { title?: string }) {
+    compact = false,
+}: ProblemFilter & { title?: string; compact?: boolean }) {
     const found = useProblems({ scope, model });
     const [expanded, setExpanded] = useState(false);
     const problems = found.data;
+    if (compact && !found.error && (problems?.length ?? 0) === 0) {
+        return <HealthyLine loading={!problems} />;
+    }
     const shown = problems ? Math.min(grouped(problems).length, COLLAPSED_LINES) : 0;
     const more = (problems?.length ?? 0) > shown;
     const toggle = (
@@ -209,7 +230,7 @@ export function NeedsAttention({
     );
     return (
         <PanelSection flush icon={IconAlertTriangle} title={title} actions={toggle}>
-            <div className={expanded && more ? undefined : "h-40"}>
+            <div className={compact || (expanded && more) ? undefined : "h-40"}>
                 <Lines
                     problems={problems}
                     expanded={expanded && more}

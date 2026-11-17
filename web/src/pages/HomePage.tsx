@@ -54,7 +54,7 @@ export function HomePage() {
                 caption="Models of any size, trained on your data and served on an OpenAI-compatible endpoint. Everything runs on your own hardware."
             />
             {can.build && models && <Checklist models={models} />}
-            <NeedsAttention />
+            <NeedsAttention compact />
             <Section title="Overview">
                 <div className="flex flex-wrap gap-8">
                     <Stat label="Models" value={count(models?.length)} />

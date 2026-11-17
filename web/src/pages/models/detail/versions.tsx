@@ -62,6 +62,7 @@ import {
     isBaseline,
     liveBlock,
     liveOf,
+    readyToDeploy,
     ruleReason,
     versionLabel,
 } from "./makeLive";
@@ -108,6 +109,60 @@ function jobProgress(version: VersionInfo): Pick<ShownStatus, "active" | "progre
     return share > 0 ? { progress: percentOf(share) } : { active: true };
 }
 
+function shareText(version: VersionInfo): string {
+    const share = version.job?.progress ?? 0;
+    return share > 0 ? ` ${Math.round(share * 100)}%` : "";
+}
+
+export function inFlight(version: VersionInfo): boolean {
+    return version.status === "queued" || (IN_PROGRESS.has(version.status) && !cancelling(version));
+}
+
+function activityLabel(version: VersionInfo): string {
+    const name = `v${version.number}`;
+    if (version.status === "queued" || version.job?.status === "queued") {
+        return `Queued ${name}`;
+    }
+    const verb = version.status === "training" ? "Training" : "Scoring";
+    const share = version.job?.progress ?? 0;
+    const eta = version.job?.eta_seconds;
+    return [
+        `${verb} ${name}`,
+        share > 0 ? `${Math.round(share * 100)}%` : null,
+        eta ? `about ${durationText(eta)}` : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
+export function VersionActivity({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
+    const running = newestFirst(versions).filter(inFlight);
+    const [shown] = running;
+    if (!shown) {
+        return null;
+    }
+    const status = versionStatus(row, shown);
+    const more = running.length - 1;
+    return (
+        <Link
+            href={modelVersionHref(row.key, shown.number)}
+            className="text-inherit hover:underline"
+        >
+            <StatusText
+                tone={status.tone}
+                active={status.active}
+                waiting={status.waiting}
+                progress={status.progress}
+            >
+                <span className="tabular-nums">
+                    {activityLabel(shown)}
+                    {more > 0 && <span className="text-muted-foreground">{` · ${more} more`}</span>}
+                </span>
+            </StatusText>
+        </Link>
+    );
+}
+
 export function versionStatus(row: ModelRow, version: VersionInfo): ShownStatus {
     if (version.current && row.deployment.state === "starting") {
         return row.deployment.waiting
@@ -127,15 +182,10 @@ export function versionStatus(row: ModelRow, version: VersionInfo): ShownStatus 
         return { tone: "neutral", label: "Queued", waiting: true };
     }
     if (version.status === "training") {
-        const progress = version.job?.progress ?? 0;
-        return {
-            tone: "info",
-            label: `Training ${Math.round(progress * 100)}%`,
-            ...jobProgress(version),
-        };
+        return { tone: "info", label: `Training${shareText(version)}`, ...jobProgress(version) };
     }
     if (version.status === "evaluating") {
-        return { tone: "info", label: "Scoring", ...jobProgress(version) };
+        return { tone: "info", label: `Scoring${shareText(version)}`, ...jobProgress(version) };
     }
     if (isCancelled(version)) {
         return { tone: "neutral", label: "Cancelled" };
@@ -417,6 +467,7 @@ function VersionActions({
     const failed = version.status === "failed";
     const live = canGoLive(row, version);
     const blocked = live ? liveBlock(row, version) : null;
+    const pinned = pinnedDeploy(row, version, isDeployed(row) ? liveOf(versions) : undefined);
     return (
         <>
             {can.build && failed && (
@@ -425,7 +476,7 @@ function VersionActions({
                     Retry
                 </Button>
             )}
-            {can.build && live && !blocked && (
+            {can.build && live && !blocked && !pinned && (
                 <Button variant="outline" onClick={onLive}>
                     <IconRocket aria-hidden="true" />
                     {`Deploy v${version.number}`}
@@ -442,12 +493,27 @@ function VersionActions({
     );
 }
 
+function pinnedDeploy(row: ModelRow, version: VersionInfo, live: VersionInfo | undefined): boolean {
+    return readyToDeploy(version, live) && canGoLive(row, version) && !liveBlock(row, version);
+}
+
+function DeployNow({ onDeploy }: { onDeploy: () => void }) {
+    return (
+        <Button variant="outline" size="sm" className="relative z-10 -my-1.5" onClick={onDeploy}>
+            <IconRocket aria-hidden="true" />
+            Deploy
+        </Button>
+    );
+}
+
 function versionColumns(
     row: ModelRow,
     versions: VersionInfo[],
     jobs: JobInfo[],
     metric: string,
+    deploy: ((number: number) => void) | null,
 ): ColumnDef<VersionInfo, unknown>[] {
+    const live = isDeployed(row) ? liveOf(versions) : undefined;
     return [
         {
             id: "version",
@@ -474,7 +540,14 @@ function versionColumns(
             id: "status",
             header: "Status",
             accessorFn: (version) => versionStatus(row, version).label,
-            cell: ({ row: { original: version } }) => <RunStatus row={row} version={version} />,
+            cell: ({ row: { original: version } }) => (
+                <span className="inline-flex items-center gap-3">
+                    <RunStatus row={row} version={version} />
+                    {deploy && pinnedDeploy(row, version, live) && (
+                        <DeployNow onDeploy={() => deploy(version.number)} />
+                    )}
+                </span>
+            ),
         },
         {
             id: "score",
@@ -580,8 +653,9 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     );
     const metric = metricName(versions.find((version) => version.main_metric)?.main_metric);
     const columns = useMemo(
-        () => versionColumns(row, versions, jobs.data ?? [], metric),
-        [row, versions, jobs.data, metric],
+        () =>
+            versionColumns(row, versions, jobs.data ?? [], metric, can.build ? setPromoting : null),
+        [row, versions, jobs.data, metric, can.build],
     );
     const keptText = (doomed: VersionInfo[]) => {
         const kept = chosen

@@ -28,6 +28,29 @@ import {
     startingReplicas,
 } from "./poolPicker";
 
+export const SAME = 0.0005;
+
+export function deltaOf(version: VersionInfo, live: VersionInfo | undefined): number | null {
+    if (!live || live.number === version.number || live.score === null || version.score === null) {
+        return null;
+    }
+    return version.score - live.score;
+}
+
+export function readyToDeploy(version: VersionInfo, live: VersionInfo | undefined): boolean {
+    const delta = deltaOf(version, live);
+    return (
+        live !== undefined &&
+        version.number > live.number &&
+        version.status === "ready" &&
+        !version.base_refusal &&
+        !isBaseline(version) &&
+        version.promotion?.passed === true &&
+        delta !== null &&
+        delta > SAME
+    );
+}
+
 export function liveOf(versions: VersionInfo[] | undefined): VersionInfo | undefined {
     return versions?.find((version) => version.current);
 }

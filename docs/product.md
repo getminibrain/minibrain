@@ -151,10 +151,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Score history, a week of traffic and the next step.
   UI: Models › Quick look · API: GET /api/models/{name}/overview, GET /api/requests
 - **Model page** · shipped · product, ml, admin
-  Overview, Versions, Evaluation, Monitoring, API keys, Activity and Settings tabs.
+  Tabs per kind; the header shows deployment and any training or scoring.
   UI: Models › model · API: GET /api/models/{name}/overview, GET /api/models/{name}, PATCH /api/models/{name}
 - **Model overview** · shipped · product, ml
-  Problems, a usage strip, the last five versions, facts and setup.
+  Usage, facts and setup; problems and the last five versions beside them.
   UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions, GET /api/problems
 - **Model activity** · shipped · product, ml, admin
   Who changed or trained this model, by day, with bursts folded.
@@ -297,7 +297,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Tick jobs to cancel, retry or delete them together, each one audited.
   UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry, POST /api/jobs/delete
 - **Versions** · shipped · product, ml
-  One table of every version and its run; retry any failed one.
+  Every version and its run; retry failures, deploy better ones in place.
   UI: Models › model › Versions, Models › model › Versions › version, Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}, POST /api/models/{name}/versions/{number}/retry
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.

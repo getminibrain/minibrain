@@ -234,18 +234,29 @@ export function ModelHeader({
     row,
     base,
     actions,
+    activity,
 }: {
     row: ModelRow;
     base: BaseModelDetail | undefined;
     actions: ReactNode;
+    activity?: ReactNode;
 }) {
     const description = subtitleOf(row, base);
+    const status =
+        activity && !isDeployed(row) ? (
+            activity
+        ) : (
+            <span className="flex items-center gap-4">
+                <DeploymentStatus row={row} />
+                {activity}
+            </span>
+        );
     return (
         <PageHeader
             icon={<ModelAvatar row={row} size="lg" />}
             title={row.name}
             crumbs={modelCrumbs(row)}
-            badge={<DeploymentStatus row={row} />}
+            badge={status}
             caption={
                 <InlineFacts
                     items={[

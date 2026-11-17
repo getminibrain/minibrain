@@ -34,7 +34,7 @@ import { SettingsTab } from "./settings";
 import { TAB_LABELS, tabsFor, useModelTab } from "./tabs";
 import { UsagePanel } from "./usage";
 import { VersionView, useVersionNumber } from "./version";
-import { VersionsTab } from "./versions";
+import { VersionActivity, VersionsTab, inFlight } from "./versions";
 
 type Lookup = {
     row: ModelRow | undefined;
@@ -90,7 +90,7 @@ function OverviewLayout({ main, side }: { main: ReactNode; side?: ReactNode }) {
     }
     return (
         <div className="@container">
-            <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_24rem]">
                 <div className="min-w-0">
                     <PanelSections>{main}</PanelSections>
                 </div>
@@ -179,7 +179,9 @@ function Overview({
         <OverviewLayout
             main={
                 <>
-                    <NeedsAttention scope="model" model={row.key} />
+                    {row.kind === "base" && (
+                        <NeedsAttention scope="model" model={row.key} compact />
+                    )}
                     <UsagePanel row={row} />
                     {row.kind === "base" ? (
                         <>
@@ -195,7 +197,12 @@ function Overview({
                 </>
             }
             side={
-                row.kind === "custom" ? <VersionsPanel row={row} versions={versions} /> : undefined
+                row.kind === "custom" ? (
+                    <>
+                        <NeedsAttention scope="model" model={row.key} compact />
+                        <VersionsPanel row={row} versions={versions} />
+                    </>
+                ) : undefined
             }
         />
     );
@@ -265,6 +272,9 @@ function Loaded({ row }: { row: ModelRow }) {
             <ModelHeader
                 row={row}
                 base={base.data}
+                activity={
+                    list.some(inFlight) ? <VersionActivity row={row} versions={list} /> : undefined
+                }
                 actions={
                     <ModelActions row={row} detail={modelDetail} base={base.data} versions={list} />
                 }
