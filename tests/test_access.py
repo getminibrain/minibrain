@@ -93,6 +93,7 @@ ROUTE_ROLES = {
     ("GET", "/api/datasets/{slug}/versions"): "builder",
     ("POST", "/api/datasets/{slug}/versions"): "builder",
     ("GET", "/api/dataset-versions/{dataset_version_id}/diff/{other_id}"): "builder",
+    ("GET", "/api/dataset-versions/{dataset_version_id}/stats"): "builder",
     ("PUT", "/api/datasets/{slug}/checks/{check}/dismissal"): "builder",
     ("DELETE", "/api/datasets/{slug}/checks/{check}/dismissal"): "builder",
     ("GET", "/api/settings/data"): "builder",

@@ -52,15 +52,18 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder, Data › folder › New dataset, Data › folder › … › Rename, Data › dataset › … › Move to · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
+- **Data links** · shipped · product, ml
+  Open any dataset, folder, source or group by its own path.
+  UI: Data › Datasets, Data › Sources, Data › dataset, Data › source
 - **Unique names** · shipped · product, ml
   No two datasets share a name in a folder, nor two sources.
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
-  Train on exactly the rows you checked.
-  UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
+  Train on exactly the rows you checked, and see their stats.
+  UI: Data › dataset, Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, GET /api/dataset-versions/{dataset_version_id}/stats, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
 - **Sampled versions** · shipped · product, ml
-  Save a seeded random sample when a query exceeds the row limit.
-  UI: Data › dataset, Data › dataset › Edit query, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
+  Sample over the row limit; save in full once the limit allows.
+  UI: Data › dataset, Data › dataset › Edit query, Data › dataset › … › Save full version, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
   UI: Data › dataset › Versions › All versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
@@ -68,7 +71,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Know when sources or the query changed since the last version.
   UI: Data › dataset, Models › model › Train › Data
 - **Version checks** · shipped · product, ml
-  Catch duplicates, conflicts, imbalance, leakage and personal data before training.
+  Catch too few rows, duplicates, conflicts, imbalance, leakage and personal data.
   UI: Data › dataset › Checks · API: PUT /api/datasets/{slug}/checks/{check}/dismissal, DELETE /api/datasets/{slug}/checks/{check}/dismissal · Config: data.checks_off, data.majority_share, data.min_label_rows
 - **Data settings** · shipped · admin
   Set the row limit, version retention and check thresholds.

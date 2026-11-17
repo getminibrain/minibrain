@@ -10,7 +10,7 @@ import { StatusText, type Tone } from "~/components/models/StatusText";
 import { percent, points } from "~/lib/format";
 import { deviceHoursText, durationText, jobDuration, jobSeconds, kindNoun } from "~/lib/jobs";
 import { jobHref, modelPageHref } from "~/lib/modelLinks";
-import { datasetHref } from "~/pages/models/list/cells";
+import { datasetHref } from "~/pages/data/catalogue";
 
 type JobColumn = ColumnDef<JobInfo, unknown>;
 

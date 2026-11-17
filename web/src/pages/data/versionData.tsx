@@ -4,7 +4,7 @@ import type { VersionInfo } from "~/api/client";
 import { useModel } from "~/api/queries";
 import { ChangeNotice } from "./DatasetVersions";
 import { compareParam } from "./VersionDiff";
-import { itemHref } from "./catalogue";
+import { datasetHref } from "./catalogue";
 
 function previousOf(version: VersionInfo, versions: VersionInfo[]): VersionInfo | undefined {
     return versions
@@ -17,7 +17,7 @@ export function datasetVersionDiffHref(before: VersionInfo, after: VersionInfo):
     if (!dataset || !before.dataset_version_id || !after.dataset_version_id) {
         return null;
     }
-    return `${itemHref({ kind: "dataset", id: dataset })}&compare=${compareParam(before.dataset_version_id, after.dataset_version_id)}`;
+    return `${datasetHref(dataset)}?compare=${compareParam(before.dataset_version_id, after.dataset_version_id)}`;
 }
 
 function AccuracyChange({ version, previous }: { version: VersionInfo; previous?: VersionInfo }) {

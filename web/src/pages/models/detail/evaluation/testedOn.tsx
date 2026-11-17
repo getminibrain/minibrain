@@ -9,7 +9,7 @@ import { TestExamples } from "~/components/TestExamples";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { playgroundHref } from "~/lib/modelLinks";
-import { datasetHref } from "../about";
+import { datasetHref } from "~/pages/data/catalogue";
 import { AddExampleDialog } from "./addExample";
 import { scoredVersions } from "./scores";
 

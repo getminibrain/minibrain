@@ -165,13 +165,15 @@ export function useTrainRun({
     const heldOut = info?.held_out_rows ?? chosen?.counts.eval ?? 0;
     const pickedMachine = info?.machines.find((item) => item.picked) ?? null;
     const option = info?.chosen ?? pickedMachine?.smallest ?? null;
+    const usable = !chosen?.too_few_rows;
     const ready = training
         ? !blocked &&
+          usable &&
           Boolean(chosen) &&
           issues.length === 0 &&
           (Boolean(info?.chosen) || info?.level === "unknown") &&
           !plan.isFetching
-        : !blocked;
+        : !blocked && usable;
 
     const create = useMutation({
         mutationFn: (force: boolean) => {

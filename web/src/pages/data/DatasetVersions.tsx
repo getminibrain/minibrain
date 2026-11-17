@@ -1,3 +1,4 @@
+import { IconDeviceFloppy } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -10,12 +11,13 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DropdownMenuItem,
     Link,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { type DatasetSummary, api, unwrap } from "~/api/client";
 import {
     type ChangeInfo,
@@ -24,6 +26,7 @@ import {
     useDatasetVersions,
 } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { ErrorLine } from "~/components/Section";
 import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
@@ -193,6 +196,79 @@ export function needsSample(dataset: DatasetSummary): boolean {
     return !current;
 }
 
+export type SaveVersion = ReturnType<typeof useSaveVersion>;
+
+export function fullVersionBlock(dataset: DatasetSummary): string | null {
+    const rows = dataset.rows ?? null;
+    const limit = dataset.row_limit ?? 0;
+    if (rows === null) {
+        return "The query fails, so its rows cannot be counted.";
+    }
+    if (limit > 0 && rows > limit) {
+        return `The query returns ${count(rows)} rows, over the ${count(limit)}-row limit.`;
+    }
+    return null;
+}
+
+const FULL_VERSION = "Save full version";
+
+export function SampleLine({ dataset, save }: { dataset: DatasetSummary; save: SaveVersion }) {
+    const can = useCan();
+    const sample = dataset.dataset_version?.sample;
+    if (!sample) {
+        return null;
+    }
+    const blocked = fullVersionBlock(dataset);
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <p className="text-muted-foreground tabular-nums">{sampleText(sample)}</p>
+                {can.build &&
+                    (blocked ? (
+                        <BlockedButton reason={blocked} variant="outline" size="sm">
+                            {FULL_VERSION}
+                        </BlockedButton>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={save.isPending}
+                            onClick={() => save.mutate(undefined)}
+                        >
+                            {save.isPending ? "Saving…" : FULL_VERSION}
+                        </Button>
+                    ))}
+            </div>
+            <ErrorLine error={save.error} />
+        </div>
+    );
+}
+
+export function FullVersionItem({ dataset, save }: { dataset: DatasetSummary; save: SaveVersion }) {
+    const reason = useId();
+    if (!dataset.dataset_version?.sample) {
+        return null;
+    }
+    const blocked = fullVersionBlock(dataset);
+    return (
+        <>
+            <DropdownMenuItem
+                disabled={blocked !== null || save.isPending}
+                aria-describedby={blocked ? reason : undefined}
+                onSelect={() => save.mutate(undefined)}
+            >
+                <IconDeviceFloppy />
+                {FULL_VERSION}
+            </DropdownMenuItem>
+            {blocked && (
+                <p id={reason} className="pr-2.5 pb-1.5 pl-9 text-sm text-muted-foreground">
+                    {blocked}
+                </p>
+            )}
+        </>
+    );
+}
+
 export function RowLimitNotice({ dataset }: { dataset: DatasetSummary }) {
     const can = useCan();
     const save = useSaveVersion(dataset.slug);
@@ -345,13 +421,15 @@ function useCompareParam() {
         select: (state) => parseCompare((state.location.search as { compare?: unknown }).compare),
     });
     const set = (pair: [number, number] | null) => {
-        const params = new URLSearchParams(window.location.search);
+        const { pathname, searchStr } = router.state.location;
+        const params = new URLSearchParams(searchStr);
         if (pair) {
             params.set("compare", compareParam(pair[0], pair[1]));
         } else {
             params.delete("compare");
         }
-        router.history.replace(`/data?${params.toString()}`);
+        const search = params.toString();
+        router.history.replace(`${pathname}${search ? `?${search}` : ""}`);
     };
     return { requested, set };
 }

@@ -11,18 +11,36 @@ export type GroupId = SourceGroupId | "datasets" | "sources";
 
 export type ItemRef =
     | { kind: "group"; id: GroupId }
-    | { kind: "source"; id: number }
+    | { kind: "source"; id: number; group: SourceGroupId }
     | { kind: "folder"; id: number }
     | { kind: "dataset"; id: string };
 
-export type SourceGroup = { id: SourceGroupId; label: string; noun: string; kinds: SourceKind[] };
+export type SourceGroup = {
+    id: SourceGroupId;
+    path: string;
+    label: string;
+    noun: string;
+    kinds: SourceKind[];
+};
 
 export const SOURCE_GROUPS: SourceGroup[] = [
-    { id: "upload", label: "Uploads", noun: "file", kinds: ["upload"] },
-    { id: "folder", label: "Folders", noun: "folder", kinds: ["folder"] },
-    { id: "s3", label: "S3", noun: "bucket", kinds: ["s3"] },
-    { id: "database", label: "Databases", noun: "database", kinds: ["database"] },
-    { id: "lakehouse", label: "Lakehouse", noun: "table", kinds: ["iceberg", "delta"] },
+    { id: "upload", path: "uploads", label: "Uploads", noun: "file", kinds: ["upload"] },
+    { id: "folder", path: "folders", label: "Folders", noun: "folder", kinds: ["folder"] },
+    { id: "s3", path: "s3", label: "S3", noun: "bucket", kinds: ["s3"] },
+    {
+        id: "database",
+        path: "databases",
+        label: "Databases",
+        noun: "database",
+        kinds: ["database"],
+    },
+    {
+        id: "lakehouse",
+        path: "lakehouse",
+        label: "Lakehouse",
+        noun: "table",
+        kinds: ["iceberg", "delta"],
+    },
 ];
 
 export const TABLE_FORMATS: Record<TableFormat, { label: string; short: string }> = {
@@ -42,41 +60,91 @@ export function inGroup(source: SourceSummary, group: SourceGroup): boolean {
     return group.kinds.includes(source.kind);
 }
 
+export const DATA_PATH = "/data";
+
 export const DATASETS_GROUP: ItemRef = { kind: "group", id: "datasets" };
 
 export const SOURCES_GROUP: ItemRef = { kind: "group", id: "sources" };
 
-export function itemKey(item: ItemRef): string {
-    return `${item.kind}:${item.id}`;
+export function sourceRef(source: { id: number; kind: SourceKind }): ItemRef {
+    return { kind: "source", id: source.id, group: groupOf(source.kind).id };
+}
+
+function groupPath(id: SourceGroupId): string {
+    return SOURCE_GROUPS.find((group) => group.id === id)?.path ?? id;
+}
+
+export function datasetHref(slug: string): string {
+    return `${DATA_PATH}/datasets/${encodeURIComponent(slug)}`;
+}
+
+export function uploadHref(id: number | string): string {
+    return `${DATA_PATH}/sources/${groupPath("upload")}/${id}`;
 }
 
 export function itemHref(item: ItemRef): string {
-    return `/data?item=${item.kind}:${encodeURIComponent(String(item.id))}`;
+    switch (item.kind) {
+        case "dataset":
+            return datasetHref(item.id);
+        case "folder":
+            return `${DATA_PATH}/folders/${item.id}`;
+        case "source":
+            return `${DATA_PATH}/sources/${groupPath(item.group)}/${item.id}`;
+        default:
+            return item.id === "datasets" || item.id === "sources"
+                ? `${DATA_PATH}/${item.id}`
+                : `${DATA_PATH}/sources/${groupPath(item.id)}`;
+    }
 }
 
-export function parseItem(value: unknown): ItemRef | null {
-    if (typeof value !== "string") {
+function segmentsOf(path: string): string[] | null {
+    const prefix = `${DATA_PATH}/`;
+    if (!path.startsWith(prefix)) {
         return null;
     }
-    const split = value.indexOf(":");
-    const kind = value.slice(0, split);
-    const id = value.slice(split + 1);
-    if (split < 1 || !id) {
+    try {
+        return path.slice(prefix.length).split("/").filter(Boolean).map(decodeURIComponent);
+    } catch {
         return null;
     }
-    if (kind === "dataset") {
-        return { kind, id };
+}
+
+const WHOLE_NUMBER = /^\d+$/;
+
+function parseSource(rest: string[]): ItemRef | null {
+    if (rest.length === 0) {
+        return SOURCES_GROUP;
     }
-    if ((kind === "source" || kind === "folder") && /^\d+$/.test(id)) {
-        return { kind, id: Number(id) };
+    const group = SOURCE_GROUPS.find((entry) => entry.path === rest[0]);
+    if (!group || rest.length > 2) {
+        return null;
     }
-    if (kind === "group" && (id === "datasets" || id === "sources")) {
-        return { kind, id };
+    if (rest.length === 1) {
+        return { kind: "group", id: group.id };
     }
-    const group = SOURCE_GROUPS.find(
-        (entry) => entry.id === id || entry.kinds.some((member) => member === id),
-    );
-    return kind === "group" && group ? { kind, id: group.id } : null;
+    return WHOLE_NUMBER.test(rest[1])
+        ? { kind: "source", id: Number(rest[1]), group: group.id }
+        : null;
+}
+
+export function parseItem(path: string | null | undefined): ItemRef | null {
+    const segments = path ? segmentsOf(path) : null;
+    if (!segments || segments.length === 0) {
+        return null;
+    }
+    const [head, ...rest] = segments;
+    if (head === "datasets") {
+        if (rest.length > 1) {
+            return null;
+        }
+        return rest.length === 0 ? DATASETS_GROUP : { kind: "dataset", id: rest[0] };
+    }
+    if (head === "folders") {
+        return rest.length === 1 && WHOLE_NUMBER.test(rest[0])
+            ? { kind: "folder", id: Number(rest[0]) }
+            : null;
+    }
+    return head === "sources" ? parseSource(rest) : null;
 }
 
 function haystack(parts: (string | null | undefined)[]): string {

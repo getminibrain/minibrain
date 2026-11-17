@@ -45,6 +45,7 @@ import {
 } from "~/lib/modelLinks";
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { bytes } from "~/lib/time";
+import { datasetHref } from "~/pages/data/catalogue";
 import { labelOf, presetChanges, recordedRun } from "../models/detail/train/recipe";
 import { ProgressSection, ResultSection } from "./ProgressPanels";
 import { LossSection } from "./TrainingPanel";
@@ -379,10 +380,7 @@ function dataFacts(setup: Setup): Fact[] {
         [
             "Data",
             <span key="data">
-                <Link
-                    href={`/data?item=${encodeURIComponent(`dataset:${setup.dataset}`)}`}
-                    className={LINK}
-                >
+                <Link href={datasetHref(setup.dataset)} className={LINK}>
                     {label}
                 </Link>
                 {setup.dataset_rows ? (

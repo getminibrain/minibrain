@@ -1008,9 +1008,29 @@ export interface paths {
         put?: never;
         /**
          * Save a dataset version
-         * @description Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample.
+         * @description Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample, and a full version that follows a sample as dataset.full.
          */
         post: operations["save_dataset_version_api_datasets__slug__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dataset-versions/{dataset_version_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe the rows a dataset version holds
+         * @description Row, empty and duplicate counts and rows per label of the saved rows, the ones a model trains on.
+         */
+        get: operations["dataset_version_stats_api_dataset_versions__dataset_version_id__stats_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5096,10 +5116,21 @@ export interface components {
              */
             feedback_rows?: number;
             sample?: components["schemas"]["SampleInfo"] | null;
+            /**
+             * Too Few Rows
+             * @description Why training and scoring refuse this version, when it holds too few rows.
+             */
+            too_few_rows?: string | null;
         };
         /** DatasetVersionRequest */
         DatasetVersionRequest: {
             sample?: components["schemas"]["SampleRequest"] | null;
+        };
+        /** DatasetVersionStats */
+        DatasetVersionStats: {
+            quality: components["schemas"]["QualityInfo"];
+            /** Label Counts */
+            label_counts: components["schemas"]["LabelCount"][];
         };
         /** DecisionInfo */
         DecisionInfo: {
@@ -12984,6 +13015,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverLimitInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dataset_version_stats_api_dataset_versions__dataset_version_id__stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dataset_version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetVersionStats"];
                 };
             };
             /** @description Validation Error */

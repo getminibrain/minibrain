@@ -10,7 +10,7 @@ import { count } from "~/lib/format";
 import { deviceHoursText, durationText, jobDuration } from "~/lib/jobs";
 import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
-import { datasetHref } from "./about";
+import { datasetHref } from "~/pages/data/catalogue";
 import { Tip, baseNameOf, isDeployed } from "./header";
 import { VersionNote } from "./versionNote";
 import { presetText, ranOn, useAvailableRows } from "./versionRun";

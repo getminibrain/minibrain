@@ -302,6 +302,9 @@ export function trainBlock(
     if (detail && !detail.dataset_version) {
         return "Add training data first: training needs examples.";
     }
+    if (detail?.dataset_version?.too_few_rows) {
+        return detail.dataset_version.too_few_rows;
+    }
     if (beingDeleted(row)) {
         return "It is being deleted.";
     }

@@ -32,7 +32,9 @@ import {
     succeed,
     unwrap,
 } from "~/api/client";
+import { type DatasetVersionStats, useDatasetVersionStats } from "~/api/dataQueries";
 import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { asCode, count } from "~/lib/format";
@@ -42,14 +44,16 @@ import { MoveDialog, type MoveTarget, PathLinks, folderRef } from "./DatasetFold
 import {
     ChangeNotice,
     FirstVersionNotice,
+    FullVersionItem,
     RowLimitNotice,
+    SampleLine,
     VersionsPart,
     needsSample,
+    useSaveVersion,
     useVersionRefresh,
 } from "./DatasetVersions";
 import { Clamp, type MappingBody, QueryEditor } from "./QueryEditor";
 import { RowsPreview } from "./RowsPreview";
-import { SampleNote } from "./SampleOffer";
 import {
     type FolderIndex,
     type ItemRef,
@@ -57,6 +61,7 @@ import {
     datasetsIn,
     freeDatasetName,
     itemHref,
+    sourceRef,
     stem,
 } from "./catalogue";
 import {
@@ -161,7 +166,7 @@ function QueryPart({
                 <dt className="text-muted-foreground">Source</dt>
                 <dd className="truncate">
                     <Link
-                        href={itemHref({ kind: "source", id: source.id })}
+                        href={itemHref(sourceRef(source))}
                         className="text-primary hover:underline"
                     >
                         {source.name}
@@ -408,36 +413,44 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     );
 }
 
-function splitsNote(dataset: DatasetSummary): string {
+function splitsNote(dataset: DatasetSummary): string | null {
     const latest = dataset.dataset_version;
     if (!latest) {
         return "The first version sets the splits.";
     }
-    if (Object.keys(latest.counts ?? {}).length === 0) {
-        return `Version ${latest.number ?? "–"} has too few rows to split into training and test rows; add rows before training.`;
+    return latest.too_few_rows ?? null;
+}
+
+function liveRowsNote(dataset: DatasetSummary): string | null {
+    const live = dataset.rows ?? null;
+    const latest = dataset.dataset_version;
+    const saved = latest ? (latest.sample?.total ?? latest.rows) : null;
+    if (live === null || live === saved) {
+        return null;
     }
-    return "Splits are unknown since the change.";
+    return `The query now returns ${count(live)} rows; save a version to use them.`;
 }
 
 function DatasetStats({
     dataset,
-    preview,
+    stats,
 }: {
     dataset: DatasetSummary;
-    preview: PreviewResponse | undefined;
+    stats: DatasetVersionStats | undefined;
 }) {
-    const quality = preview?.quality;
-    const splits = dataset.splits;
+    const latest = dataset.dataset_version;
+    const quality = stats?.quality;
+    const splits = latest?.counts ?? {};
+    const notes = [splitsNote(dataset), liveRowsNote(dataset)].filter(Boolean);
     return (
         <div className="flex flex-col gap-3">
             <Stats>
-                <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
+                <Stat label="Rows" value={latest ? count(quality?.rows ?? latest.rows) : "–"} />
                 <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
                 <Stat label="Sources" value={count(dataset.sources.length)} />
-                {splits &&
-                    SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
-                        <Stat key={key} label={label} value={count(splits[key])} />
-                    ))}
+                {SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
+                    <Stat key={key} label={label} value={count(splits[key])} />
+                ))}
                 {quality && (
                     <>
                         <Stat label="Empty" value={count(quality.empty)} />
@@ -453,8 +466,39 @@ function DatasetStats({
                     </>
                 )}
             </Stats>
-            {!splits && <p className="text-sm text-muted-foreground">{splitsNote(dataset)}</p>}
+            {notes.map((note) => (
+                <p key={note} className="text-sm text-muted-foreground tabular-nums">
+                    {note}
+                </p>
+            ))}
         </div>
+    );
+}
+
+function SavedLabelBalance({
+    dataset,
+    stats,
+}: {
+    dataset: DatasetSummary;
+    stats: ReturnType<typeof useDatasetVersionStats>;
+}) {
+    if (!dataset.dataset_version) {
+        return <p className="text-muted-foreground">No version yet.</p>;
+    }
+    if (!stats.data) {
+        return stats.error ? (
+            <ErrorLine error={stats.error} />
+        ) : (
+            <p className="text-muted-foreground">Loading…</p>
+        );
+    }
+    const { quality, label_counts } = stats.data;
+    return (
+        <LabelBalance
+            counts={label_counts}
+            labels={quality.labels}
+            rows={quality.rows - quality.empty}
+        />
     );
 }
 
@@ -558,7 +602,9 @@ export function DatasetDetail({
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const folderId = dataset.folder_id ?? null;
     const mapped = Boolean(dataset.mapping.sql);
-    const preview = useDatasetPreview(dataset.slug, mapped);
+    const stats = useDatasetVersionStats(dataset.dataset_version?.id);
+    const save = useSaveVersion(dataset.slug);
+    const tooFew = dataset.dataset_version?.too_few_rows ?? null;
     const path = { params: { path: { slug: dataset.slug } } };
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/datasets/{slug}", path)),
@@ -583,11 +629,15 @@ export function DatasetDetail({
             }
             actions={
                 <>
-                    <Button asChild>
-                        <Link href={`/models/new?dataset=${encodeURIComponent(dataset.slug)}`}>
-                            Train a model
-                        </Link>
-                    </Button>
+                    {tooFew ? (
+                        <BlockedButton reason={tooFew}>Train a model</BlockedButton>
+                    ) : (
+                        <Button asChild>
+                            <Link href={`/models/new?dataset=${encodeURIComponent(dataset.slug)}`}>
+                                Train a model
+                            </Link>
+                        </Button>
+                    )}
                     <ItemMenu name={dataset.name}>
                         <DropdownMenuItem onSelect={() => setEditing("name")}>
                             <IconPencil />
@@ -601,6 +651,7 @@ export function DatasetDetail({
                             <IconSql />
                             Edit query
                         </DropdownMenuItem>
+                        <FullVersionItem dataset={dataset} save={save} />
                         <DropdownMenuItem
                             onSelect={() =>
                                 setMoving({
@@ -641,8 +692,8 @@ export function DatasetDetail({
                         : "Models keep training on it until you update."
                 }
             />
-            <SampleNote sample={dataset.dataset_version?.sample} />
-            <DatasetStats dataset={dataset} preview={preview.data} />
+            <SampleLine dataset={dataset} save={save} />
+            <DatasetStats dataset={dataset} stats={stats.data} />
             <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
             <AboutPart title="Checks" tip={checksCaption(dataset.dataset_version) || undefined}>
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
@@ -650,19 +701,9 @@ export function DatasetDetail({
             {mapped && (
                 <AboutPart
                     title="Label balance"
-                    tip="Rows per label across the whole dataset. Rare labels are the ones a model gets wrong."
+                    tip="Rows per label in the saved version, the rows a model trains on. Rare labels are the ones a model gets wrong."
                 >
-                    {preview.data ? (
-                        <LabelBalance
-                            counts={preview.data.label_counts}
-                            labels={preview.data.quality.labels}
-                            rows={preview.data.quality.rows - preview.data.quality.empty}
-                        />
-                    ) : (
-                        <p className="text-muted-foreground">
-                            {preview.isLoading ? "Loading…" : "–"}
-                        </p>
-                    )}
+                    <SavedLabelBalance dataset={dataset} stats={stats} />
                 </AboutPart>
             )}
             <AboutPart title="Versions">

@@ -4,6 +4,7 @@ import { TONE_LABELS, type ToneName } from "~/components/avatar/tones";
 import { listHref } from "~/lib/listSearch";
 import { API_KEYS_PATH, jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes, exactTime } from "~/lib/time";
+import { datasetHref, itemHref } from "~/pages/data/catalogue";
 
 export type AuditEvent = components["schemas"]["AuditInfo"];
 export type AuditTarget = components["schemas"]["AuditTarget"];
@@ -74,6 +75,7 @@ const ACTIONS: Record<string, string> = {
     "feedback.reject": "Feedback rejected",
     "feedback.unassign": "Feedback unassigned",
     "dataset.delete": "Dataset deleted",
+    "dataset.full": "Full dataset version saved",
     "dataset.move": "Dataset moved",
     "dataset.sample": "Dataset version sampled",
     "dataset_folder.create": "Dataset folder created",
@@ -294,8 +296,8 @@ export function targetHref(event: AuditEvent): string | undefined {
         key: () => listHref(API_KEYS_PATH, { q: ref.key }),
         account: () => "/settings/accounts",
         job: () => jobHref({ id: Number(ref.key), kind: jobKind(event) }),
-        dataset: () => `/data?item=${encodeURIComponent(`dataset:${ref.key}`)}`,
-        dataset_folder: () => "/data",
+        dataset: () => datasetHref(ref.key),
+        dataset_folder: () => itemHref({ kind: "folder", id: Number(ref.key) }),
         feedback: () => listHref("/feedback", { item: ref.key.split("/").at(-1) }),
         connection: () => "/settings/connections",
         policy: () => "/settings/security",

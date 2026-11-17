@@ -37,6 +37,7 @@ import {
     freeDatasetName,
     itemHref,
     plural,
+    sourceRef,
     stem,
 } from "./catalogue";
 import { SourceIcon } from "./icons";
@@ -53,7 +54,7 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
         cell: ({ row }) => (
             <span className="flex min-w-0 items-center gap-2">
                 <SourceIcon source={row.original} className="size-4 shrink-0" />
-                <Link href={itemHref({ kind: "source", id: row.original.id })} className="truncate">
+                <Link href={itemHref(sourceRef(row.original))} className="truncate">
                     {row.original.name}
                 </Link>
             </span>
@@ -493,7 +494,7 @@ export function SourceTable({
                 columns={COLUMNS}
                 rows={sources}
                 getRowId={(row) => String(row.id)}
-                onOpen={(row) => onSelect({ kind: "source", id: row.id })}
+                onOpen={(row) => onSelect(sourceRef(row))}
                 rowLabel={(row) => row.name}
                 selectedIds={selected}
                 onSelectedIdsChange={onSelectedChange}

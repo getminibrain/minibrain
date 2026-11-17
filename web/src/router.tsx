@@ -91,6 +91,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/$name/$tab", ModelPage),
     globalPage("/playground", PlaygroundPage),
     globalPage("/data", guarded("builder", DataPage)),
+    globalPage("/data/$", guarded("builder", DataPage)),
     globalPage("/training", TrainingListPage),
     globalPage("/training/$id", TrainingItemPage),
     globalPage(JOBS_PATH, JobsPage),

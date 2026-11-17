@@ -39,6 +39,7 @@ import {
     trainHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
+import { datasetHref } from "~/pages/data/catalogue";
 import { splitTags, useModelsRefresh } from "../dialogs";
 import { Clipped, Fact, Group, GroupColumns, Mono, Muted, Row, parametersText } from "./facts";
 import { baseNameOf, isDeployed } from "./header";
@@ -269,10 +270,6 @@ function scoreText(version: VersionInfo): string {
 function createdText(page: ReturnType<typeof useModelPage>["data"]): string {
     const when = page?.created_at ? relativeTime(page.created_at) : null;
     return [page?.created_by, when].filter(Boolean).join(" · ") || "Unknown";
-}
-
-export function datasetHref(slug: string): string {
-    return `/data?item=${encodeURIComponent(`dataset:${slug}`)}`;
 }
 
 export function About({

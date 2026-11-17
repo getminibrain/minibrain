@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 
+from minibrain.data.splits import MIN_ROWS
 from minibrain.tasks.examples import Example
 
 CHECKS = ("duplicates", "conflicts", "balance", "leakage", "length", "personal_data")
@@ -66,16 +67,29 @@ def agree(count: int, one: str, many: str) -> str:
     return one if count == 1 else many
 
 
-def hard_stops(rows: list[tuple[str, str]], labelled: bool) -> list[Finding]:
-    labels = Counter(label for _, label in rows)
-    empty = Finding("empty", "ok", "Rows to train on", f"{plural(len(rows), 'row')} with an input and an answer.")
+def rows_to_train_on(rows: list[tuple[str, str]], examples: int) -> Finding:
     if not rows:
-        empty = Finding(
+        return Finding(
             "empty",
             "blocked",
             "No rows to train on",
             "No row has both an input and an answer. Check the query's input and label columns, or its messages.",
         )
+    if examples < MIN_ROWS:
+        return Finding(
+            "empty",
+            "blocked",
+            "Too few rows to train on",
+            f"{plural(examples, 'row')} {agree(examples, 'is', 'are')} left after removing empty and repeated "
+            f"inputs; training and scoring need at least {MIN_ROWS:,}.",
+            count=examples,
+        )
+    return Finding("empty", "ok", "Rows to train on", f"{plural(examples, 'row')} with an input and an answer.")
+
+
+def hard_stops(rows: list[tuple[str, str]], labelled: bool, examples: int) -> list[Finding]:
+    labels = Counter(label for _, label in rows)
+    empty = rows_to_train_on(rows, examples)
     if not labelled:
         return [empty]
     single = Finding("single_label", "ok", "More than one label", f"{plural(len(labels), 'label')}.")
@@ -313,10 +327,15 @@ TITLES = {
 
 
 def run_checks(
-    raw: Rows, splits: dict[str, list[Example]] | None, limits: CheckLimits, labelled: bool = True
+    raw: Rows,
+    splits: dict[str, list[Example]] | None,
+    limits: CheckLimits,
+    labelled: bool = True,
+    examples: int | None = None,
 ) -> list[Finding]:
     rows = usable(raw)
-    findings = hard_stops(rows, labelled)
+    kept = examples if examples is not None else len({text for text, _ in rows})
+    findings = hard_stops(rows, labelled, kept)
     for name in CHECKS:
         if name in limits.off:
             findings.append(Finding(name, "off", TITLES[name], "Turned off under Settings, Data."))
@@ -329,5 +348,10 @@ def run_checks(
     return findings
 
 
+def blocks_saving(finding: Finding) -> bool:
+    too_few = finding.check == "empty" and finding.count > 0
+    return finding.status == "blocked" and not too_few
+
+
 def blocking(findings: Sequence[Finding]) -> Finding | None:
-    return next((finding for finding in findings if finding.status == "blocked"), None)
+    return next((finding for finding in findings if blocks_saving(finding)), None)

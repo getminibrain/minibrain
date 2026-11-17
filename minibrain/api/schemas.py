@@ -346,6 +346,9 @@ class DatasetVersionInfo(BaseModel):
     checks: list[CheckInfo] = Field(default_factory=list)
     feedback_rows: int = 0
     sample: SampleInfo | None = None
+    too_few_rows: str | None = Field(
+        default=None, description="Why training and scoring refuse this version, when it holds too few rows."
+    )
 
 
 class DismissRequest(BaseModel):
@@ -1032,6 +1035,11 @@ class PreviewResponse(BaseModel):
     labels: list[str]
     label_counts: list[LabelCount]
     example: list[ChatMessage]
+
+
+class DatasetVersionStats(BaseModel):
+    quality: QualityInfo
+    label_counts: list[LabelCount]
 
 
 class ExampleInfo(BaseModel):

@@ -9,8 +9,8 @@ import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
-import { datasetHref } from "~/pages/models/list/cells";
-import { TextLink, sourceHref } from "./UsageSection";
+import { datasetHref, uploadHref } from "~/pages/data/catalogue";
+import { TextLink } from "./UsageSection";
 import { type InfrastructureInfo, plural } from "./parts";
 
 type FreeUpItem = components["schemas"]["FreeUpItem"];
@@ -84,9 +84,9 @@ function rowOf(
     if (item.kind === "source") {
         return {
             ...base,
-            what: <TextLink href={sourceHref(item.key)}>{item.name}</TextLink>,
+            what: <TextLink href={uploadHref(item.key)}>{item.name}</TextLink>,
             why: "No dataset uses this upload.",
-            action: <TextLink href={sourceHref(item.key)}>Delete on its page</TextLink>,
+            action: <TextLink href={uploadHref(item.key)}>Delete on its page</TextLink>,
         };
     }
     const kept = keepDays > 0 ? `; kept ${count(keepDays)} days, then removed` : "";

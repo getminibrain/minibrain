@@ -7,6 +7,7 @@ import { HealthStatus } from "~/components/models/HealthStatus";
 import { StatusText, percentOf } from "~/components/models/StatusText";
 import { TeardownStatus } from "~/components/models/TeardownStatus";
 import { jobHref } from "~/lib/modelLinks";
+import { datasetHref } from "~/pages/data/catalogue";
 import {
     BASELINE_HINT,
     type CostShown,
@@ -303,10 +304,6 @@ export function VersionStatus({
         );
     }
     return text;
-}
-
-export function datasetHref(key: string): string {
-    return `/data?item=${encodeURIComponent(`dataset:${key}`)}`;
 }
 
 export function DataCell({ dataset }: { dataset: ModelRow["dataset"] }) {

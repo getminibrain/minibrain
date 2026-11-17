@@ -1,4 +1,4 @@
-from minibrain.data.checks import CheckLimits, Finding, run_checks
+from minibrain.data.checks import CheckLimits, Finding, blocking, run_checks
 from minibrain.data.splits import Row, clean, split
 from minibrain.tasks.examples import Example, Turn, encode_turns, single
 from tests.conftest import Harness, tickets_csv
@@ -37,6 +37,18 @@ def test_hard_stops_block_an_empty_or_single_label_dataset() -> None:
     assert empty["empty"].status == "blocked"
     single = by_check(run_checks([(f"row {index}", "billing") for index in range(150)], None, CheckLimits()))
     assert single["single_label"].status == "blocked" and "'billing'" in single["single_label"].detail
+
+
+def test_too_few_rows_block_with_the_minimum_and_the_count() -> None:
+    rows = [*labelled(60), ("message number 1", "label 1")]
+    found = by_check(run_checks(rows, None, CheckLimits()))["empty"]
+    assert (found.status, found.title, found.count) == ("blocked", "Too few rows to train on", 60)
+    assert found.detail == (
+        "60 rows are left after removing empty and repeated inputs; training and scoring need at least 100."
+    )
+    assert blocking([found]) is None
+    assert by_check(run_checks(labelled(100), None, CheckLimits()))["empty"].status == "ok"
+    assert by_check(run_checks(labelled(150), None, CheckLimits(), examples=99))["empty"].status == "blocked"
 
 
 def test_duplicates_conflicts_and_lengths_are_counted() -> None:

@@ -17,6 +17,7 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     FileName,
+    Link,
     SearchInput,
     Tooltip,
     TooltipContent,
@@ -30,6 +31,7 @@ import {
 import {
     type CSSProperties,
     type KeyboardEvent,
+    type MouseEvent,
     type ReactNode,
     useEffect,
     useMemo,
@@ -66,6 +68,7 @@ import { SourcesOverview } from "./Sources";
 import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
     DATASETS_GROUP,
+    DATA_PATH,
     type FolderIndex,
     type ItemRef,
     SOURCES_GROUP,
@@ -79,9 +82,9 @@ import {
     groupOf,
     inGroup,
     itemHref,
-    itemKey,
     parseItem,
     siblingNamed,
+    sourceRef,
     sourceText,
     tableFormat,
     usesSource,
@@ -92,8 +95,35 @@ import { FILL, useDataRefresh } from "./parts";
 const TREE_WIDTH = { key: "minibrain.data.treeWidth", initial: 288, min: 200, max: 520 };
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
+function openElsewhere(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        event.stopPropagation();
+        return;
+    }
+    event.preventDefault();
+}
+
+function linked(node: TreeNode): TreeNode {
+    return {
+        ...node,
+        textValue: node.textValue ?? (typeof node.label === "string" ? node.label : undefined),
+        label: (
+            <Link
+                href={node.id}
+                tabIndex={-1}
+                draggable={false}
+                onClick={openElsewhere}
+                className="block truncate"
+            >
+                {node.label}
+            </Link>
+        ),
+        children: node.children?.map(linked),
+    };
+}
+
 function sourceNode(source: SourceSummary): TreeNode {
-    const id = itemKey({ kind: "source", id: source.id });
+    const id = itemHref(sourceRef(source));
     const format = tableFormat(source.kind);
     if (format) {
         return {
@@ -116,7 +146,7 @@ function sourceNode(source: SourceSummary): TreeNode {
 
 function folderNodes(index: FolderIndex, parent: number | null): TreeNode[] {
     const folders = (index.folders.get(parent) ?? []).map((folder) => ({
-        id: itemKey({ kind: "folder", id: folder.id }),
+        id: itemHref({ kind: "folder", id: folder.id }),
         label: folder.name,
         icon: <IconFolder />,
         meta: datasetsInside(index, folder.id).length,
@@ -125,7 +155,7 @@ function folderNodes(index: FolderIndex, parent: number | null): TreeNode[] {
         children: folderNodes(index, folder.id),
     }));
     const datasets = (index.datasets.get(parent) ?? []).map((dataset) => ({
-        id: itemKey({ kind: "dataset", id: dataset.slug }),
+        id: itemHref({ kind: "dataset", id: dataset.slug }),
         label: dataset.name,
         icon: <IconTable />,
         draggable: true,
@@ -139,7 +169,7 @@ function buildTree(
     index: FolderIndex,
 ): TreeNode[] {
     const datasetGroup: TreeNode = {
-        id: itemKey(DATASETS_GROUP),
+        id: itemHref(DATASETS_GROUP),
         label: "Datasets",
         icon: <IconStack2 />,
         meta: datasets.length,
@@ -149,7 +179,7 @@ function buildTree(
     const sourceGroups = SOURCE_GROUPS.map((group) => {
         const members = sources.filter((source) => inGroup(source, group));
         return {
-            id: itemKey({ kind: "group", id: group.id }),
+            id: itemHref({ kind: "group", id: group.id }),
             label: group.label,
             icon: <GroupIcon group={group.id} />,
             meta: members.length,
@@ -157,13 +187,13 @@ function buildTree(
         };
     });
     const sourcesGroup: TreeNode = {
-        id: itemKey(SOURCES_GROUP),
+        id: itemHref(SOURCES_GROUP),
         label: "Sources",
         icon: <IconFileImport />,
         meta: sources.length,
         children: sourceGroups,
     };
-    return [datasetGroup, sourcesGroup];
+    return [datasetGroup, sourcesGroup].map(linked);
 }
 
 function searchIndex(
@@ -172,19 +202,19 @@ function searchIndex(
     folders: DatasetFolder[],
 ): Map<string, string> {
     const index = new Map<string, string>();
-    index.set(itemKey(DATASETS_GROUP), "datasets");
-    index.set(itemKey(SOURCES_GROUP), "sources");
+    index.set(itemHref(DATASETS_GROUP), "datasets");
+    index.set(itemHref(SOURCES_GROUP), "sources");
     for (const { id, label } of SOURCE_GROUPS) {
-        index.set(itemKey({ kind: "group", id }), label.toLowerCase());
+        index.set(itemHref({ kind: "group", id }), label.toLowerCase());
     }
     for (const folder of folders) {
-        index.set(itemKey({ kind: "folder", id: folder.id }), folder.name.toLowerCase());
+        index.set(itemHref({ kind: "folder", id: folder.id }), folder.name.toLowerCase());
     }
     for (const source of sources) {
-        index.set(itemKey({ kind: "source", id: source.id }), sourceText(source));
+        index.set(itemHref(sourceRef(source)), sourceText(source));
     }
     for (const dataset of datasets) {
-        index.set(itemKey({ kind: "dataset", id: dataset.slug }), datasetText(dataset));
+        index.set(itemHref({ kind: "dataset", id: dataset.slug }), datasetText(dataset));
     }
     return index;
 }
@@ -298,23 +328,33 @@ const MISSING_TITLE: Record<ItemRef["kind"], string> = {
     dataset: "Dataset not found",
 };
 
-function Missing({ item }: { item: ItemRef }) {
+function Missing({ item }: { item: ItemRef | null }) {
     return (
         <NotFoundState
             heading="h2"
-            title={MISSING_TITLE[item.kind]}
-            primary={{ label: "Go to Data", href: "/data" }}
+            title={item ? MISSING_TITLE[item.kind] : "Page not found"}
+            primary={{ label: "Go to Data", href: DATA_PATH }}
         >
-            {`No ${item.kind} matches this link. It may have been deleted or moved.`}
+            {item
+                ? `No ${item.kind} matches this link. It may have been deleted or moved.`
+                : "Nothing on the Data page matches this link."}
         </NotFoundState>
     );
 }
 
+function sourceAt(sources: SourceSummary[], item: ItemRef): SourceSummary | undefined {
+    const found =
+        item.kind === "source" ? sources.find((source) => source.id === item.id) : undefined;
+    return found && item.kind === "source" && groupOf(found.kind).id === item.group
+        ? found
+        : undefined;
+}
+
 export function DataExplorer() {
     const router = useRouter();
-    const requested = useRouterState({
-        select: (state) => parseItem((state.location.search as { item?: unknown }).item),
-    });
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const requested = parseItem(pathname);
+    const unknownPath = requested === null && pathname.replace(/\/+$/, "") !== DATA_PATH;
     const startAdding = useSearchParam("add") !== null;
     const sources = useSources();
     const datasets = useDatasets();
@@ -339,7 +379,7 @@ export function DataExplorer() {
     const datasetList = useMemo(() => datasets.data ?? [], [datasets.data]);
     const folderList = useMemo(() => folders.data ?? [], [folders.data]);
     const selected = requested ?? DEFAULT_ITEM;
-    const selectedKey = itemKey(selected);
+    const selectedKey = itemHref(selected);
     const index = useMemo(() => folderIndex(folderList, datasetList), [folderList, datasetList]);
     const nodes = useMemo(
         () => buildTree(sourceList, datasetList, index),
@@ -361,7 +401,7 @@ export function DataExplorer() {
     const expanded = branches.filter((id) => !collapsed.includes(id));
     const matches = text
         ? [...haystacks.entries()].filter(
-              ([id, value]) => !id.startsWith("group:") && value.includes(text),
+              ([id, value]) => parseItem(id)?.kind !== "group" && value.includes(text),
           ).length
         : 0;
 
@@ -375,10 +415,13 @@ export function DataExplorer() {
     }, [nodes, selectedKey]);
 
     const select = (item: ItemRef) => {
-        if (itemKey(item) !== selectedKey) {
+        const href = itemHref(item);
+        if (href !== selectedKey) {
             setCreatingFor(null);
         }
-        router.history.replace(itemHref(item));
+        if (href !== pathname) {
+            router.history.push(href);
+        }
     };
 
     const onSelectKey = (key: string) => {
@@ -418,7 +461,7 @@ export function DataExplorer() {
             return;
         }
         setQuery("");
-        router.history.replace(itemHref({ kind: "source", id: source.id }));
+        router.history.push(itemHref(sourceRef(source)));
         setCreatingFor(source.outcome === "created" ? source.id : null);
     };
 
@@ -452,13 +495,14 @@ export function DataExplorer() {
     };
 
     const newDataset = () => {
-        if (selected.kind === "source" && sourceList.some((row) => row.id === selected.id)) {
-            setCreatingFor(selected.id);
+        const source = sourceAt(sourceList, selected);
+        if (source) {
+            setCreatingFor(source.id);
             return;
         }
         const folder = currentFolder();
         const into = folderRef(folder);
-        createIn(into, folder === null ? "new" : itemKey(into));
+        createIn(into, folder === null ? "new" : itemHref(into));
     };
 
     const fromSources = () => {
@@ -516,7 +560,7 @@ export function DataExplorer() {
             }
             return (
                 <TreeRowMenu label={label}>
-                    <DropdownMenuItem onSelect={() => createIn(item, itemKey(item))}>
+                    <DropdownMenuItem onSelect={() => createIn(item, itemHref(item))}>
                         <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
@@ -637,7 +681,9 @@ export function DataExplorer() {
         Promise.all([sources.refetch(), datasets.refetch(), folders.refetch()]);
     let detail: ReactNode = null;
     let split = false;
-    if (listError) {
+    if (unknownPath) {
+        detail = <Missing item={null} />;
+    } else if (listError) {
         detail = <QueryError heading="h2" error={listError} retry={retryLists} />;
     } else if (!loading) {
         if (selected.kind === "group" && selected.id === "datasets") {
@@ -676,7 +722,7 @@ export function DataExplorer() {
                 />
             );
         } else if (selected.kind === "source") {
-            const source = sourceList.find((item) => item.id === selected.id);
+            const source = sourceAt(sourceList, selected);
             split = Boolean(source);
             detail = source ? (
                 <FileDetail
@@ -797,7 +843,7 @@ export function DataExplorer() {
                                 <Tree
                                     aria-label="Datasets and sources"
                                     nodes={filtered?.nodes ?? nodes}
-                                    selectedId={selectedKey}
+                                    selectedId={unknownPath ? null : selectedKey}
                                     onSelect={onSelectKey}
                                     expandedIds={
                                         filtered ? [...expanded, ...filtered.expandedIds] : expanded
@@ -856,7 +902,7 @@ export function DataExplorer() {
                 onOpenChange={(open) => !open && setAlready(null)}
                 onOpen={(source) => {
                     setQuery("");
-                    select({ kind: "source", id: source.id });
+                    select(sourceRef(source));
                 }}
             />
             <MakeDatasetDialog

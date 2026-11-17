@@ -15,7 +15,7 @@ import { PanelSection } from "~/components/Section";
 import { count } from "~/lib/format";
 import { JOBS_PATH, modelPageHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
-import { datasetHref } from "~/pages/models/list/cells";
+import { datasetHref, uploadHref } from "~/pages/data/catalogue";
 import { type InfrastructureInfo, plural } from "./parts";
 
 type UsageGroup = components["schemas"]["UsageGroup"];
@@ -30,10 +30,6 @@ export function TextLink({ href, children }: { href: string; children: ReactNode
             {children}
         </Link>
     );
-}
-
-export function sourceHref(key: string): string {
-    return `/data?item=${encodeURIComponent(`source:${key}`)}`;
 }
 
 function BaseUse({ item }: { item: UsageItem }) {
@@ -104,7 +100,7 @@ const KINDS: Record<UsageKind, KindView> = {
         label: "Uploads",
         icon: IconUpload,
         empty: "No file uploaded yet.",
-        name: (item) => <TextLink href={sourceHref(item.key)}>{item.name}</TextLink>,
+        name: (item) => <TextLink href={uploadHref(item.key)}>{item.name}</TextLink>,
         detail: () => "Source file",
     },
     jobs: {

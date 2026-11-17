@@ -19,6 +19,7 @@ import {
     folderPath,
     groupOf,
     sourceNameProblem,
+    sourceRef,
 } from "./catalogue";
 import { useDataRefresh } from "./parts";
 
@@ -44,7 +45,7 @@ function removedRef(removal: Removal): ItemRef {
     if (removal.kind === "dataset") {
         return { kind: "dataset", id: removal.dataset.slug };
     }
-    return { kind: "source", id: removal.source.id };
+    return sourceRef(removal.source);
 }
 
 function parentRef(removal: Removal): ItemRef {

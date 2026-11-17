@@ -24,6 +24,7 @@ from minibrain.api.schemas import (
     DatasetVersionDiff,
     DatasetVersionInfo,
     DatasetVersionRequest,
+    DatasetVersionStats,
     DeltaSourceCreate,
     DemoDataInfo,
     DiffRow,
@@ -110,6 +111,7 @@ from minibrain.data.sources import (
     require_mapping,
     run_query,
     safe_filename,
+    saved_quality,
     summarize,
     to_text,
 )
@@ -712,7 +714,8 @@ def list_dataset_versions(slug: str, session: SessionDep) -> list[DatasetVersion
     dependencies=[Depends(builder)],
     summary="Save a dataset version",
     description="Refused with 409 and the row counts when the query returns more rows than the limit; send a sample "
-    "to save a random sample instead. A sample is audited as dataset.sample.",
+    "to save a random sample instead. A sample is audited as dataset.sample, and a full version that follows a "
+    "sample as dataset.full.",
 )
 def save_dataset_version(
     slug: str, session: SessionDep, settings: SettingsDep, body: DatasetVersionRequest | None = None
@@ -729,6 +732,21 @@ def get_dataset_version(session: Session, dataset_version_id: int) -> DatasetVer
     if found is None:
         raise NotFoundError(f"no dataset version {dataset_version_id}")
     return found
+
+
+@router.get(
+    "/dataset-versions/{dataset_version_id}/stats",
+    dependencies=[Depends(builder)],
+    summary="Describe the rows a dataset version holds",
+    description="Row, empty and duplicate counts and rows per label of the saved rows, the ones a model trains on.",
+)
+def dataset_version_stats(dataset_version_id: int, session: SessionDep, store: StoreDep) -> DatasetVersionStats:
+    found = get_dataset_version(session, dataset_version_id)
+    quality, counts = saved_quality(dataset_version_location(session, store, found), LABEL_COUNTS)
+    return DatasetVersionStats(
+        quality=QualityInfo.model_validate(quality, from_attributes=True),
+        label_counts=[LabelCount(label=label, rows=size) for label, size in counts],
+    )
 
 
 @router.get(

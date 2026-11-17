@@ -46,7 +46,6 @@ import {
     folderTrail,
     insideFolder,
     itemHref,
-    itemKey,
     parseItem,
     plural,
     siblingNamed,
@@ -154,7 +153,7 @@ export function PathLinks({ index, folderId }: { index: FolderIndex; folderId: n
     return (
         <>
             {steps.map((step, position) => (
-                <Fragment key={itemKey(step.item)}>
+                <Fragment key={itemHref(step.item)}>
                     {position > 0 && " / "}
                     <Link href={itemHref(step.item)} className="text-primary">
                         {step.label}
@@ -323,7 +322,7 @@ function folderChoices(
     return (index.folders.get(parent) ?? [])
         .filter((folder) => !blocked.has(folder.id))
         .map((folder) => ({
-            id: itemKey({ kind: "folder", id: folder.id }),
+            id: itemHref({ kind: "folder", id: folder.id }),
             label: folder.name,
             icon: <IconFolder />,
             meta: folder.id === current ? "Current" : undefined,
@@ -370,7 +369,7 @@ export function MoveDialog({
         : null;
     useEffect(() => {
         if (opened !== null) {
-            setChosen(itemKey(folderRef(from)));
+            setChosen(itemHref(folderRef(from)));
             reset();
         }
     }, [opened, from, reset]);
@@ -380,7 +379,7 @@ export function MoveDialog({
     const blocked = new Set(folders.flatMap((id) => insideFolder(index, id)));
     const nodes: TreeNode[] = [
         {
-            id: itemKey(DATASETS_GROUP),
+            id: itemHref(DATASETS_GROUP),
             label: "Datasets",
             icon: <IconStack2 />,
             meta: together && from === null ? "Current" : undefined,
@@ -487,7 +486,7 @@ function contentRows(index: FolderIndex, folderId: number | null): ContentRow[] 
     const folders = (index.folders.get(folderId) ?? []).map((folder) => {
         const inside = datasetsInside(index, folder.id);
         return {
-            key: itemKey({ kind: "folder", id: folder.id }),
+            key: itemHref({ kind: "folder", id: folder.id }),
             item: { kind: "folder", id: folder.id } as ItemRef,
             name: folder.name,
             folder: true,
@@ -498,7 +497,7 @@ function contentRows(index: FolderIndex, folderId: number | null): ContentRow[] 
         };
     });
     const datasets = (index.datasets.get(folderId) ?? []).map((dataset) => ({
-        key: itemKey({ kind: "dataset", id: dataset.slug }),
+        key: itemHref({ kind: "dataset", id: dataset.slug }),
         item: { kind: "dataset", id: dataset.slug } as ItemRef,
         name: dataset.name,
         folder: false,

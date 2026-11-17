@@ -441,17 +441,15 @@ def count_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None
     return int(found[0]) if found else 0
 
 
-def assess(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> Quality:
-    examples = examples_query(sql, output_columns(tables, sql, aliases))
-    with sandbox(tables, aliases) as connection:
-        found = connection.execute(
-            f"WITH everything AS ({examples}), usable AS ({usable_examples(examples)}), "
-            "per_label AS (SELECT expected, count(*) AS rows FROM usable GROUP BY expected) "
-            "SELECT (SELECT count(*) FROM everything), (SELECT count(*) FROM usable), "
-            "(SELECT count(DISTINCT input) FROM usable), (SELECT count(*) FROM per_label), "
-            "(SELECT coalesce(min(rows), 0) FROM per_label), (SELECT coalesce(max(rows), 0) FROM per_label), "
-            "(SELECT coalesce(avg(length(input)), 0) FROM usable)"
-        ).fetchone()
+def quality_of(connection: duckdb.DuckDBPyConnection, examples: str) -> Quality:
+    found = connection.execute(
+        f"WITH everything AS ({examples}), usable AS ({usable_examples(examples)}), "
+        "per_label AS (SELECT expected, count(*) AS rows FROM usable GROUP BY expected) "
+        "SELECT (SELECT count(*) FROM everything), (SELECT count(*) FROM usable), "
+        "(SELECT count(DISTINCT input) FROM usable), (SELECT count(*) FROM per_label), "
+        "(SELECT coalesce(min(rows), 0) FROM per_label), (SELECT coalesce(max(rows), 0) FROM per_label), "
+        "(SELECT coalesce(avg(length(input)), 0) FROM usable)"
+    ).fetchone()
     rows, usable, distinct, labels, smallest, largest, mean = found or (0, 0, 0, 0, 0, 0, 0.0)
     return Quality(
         rows=int(rows),
@@ -464,16 +462,33 @@ def assess(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = N
     )
 
 
+def label_counts_of(connection: duckdb.DuckDBPyConnection, examples: str, limit: int) -> list[tuple[str, int]]:
+    found = connection.execute(
+        f"SELECT expected, count(*) AS rows FROM ({usable_examples(examples)}) GROUP BY expected "
+        f"ORDER BY rows DESC, expected LIMIT {int(limit)}"
+    ).fetchall()
+    return [(str(label), int(rows)) for label, rows in found]
+
+
+def assess(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> Quality:
+    examples = examples_query(sql, output_columns(tables, sql, aliases))
+    with sandbox(tables, aliases) as connection:
+        return quality_of(connection, examples)
+
+
 def label_counts(
     tables: Sequence[Table], sql: str, limit: int, aliases: dict[str, str] | None = None
 ) -> list[tuple[str, int]]:
     examples = examples_query(sql, output_columns(tables, sql, aliases))
     with sandbox(tables, aliases) as connection:
-        found = connection.execute(
-            f"SELECT expected, count(*) AS rows FROM ({usable_examples(examples)}) GROUP BY expected "
-            f"ORDER BY rows DESC, expected LIMIT {int(limit)}"
-        ).fetchall()
-    return [(str(label), int(rows)) for label, rows in found]
+        return label_counts_of(connection, examples, limit)
+
+
+def saved_quality(location: str, limit: int) -> tuple[Quality, list[tuple[str, int]]]:
+    examples = f"SELECT messages, input, expected FROM read_parquet({quote_literal(location)})"
+    with duckdb.connect() as connection:
+        register(connection)
+        return quality_of(connection, examples), label_counts_of(connection, examples, limit)
 
 
 def table_identifier(name: str) -> str:

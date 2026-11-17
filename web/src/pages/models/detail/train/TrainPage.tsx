@@ -180,6 +180,8 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
                     onChange={(next) => run.setPicked(Number(next))}
                     options={run.saved.map((item, index) => ({
                         value: String(item.id),
+                        disabled: Boolean(item.too_few_rows),
+                        description: item.too_few_rows ?? undefined,
                         label: `${dataset} v${item.number ?? "–"}${index === 0 ? " · latest" : ""}`,
                         meta: [
                             `${count(item.counts.train ?? item.rows)} rows`,
@@ -336,7 +338,9 @@ function blockFor(method: TrainMethod, row: ModelRow, detail: ModelDetail): stri
     if (method === "sft") {
         return trainBlock(row, detail);
     }
-    return beingDeleted(row) ? "It is being deleted." : null;
+    return beingDeleted(row)
+        ? "It is being deleted."
+        : (detail.dataset_version?.too_few_rows ?? null);
 }
 
 function trainCrumbs(row: ModelRow) {

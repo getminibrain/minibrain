@@ -3013,7 +3013,7 @@
           "Data"
         ],
         "summary": "Save a dataset version",
-        "description": "Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample.",
+        "description": "Refused with 409 and the row counts when the query returns more rows than the limit; send a sample to save a random sample instead. A sample is audited as dataset.sample, and a full version that follows a sample as dataset.full.",
         "operationId": "save_dataset_version_api_datasets__slug__versions_post",
         "parameters": [
           {
@@ -3060,6 +3060,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OverLimitInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset-versions/{dataset_version_id}/stats": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Describe the rows a dataset version holds",
+        "description": "Row, empty and duplicate counts and rows per label of the saved rows, the ones a model trains on.",
+        "operationId": "dataset_version_stats_api_dataset_versions__dataset_version_id__stats_get",
+        "parameters": [
+          {
+            "name": "dataset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Dataset Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetVersionStats"
                 }
               }
             }
@@ -17128,6 +17171,18 @@
                 "type": "null"
               }
             ]
+          },
+          "too_few_rows": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Too Few Rows",
+            "description": "Why training and scoring refuse this version, when it holds too few rows."
           }
         },
         "type": "object",
@@ -17161,6 +17216,26 @@
         },
         "type": "object",
         "title": "DatasetVersionRequest"
+      },
+      "DatasetVersionStats": {
+        "properties": {
+          "quality": {
+            "$ref": "#/components/schemas/QualityInfo"
+          },
+          "label_counts": {
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            },
+            "type": "array",
+            "title": "Label Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quality",
+          "label_counts"
+        ],
+        "title": "DatasetVersionStats"
       },
       "DecisionInfo": {
         "properties": {

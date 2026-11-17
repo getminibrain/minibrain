@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from minibrain.auth.identity import current_actor
-from minibrain.data.checks import Finding, blocking, run_checks
+from minibrain.data.checks import Finding, blocking, plural, run_checks
 from minibrain.data.feedback import FeedbackRow, training_rows
 from minibrain.data.limits import load_limits
 from minibrain.data.shared import dataset_sql, dataset_tables, fingerprint
@@ -70,14 +70,14 @@ def sampling(sample: Sample | None, total: int) -> tuple[int, int] | None:
 
 def split_summary(
     rows: list[Row], held_out: frozenset[str] = frozenset()
-) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None]:
+) -> tuple[dict[str, int], list[str], dict[str, list[Example]] | None, int]:
     examples = clean(rows)
     labels = answer_labels(examples)
     try:
         splits = split(examples, held_out=held_out)
     except DatasetVersionError:
-        return {}, labels, None
-    return {name: len(splits[name]) for name in SPLITS}, labels, splits
+        return {}, labels, None, len(examples)
+    return {name: len(splits[name]) for name in SPLITS}, labels, splits, len(examples)
 
 
 @dataclass(frozen=True)
@@ -91,8 +91,10 @@ class Taken:
 
 def checked(session: Session, settings: Settings, target: Path) -> Taken:
     rows_read = read_rows(target)
-    counts, labels, splits = split_summary(rows_read, held_out_inputs(target))
-    findings = run_checks(pairs(rows_read), splits, load_limits(session).checks(), labelled=bool(labels))
+    counts, labels, splits, examples = split_summary(rows_read, held_out_inputs(target))
+    findings = run_checks(
+        pairs(rows_read), splits, load_limits(session).checks(), labelled=bool(labels), examples=examples
+    )
     stop = blocking(findings)
     if stop is not None:
         raise ConflictError(f"{stop.title}: {stop.detail}")
@@ -135,6 +137,17 @@ def audit_sample(session: Session, dataset: Dataset, found: DatasetVersion) -> N
     )
 
 
+def audit_full(session: Session, dataset: Dataset, found: DatasetVersion) -> None:
+    session.add(
+        AuditEvent(
+            actor=current_actor(),
+            action="dataset.full",
+            target=f"dataset:{dataset.slug}",
+            detail={"name": dataset.name, "version": found.number, "rows": found.rows},
+        )
+    )
+
+
 def take_version(
     session: Session, settings: Settings, dataset: Dataset, sample: Sample | None = None
 ) -> DatasetVersion:
@@ -157,6 +170,7 @@ def take_version(
         result = checked(session, settings, target)
     moment = now()
     found = latest_version(dataset)
+    was_sampled = found is not None and found.sample is not None
     if found is None or found.hash != result.artifact.id:
         found = stored(dataset, result, moment)
         found.number = next_number(dataset)
@@ -169,6 +183,8 @@ def take_version(
     found.taken_at = moment
     session.flush()
     audit_sample(session, dataset, found)
+    if was_sampled and found.sample is None:
+        audit_full(session, dataset, found)
     return found
 
 
@@ -246,12 +262,27 @@ def training_dataset_version(
     return with_feedback(session, settings, model, chosen_dataset_version(session, model, dataset_version_id))
 
 
+def kept_rows(dataset_version: DatasetVersion) -> int | None:
+    found = next((item for item in dataset_version.checks or [] if item.get("check") == "empty"), None)
+    kept = found.get("count") if found is not None else None
+    return kept if isinstance(kept, int) and kept > 0 else None
+
+
+def too_few_rows(dataset_version: DatasetVersion) -> str | None:
+    if dataset_version.counts:
+        return None
+    kept = kept_rows(dataset_version)
+    have = plural(kept, "row") if kept is not None else f"fewer than {MIN_ROWS:,} rows"
+    return (
+        f"The data has {have} after removing empty and repeated inputs; "
+        f"training and scoring need at least {MIN_ROWS:,}."
+    )
+
+
 def require_splits(dataset_version: DatasetVersion) -> None:
-    if not dataset_version.counts:
-        raise ConflictError(
-            f"The data has fewer than {MIN_ROWS} labelled rows after removing empty and repeated inputs; "
-            "add rows before scoring or training."
-        )
+    reason = too_few_rows(dataset_version)
+    if reason is not None:
+        raise ConflictError(reason)
 
 
 def taken(dataset_version: DatasetVersion) -> tuple[datetime, int]:

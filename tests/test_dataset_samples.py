@@ -113,3 +113,40 @@ def test_a_model_on_a_dataset_without_a_version_takes_a_sample_when_over_the_lim
     assert made.status_code == 201, made.text
     version = harness.client.get("/api/datasets/tickets").json()["dataset_version"]
     assert (version["rows"], version["sample"]) == (700, {"rows": 700, "seed": 5, "total": TOTAL})
+
+
+def full_events(harness: Harness) -> list[AuditEvent]:
+    with harness.sessions() as session:
+        return list(session.scalars(select(AuditEvent).where(AuditEvent.action == "dataset.full")))
+
+
+def test_a_full_version_after_a_raised_limit_replaces_the_sample_and_is_audited(harness: Harness) -> None:
+    source = big_dataset(harness, rows=1_500)
+    sampled = created(harness, source, "Tickets", {"rows": 500, "seed": 3}).json()["dataset_version"]
+    assert sampled["sample"] == {"rows": 500, "seed": 3, "total": 1_500}
+    assert harness.client.post("/api/datasets/tickets/versions").status_code == 409
+    assert full_events(harness) == []
+    assert harness.client.put("/api/settings/data", json={"row_limit": 2_000}).status_code == 200
+    full = harness.client.post("/api/datasets/tickets/versions")
+    assert full.status_code == 201, full.text
+    assert (full.json()["number"], full.json()["rows"], full.json()["sample"]) == (2, 1_500, None)
+    events = full_events(harness)
+    assert [(event.target, event.detail["version"], event.detail["rows"]) for event in events] == [
+        ("dataset:tickets", 2, 1_500)
+    ]
+    assert harness.client.post("/api/datasets/tickets/versions").status_code == 201
+    assert len(full_events(harness)) == 1
+
+
+def test_stats_describe_the_saved_rows_not_the_live_query(harness: Harness) -> None:
+    source = big_dataset(harness, rows=1_500)
+    sampled = created(harness, source, "Tickets", {"rows": 500, "seed": 3}).json()["dataset_version"]
+    stats = harness.client.get(f"/api/dataset-versions/{sampled['id']}/stats")
+    assert stats.status_code == 200, stats.text
+    quality = stats.json()["quality"]
+    assert (quality["rows"], quality["empty"], quality["duplicates"]) == (500, 0, 0)
+    assert quality["labels"] == len(stats.json()["label_counts"]) == 4
+    assert sum(item["rows"] for item in stats.json()["label_counts"]) == 500
+    live = harness.client.get("/api/datasets/tickets/preview").json()["quality"]
+    assert live["rows"] == 1_500
+    assert harness.client.get("/api/dataset-versions/999/stats").status_code == 404

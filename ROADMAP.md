@@ -1483,10 +1483,14 @@ keys, and `/v1` stays key-only.
   size and last change; a connected source shows its connection, path, table or query, and
   how its changes are tracked.
   A dataset shows the sources it reads, its query (Columns or SQL mode, the table names beside the SQL editor), a live
-  preview, label balance, splits, its versions (tick two to compare), the models that use it, Update when its sources
-  or query changed since the latest version, and "Train a model". Every item shows its sources → dataset → models trail. `/data?item=<kind>:<id>`
-  (`group:datasets`, `group:sources`, `group:upload`, `folder:3`, `source:12`, `dataset:<slug>`, plus
-  `&compare=<id>~<id>` for a version diff) is the permalink; `/data/datasets/<slug>` redirects to it.
+  preview, the saved version's rows, splits, label balance and duplicates (with one line when the query now returns
+  another row count), its versions (tick two to compare), the models that use it, Update when its sources or query
+  changed since the latest version, Save full version when the latest is a sample the row limit now covers, and "Train
+  a model" (disabled while the latest version has fewer rows than training needs). Every item shows its sources →
+  dataset → models trail. Every item has a path: `/data/datasets`, `/data/datasets/<slug>` (plus
+  `?compare=<id>~<id>` for a version diff), `/data/folders/<id>`, `/data/sources`, `/data/sources/<group>`
+  (`uploads`, `folders`, `s3`, `databases`, `lakehouse`) and `/data/sources/<group>/<id>`; the tree pushes history, so
+  back and forward walk the selection, and a middle-click opens a row in a new tab.
 - Dataset folders (`dataset_folders`, `datasets.folder_id`) only organise; nothing a model trains on depends on them.
   They nest, sort before datasets (both by name), and a folder name is unique among its sibling folders and a dataset
   name among the datasets beside it, case aside. Every dialog that names or renames a folder, dataset or source (New
