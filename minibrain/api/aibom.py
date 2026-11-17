@@ -64,7 +64,7 @@ class Refs:
     version: str
     card: str
     base: str
-    dataset_version: str
+    dataset_version: str | None
     adapter: str | None
 
 
@@ -131,11 +131,12 @@ def serial(sha256: str) -> str:
 
 
 def refs_of(card: ModelCard, adapter: Adapter | None) -> Refs:
+    data = card.training_data
     return Refs(
         version=f"minibrain:{card.version.id}",
         card=f"model-card:{card.version.id}",
         base=f"base-model:{card.base_model.key}",
-        dataset_version=f"dataset-version:{card.training_data.dataset_version_hash}",
+        dataset_version=f"dataset-version:{data.dataset_version_hash}" if data is not None else None,
         adapter=f"adapter:{adapter.sha256}" if adapter is not None else None,
     )
 
@@ -252,7 +253,7 @@ def dataset_entry(data: CardData) -> dict[str, Any]:
     )
 
 
-def dataset_version_component(data: CardData, refs: Refs) -> dict[str, Any]:
+def dataset_version_component(data: CardData, ref: str) -> dict[str, Any]:
     splits = data.splits
     values: Values = [
         ("dataset", data.dataset_slug),
@@ -267,7 +268,7 @@ def dataset_version_component(data: CardData, refs: Refs) -> dict[str, Any]:
     return kept(
         {
             "type": "data",
-            "bom-ref": refs.dataset_version,
+            "bom-ref": ref,
             "name": data.dataset_slug or "dataset_version",
             "version": data.dataset_version_taken_at,
             "hashes": sha256_hashes(data.dataset_version_hash),
@@ -355,7 +356,7 @@ def model_card(card: ModelCard, refs: Refs) -> dict[str, Any]:
             "approach": {"type": "supervised"} if trained else None,
             "task": TASKS.get(card.purpose.task, card.purpose.task),
             "modelArchitecture": architecture(card),
-            "datasets": [{"ref": refs.dataset_version}],
+            "datasets": [{"ref": refs.dataset_version}] if refs.dataset_version else [],
             "inputs": [{"format": "text"}],
             "outputs": [{"format": "label"}],
         }
@@ -405,6 +406,7 @@ def version_values(card: ModelCard) -> Values:
         ("version:name", version.name),
         ("version:kind", version.kind),
         ("version:status", version.status),
+        ("training_data", "not available: no data yet" if card.training_data is None else None),
         ("version:created_at", version.created_at),
         ("version:created_by", version.created_by),
         ("version:note", version.note),
@@ -445,15 +447,17 @@ def timestamp(card: ModelCard, edited: str | None) -> str:
 
 
 def dependencies(card: ModelCard, refs: Refs, exports: list[Export]) -> list[dict[str, Any]]:
-    sources = [source_ref(source) for source in card.training_data.sources]
+    data = card.training_data
+    sources = [source_ref(source) for source in data.sources] if data is not None else []
     adapter = [refs.adapter] if refs.adapter else []
+    dataset = [refs.dataset_version] if refs.dataset_version else []
     found = [
-        {"ref": refs.version, "dependsOn": [refs.base, *adapter, refs.dataset_version]},
+        {"ref": refs.version, "dependsOn": [refs.base, *adapter, *dataset]},
         {"ref": refs.base, "dependsOn": []},
     ]
     found += [{"ref": ref, "dependsOn": [refs.base]} for ref in adapter]
     found += [{"ref": export_ref(export), "dependsOn": [refs.base, *adapter]} for export in exports]
-    found.append({"ref": refs.dataset_version, "dependsOn": sources})
+    found += [{"ref": ref, "dependsOn": sources} for ref in dataset]
     return found + [{"ref": ref, "dependsOn": []} for ref in sources]
 
 
@@ -462,8 +466,11 @@ def components(card: ModelCard, adapter: Adapter | None, refs: Refs, exports: li
     if adapter is not None:
         found.append(adapter_component(card, adapter, refs))
         found += [export_component(card, export) for export in exports]
-    found.append(dataset_version_component(card.training_data, refs))
-    return found + [source_component(source) for source in card.training_data.sources]
+    data = card.training_data
+    if data is None or refs.dataset_version is None:
+        return found
+    found.append(dataset_version_component(data, refs.dataset_version))
+    return found + [source_component(source) for source in data.sources]
 
 
 def build_aibom(

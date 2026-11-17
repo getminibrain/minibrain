@@ -1,3 +1,10 @@
+import {
+    IconBraces,
+    IconChevronDown,
+    IconDownload,
+    IconMarkdown,
+    IconPackages,
+} from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import {
@@ -10,18 +17,21 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     Field,
+    PageContents,
     Textarea,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
-import { useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat, errorMessage } from "~/components/Section";
-import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent, pointsSize } from "~/lib/format";
 import {
@@ -35,6 +45,8 @@ import { modelsHref } from "~/lib/modelsSearch";
 import {
     ApprovalsSection,
     BaseSection,
+    CARD_CONTENTS,
+    CardState,
     DataSection,
     EvaluationSection,
     IntegritySection,
@@ -85,17 +97,14 @@ function Change({ value }: { value: number | null | undefined }) {
     );
 }
 
-function Summary({ card, live }: { card: ModelCard; live: boolean }) {
+function Summary({ card }: { card: ModelCard }) {
     const version = card.version;
     const baseline = card.evaluation.prompt_only;
     return (
         <Card>
             <CardContent className="flex flex-wrap gap-x-8 gap-y-4">
                 <Stat label="Kind" value={KIND_NAMES[version.kind] ?? version.kind} />
-                <Stat
-                    label="Status"
-                    value={<VersionState version={{ status: version.status, live }} />}
-                />
+                <Stat label="Status" value={<CardState state={version.state} />} />
                 <Stat
                     label={`Held-out ${scoreWord(card)}`}
                     value={percent(card.evaluation.held_out?.accuracy)}
@@ -216,23 +225,55 @@ function EditDialog({
 
 function Downloads({ target }: { target: Target }) {
     return (
-        <>
-            <Button variant="outline" asChild>
-                <a href={modelCardDownloadHref(target.slug, target.number, "md")} download>
-                    Download Markdown
-                </a>
-            </Button>
-            <Button variant="outline" asChild>
-                <a href={modelCardDownloadHref(target.slug, target.number, "json")} download>
-                    Download JSON
-                </a>
-            </Button>
-            <Button variant="outline" asChild>
-                <a href={modelAibomHref(target.slug, target.number)} download>
-                    Download AI-BOM
-                </a>
-            </Button>
-        </>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    <IconDownload aria-hidden />
+                    Download
+                    <IconChevronDown aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <a href={modelCardDownloadHref(target.slug, target.number, "md")} download>
+                        <IconMarkdown aria-hidden />
+                        Markdown
+                    </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={modelCardDownloadHref(target.slug, target.number, "json")} download>
+                        <IconBraces aria-hidden />
+                        JSON
+                    </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={modelAibomHref(target.slug, target.number)} download>
+                        <IconPackages aria-hidden />
+                        AI-BOM (CycloneDX)
+                    </a>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+const READING = "flex w-full max-w-4xl min-w-0 flex-col gap-4";
+
+function Reading({ children }: { children: ReactNode }) {
+    return (
+        <div className="@container/card">
+            <div className="flex justify-center gap-8">
+                <div className={READING}>{children}</div>
+                <aside className="hidden w-48 shrink-0 @min-[70rem]/card:block">
+                    <PageContents
+                        items={CARD_CONTENTS}
+                        title="On this card"
+                        label="Model card sections"
+                        className="sticky top-8"
+                    />
+                </aside>
+            </div>
+        </div>
     );
 }
 
@@ -249,12 +290,8 @@ function CardView({
 }) {
     const [editing, setEditing] = useState<Focus | null>(null);
     const can = useCan();
-    const versions = useVersions(target.slug);
-    const model = useModel(target.slug);
-    const current = versions.data?.find((item) => item.number === target.number)?.current ?? false;
-    const live = current && Boolean(model.data?.deployed);
     return (
-        <>
+        <Reading>
             <PageHeader
                 title={`${card.version.name} v${card.version.number}`}
                 crumbs={[
@@ -270,7 +307,7 @@ function CardView({
                 caption="Model card and validation report, built from the stored version, its data, its scores and the audit log."
                 actions={<Downloads target={target} />}
             />
-            <Summary card={card} live={live} />
+            <Summary card={card} />
             <PanelSections>
                 <PurposeSection card={card} />
                 <UseSection
@@ -296,7 +333,7 @@ function CardView({
                     onOpenChange={(open) => !open && setEditing(null)}
                 />
             )}
-        </>
+        </Reading>
     );
 }
 

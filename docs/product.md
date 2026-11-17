@@ -359,7 +359,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Price each pool's GPU hour to get cost per 1M tokens.
   UI: Settings › General › Compute prices · API: GET /api/compute/prices, PUT /api/compute/prices · Config: compute
 - **Model card** · shipped · product, admin
-  Generate a model card and validation report for each version.
+  A model card and validation report per version, even before data.
   UI: Models › model › Versions › Model card · API: GET /api/models/{name}/versions/{number}/card, PUT /api/models/{name}/versions/{number}/card, GET /api/models/{name}/versions/{number}/card.json, GET /api/models/{name}/versions/{number}/card.md
 - **Golden set authoring** · planned · product
   Write 20 to 50 verified examples before any training.

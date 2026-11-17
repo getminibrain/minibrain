@@ -11,6 +11,7 @@ CANONICAL_FORM = (
 
 LicenceUseGroup = Literal["commercial", "restricted", "non-commercial", "unknown"]
 DeploymentKind = Literal["deployed", "replaced", "undeployed"]
+VersionState = Literal["live", "ready_to_deploy", "not_deployed", "training", "scoring", "failed", "deleting"]
 
 
 class CardVersion(BaseModel):
@@ -20,6 +21,9 @@ class CardVersion(BaseModel):
     number: int
     kind: str
     status: str
+    state: VersionState = Field(
+        description="Where the version stands: live, meets the deploy rule (ready_to_deploy), or neither."
+    )
     created_at: str
     created_by: str | None
     note: str = ""
@@ -233,7 +237,7 @@ class ModelCard(BaseModel):
     version: CardVersion
     purpose: CardPurpose
     base_model: CardBaseModel
-    training_data: CardData
+    training_data: CardData | None = Field(description="None while the version has no data yet.")
     training: CardTraining
     evaluation: CardEvaluation
     limits: CardLimits

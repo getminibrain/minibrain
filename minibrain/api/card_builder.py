@@ -31,6 +31,7 @@ from minibrain.api.card_schemas import (
     CardVersion,
     DeploymentKind,
     ModelCard,
+    VersionState,
 )
 from minibrain.api.numbers import half_up, percent_text
 from minibrain.artifacts import ArtifactError
@@ -58,11 +59,10 @@ from minibrain.registry.models import (
     Worker,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost, load_prices
-from minibrain.registry.service import ConflictError
 from minibrain.settings import Settings
 from minibrain.tasks.examples import Example
 from minibrain.tasks.graders import metric_values
-from minibrain.tasks.service import version_metric
+from minibrain.tasks.service import decision, live_version, version_contract, version_metric
 
 CARD_ACTIONS = ("version.create", "version.promote", "model.deploy", "model.undeploy")
 FEW_TRAINING_ROWS = 10
@@ -566,31 +566,74 @@ def score_limits(evaluation: CardEvaluation) -> list[CardLimit]:
     return found
 
 
-def derived_limits(version: Version, data: CardData, evaluation: CardEvaluation) -> list[CardLimit]:
+def unscored_reason(version: Version, data: CardData | None) -> str:
+    if data is None:
+        return "the version has no data yet"
+    return "scoring failed" if version.status == VersionStatus.FAILED else "scoring has not finished"
+
+
+def data_limits(data: CardData | None) -> list[CardLimit]:
+    if data is None:
+        return []
     found: list[CardLimit] = []
-    if not evaluation.scored:
-        reason = "scoring failed" if version.status == VersionStatus.FAILED else "scoring has not finished"
-        found.append(CardLimit(kind="not_scored", text=f"Nothing on this card is measured yet: {reason}."))
     rare = few_rows_limit(data)
     if rare is not None:
         found.append(rare)
+    return found
+
+
+def leak_limits(data: CardData | None) -> list[CardLimit]:
+    checks = data.checks if data is not None else []
+    leak = next((check for check in checks if check.check == "leakage" and check.status == "warning"), None)
+    return [] if leak is None else [CardLimit(kind="train_test_overlap", text=leak.detail)]
+
+
+def derived_limits(version: Version, data: CardData | None, evaluation: CardEvaluation) -> list[CardLimit]:
+    found: list[CardLimit] = []
+    if not evaluation.scored:
+        reason = unscored_reason(version, data)
+        found.append(CardLimit(kind="not_scored", text=f"Nothing on this card is measured yet: {reason}."))
+    found += data_limits(data)
     found += label_limits(evaluation)
     found += score_limits(evaluation)
-    leak = next((check for check in data.checks if check.check == "leakage" and check.status == "warning"), None)
-    if leak is not None:
-        found.append(CardLimit(kind="train_test_overlap", text=leak.detail))
-    return found
+    return found + leak_limits(data)
+
+
+IN_PROGRESS: dict[str, VersionState] = {
+    VersionStatus.TRAINING: "training",
+    VersionStatus.EVALUATING: "scoring",
+    VersionStatus.FAILED: "failed",
+    VersionStatus.DELETING: "deleting",
+}
+
+
+def state_of(model: Model, version: Version) -> VersionState:
+    live = live_version(model)
+    if live is not None and live.id == version.id:
+        return "live"
+    if version.status in IN_PROGRESS:
+        return IN_PROGRESS[version.status]
+    return "ready_to_deploy" if is_scored(version) and decision(model, version).passed else "not_deployed"
+
+
+def card_labels(version: Version) -> list[str]:
+    if version.dataset_version is not None:
+        return sorted(version.dataset_version.labels)
+    return sorted(version_contract(version).labels or [])
+
+
+def card_data_of(session: Session, settings: Settings, version: Version) -> CardData | None:
+    found = version.dataset_version
+    if found is None:
+        return None
+    return data_card(session, found, dataset_version_splits(session, settings, found))
 
 
 def build_card(session: Session, settings: Settings, model: Model, version: Version, owner: str) -> ModelCard:
     events = card_events(session, model)
     history = history_of(events, model, version.number)
     creator = creator_of(events, model, version.number)
-    if version.dataset_version is None:
-        raise ConflictError(f"{model.slug}@{version.number} has no data yet, so there is nothing to put on a card")
-    data = data_card(
-        session, version.dataset_version, dataset_version_splits(session, settings, version.dataset_version)
-    )
+    data = card_data_of(session, settings, version)
     evaluation = evaluation_card(session, model, version)
     return ModelCard(
         version=CardVersion(
@@ -600,13 +643,12 @@ def build_card(session: Session, settings: Settings, model: Model, version: Vers
             number=version.number,
             kind=version.kind,
             status=version.status,
+            state=state_of(model, version),
             created_at=stamp(version.created_at) or "",
             created_by=creator,
             note=version.note or "",
         ),
-        purpose=CardPurpose(
-            description=model.description, task=model.preset, labels=sorted(version.dataset_version.labels)
-        ),
+        purpose=CardPurpose(description=model.description, task=model.preset, labels=card_labels(version)),
         base_model=base_card(session, model, version),
         training_data=data,
         training=training_card(session, model, version),

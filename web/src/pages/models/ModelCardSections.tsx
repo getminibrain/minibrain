@@ -22,7 +22,7 @@ import {
     InfoTip,
     Link,
 } from "obp-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
@@ -35,6 +35,14 @@ import { metricName } from "~/lib/metrics";
 import { modelPageHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 import { itemHref } from "../data/catalogue";
+import {
+    EndsGrid,
+    FOLDED_LABELS,
+    LabelChips,
+    type ListColumn,
+    ShowAll,
+    useFolded,
+} from "./cardLists";
 import { SCHEDULERS } from "./detail/train/recipe";
 
 type Schemas = components["schemas"];
@@ -49,6 +57,35 @@ type CardEvent = Schemas["CardEvent"];
 type Run = Schemas["CardRun"];
 
 type Variant = "success" | "info" | "approval" | "neutral" | "warning" | "destructive";
+
+export const CARD_CONTENTS = [
+    { id: "purpose", label: "Purpose" },
+    { id: "use", label: "Intended use and owner" },
+    { id: "base-model", label: "Base model" },
+    { id: "training-data", label: "Training data" },
+    { id: "training", label: "Training" },
+    { id: "evaluation", label: "Evaluation" },
+    { id: "limits", label: "Limits" },
+    { id: "deployments", label: "Approvals and deployments" },
+    { id: "integrity", label: "Integrity" },
+];
+
+const NO_DATA = "No data yet.";
+
+const STATES: Record<string, { variant: Variant; label: string }> = {
+    live: { variant: "success", label: "Live" },
+    ready_to_deploy: { variant: "approval", label: "Ready to deploy" },
+    not_deployed: { variant: "neutral", label: "Not deployed" },
+    training: { variant: "info", label: "Training" },
+    scoring: { variant: "info", label: "Scoring" },
+    failed: { variant: "destructive", label: "Failed" },
+    deleting: { variant: "neutral", label: "Deleting" },
+};
+
+export function CardState({ state }: { state: string }) {
+    const badge = STATES[state] ?? { variant: "neutral", label: state };
+    return <Badge variant={badge.variant}>{badge.label}</Badge>;
+}
 
 export function scoreWord(card: ModelCard): string {
     const metric = card.evaluation.metric;
@@ -163,12 +200,28 @@ function points(amount: number): string {
 export function PurposeSection({ card }: { card: ModelCard }) {
     const purpose = card.purpose;
     return (
-        <PanelSection icon={IconTarget} title="Purpose" description="What the model is for.">
+        <PanelSection
+            anchor="purpose"
+            icon={IconTarget}
+            title="Purpose"
+            description="What the model is for."
+        >
             <Facts
                 items={[
                     ["Description", purpose.description || "No description."],
                     ["Task", purpose.task.charAt(0).toUpperCase() + purpose.task.slice(1)],
-                    ["Labels", <Mono key="labels">{purpose.labels.join(", ")}</Mono>],
+                    [
+                        purpose.labels.length > 1
+                            ? `Labels (${count(purpose.labels.length)})`
+                            : "Labels",
+                        purpose.labels.length > 0 ? (
+                            <LabelChips key="labels" labels={purpose.labels} />
+                        ) : (
+                            <span key="labels" className="text-muted-foreground">
+                                {NO_DATA}
+                            </span>
+                        ),
+                    ],
                 ]}
             />
         </PanelSection>
@@ -178,6 +231,7 @@ export function PurposeSection({ card }: { card: ModelCard }) {
 export function UseSection({ card, onEdit }: { card: ModelCard; onEdit?: () => void }) {
     return (
         <PanelSection
+            anchor="use"
             icon={IconUser}
             title="Intended use and owner"
             description="Written by people; stored with this version and audited on every change."
@@ -222,6 +276,7 @@ export function BaseSection({ card }: { card: ModelCard }) {
         : "From the base model's current files; a prompt-only version records no hash.";
     return (
         <PanelSection
+            anchor="base-model"
             icon={IconCube}
             title="Base model"
             description="The weights this version runs on."
@@ -267,36 +322,32 @@ export function BaseSection({ card }: { card: ModelCard }) {
     );
 }
 
-const BALANCE_COLUMNS: ColumnDef<LabelRows, unknown>[] = [
-    {
-        header: "Label",
-        accessorKey: "label",
-        cell: (info) => <Mono>{String(info.getValue())}</Mono>,
-    },
+const BALANCE_COLUMNS: ListColumn<LabelRows>[] = [
+    { header: "Label", value: (row) => row.label, render: (row) => <Mono>{row.label}</Mono> },
     {
         header: "Rows",
-        accessorKey: "rows",
-        cell: (info) => <Numeric value={count(info.row.original.rows)} />,
+        value: (row) => row.rows,
+        render: (row) => <Numeric value={count(row.rows)} />,
     },
     {
         header: "Share",
-        accessorKey: "share",
-        cell: (info) => <Numeric value={percent(info.row.original.share)} />,
+        value: (row) => row.share,
+        render: (row) => <Numeric value={percent(row.share)} />,
     },
     {
         header: "Train",
-        accessorKey: "train",
-        cell: (info) => <Numeric value={count(info.row.original.train)} />,
+        value: (row) => row.train,
+        render: (row) => <Numeric value={count(row.train)} />,
     },
     {
         header: "Held-out",
-        accessorKey: "held_out",
-        cell: (info) => <Numeric value={count(info.row.original.held_out)} />,
+        value: (row) => row.held_out,
+        render: (row) => <Numeric value={count(row.held_out)} />,
     },
     {
         header: "Test",
-        accessorKey: "test",
-        cell: (info) => <Numeric value={count(info.row.original.test)} />,
+        value: (row) => row.test,
+        render: (row) => <Numeric value={count(row.test)} />,
     },
 ];
 
@@ -342,7 +393,7 @@ function CheckList({ checks }: { checks: Check[] }) {
     );
 }
 
-function datasetVersion(data: ModelCard["training_data"]): string {
+function datasetVersion(data: Schemas["CardData"]): string {
     if (data.dataset_version === null || data.dataset_version === undefined) {
         return NONE;
     }
@@ -352,8 +403,23 @@ function datasetVersion(data: ModelCard["training_data"]): string {
         : `Version ${data.dataset_version}`;
 }
 
+const DATA_TITLE = {
+    anchor: "training-data",
+    icon: IconDatabase,
+    title: "Training data",
+    description:
+        "The dataset version this model version trained and scored on, with the checks run when it was saved.",
+};
+
 export function DataSection({ card }: { card: ModelCard }) {
     const data = card.training_data;
+    if (!data) {
+        return (
+            <PanelSection {...DATA_TITLE}>
+                <Muted>{NO_DATA}</Muted>
+            </PanelSection>
+        );
+    }
     const splits = data.splits;
     const dataset = data.dataset_slug ? (
         <Link
@@ -367,12 +433,7 @@ export function DataSection({ card }: { card: ModelCard }) {
         NONE
     );
     return (
-        <PanelSection
-            icon={IconDatabase}
-            title="Training data"
-            description="The dataset version this model version trained and scored on, with the checks run when it was saved."
-            bare
-        >
+        <PanelSection {...DATA_TITLE} bare>
             <Panel>
                 <Facts
                     items={[
@@ -408,12 +469,16 @@ export function DataSection({ card }: { card: ModelCard }) {
                     ]}
                 />
             </Panel>
-            <Subhead title="Label balance" caption="Usable rows per label in each split." />
+            <Subhead
+                title="Label balance"
+                caption={balanceCaption(data.label_balance?.length ?? 0)}
+            />
             {data.label_balance ? (
-                <DataGrid
+                <EndsGrid
                     columns={BALANCE_COLUMNS}
                     rows={data.label_balance}
                     getRowId={(row) => row.label}
+                    noun="labels"
                 />
             ) : (
                 <Muted>Not available: the data file could not be read.</Muted>
@@ -434,6 +499,13 @@ export function DataSection({ card }: { card: ModelCard }) {
             </Panel>
         </PanelSection>
     );
+}
+
+function balanceCaption(labels: number): string {
+    const base = "Usable rows per label in each split";
+    return labels > FOLDED_LABELS
+        ? `${base}: the 10 largest and the 10 smallest labels.`
+        : `${base}.`;
 }
 
 function runFacts(run: Run | null | undefined): [string, ReactNode][] {
@@ -479,7 +551,12 @@ export function TrainingSection({ card }: { card: ModelCard }) {
         : [];
     if (training.method !== "lora" || !recipe) {
         return (
-            <PanelSection icon={IconCpu} title="Training" description="How the version was built.">
+            <PanelSection
+                anchor="training"
+                icon={IconCpu}
+                title="Training"
+                description="How the version was built."
+            >
                 <p>
                     {`Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and ${training.few_shot_examples ?? 0} few-shot examples from the training split.`}
                 </p>
@@ -489,7 +566,12 @@ export function TrainingSection({ card }: { card: ModelCard }) {
     }
     const value = (item: number | null | undefined) => <Numeric value={item ?? NONE} />;
     return (
-        <PanelSection icon={IconCpu} title="Training" description="How the version was built.">
+        <PanelSection
+            anchor="training"
+            icon={IconCpu}
+            title="Training"
+            description="How the version was built."
+        >
             <Facts
                 items={[
                     ...copied,
@@ -687,38 +769,38 @@ function ComparisonTable({ card }: { card: ModelCard }) {
     );
 }
 
-const LABEL_COLUMNS: ColumnDef<LabelScore, unknown>[] = [
-    {
-        header: "Label",
-        accessorKey: "label",
-        cell: (info) => <Mono>{String(info.getValue())}</Mono>,
-    },
+const LABEL_COLUMNS: ListColumn<LabelScore>[] = [
+    { header: "Label", value: (row) => row.label, render: (row) => <Mono>{row.label}</Mono> },
     {
         header: "Held-out rows",
-        accessorKey: "support",
-        cell: (info) => <Numeric value={count(info.row.original.support)} />,
+        value: (row) => row.support,
+        render: (row) => <Numeric value={count(row.support)} />,
     },
     {
         header: "Predicted",
-        accessorKey: "predicted",
-        cell: (info) => <Numeric value={count(info.row.original.predicted)} />,
+        value: (row) => row.predicted,
+        render: (row) => <Numeric value={count(row.predicted)} />,
     },
     {
         header: "Precision",
-        accessorFn: (score) => score.precision ?? -1,
-        cell: (info) => <Numeric value={percent(info.row.original.precision)} />,
+        value: (row) => row.precision ?? -1,
+        render: (row) => <Numeric value={percent(row.precision)} />,
     },
     {
         header: "Recall",
-        accessorFn: (score) => score.recall ?? -1,
-        cell: (info) => <Numeric value={percent(info.row.original.recall)} />,
+        value: (row) => row.recall ?? -1,
+        render: (row) => <Numeric value={percent(row.recall)} />,
     },
     {
         header: "F1",
-        accessorFn: (score) => score.f1 ?? -1,
-        cell: (info) => <Numeric value={decimal(info.row.original.f1)} />,
+        value: (row) => row.f1 ?? -1,
+        render: (row) => <Numeric value={decimal(row.f1)} />,
     },
 ];
+
+function bySupport(scores: LabelScore[]): LabelScore[] {
+    return [...scores].sort((a, b) => b.support - a.support || a.label.localeCompare(b.label));
+}
 
 const CONFUSION_COLUMNS: ColumnDef<Confusion, unknown>[] = [
     {
@@ -762,17 +844,46 @@ function cardHeadline(card: ModelCard): string | null {
     );
 }
 
+const EVALUATION_TITLE = {
+    anchor: "evaluation",
+    icon: IconGauge,
+    title: "Evaluation",
+    description: "Scores on rows the model never trained on: the held-out split and the test set.",
+};
+
+function Confusions({ rows }: { rows: Confusion[] }) {
+    const folded = useFolded(rows);
+    return (
+        <div className="flex flex-col gap-1.5">
+            <DataGrid
+                columns={CONFUSION_COLUMNS}
+                rows={folded.rows}
+                getRowId={confusionKey}
+                empty="Every held-out row was answered correctly."
+            />
+            {folded.toggle}
+        </div>
+    );
+}
+
 export function EvaluationSection({ card }: { card: ModelCard }) {
+    if (!card.training_data) {
+        return (
+            <PanelSection {...EVALUATION_TITLE}>
+                <Muted>{NO_DATA}</Muted>
+            </PanelSection>
+        );
+    }
+    return <Evaluation card={card} />;
+}
+
+function Evaluation({ card }: { card: ModelCard }) {
     const evaluation = card.evaluation;
     const held = evaluation.held_out;
     const summary = cardHeadline(card);
+    const labels = evaluation.per_label ?? [];
     return (
-        <PanelSection
-            icon={IconGauge}
-            title="Evaluation"
-            description="Scores on rows the model never trained on: the held-out split and the test set."
-            bare
-        >
+        <PanelSection {...EVALUATION_TITLE} bare>
             <Panel>
                 {!evaluation.scored && <p className="pb-3 text-warning">Not scored yet.</p>}
                 {summary && <p className="pb-3 text-base font-semibold tabular-nums">{summary}</p>}
@@ -805,13 +916,18 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
             <ComparisonTable card={card} />
             <Subhead
                 title="Per label"
-                caption="Held-out precision, recall and F1 for each label."
+                caption={
+                    labels.length > FOLDED_LABELS
+                        ? "Held-out precision, recall and F1: the 10 labels with the most held-out rows and the 10 with the fewest."
+                        : "Held-out precision, recall and F1 for each label."
+                }
             />
             {evaluation.per_label ? (
-                <DataGrid
+                <EndsGrid
                     columns={LABEL_COLUMNS}
-                    rows={evaluation.per_label}
+                    rows={bySupport(labels)}
                     getRowId={(item) => item.label}
+                    noun="labels"
                 />
             ) : (
                 <Muted>Per-label scores were not recorded for this version.</Muted>
@@ -821,13 +937,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
                 caption="Held-out rows answered with the wrong label, most frequent first."
             />
             {evaluation.confusion ? (
-                <DataGrid
-                    columns={CONFUSION_COLUMNS}
-                    rows={evaluation.confusion}
-                    getRowId={confusionKey}
-                    empty="Every held-out row was answered correctly."
-                    maxHeight="320px"
-                />
+                <Confusions rows={evaluation.confusion} />
             ) : (
                 <Muted>Confusions were not recorded for this version.</Muted>
             )}
@@ -835,10 +945,25 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
     );
 }
 
+const LONG_LIMIT = 12;
+
+function LimitLine({ limit }: { limit: ModelCard["limits"]["derived"][number] }) {
+    const [open, setOpen] = useState(false);
+    const labels = limit.labels ?? [];
+    const long = labels.length > LONG_LIMIT;
+    return (
+        <li>
+            <span className={long && !open ? "line-clamp-2" : undefined}>{limit.text}</span>
+            {long && <ShowAll open={open} total={labels.length} onToggle={() => setOpen(!open)} />}
+        </li>
+    );
+}
+
 export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () => void }) {
     const derived = card.limits.derived;
     return (
         <PanelSection
+            anchor="limits"
             icon={IconAlertTriangle}
             title="Limits"
             description="Facts read from the data and scores, then what people know beyond them."
@@ -858,7 +983,7 @@ export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () =
                     ) : (
                         <ul className="flex list-disc flex-col gap-1 pl-5">
                             {derived.map((limit) => (
-                                <li key={limit.kind}>{limit.text}</li>
+                                <LimitLine key={limit.kind} limit={limit} />
                             ))}
                         </ul>
                     )}
@@ -921,8 +1046,10 @@ function approvalText(card: ModelCard): string {
 }
 
 export function ApprovalsSection({ card }: { card: ModelCard }) {
+    const folded = useFolded(card.deployments, "end");
     return (
         <PanelSection
+            anchor="deployments"
             icon={IconShieldCheck}
             title="Approvals and deployments"
             description={approvalText(card)}
@@ -930,10 +1057,11 @@ export function ApprovalsSection({ card }: { card: ModelCard }) {
         >
             <DataGrid
                 columns={EVENT_COLUMNS}
-                rows={card.deployments}
+                rows={folded.rows}
                 getRowId={(event) => String(event.audit_id)}
                 empty="No deployment changes recorded in the audit log."
             />
+            {folded.toggle}
         </PanelSection>
     );
 }
@@ -941,6 +1069,7 @@ export function ApprovalsSection({ card }: { card: ModelCard }) {
 export function IntegritySection({ sha256, form }: { sha256: string; form: string | undefined }) {
     return (
         <PanelSection
+            anchor="integrity"
             icon={IconFingerprint}
             title="Integrity"
             description="The Markdown and JSON downloads carry this digest, so a reviewer can check the card was not changed."

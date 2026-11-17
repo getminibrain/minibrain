@@ -14295,6 +14295,20 @@
             "type": "string",
             "title": "Status"
           },
+          "state": {
+            "type": "string",
+            "enum": [
+              "live",
+              "ready_to_deploy",
+              "not_deployed",
+              "training",
+              "scoring",
+              "failed",
+              "deleting"
+            ],
+            "title": "State",
+            "description": "Where the version stands: live, meets the deploy rule (ready_to_deploy), or neither."
+          },
           "created_at": {
             "type": "string",
             "title": "Created At"
@@ -14324,6 +14338,7 @@
           "number",
           "kind",
           "status",
+          "state",
           "created_at",
           "created_by"
         ],
@@ -23558,7 +23573,15 @@
             "$ref": "#/components/schemas/CardBaseModel"
           },
           "training_data": {
-            "$ref": "#/components/schemas/CardData"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardData"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None while the version has no data yet."
           },
           "training": {
             "$ref": "#/components/schemas/CardTraining"

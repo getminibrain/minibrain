@@ -4131,6 +4131,12 @@ export interface components {
             kind: string;
             /** Status */
             status: string;
+            /**
+             * State
+             * @description Where the version stands: live, meets the deploy rule (ready_to_deploy), or neither.
+             * @enum {string}
+             */
+            state: "live" | "ready_to_deploy" | "not_deployed" | "training" | "scoring" | "failed" | "deleting";
             /** Created At */
             created_at: string;
             /** Created By */
@@ -7275,7 +7281,8 @@ export interface components {
             version: components["schemas"]["CardVersion"];
             purpose: components["schemas"]["CardPurpose"];
             base_model: components["schemas"]["CardBaseModel"];
-            training_data: components["schemas"]["CardData"];
+            /** @description None while the version has no data yet. */
+            training_data: components["schemas"]["CardData"] | null;
             training: components["schemas"]["CardTraining"];
             evaluation: components["schemas"]["CardEvaluation"];
             limits: components["schemas"]["CardLimits"];

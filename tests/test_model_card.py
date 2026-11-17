@@ -3,7 +3,9 @@ import json
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
+from minibrain.registry.models import Model, Version, VersionStatus
 from minibrain.tasks.contracts import label_set
 from minibrain.tasks.examples import Example, single
 from minibrain.tasks.graders import LabelAccuracy, grade
@@ -82,6 +84,7 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
         "number": 1,
         "kind": "lora",
         "status": "ready",
+        "state": "live",
         "created_at": None,
         "created_by": "admin@example.com",
         "note": "",
@@ -252,3 +255,49 @@ def test_a_version_note_is_one_line_audited_and_on_the_card(harness: Harness) ->
     ]
     assert harness.client.put(f"{CARD}/1/note", json={"note": "x" * 201}).status_code == 422
     assert harness.client.put(f"{CARD}/9/note", json={"note": "Missing"}).status_code == 404
+
+
+def without_data(harness: Harness, number: int) -> None:
+    with harness.sessions() as session:
+        version = session.scalar(select(Version).join(Model).where(Model.slug == SLUG, Version.number == number))
+        assert version is not None
+        version.dataset_version_id = None
+        version.metrics = None
+        version.status = VersionStatus.READY
+        session.commit()
+
+
+def test_a_version_without_data_gets_a_partial_card(harness: Harness) -> None:
+    trained_card(harness)
+    assert harness.client.post(CARD, json={"kind": "prompt"}).status_code == 201
+    without_data(harness, 2)
+    response = harness.client.get(f"{CARD}/2/card")
+    assert response.status_code == 200, response.text
+    card = response.json()["card"]
+    assert card["training_data"] is None
+    assert card["version"]["state"] == "not_deployed"
+    assert card["evaluation"]["scored"] is False
+    assert card["purpose"]["labels"] == sorted(LABELS)
+    unscored = "Nothing on this card is measured yet: the version has no data yet."
+    assert card["limits"]["derived"] == [{"kind": "not_scored", "text": unscored, "labels": []}]
+    text = harness.client.get(f"{CARD}/2/card.md").text
+    assert "\n## Training data\n\nNo data yet: this version has no dataset version" in text
+    assert "· Not deployed ·" in text
+    assert "Not scored yet: no data yet." in text
+    envelope = harness.client.get(f"{CARD}/2/card.json").json()
+    assert envelope["card"]["training_data"] is None
+    assert envelope["sha256"] == response.json()["sha256"]
+    bom = harness.client.get(f"{CARD}/2/aibom.json").json()
+    assert [component["type"] for component in bom["components"]] == ["machine-learning-model"]
+    properties = {item["name"]: item["value"] for item in bom["metadata"]["component"]["properties"]}
+    assert properties["minibrain:training_data"] == "not available: no data yet"
+    assert all("dataset-version" not in ref for item in bom["dependencies"] for ref in item["dependsOn"])
+
+
+def test_the_card_states_where_the_version_stands_in_product_words(harness: Harness) -> None:
+    trained_card(harness)
+    states = {n: harness.client.get(f"{CARD}/{n}/card").json()["card"]["version"]["state"] for n in (0, 1)}
+    assert states == {0: "not_deployed", 1: "live"}
+    text = harness.client.get(f"{CARD}/1/card.md").text
+    assert "· Live ·" in text
+    assert "promot" not in text.lower()

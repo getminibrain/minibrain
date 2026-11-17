@@ -11,7 +11,7 @@ from referencing import Registry, Resource
 from minibrain.registry.models import Version
 from tests.conftest import LABELS, Harness, fake_adapter, tickets_csv
 from tests.test_flow import SLUG
-from tests.test_model_card import CARD, trained_card
+from tests.test_model_card import CARD, trained_card, without_data
 
 SCHEMAS = Path(__file__).parent / "cyclonedx"
 BASE_HASH = "ab" * 32
@@ -133,6 +133,19 @@ def test_prompt_only_version_has_no_adapter_and_is_valid(harness: Harness) -> No
     assert props(model)["minibrain:training:few_shot_examples"] == "4"
     graph = {entry["ref"]: entry["dependsOn"] for entry in bom["dependencies"]}
     assert len(graph[model["bom-ref"]]) == 2
+
+
+def test_a_version_without_data_has_a_valid_bom_with_no_data_components(harness: Harness) -> None:
+    trained_card(harness)
+    assert harness.client.post(CARD, json={"kind": "prompt"}).status_code == 201
+    without_data(harness, 2)
+    bom = aibom(harness, 2)
+    assert_valid(bom)
+    assert by_type(bom, "data") == []
+    model = bom["metadata"]["component"]
+    assert "datasets" not in model["modelCard"]["modelParameters"]
+    graph = {entry["ref"]: entry["dependsOn"] for entry in bom["dependencies"]}
+    assert graph[model["bom-ref"]] == [bom["components"][0]["bom-ref"]]
 
 
 def test_aibom_is_deterministic_and_carries_its_sha256(harness: Harness) -> None:
