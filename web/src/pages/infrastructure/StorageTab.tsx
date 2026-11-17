@@ -1,9 +1,8 @@
 import { IconCylinder, IconServer } from "@tabler/icons-react";
-import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MiddleTruncate } from "~/components/MiddleTruncate";
 import { PoolLink } from "~/components/PoolLink";
-import { PanelSection, PanelSections } from "~/components/Section";
+import { PanelColumns, PanelSection, PanelSections } from "~/components/Section";
 import { type GaugeKind, type GaugeSegment, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes, relativeTime } from "~/lib/time";
@@ -289,12 +288,6 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
     );
 }
 
-function Columns({ children }: { children: ReactNode }) {
-    return (
-        <div className="grid items-start gap-x-panel-gap gap-y-10 xl:grid-cols-2">{children}</div>
-    );
-}
-
 export function StorageTab({
     info,
     pools,
@@ -304,14 +297,14 @@ export function StorageTab({
 }) {
     return (
         <PanelSections>
-            <Columns>
+            <PanelColumns>
                 <MainDisksSection info={info} />
                 <MachineDisksSection pools={pools} />
-            </Columns>
-            <Columns>
+            </PanelColumns>
+            <PanelColumns>
                 <UsageSection info={info} />
                 <FreeUpSection info={info} />
-            </Columns>
+            </PanelColumns>
         </PanelSections>
     );
 }

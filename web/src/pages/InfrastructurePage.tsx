@@ -6,7 +6,15 @@ import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
+import {
+    ErrorLine,
+    FLUSH_GRID,
+    Page,
+    PanelColumns,
+    PanelSection,
+    PanelSections,
+    Stat,
+} from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { AddMachine } from "./infrastructure/AddMachine";
@@ -84,41 +92,45 @@ function SetupTab({
     return (
         <PanelSections>
             <SetupDiagram info={info} pools={pools} loops={system?.loops} />
-            <PanelSection
-                icon={IconCpu}
-                title="This main process"
-                description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
-            >
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                    <Stat
-                        label="Inference"
-                        value={<span className="font-mono">{device?.inference ?? "–"}</span>}
-                    />
-                    <Stat
-                        label="Training"
-                        value={<span className="font-mono">{device?.training ?? "–"}</span>}
-                    />
-                    <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
-                    <Stat
-                        label="GPU memory used"
-                        value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
-                    />
-                    <Stat label="CPU cores" value={count(device?.cpu_count)} />
-                    <Stat label="Background loops" value={LOOPS[system?.loops ?? "single"]} />
-                </div>
-            </PanelSection>
-            <PanelSection
-                bare
-                icon={IconMemory}
-                title="Loaded in memory"
-                description="Base models and adapters the serving process holds right now."
-            >
-                <DataGrid
-                    columns={LOADED_COLUMNS}
-                    rows={system?.loaded ?? []}
-                    empty="Nothing loaded yet; the first request loads the base model."
-                />
-            </PanelSection>
+            <PanelColumns stretch>
+                <PanelSection
+                    icon={IconCpu}
+                    title="This main process"
+                    description="Inference uses the GPU; training avoids the Apple GPU, which hangs."
+                >
+                    <div className="grid grid-cols-3 gap-x-8 gap-y-4">
+                        <Stat
+                            label="Inference"
+                            value={<span className="font-mono">{device?.inference ?? "–"}</span>}
+                        />
+                        <Stat
+                            label="Training"
+                            value={<span className="font-mono">{device?.training ?? "–"}</span>}
+                        />
+                        <Stat label="Accelerator" value={device?.accelerator ?? "None"} />
+                        <Stat
+                            label="GPU memory used"
+                            value={`${gigabytes(device?.memory_used_mb)} of ${gigabytes(device?.memory_total_mb)}`}
+                        />
+                        <Stat label="CPU cores" value={count(device?.cpu_count)} />
+                        <Stat label="Background loops" value={LOOPS[system?.loops ?? "single"]} />
+                    </div>
+                </PanelSection>
+                <PanelSection
+                    flush
+                    icon={IconMemory}
+                    title="Loaded in memory"
+                    description="Base models and adapters the serving process holds right now."
+                >
+                    <div className={FLUSH_GRID}>
+                        <DataGrid
+                            columns={LOADED_COLUMNS}
+                            rows={system?.loaded ?? []}
+                            empty="Nothing loaded yet; the first request loads the base model."
+                        />
+                    </div>
+                </PanelSection>
+            </PanelColumns>
             <StoresSection info={info} />
         </PanelSections>
     );

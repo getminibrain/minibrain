@@ -97,9 +97,9 @@ export function PanelSection({
             {bare ? (
                 children
             ) : flush ? (
-                <Card className="gap-0 overflow-clip py-0">{children}</Card>
+                <Card className="flex-1 gap-0 overflow-clip py-0">{children}</Card>
             ) : (
-                <Card>
+                <Card className="flex-1">
                     <CardContent>{children}</CardContent>
                 </Card>
             )}
@@ -109,6 +109,25 @@ export function PanelSection({
 
 export function PanelSections({ children }: { children: ReactNode }) {
     return <div className="flex flex-col gap-10 pt-4">{children}</div>;
+}
+
+export function PanelColumns({
+    children,
+    stretch = false,
+}: {
+    children: ReactNode;
+    stretch?: boolean;
+}) {
+    return (
+        <div
+            className={cn(
+                "grid gap-x-panel-gap gap-y-10 xl:grid-cols-2",
+                !stretch && "items-start",
+            )}
+        >
+            {children}
+        </div>
+    );
 }
 
 export function Stat({ label, value }: { label: string; value: ReactNode }) {
@@ -160,9 +179,23 @@ export function pageFrame(width: PageWidth): string {
     return cn("mx-auto w-full px-6 pt-8", PAGE_WIDTH[width]);
 }
 
-export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+export function Page({
+    children,
+    wide = false,
+    fill = false,
+}: {
+    children: ReactNode;
+    wide?: boolean;
+    fill?: boolean;
+}) {
     return (
-        <div className={cn(pageFrame(wide ? "wide" : "normal"), "flex flex-col gap-4 pb-12")}>
+        <div
+            className={cn(
+                pageFrame(wide ? "wide" : "normal"),
+                "flex flex-col gap-4",
+                fill ? "flex-1 pb-6" : "pb-12",
+            )}
+        >
             {children}
         </div>
     );

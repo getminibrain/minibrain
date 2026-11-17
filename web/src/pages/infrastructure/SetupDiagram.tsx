@@ -50,7 +50,7 @@ function Node({
 
 function Connector({ label }: { label: string }) {
     return (
-        <div className="flex min-w-fit flex-1 flex-col items-center justify-center gap-0.5 self-center">
+        <div className="flex min-w-fit max-w-40 flex-1 flex-col items-center justify-center gap-0.5 self-center">
             <span className="px-2 text-sm whitespace-nowrap text-muted-foreground">{label}</span>
             <span aria-hidden className="flex w-full items-center">
                 <span className="h-px flex-1 bg-border" />

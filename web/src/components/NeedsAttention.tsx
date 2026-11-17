@@ -209,8 +209,9 @@ export function NeedsAttention({
     scope,
     model,
     title = "Needs attention",
+    description,
     compact = false,
-}: ProblemFilter & { title?: string; compact?: boolean }) {
+}: ProblemFilter & { title?: string; description?: string; compact?: boolean }) {
     const found = useProblems({ scope, model });
     const [expanded, setExpanded] = useState(false);
     const problems = found.data;
@@ -229,15 +230,19 @@ export function NeedsAttention({
         </span>
     );
     return (
-        <PanelSection flush icon={IconAlertTriangle} title={title} actions={toggle}>
-            <div className={compact || (expanded && more) ? undefined : "h-40"}>
-                <Lines
-                    problems={problems}
-                    expanded={expanded && more}
-                    loading={found.isLoading}
-                    error={found.error}
-                />
-            </div>
+        <PanelSection
+            flush
+            icon={IconAlertTriangle}
+            title={title}
+            description={description}
+            actions={toggle}
+        >
+            <Lines
+                problems={problems}
+                expanded={expanded && more}
+                loading={found.isLoading}
+                error={found.error}
+            />
         </PanelSection>
     );
 }

@@ -48,12 +48,13 @@ function hasActivity(row: MachineRow): boolean {
     return row.engines.length > 0 || row.node.jobs.length > 0;
 }
 
-type Summary = { key: string; content: ReactNode };
+type Summary = { key: string; text: string; content: ReactNode };
 
 function summaryItems(row: MachineRow): Summary[] {
     const { models, bare } = servedOn(row.engines);
     const served = models.map(({ served, engines }) => ({
         key: `served-${served.model}`,
+        text: `${ENGINE_DOING[worstKey(engines)] ?? "Serving"} ${versioned(served.name, served.version)}`,
         content: (
             <>
                 {`${ENGINE_DOING[worstKey(engines)] ?? "Serving"} `}
@@ -65,6 +66,7 @@ function summaryItems(row: MachineRow): Summary[] {
     }));
     const engines = bare.map((engine) => ({
         key: `engine-${engine.id}`,
+        text: `${ENGINE_DOING[engine.state] ?? "Running"} ${engine.base_model}`,
         content: (
             <>
                 {`${ENGINE_DOING[engine.state] ?? "Running"} `}
@@ -74,6 +76,7 @@ function summaryItems(row: MachineRow): Summary[] {
     }));
     const jobs = row.node.jobs.map((job) => ({
         key: `job-${job.id}`,
+        text: `${kindNoun(job.kind)} ${jobSubject(job)} · ${Math.round(job.progress * 100)}%`,
         content: (
             <>
                 {`${kindNoun(job.kind)} `}
@@ -91,12 +94,16 @@ function RunningCell({ row }: { row: MachineRow }) {
     if (!row.node.online) {
         return <span className="block truncate text-muted-foreground">{seenText(row)}</span>;
     }
-    const [first, ...rest] = summaryItems(row);
+    const items = summaryItems(row);
+    const [first, ...rest] = items;
     if (first === undefined) {
         return <span className="text-muted-foreground">Idle</span>;
     }
     return (
-        <span className="flex min-w-0 items-baseline gap-1.5">
+        <span
+            className="flex min-w-0 items-baseline gap-1.5"
+            title={items.map((item) => item.text).join("\n")}
+        >
             <span className="min-w-0 truncate">{first.content}</span>
             {rest.length > 0 && (
                 <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{`+${count(rest.length)}`}</span>
