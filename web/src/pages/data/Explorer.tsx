@@ -87,7 +87,7 @@ import {
     usesSource,
 } from "./catalogue";
 import { GroupIcon, SourceIcon } from "./icons";
-import { useDataRefresh } from "./parts";
+import { FILL, useDataRefresh } from "./parts";
 
 const WIDTH_KEY = "minibrain.data.treeWidth";
 const DEFAULT_WIDTH = 288;
@@ -281,7 +281,7 @@ function GroupDetail({
     );
     if (kind !== "upload") {
         return (
-            <div className="flex flex-col gap-6">
+            <div className={`${FILL} gap-6`}>
                 {kind === "folder" ? (
                     <FoldersGroup sources={sources} datasets={datasets} />
                 ) : kind === "lakehouse" ? (
@@ -299,7 +299,7 @@ function GroupDetail({
         dataset.sources.some((source) => ids.has(source.id)),
     );
     return (
-        <div className="flex flex-col gap-6">
+        <div className={`${FILL} gap-6`}>
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="text-2xl font-semibold">Uploads</h2>
@@ -697,7 +697,7 @@ export function DataExplorer() {
     } else if (!loading) {
         if (selected.kind === "group" && selected.id === "datasets") {
             detail = (
-                <div className="flex flex-col gap-6">
+                <div className={creatingFor === "new" ? "flex flex-col gap-6" : `${FILL} gap-6`}>
                     <DatasetsRoot
                         datasets={datasetList}
                         index={index}
@@ -749,7 +749,11 @@ export function DataExplorer() {
         } else if (selected.kind === "folder") {
             const folder = index.byId.get(selected.id);
             detail = folder ? (
-                <div className="flex flex-col gap-6">
+                <div
+                    className={
+                        creatingFor === selectedKey ? "flex flex-col gap-6" : `${FILL} gap-6`
+                    }
+                >
                     <FolderDetail
                         key={selectedKey}
                         folder={folder}
@@ -787,7 +791,7 @@ export function DataExplorer() {
     }
 
     return (
-        <div className="@container flex min-h-0 flex-1 flex-col">
+        <div className="@container/data flex min-h-0 flex-1 flex-col">
             <div className={pageFrame("full")}>
                 <PageHeader
                     title="Data"
@@ -891,7 +895,7 @@ export function DataExplorer() {
                     className={
                         split
                             ? "flex min-w-0 flex-1 flex-col @3xl:min-h-0"
-                            : "min-w-0 flex-1 px-6 py-6 @3xl:overflow-y-auto"
+                            : "flex min-w-0 flex-1 flex-col px-6 py-6 @3xl:overflow-y-auto"
                     }
                 >
                     {detail}

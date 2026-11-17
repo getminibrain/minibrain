@@ -40,7 +40,7 @@ import {
     stem,
 } from "./catalogue";
 import { SourceIcon } from "./icons";
-import { useDataRefresh } from "./parts";
+import { FILL, FILL_GRID, useDataRefresh } from "./parts";
 
 const INPUT_NAMES = /text|message|input|question|prompt|content|body|utterance|query/i;
 const LABEL_NAMES = /label|intent|category|class|target|tag|topic|answer/i;
@@ -470,7 +470,7 @@ export function SourceTable({
     const chosen = sources.filter((source) => selected.includes(String(source.id)));
     const clear = () => onSelectedChange([]);
     return (
-        <div className="flex flex-col gap-3">
+        <div className={`${FILL} gap-3`}>
             {chosen.length > 0 && (
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
                     <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
@@ -497,6 +497,8 @@ export function SourceTable({
                 rowLabel={(row) => row.name}
                 selectedIds={selected}
                 onSelectedIdsChange={onSelectedChange}
+                maxHeight="100%"
+                className={FILL_GRID}
             />
             <DeleteSourcesDialog
                 sources={deleting}

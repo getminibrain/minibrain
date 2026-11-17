@@ -1,13 +1,18 @@
+import { IconDots, IconTrash } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
-    ConfirmDialog,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Field,
     FieldGroup,
     InfoTip,
@@ -17,7 +22,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import type { LabelCount } from "~/api/client";
 import { dataKeys } from "~/api/dataQueries";
 import { keys, useAllModels, useSources } from "~/api/queries";
@@ -26,6 +31,10 @@ import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { modelPageHref } from "~/lib/modelLinks";
 import { splitTags } from "../models/dialogs";
 import { sourceNameProblem } from "./catalogue";
+
+export const FILL = "flex min-h-0 flex-1 flex-col";
+
+export const FILL_GRID = "min-h-64 flex-1";
 
 export type Described = { name: string; description: string; tags: string[] };
 
@@ -95,12 +104,12 @@ export function SplitDetail({
     preview: ReactNode;
 }) {
     return (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="@container/detail flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="shrink-0 border-b px-6 py-5">{header}</div>
-            <div className="flex min-h-0 flex-1 flex-col @3xl:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col @3xl/data:flex-row">
                 <section
                     aria-label="About"
-                    className="flex shrink-0 flex-col gap-6 border-b p-6 @3xl:w-90 @3xl:overflow-y-auto @6xl:w-100 @3xl:border-r @3xl:border-b-0"
+                    className="flex shrink-0 flex-col gap-6 border-b p-6 @3xl/data:w-80 @3xl/data:overflow-y-auto @3xl/data:border-r @3xl/data:border-b-0 @min-[54rem]/detail:w-90 @6xl/detail:w-100"
                 >
                     {about}
                 </section>
@@ -163,21 +172,27 @@ export function Description({ item, onEdit }: { item: Described; onEdit: () => v
     );
 }
 
+export type EditFocus = "name" | "description";
+
 export function EditDialog({
     item,
-    open,
+    focus,
     noun,
     problem,
-    onOpenChange,
+    onFocusChange,
     onSave,
 }: {
     item: Described;
-    open: boolean;
+    focus: EditFocus | null;
     noun: string;
     problem: (name: string) => string | null;
-    onOpenChange: (open: boolean) => void;
+    onFocusChange: (focus: EditFocus | null) => void;
     onSave: (body: Described) => Promise<unknown>;
 }) {
+    const open = focus !== null;
+    const onOpenChange = (next: boolean) => !next && onFocusChange(null);
+    const nameField = useRef<HTMLInputElement>(null);
+    const descriptionField = useRef<HTMLTextAreaElement>(null);
     const [name, setName] = useState(item.name);
     const [description, setDescription] = useState(item.description);
     const [tags, setTags] = useState(editableTags(item.tags));
@@ -196,7 +211,10 @@ export function EditDialog({
     const clash = name.trim() ? problem(name) : null;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent
+                className="sm:max-w-lg"
+                initialFocus={focus === "description" ? descriptionField : nameField}
+            >
                 <form
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -215,6 +233,7 @@ export function EditDialog({
                     <FieldGroup>
                         <Field id="data-edit-name" label="Name" error={clash}>
                             <Input
+                                ref={nameField}
                                 id="data-edit-name"
                                 value={name}
                                 maxLength={120}
@@ -224,6 +243,7 @@ export function EditDialog({
                         </Field>
                         <Field id="data-edit-description" label="Description">
                             <Textarea
+                                ref={descriptionField}
                                 id="data-edit-description"
                                 value={description}
                                 maxLength={1000}
@@ -254,40 +274,47 @@ export function EditDialog({
     );
 }
 
-export function DeleteAction({
+export function ItemMenu({ name, children }: { name: string; children: ReactNode }) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label={`More actions for ${name}`}>
+                    <IconDots />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+                {children}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+export function DeleteMenuItem({
     blocked,
-    title,
-    description,
-    onConfirm,
+    onSelect,
 }: {
     blocked: string | null;
-    title: string;
-    description: string;
-    onConfirm: () => Promise<unknown>;
+    onSelect: () => void;
 }) {
-    if (blocked) {
-        return (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span>
-                        <Button variant="outline" disabled>
-                            Delete
-                        </Button>
-                    </span>
-                </TooltipTrigger>
-                <TooltipContent>{blocked}</TooltipContent>
-            </Tooltip>
-        );
-    }
+    const reason = useId();
     return (
-        <ConfirmDialog
-            trigger={<Button variant="outline">Delete</Button>}
-            title={title}
-            description={description}
-            confirmLabel="Delete"
-            destructive
-            onConfirm={onConfirm}
-        />
+        <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+                variant="destructive"
+                disabled={blocked !== null}
+                aria-describedby={blocked ? reason : undefined}
+                onSelect={onSelect}
+            >
+                <IconTrash />
+                Delete
+            </DropdownMenuItem>
+            {blocked && (
+                <p id={reason} className="pr-2.5 pb-1.5 pl-9 text-sm text-muted-foreground">
+                    {blocked}
+                </p>
+            )}
+        </>
     );
 }
 

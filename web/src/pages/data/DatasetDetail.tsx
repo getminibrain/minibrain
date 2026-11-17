@@ -1,14 +1,17 @@
+import { IconFolderDown, IconPencil, IconSql, IconTags } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     CodeBlock,
+    ConfirmDialog,
     DataGrid,
     Dialog,
     DialogContent,
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DropdownMenuItem,
     Field,
     Input,
     Link,
@@ -58,10 +61,12 @@ import {
 } from "./catalogue";
 import {
     AboutPart,
-    DeleteAction,
+    DeleteMenuItem,
     Description,
     EditDialog,
+    type EditFocus,
     ItemHeader,
+    ItemMenu,
     LabelBalance,
     SplitDetail,
     Stats,
@@ -138,11 +143,12 @@ function QueryDialog({
 function QueryPart({
     dataset,
     sources,
+    onEdit,
 }: {
     dataset: DatasetSummary;
     sources: SourceSummary[];
+    onEdit: () => void;
 }) {
-    const [editing, setEditing] = useState(false);
     const { mapping } = dataset;
     const source = sources.find((item) => item.id === dataset.source_id);
     let body: ReactNode;
@@ -182,18 +188,12 @@ function QueryPart({
             title="Query"
             tip={QUERY_HELP}
             action={
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Button variant="outline" size="sm" onClick={onEdit}>
                     Edit query
                 </Button>
             }
         >
             {body}
-            <QueryDialog
-                dataset={dataset}
-                sources={sources}
-                open={editing}
-                onOpenChange={setEditing}
-            />
         </AboutPart>
     );
 }
@@ -543,7 +543,9 @@ export function DatasetDetail({
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const [editing, setEditing] = useState(false);
+    const [editing, setEditing] = useState<EditFocus | null>(null);
+    const [editingQuery, setEditingQuery] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const folderId = dataset.folder_id ?? null;
     const mapped = Boolean(dataset.mapping.sql);
@@ -577,34 +579,43 @@ export function DatasetDetail({
                             Train a model
                         </Link>
                     </Button>
-                    <Button variant="outline" onClick={() => setEditing(true)}>
-                        Edit
-                    </Button>
-                    <Button
-                        variant="outline"
-                        onClick={() =>
-                            setMoving({
-                                item: { kind: "dataset", id: dataset.slug },
-                                name: dataset.name,
-                                from: folderId,
-                            })
-                        }
-                    >
-                        Move to…
-                    </Button>
-                    <DeleteAction
-                        blocked={dataset.delete_lock ?? null}
-                        title={`Delete ${dataset.name}?`}
-                        description={datasetDeleteNote(dataset.model_names ?? [])}
-                        onConfirm={() => remove.mutateAsync().catch(() => undefined)}
-                    />
+                    <ItemMenu name={dataset.name}>
+                        <DropdownMenuItem onSelect={() => setEditing("name")}>
+                            <IconPencil />
+                            Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditing("description")}>
+                            <IconTags />
+                            Edit description and tags
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditingQuery(true)}>
+                            <IconSql />
+                            Edit query
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                setMoving({
+                                    item: { kind: "dataset", id: dataset.slug },
+                                    name: dataset.name,
+                                    from: folderId,
+                                })
+                            }
+                        >
+                            <IconFolderDown />
+                            Move to…
+                        </DropdownMenuItem>
+                        <DeleteMenuItem
+                            blocked={dataset.delete_lock ?? null}
+                            onSelect={() => setDeleting(true)}
+                        />
+                    </ItemMenu>
                 </>
             }
         />
     );
     const about = (
         <>
-            <Description item={dataset} onEdit={() => setEditing(true)} />
+            <Description item={dataset} onEdit={() => setEditing("description")} />
             <ErrorLine error={remove.error} />
             {dataset.error && (
                 <p className="text-destructive">{`The query fails: ${dataset.error}`}</p>
@@ -623,7 +634,7 @@ export function DatasetDetail({
             />
             <SampleNote sample={dataset.dataset_version?.sample} />
             <DatasetStats dataset={dataset} preview={preview.data} />
-            <QueryPart dataset={dataset} sources={sources} />
+            <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
             <AboutPart title="Checks" tip={checksCaption(dataset.dataset_version) || undefined}>
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             </AboutPart>
@@ -665,11 +676,26 @@ export function DatasetDetail({
                 problem={(name) =>
                     datasetNameProblem(index.datasets.get(folderId) ?? [], name, dataset.slug)
                 }
-                open={editing}
-                onOpenChange={setEditing}
+                focus={editing}
+                onFocusChange={setEditing}
                 onSave={(body) =>
                     unwrap(api.PATCH("/api/datasets/{slug}", { ...path, body })).then(refresh)
                 }
+            />
+            <QueryDialog
+                dataset={dataset}
+                sources={sources}
+                open={editingQuery}
+                onOpenChange={setEditingQuery}
+            />
+            <ConfirmDialog
+                open={deleting}
+                onOpenChange={setDeleting}
+                title={`Delete ${dataset.name}?`}
+                description={datasetDeleteNote(dataset.model_names ?? [])}
+                confirmLabel="Delete"
+                destructive
+                onConfirm={() => remove.mutateAsync().catch(() => undefined)}
             />
         </>
     );

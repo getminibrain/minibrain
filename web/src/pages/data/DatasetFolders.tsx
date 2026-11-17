@@ -47,7 +47,7 @@ import {
     plural,
     siblingNamed,
 } from "./catalogue";
-import { ItemHeader, useDataRefresh } from "./parts";
+import { FILL, FILL_GRID, ItemHeader, useDataRefresh } from "./parts";
 
 export type Movable = { kind: "dataset"; id: string } | { kind: "folder"; id: number };
 
@@ -622,7 +622,7 @@ export function FolderContents({
     const chosen = rows.filter((row) => selected.includes(row.key));
     const clear = () => setSelected([]);
     return (
-        <div className="flex flex-col gap-3">
+        <div className={`${FILL} gap-3`}>
             {chosen.length > 0 && (
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
                     <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
@@ -664,6 +664,8 @@ export function FolderContents({
                 selectedIds={selected}
                 onSelectedIdsChange={setSelected}
                 empty={empty}
+                maxHeight="100%"
+                className={FILL_GRID}
             />
             <MoveDialog
                 targets={moving}
@@ -729,7 +731,7 @@ export function FolderDetail({
         },
     });
     return (
-        <div className="flex flex-col gap-6">
+        <div className={`${FILL} gap-6`}>
             <ItemHeader
                 title={folder.name}
                 detail={
@@ -815,7 +817,7 @@ export function DatasetsRoot({
     const models = new Set(datasets.flatMap((dataset) => dataset.models));
     const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
     return (
-        <div className="flex flex-col gap-6">
+        <div className={`${FILL} gap-6`}>
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Datasets</h2>
                 <p className="text-muted-foreground">

@@ -13,6 +13,7 @@ import {
     plural,
     usesSource,
 } from "./catalogue";
+import { FILL, FILL_GRID } from "./parts";
 
 type KindRow = {
     kind: SourceGroupId;
@@ -75,7 +76,7 @@ export function SourcesOverview({
         .filter((source) => source.kind === "upload")
         .reduce((sum, source) => sum + source.size, 0);
     return (
-        <div className="flex flex-col gap-6">
+        <div className={`${FILL} gap-6`}>
             <header className="flex min-w-0 flex-col gap-0.5">
                 <h2 className="text-2xl font-semibold">Sources</h2>
                 <p className="text-muted-foreground">
@@ -102,6 +103,8 @@ export function SourcesOverview({
                         sortable={false}
                         onOpen={(row) => onSelect({ kind: "group", id: row.kind })}
                         rowLabel={(row) => `${row.label}, ${plural(row.sources, row.noun)}`}
+                        maxHeight="100%"
+                        className={FILL_GRID}
                     />
                 </>
             )}

@@ -1,6 +1,17 @@
+import { IconPencil, IconTags } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button, DataGrid, FileName, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import {
+    Button,
+    ConfirmDialog,
+    DataGrid,
+    DropdownMenuItem,
+    FileName,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { useMemo, useState } from "react";
 import {
     type ColumnStats,
@@ -32,10 +43,12 @@ import { isTextType, rowRecord, typeWord } from "./columnTypes";
 import { SourceIcon } from "./icons";
 import {
     AboutPart,
-    DeleteAction,
+    DeleteMenuItem,
     Description,
     EditDialog,
+    type EditFocus,
     ItemHeader,
+    ItemMenu,
     SplitDetail,
     Stats,
     useDataRefresh,
@@ -124,13 +137,19 @@ function Schema({ source }: { source: SourceSummary }) {
                         <th scope="col" className="pr-3 text-left font-normal">
                             Column
                         </th>
-                        <th scope="col" className="w-28 pr-3 text-left font-normal">
+                        <th
+                            scope="col"
+                            className="w-20 pr-3 @min-[54rem]/detail:w-28 text-left font-normal"
+                        >
                             Type
                         </th>
                         <th scope="col" className="w-14 pr-3 text-right font-normal">
                             Empty
                         </th>
-                        <th scope="col" className="w-16 text-right font-normal">
+                        <th
+                            scope="col"
+                            className="w-14 text-right @min-[54rem]/detail:w-16 font-normal"
+                        >
                             Distinct
                         </th>
                     </tr>
@@ -274,7 +293,8 @@ export function FileDetail({
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const [editing, setEditing] = useState(false);
+    const [editing, setEditing] = useState<EditFocus | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const path = { params: { path: { source_id: source.id } } };
     const remove = useMutation({
         mutationFn: () => succeed(api.DELETE("/api/sources/{source_id}", path)),
@@ -294,30 +314,31 @@ export function FileDetail({
                     <Button onClick={() => onCreating(true)} disabled={creating}>
                         Create dataset
                     </Button>
-                    <Button variant="outline" onClick={() => setEditing(true)}>
-                        Edit
-                    </Button>
-                    <DeleteAction
-                        blocked={
-                            datasets.length
-                                ? `Used by ${plural(datasets.length, "dataset")}: delete those first`
-                                : null
-                        }
-                        title={`Delete ${source.name}?`}
-                        description={
-                            source.kind === "upload"
-                                ? "The stored copy and its staged table go. This cannot be undone."
-                                : "minibrain stops reading it; the data stays where it is."
-                        }
-                        onConfirm={() => remove.mutateAsync().catch(() => undefined)}
-                    />
+                    <ItemMenu name={source.name}>
+                        <DropdownMenuItem onSelect={() => setEditing("name")}>
+                            <IconPencil />
+                            Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditing("description")}>
+                            <IconTags />
+                            Edit description and tags
+                        </DropdownMenuItem>
+                        <DeleteMenuItem
+                            blocked={
+                                datasets.length
+                                    ? `Used by ${plural(datasets.length, "dataset")}: delete those first.`
+                                    : null
+                            }
+                            onSelect={() => setDeleting(true)}
+                        />
+                    </ItemMenu>
                 </>
             }
         />
     );
     const about = (
         <>
-            <Description item={source} onEdit={() => setEditing(true)} />
+            <Description item={source} onEdit={() => setEditing("description")} />
             <ErrorLine error={remove.error} />
             {source.error && <p className="text-destructive">{source.error}</p>}
             <SourceStats source={source} datasets={datasets.length} />
@@ -349,11 +370,24 @@ export function FileDetail({
                 item={source}
                 noun={source.kind === "upload" ? "file" : "source"}
                 problem={(name) => sourceNameProblem(sources, name, source.id)}
-                open={editing}
-                onOpenChange={setEditing}
+                focus={editing}
+                onFocusChange={setEditing}
                 onSave={(body) =>
                     unwrap(api.PATCH("/api/sources/{source_id}", { ...path, body })).then(refresh)
                 }
+            />
+            <ConfirmDialog
+                open={deleting}
+                onOpenChange={setDeleting}
+                title={`Delete ${source.name}?`}
+                description={
+                    source.kind === "upload"
+                        ? "The stored copy and its staged table go. This cannot be undone."
+                        : "minibrain stops reading it; the data stays where it is."
+                }
+                confirmLabel="Delete"
+                destructive
+                onConfirm={() => remove.mutateAsync().catch(() => undefined)}
             />
         </>
     );
