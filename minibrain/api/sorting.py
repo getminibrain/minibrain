@@ -125,18 +125,27 @@ def raw_values(cursor: str) -> list[Any]:
     return values
 
 
-def cursor_anchor(cursor: str | None) -> datetime | None:
+Anchors = tuple[datetime | None, ...]
+
+
+def anchor_value(value: Any) -> datetime | None:
+    return None if value is None else parsed(value, datetime)
+
+
+def cursor_anchors(cursor: str | None, count: int) -> Anchors | None:
     if cursor is None:
         return None
     values = raw_values(cursor)
-    return parsed(values[0], datetime) if values else None
+    if len(values) < count:
+        raise bad_cursor()
+    return tuple(anchor_value(value) for value in values[:count])
 
 
 @dataclass(frozen=True)
 class Keyset:
     columns: tuple[SQLColumnExpression[Any], ...]
     descending: bool
-    anchor: datetime | None = None
+    anchors: Anchors = ()
 
     def order_by(self, reverse: bool = False) -> list[SQLColumnExpression[Any]]:
         down = self.descending != reverse
@@ -155,16 +164,15 @@ class Keyset:
         return clause
 
     def encode(self, values: Sequence[Any]) -> str:
-        pinned = [] if self.anchor is None else [self.anchor]
-        text = json.dumps([plain(value) for value in [*pinned, *values]], separators=(",", ":"))
+        text = json.dumps([plain(value) for value in [*self.anchors, *values]], separators=(",", ":"))
         return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
     def decode(self, cursor: str) -> list[Any]:
         values = raw_values(cursor)
-        if self.anchor is not None:
-            if not values or parsed(values[0], datetime) != self.anchor:
-                raise bad_cursor()
-            values = values[1:]
+        pinned = len(self.anchors)
+        if cursor_anchors(cursor, pinned) != self.anchors:
+            raise bad_cursor()
+        values = values[pinned:]
         if len(values) != len(self.columns):
             raise bad_cursor()
         return [parsed(value, expected_type(column)) for value, column in zip(values, self.columns, strict=True)]

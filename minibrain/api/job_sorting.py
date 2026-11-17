@@ -7,7 +7,7 @@ from sqlalchemy.orm import aliased
 
 from minibrain.api.job_facts import SCORED_KINDS
 from minibrain.api.sort_labels import JOB_KIND_LABELS, label_rank
-from minibrain.api.sorting import Keyset, Order, cursor_anchor, pool_of_node, seconds_between
+from minibrain.api.sorting import Keyset, Order, cursor_anchors, pool_of_node, seconds_between
 from minibrain.registry.models import (
     BaseModel,
     Dataset,
@@ -152,5 +152,6 @@ PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
 def job_keyset(sort: JobSort, order: Order, cursor: str | None = None) -> Keyset:
     if sort != "duration":
         return Keyset(columns=(*PARTS[sort](), Job.id), descending=order == "desc")
-    moment = cursor_anchor(cursor) or now()
-    return Keyset(columns=(*duration_parts(moment), Job.id), descending=order == "desc", anchor=moment)
+    pinned = cursor_anchors(cursor, 1)
+    moment = pinned[0] if pinned and pinned[0] else now()
+    return Keyset(columns=(*duration_parts(moment), Job.id), descending=order == "desc", anchors=(moment,))

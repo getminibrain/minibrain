@@ -1,7 +1,7 @@
 import math
 import re
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import sees_rows, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.owners import base_token, custom_owned, log_custom_token, log_owned, split_token
-from minibrain.api.sorting import CURSOR_PATTERN, Keyset, Order, keyset_rows
+from minibrain.api.sorting import CURSOR_PATTERN, Keyset, Order, cursor_anchors, keyset_rows
 from minibrain.data.feedback import UP
 from minibrain.models.registry import base_publisher
 from minibrain.policy import bodies_choice
@@ -281,8 +281,14 @@ PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
 }
 
 
-def request_keyset(sort: RequestSort, order: Order) -> Keyset:
-    return Keyset(columns=(*PARTS[sort](), RequestLog.id), descending=order == "desc")
+def request_keyset(sort: RequestSort, order: Order, filters: RequestFilter) -> Keyset:
+    window = (filters.since, filters.until)
+    return Keyset(columns=(*PARTS[sort](), RequestLog.id), descending=order == "desc", anchors=window)
+
+
+def anchored(filters: RequestFilter, cursor: str | None) -> RequestFilter:
+    window = cursor_anchors(cursor, 2)
+    return filters if window is None else replace(filters, since=window[0], until=window[1])
 
 
 @dataclass(frozen=True)
@@ -353,10 +359,11 @@ def list_requests(
     sort: RequestSort = "at",
     order: Order = "desc",
 ) -> RequestPage:
+    filters = anchored(filters, cursor)
     where = filters.conditions()
     size = max(1, min(limit, PAGE_MAX))
     bounds = [RequestLog.id > int(after)] if after is not None else []
-    keyset = request_keyset(sort, order)
+    keyset = request_keyset(sort, order, filters)
     found = keyset_rows(session, rows_query([*where, *bounds]), keyset, cursor, size)
     return RequestPage(
         items=request_rows(session, found.rows),

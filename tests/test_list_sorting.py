@@ -392,3 +392,19 @@ def test_kind_and_action_sort_by_label_with_unknown_codes_last(harness: Harness)
     assert [job["kind"] for job in jobs] == ["download", "export", "eval", "train", "unheard_of"]
     events = walk(harness, "/api/audit", {"sort": "action", "order": "asc", "target": "sorted"}, cursor_name="next")
     assert [event["action"] for event in events] == ["key.create", "model.create", "version.promote", "zz.unknown"]
+
+
+@pytest.mark.parametrize("sort", ["at", "latency"])
+def test_request_pages_keep_the_time_window_of_the_first_page(harness: Harness, sort: str) -> None:
+    ids = seed_requests(harness)
+    since = now() - timedelta(minutes=1)
+    params = {"sort": sort, "order": "desc", "limit": 4}
+    first = harness.client.get("/api/requests", params=params | {"since": since.isoformat()}).json()
+    items, page = list(first["items"]), first
+    while page["next_cursor"]:
+        later = since + timedelta(seconds=10 * len(items))
+        query = params | {"since": later.isoformat(), "cursor": page["next_cursor"]}
+        page = harness.client.get("/api/requests", params=query).json()
+        assert page["total"] == first["total"] == len(ids)
+        items += page["items"]
+    assert sorted(item["id"] for item in items) == sorted(ids)
