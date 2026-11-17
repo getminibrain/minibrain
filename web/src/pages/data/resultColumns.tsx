@@ -54,7 +54,7 @@ function timeOf(text: string): number {
 }
 
 function sortValue(kind: Kind, text: Cell): number | string | undefined {
-    if (text === null) {
+    if (text === null || text === "") {
         return undefined;
     }
     if (kind === "number") {
