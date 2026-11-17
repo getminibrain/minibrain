@@ -161,7 +161,7 @@ def read_extensions() -> ExtensionsInfo:
         platform=extensions.platform(),
         directory=str(extensions.directory()),
         repository=extensions.repository(),
-        command=extensions.INSTALL_HINT,
+        command=extensions.INSTALL_COMMAND,
         extensions=[
             ExtensionInfo(name=state.name, purpose=state.purpose, installed=state.installed)
             for state in extensions.status()

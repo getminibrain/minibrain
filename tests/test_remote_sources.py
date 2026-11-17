@@ -182,7 +182,7 @@ def test_missing_extensions_are_named_and_never_downloaded(harness: Harness, buc
     bucket.put("data", "exports/jan.parquet", parquet(tmp_path))
     listed = harness.client.get("/api/extensions").json()
     assert {item["name"]: item["installed"] for item in listed["extensions"]}["httpfs"] is False
-    assert listed["command"] == extensions.INSTALL_HINT
+    assert listed["command"] == extensions.INSTALL_COMMAND
     connection = s3_connection(harness, bucket)
     response = harness.client.post(
         "/api/sources/s3", json={"connection_id": connection["id"], "path": "s3://data/exports/"}

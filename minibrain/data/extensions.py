@@ -21,7 +21,8 @@ PURPOSES = {
 }
 NEEDS = {"iceberg": ("avro",)}
 DEFAULT_SET = ("httpfs", "postgres_scanner", "iceberg", "avro", "delta")
-INSTALL_HINT = "minibrain extensions install (add --from <folder> on a server without internet)"
+INSTALL_COMMAND = "minibrain extensions install"
+INSTALL_HINT = f"{INSTALL_COMMAND} (add --from <folder> on a server without internet)"
 
 
 class ExtensionMissingError(Exception):
