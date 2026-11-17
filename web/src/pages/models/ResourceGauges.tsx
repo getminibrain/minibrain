@@ -1,4 +1,4 @@
-import { IconServer, IconServer2, type TablerIcon } from "@tabler/icons-react";
+import { IconDeviceSdCard, IconServer, type TablerIcon } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
 import { SummaryLine } from "~/components/CreateLayout";
@@ -66,7 +66,7 @@ export function DiskGauge({
                 : `${bytes(store.stagingFree)} free on main's disk to pass through`;
         return (
             <>
-                <Figures icon={IconServer2}>
+                <Figures icon={IconDeviceSdCard}>
                     {[amount, staging].filter(Boolean).join(" · ")}
                 </Figures>
                 <Where>{`${store.label}: S3 reports no free space, so the bucket's quota is the limit.`}</Where>
@@ -76,7 +76,7 @@ export function DiskGauge({
     if (free === null || free === undefined || !total) {
         return (
             <>
-                <Figures icon={IconServer2}>{`${amount} · free space unknown`}</Figures>
+                <Figures icon={IconDeviceSdCard}>{`${amount} · free space unknown`}</Figures>
                 {place}
             </>
         );

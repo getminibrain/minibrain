@@ -1,11 +1,11 @@
 import {
     IconChevronDown,
+    IconDeviceSdCard,
     IconExternalLink,
     IconMemory,
     IconPackages,
     IconPlus,
     IconSchool,
-    IconServer2,
     type TablerIcon,
 } from "@tabler/icons-react";
 import {
@@ -159,7 +159,7 @@ function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
             ) : null}
             {disk ? (
                 <Amount
-                    icon={IconServer2}
+                    icon={IconDeviceSdCard}
                     label={installState(option) ? "On disk" : "Download"}
                     help={
                         installState(option)

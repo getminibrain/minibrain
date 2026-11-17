@@ -1,10 +1,10 @@
 import {
     IconArchive,
+    IconDeviceSdCard,
     IconExternalLink,
     IconMemory,
     IconPlayerPlay,
     IconSchool,
-    IconServer2,
     type TablerIcon,
 } from "@tabler/icons-react";
 import {
@@ -122,7 +122,7 @@ function Requirements({
                 {train}
             </SummaryFact>
             <SummaryFact icon={IconArchive} label="Storage">
-                {storage ? <Amount icon={IconServer2} value={bytes(storage)} /> : "Unknown"}
+                {storage ? <Amount icon={IconDeviceSdCard} value={bytes(storage)} /> : "Unknown"}
             </SummaryFact>
         </SummaryFacts>
     );

@@ -33,7 +33,13 @@ import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { TRAIN_KIND, jobPageHref } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
-import { TRAINING_PATH, jobHref, modelPageHref, trainHref } from "~/lib/modelLinks";
+import {
+    TRAINING_PATH,
+    jobHref,
+    modelPageHref,
+    modelVersionHref,
+    trainHref,
+} from "~/lib/modelLinks";
 import { JobPage } from "../jobs/JobPage";
 import {
     ATTEMPT_COLUMN,
@@ -63,21 +69,44 @@ const METHODS = [
     { value: "rl", label: "Reinforcement learning", ready: false },
 ];
 
-function TrainedModel({ job }: { job: JobInfo }) {
-    const name = ownerName(job);
-    const label = (
-        <span className="flex min-w-0 items-center gap-2">
-            <PublisherLogo name={name} modelKey={job.model ?? undefined} size="sm" />
-            <ModelName name={name} deleted={job.deleted} className="truncate font-medium" />
-        </span>
-    );
-    if (job.deleted || !job.model) {
-        return label;
+function VersionLine({ job }: { job: JobInfo }) {
+    if (job.version === null || job.version === undefined) {
+        return <span className="text-sm text-muted-foreground">No version</span>;
+    }
+    const label = `v${job.version}`;
+    if (job.deleted || job.version_deleted || !job.model) {
+        return <span className="text-sm text-muted-foreground tabular-nums">{label}</span>;
     }
     return (
-        <Link href={modelPageHref(job.model)} className="block min-w-0 hover:underline">
+        <Link
+            href={modelVersionHref(job.model, job.version)}
+            className="w-fit text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
+        >
             {label}
         </Link>
+    );
+}
+
+function TrainedModel({ job }: { job: JobInfo }) {
+    const name = ownerName(job);
+    const title = <ModelName name={name} deleted={job.deleted} className="truncate font-medium" />;
+    return (
+        <span className="flex min-w-0 items-center gap-2">
+            <PublisherLogo name={name} modelKey={job.model ?? undefined} />
+            <span className="flex min-w-0 flex-col">
+                {job.deleted || !job.model ? (
+                    title
+                ) : (
+                    <Link
+                        href={modelPageHref(job.model)}
+                        className="min-w-0 truncate hover:underline"
+                    >
+                        {title}
+                    </Link>
+                )}
+                <VersionLine job={job} />
+            </span>
+        </span>
     );
 }
 
@@ -88,17 +117,6 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
         header: "Model",
         accessorFn: (job) => ownerName(job).toLowerCase(),
         cell: ({ row }) => <TrainedModel job={row.original} />,
-    },
-    {
-        id: "version",
-        header: "Version",
-        accessorFn: (job) => job.version ?? -1,
-        cell: ({ row }) =>
-            row.original.version === null || row.original.version === undefined ? (
-                <span className="text-muted-foreground">–</span>
-            ) : (
-                <span className="tabular-nums">{`v${row.original.version}`}</span>
-            ),
     },
     STATUS_COLUMN,
     SCORE_COLUMN,
@@ -315,7 +333,7 @@ function Runs() {
                 loading={jobs.isLoading}
                 storageKey="minibrain.training.runs"
                 columnPicker
-                hiddenColumns={["attempt", "method"]}
+                hiddenColumns={["attempt", "method", "duration"]}
                 sorting={sortingFor(order)}
                 onSortingChange={(next) => setOrder(orderFrom(next))}
                 hasMore={jobs.hasMore}
@@ -339,7 +357,7 @@ function Runs() {
                         </p>
                     )
                 }
-                minWidth="min-w-[1160px]"
+                minWidth="min-w-[960px]"
             />
         </>
     );

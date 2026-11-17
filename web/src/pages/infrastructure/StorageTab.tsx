@@ -1,9 +1,9 @@
 import {
     IconArchive,
+    IconDeviceSdCard,
     IconEraser,
     IconFiles,
     IconServer,
-    IconServer2,
     IconStack2,
 } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -322,7 +322,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection
             flush
-            icon={IconServer2}
+            icon={IconDeviceSdCard}
             title="Disks on main"
             description="What minibrain keeps on each disk, and what is left."
         >
