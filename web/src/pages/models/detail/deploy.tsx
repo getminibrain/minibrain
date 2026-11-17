@@ -45,6 +45,19 @@ import {
     startingReplicas,
 } from "./poolPicker";
 
+const IN_FLIGHT: Record<string, string> = {
+    training: "is training",
+    evaluating: "is being scored",
+};
+
+function notReadyYet(versions: VersionInfo[]): string {
+    const latest = [...versions].sort((left, right) => right.number - left.number)[0];
+    const doing = latest ? IN_FLIGHT[latest.status] : undefined;
+    return latest && doing
+        ? `v${latest.number} ${doing}. It can be deployed once it is scored.`
+        : "Nothing to deploy yet: no version has finished scoring.";
+}
+
 function startingVersion(row: ModelRow, versions: VersionInfo[]): number | null {
     const ready = deployable(versions);
     const current = ready.find((version) => version.number === row.current_version);
@@ -187,8 +200,7 @@ function DeployButton({
     const deployed = isDeployed(row);
     const starting = custom ? startingVersion(row, versions) : null;
     const blocked = custom
-        ? (deployBlock(row, base) ??
-          (starting === null ? "Nothing to deploy yet: no version is ready." : null))
+        ? (deployBlock(row, base) ?? (starting === null ? notReadyYet(versions) : null))
         : deployed
           ? null
           : deployBlock(row, base);
