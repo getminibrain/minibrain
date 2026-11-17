@@ -1,6 +1,5 @@
 import {
     IconChevronDown,
-    IconCopy,
     IconDots,
     IconDownload,
     IconGitCompare,
@@ -153,12 +152,6 @@ function ExportDialog({
     );
 }
 
-function copyText(value: string): Promise<void> {
-    return navigator.clipboard
-        ? navigator.clipboard.writeText(value)
-        : Promise.reject(new Error("blocked"));
-}
-
 function shown(versions: VersionInfo[]): VersionInfo[] {
     return versions
         .filter((item) => item.status !== "deleting")
@@ -248,19 +241,6 @@ function VersionMenu({
                     >
                         <IconGitCompare />
                         Compare with…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onSelect={() =>
-                            copyText(callable).then(
-                                () => toast({ title: `Copied ${callable}` }),
-                                () => toast({ title: "This browser blocks copying here" }),
-                            )
-                        }
-                    >
-                        <IconCopy />
-                        <span>
-                            Copy <span className="font-mono">{callable}</span>
-                        </span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         disabled={!exportable || !can.build}
