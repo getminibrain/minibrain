@@ -1,5 +1,5 @@
+import { IconShieldCheck, IconStopwatch } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, Timer } from "lucide-react";
 import {
     Badge,
     Button,
@@ -164,7 +164,7 @@ export function AuditIntegrity() {
     const chain = useChain();
     return (
         <SettingsSection
-            icon={ShieldCheck}
+            icon={IconShieldCheck}
             anchor={SECURITY.auditIntegrity.anchor}
             title={SECURITY.auditIntegrity.title}
             description="Every event carries a SHA-256 hash of its fields and of the event before it, so an edit or a deletion breaks the chain."
@@ -256,7 +256,7 @@ export function AuditRetention({ policy }: { policy: PolicyInfo }) {
     );
     return (
         <SettingsSection
-            icon={Timer}
+            icon={IconStopwatch}
             anchor={SECURITY.auditRetention.anchor}
             title={SECURITY.auditRetention.title}
             description="How long the audit log keeps events."

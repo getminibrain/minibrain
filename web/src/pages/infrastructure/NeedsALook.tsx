@@ -1,4 +1,4 @@
-import { TriangleAlert } from "lucide-react";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
@@ -230,7 +230,7 @@ export function NeedsALook({
 }) {
     const issues = issuesOf(pools, main, info, window.location.origin);
     return (
-        <PanelSection flush icon={TriangleAlert} title="Needs a look">
+        <PanelSection flush icon={IconAlertTriangle} title="Needs a look">
             {issues.length === 0 ? (
                 <p className="px-4 py-3 text-muted-foreground">
                     Nothing: every machine is online and up to date.

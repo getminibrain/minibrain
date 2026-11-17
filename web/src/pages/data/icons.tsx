@@ -1,14 +1,21 @@
-import { Cloud, Database, Folder, FolderUp, type LucideIcon, Warehouse } from "lucide-react";
+import {
+    IconBuildingWarehouse,
+    IconCloud,
+    IconDatabase,
+    IconFolder,
+    IconFolderUp,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import { FileTypeIcon } from "obp-ui";
 import type { SourceSummary } from "~/api/client";
 import { type SourceGroupId, groupOf, tableFormat } from "./catalogue";
 
-export const GROUP_ICONS: Record<SourceGroupId, LucideIcon> = {
-    upload: FolderUp,
-    folder: Folder,
-    s3: Cloud,
-    database: Database,
-    lakehouse: Warehouse,
+export const GROUP_ICONS: Record<SourceGroupId, TablerIcon> = {
+    upload: IconFolderUp,
+    folder: IconFolder,
+    s3: IconCloud,
+    database: IconDatabase,
+    lakehouse: IconBuildingWarehouse,
 };
 
 export function GroupIcon({ group, className }: { group: SourceGroupId; className?: string }) {

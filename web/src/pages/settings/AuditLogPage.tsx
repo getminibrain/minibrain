@@ -1,17 +1,17 @@
+import {
+    IconChevronDown,
+    IconChevronLeft,
+    IconChevronRight,
+    IconDownload,
+    IconKey,
+    IconRobot,
+    IconTerminal2,
+    IconUser,
+    IconX,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-    Bot,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    Download,
-    KeyRound,
-    type LucideIcon,
-    SquareTerminal,
-    User,
-    X,
-} from "lucide-react";
 import {
     Badge,
     Button,
@@ -85,11 +85,11 @@ const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 300;
 const ALL_TIME = "all";
 
-const ACTOR_ICONS: Record<AuditEvent["actor_kind"], LucideIcon> = {
-    user: User,
-    api_key: KeyRound,
-    command_line: SquareTerminal,
-    system: Bot,
+const ACTOR_ICONS: Record<AuditEvent["actor_kind"], TablerIcon> = {
+    user: IconUser,
+    api_key: IconKey,
+    command_line: IconTerminal2,
+    system: IconRobot,
 };
 
 function usePolicies() {
@@ -265,9 +265,9 @@ function ExportMenu({ query }: { query: AuditQuery }) {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline">
-                    <Download />
+                    <IconDownload />
                     Export
-                    <ChevronDown aria-hidden />
+                    <IconChevronDown aria-hidden />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -306,12 +306,12 @@ function Pager({
             </p>
             <div className="flex items-center gap-2">
                 <Button variant="outline" disabled={page.newer_cursor === null} onClick={onNewer}>
-                    <ChevronLeft />
+                    <IconChevronLeft />
                     Newer
                 </Button>
                 <Button variant="outline" disabled={page.older_cursor === null} onClick={onOlder}>
                     Older
-                    <ChevronRight />
+                    <IconChevronRight />
                 </Button>
             </div>
         </div>
@@ -604,7 +604,7 @@ export function AuditLogPage() {
                         <Button variant="outline" onClick={() => filter({ target: "" })}>
                             <span className="text-muted-foreground">Target</span>
                             <span className="font-mono">{search.target}</span>
-                            <X aria-hidden />
+                            <IconX aria-hidden />
                         </Button>
                     )}
                     {filtering && (

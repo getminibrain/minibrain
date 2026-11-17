@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react";
+import { IconKey } from "@tabler/icons-react";
 import { Button } from "obp-ui";
 import type { ReactNode } from "react";
 import type { KeyCreated, ModelRef } from "~/api/client";
@@ -23,12 +23,12 @@ export function ApiKeys({
     const rows = (list.data ?? []).filter((key) => keyCovers(key, scope));
     return (
         <PanelSection
-            icon={KeyRound}
+            icon={IconKey}
             title="API keys"
             description={description}
             actions={
                 <Button onClick={() => manager.create([scope])}>
-                    <KeyRound aria-hidden="true" />
+                    <IconKey aria-hidden="true" />
                     Create key
                 </Button>
             }

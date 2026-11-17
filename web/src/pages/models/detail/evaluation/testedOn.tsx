@@ -1,4 +1,4 @@
-import { Database, Plus } from "lucide-react";
+import { IconDatabase, IconPlus } from "@tabler/icons-react";
 import { Button, InfoTip, Link } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
@@ -109,7 +109,7 @@ export function TestedOnPanel({
     const builds = can.build && detail !== undefined;
     return (
         <PanelSection
-            icon={Database}
+            icon={IconDatabase}
             anchor="tested-on"
             title="What it's tested on"
             tip="Held-out rows are set aside when a dataset version is made: no version trains on them, and every version made from it is scored on the same rows. Test examples join them."
@@ -120,7 +120,7 @@ export function TestedOnPanel({
                             <Link href={playgroundHref(row.key)}>From the Playground</Link>
                         </Button>
                         <Button variant="outline" onClick={() => setAdding(true)}>
-                            <Plus aria-hidden="true" />
+                            <IconPlus aria-hidden="true" />
                             Add test example
                         </Button>
                     </>

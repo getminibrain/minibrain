@@ -1,4 +1,4 @@
-import { Gauge } from "lucide-react";
+import { IconGauge } from "@tabler/icons-react";
 import { InfoTip, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
 import type { VersionInfo } from "~/api/client";
 import { PanelSection } from "~/components/Section";
@@ -206,7 +206,7 @@ export function ScoreSection({
     const held = version.held_out?.examples;
     return (
         <PanelSection
-            icon={Gauge}
+            icon={IconGauge}
             title="Score"
             tip={`Measured on ${held ? `${count(held)} ` : ""}held-out rows the version never trained on. Shares change in points.`}
             flush

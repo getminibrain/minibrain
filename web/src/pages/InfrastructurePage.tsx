@@ -1,6 +1,6 @@
+import { IconCpu, IconMemory } from "@tabler/icons-react";
 import { useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Cpu, MemoryStick } from "lucide-react";
 import { DataGrid, TabNav, type TabNavItem } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
@@ -118,7 +118,7 @@ export function InfrastructurePage() {
                         loading={pools.isLoading}
                     />
                     <PanelSection
-                        icon={Cpu}
+                        icon={IconCpu}
                         title="This main process"
                         description="Inference uses the GPU when there is one; training avoids the Apple GPU, which hangs."
                     >
@@ -144,7 +144,7 @@ export function InfrastructurePage() {
                     </PanelSection>
                     <PanelSection
                         bare
-                        icon={MemoryStick}
+                        icon={IconMemory}
                         title="Loaded in memory"
                         description="Base models and adapters the serving process holds right now."
                     >

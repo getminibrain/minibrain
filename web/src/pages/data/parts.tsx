@@ -1,5 +1,5 @@
+import { IconChevronRight } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
 import {
     Button,
     ConfirmDialog,
@@ -134,7 +134,7 @@ export function Trail({
                 {steps.map((step, index) => (
                     <Fragment key={step.key}>
                         {index > 0 && (
-                            <ChevronRight
+                            <IconChevronRight
                                 aria-hidden="true"
                                 className="size-4 shrink-0 text-muted-foreground"
                             />

@@ -1,4 +1,4 @@
-import { Dices } from "lucide-react";
+import { IconDice5 } from "@tabler/icons-react";
 import { Button, Input, Kbd, Label, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { generateName } from "~/lib/avatarNames";
@@ -136,7 +136,7 @@ export function NameAvatarField({
                             aria-label={label}
                             onClick={shuffle}
                         >
-                            <Dices aria-hidden="true" />
+                            <IconDice5 aria-hidden="true" />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import {
     type KeyboardEvent,
     type PointerEvent,
@@ -156,9 +156,11 @@ export function SortButton({
             className="inline-flex max-w-full items-center gap-1 rounded-sm font-medium hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
             <span className="truncate">{label}</span>
-            {direction === "asc" && <ChevronUp aria-hidden="true" className="size-3.5 shrink-0" />}
+            {direction === "asc" && (
+                <IconChevronUp aria-hidden="true" className="size-3.5 shrink-0" />
+            )}
             {direction === "desc" && (
-                <ChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
+                <IconChevronDown aria-hidden="true" className="size-3.5 shrink-0" />
             )}
             {direction && (
                 <span className="sr-only">

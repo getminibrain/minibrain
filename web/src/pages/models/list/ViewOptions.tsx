@@ -1,4 +1,4 @@
-import { Settings2, X } from "lucide-react";
+import { IconAdjustmentsHorizontal, IconX } from "@tabler/icons-react";
 import {
     Button,
     Checkbox,
@@ -375,7 +375,7 @@ export function ViewOptions({
                             data-active={active > 0 || undefined}
                             className="relative data-active:border-primary"
                         >
-                            <Settings2 aria-hidden="true" />
+                            <IconAdjustmentsHorizontal aria-hidden="true" />
                             {active > 0 && (
                                 <span
                                     aria-hidden="true"
@@ -498,7 +498,7 @@ export function FilterChips({
                                 aria-label={`Remove filter ${chip.group}: ${chip.text}`}
                                 onClick={() => onFilters(chip.clear)}
                             >
-                                <X aria-hidden="true" />
+                                <IconX aria-hidden="true" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>Remove</TooltipContent>

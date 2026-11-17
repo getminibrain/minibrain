@@ -1,11 +1,16 @@
+import {
+    IconArrowsSort,
+    IconCubePlus,
+    IconExternalLink,
+    IconKey,
+    IconX,
+} from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, ExternalLink, KeyRound, X } from "lucide-react";
 import {
     Badge,
     Button,
-    CubePlus,
     DataGrid,
     DataGridDetail,
     Dialog,
@@ -86,7 +91,7 @@ export function AccessSteps({
                     className="text-primary hover:underline"
                 >
                     the model page
-                    <ExternalLink className="ml-0.5 inline size-3.5" />
+                    <IconExternalLink className="ml-0.5 inline size-3.5" />
                 </a>{" "}
                 and accept the licence; access is usually granted within minutes.
             </li>
@@ -178,7 +183,7 @@ export function EntryAction({
         return (
             <div className="flex justify-end">
                 <Button onClick={() => on.download(entry)}>
-                    <CubePlus />
+                    <IconCubePlus />
                     Add model
                 </Button>
             </div>
@@ -189,7 +194,7 @@ export function EntryAction({
     }
     const label = (
         <>
-            <CubePlus />
+            <IconCubePlus />
             Add model
         </>
     );
@@ -231,7 +236,7 @@ export function EntryAction({
         return (
             <div className="flex justify-end">
                 <Button onClick={() => on.requirements(entry)}>
-                    <KeyRound />
+                    <IconKey />
                     Get access
                 </Button>
             </div>
@@ -322,7 +327,7 @@ function SortSelect({ value, onSort }: { value: string; onSort: (value: string) 
     return (
         <Select value={value} onValueChange={(next) => onSort(String(next))}>
             <SelectTrigger aria-label="Sort models" className="w-44">
-                <ArrowUpDown aria-hidden="true" className="size-4 text-muted-foreground" />
+                <IconArrowsSort aria-hidden="true" className="size-4 text-muted-foreground" />
                 <SelectValue className="flex-1 text-left" />
             </SelectTrigger>
             <SelectContent>
@@ -617,7 +622,7 @@ function SelectionBar({
         <div className={cn("flex flex-wrap items-center gap-2", className)}>
             <span className="font-medium tabular-nums">{`${count} selected`}</span>
             <Button variant="outline" onClick={onClear}>
-                <X />
+                <IconX />
                 Clear selection
             </Button>
             <div className="ml-auto flex flex-wrap items-center gap-2">

@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import type { TablerIcon } from "@tabler/icons-react";
 import { Card, cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { FLUSH_GRID } from "~/components/Section";
@@ -18,7 +18,7 @@ export function SettingsSection({
     flush = false,
     children,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     anchor?: string;
     title: string;
     description?: ReactNode;

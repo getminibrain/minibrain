@@ -1,4 +1,4 @@
-import { KeyRound, ListFilter } from "lucide-react";
+import { IconFilter, IconKey } from "@tabler/icons-react";
 import { Button, CheckboxSelect, SearchInput } from "obp-ui";
 import type { KeyInfo } from "~/api/client";
 import { useKeys } from "~/api/queries";
@@ -77,7 +77,7 @@ function KeyList({ manager }: { manager: Manager }) {
                 />
                 {filtering && (
                     <Button variant="ghost" onClick={clear}>
-                        <ListFilter aria-hidden="true" />
+                        <IconFilter aria-hidden="true" />
                         Clear filters
                     </Button>
                 )}
@@ -101,7 +101,7 @@ function KeyList({ manager }: { manager: Manager }) {
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-muted-foreground">No keys yet.</p>
                             <Button variant="outline" onClick={() => manager.create()}>
-                                <KeyRound aria-hidden="true" />
+                                <IconKey aria-hidden="true" />
                                 Create key
                             </Button>
                         </div>
@@ -126,7 +126,7 @@ export function ApiKeysPage() {
                 }
                 actions={
                     <Button onClick={() => manager.create()}>
-                        <KeyRound aria-hidden="true" />
+                        <IconKey aria-hidden="true" />
                         Create key
                     </Button>
                 }

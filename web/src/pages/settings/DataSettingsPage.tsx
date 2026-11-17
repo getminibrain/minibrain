@@ -1,5 +1,5 @@
+import { IconArchive, IconLayoutRows, IconListCheck } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Archive, ListChecks, Rows3 } from "lucide-react";
 import { SettingsGroup, SettingsRow, Switch } from "obp-ui";
 import { type ComponentProps, useState } from "react";
 import { api, unwrap } from "~/api/client";
@@ -109,7 +109,7 @@ function ChecksSettings({ data }: { data: DataSettings | undefined }) {
     };
     return (
         <SettingsSection
-            icon={ListChecks}
+            icon={IconListCheck}
             anchor={DATA.checks.anchor}
             title={DATA.checks.title}
             description="Run on every dataset version. Warnings never block training; an empty dataset or a single label stops the version from being saved."
@@ -167,7 +167,7 @@ export function DataSettingsPage() {
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <SettingsSections>
                 <SettingsSection
-                    icon={Rows3}
+                    icon={IconLayoutRows}
                     anchor={DATA.versionSize.anchor}
                     title={DATA.versionSize.title}
                     description="Each dataset version copies the query's rows. A larger result is refused with a hint to filter or sample in the query."
@@ -190,7 +190,7 @@ export function DataSettingsPage() {
                     </SettingsGroup>
                 </SettingsSection>
                 <SettingsSection
-                    icon={Archive}
+                    icon={IconArchive}
                     anchor={DATA.versionRetention.anchor}
                     title={DATA.versionRetention.title}
                     description="Dataset versions a model version uses are always kept, and so is each dataset's latest. This sets how many versions no model uses stay per dataset."

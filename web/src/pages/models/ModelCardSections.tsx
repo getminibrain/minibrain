@@ -1,15 +1,15 @@
-import type { ColumnDef } from "@tanstack/react-table";
 import {
-    Box,
-    Cpu,
-    Database,
-    Fingerprint,
-    Gauge,
-    ShieldCheck,
-    Target,
-    TriangleAlert,
-    UserRound,
-} from "lucide-react";
+    IconAlertTriangle,
+    IconCpu,
+    IconCube,
+    IconDatabase,
+    IconFingerprint,
+    IconGauge,
+    IconShieldCheck,
+    IconTarget,
+    IconUser,
+} from "@tabler/icons-react";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
     Badge,
     Button,
@@ -163,7 +163,7 @@ function points(amount: number): string {
 export function PurposeSection({ card }: { card: ModelCard }) {
     const purpose = card.purpose;
     return (
-        <PanelSection icon={Target} title="Purpose" description="What the model is for.">
+        <PanelSection icon={IconTarget} title="Purpose" description="What the model is for.">
             <Facts
                 items={[
                     ["Description", purpose.description || "No description."],
@@ -178,7 +178,7 @@ export function PurposeSection({ card }: { card: ModelCard }) {
 export function UseSection({ card, onEdit }: { card: ModelCard; onEdit?: () => void }) {
     return (
         <PanelSection
-            icon={UserRound}
+            icon={IconUser}
             title="Intended use and owner"
             description="Written by people; stored with this version and audited on every change."
             actions={
@@ -221,7 +221,11 @@ export function BaseSection({ card }: { card: ModelCard }) {
         ? "Recorded when training started; the adapter only loads on these files."
         : "From the base model's current files; a prompt-only version records no hash.";
     return (
-        <PanelSection icon={Box} title="Base model" description="The weights this version runs on.">
+        <PanelSection
+            icon={IconCube}
+            title="Base model"
+            description="The weights this version runs on."
+        >
             <Facts
                 items={[
                     [
@@ -364,7 +368,7 @@ export function DataSection({ card }: { card: ModelCard }) {
     );
     return (
         <PanelSection
-            icon={Database}
+            icon={IconDatabase}
             title="Training data"
             description="The dataset version this model version trained and scored on, with the checks run when it was saved."
             bare
@@ -475,7 +479,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
         : [];
     if (training.method !== "lora" || !recipe) {
         return (
-            <PanelSection icon={Cpu} title="Training" description="How the version was built.">
+            <PanelSection icon={IconCpu} title="Training" description="How the version was built.">
                 <p>
                     {`Prompt-only: no weights were trained. The base model answers with the task prompt, the label list and ${training.few_shot_examples ?? 0} few-shot examples from the training split.`}
                 </p>
@@ -485,7 +489,7 @@ export function TrainingSection({ card }: { card: ModelCard }) {
     }
     const value = (item: number | null | undefined) => <Numeric value={item ?? NONE} />;
     return (
-        <PanelSection icon={Cpu} title="Training" description="How the version was built.">
+        <PanelSection icon={IconCpu} title="Training" description="How the version was built.">
             <Facts
                 items={[
                     ...copied,
@@ -764,7 +768,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
     const summary = cardHeadline(card);
     return (
         <PanelSection
-            icon={Gauge}
+            icon={IconGauge}
             title="Evaluation"
             description="Scores on rows the model never trained on: the held-out split and the test set."
             bare
@@ -835,7 +839,7 @@ export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () =
     const derived = card.limits.derived;
     return (
         <PanelSection
-            icon={TriangleAlert}
+            icon={IconAlertTriangle}
             title="Limits"
             description="Facts read from the data and scores, then what people know beyond them."
             actions={
@@ -919,7 +923,7 @@ function approvalText(card: ModelCard): string {
 export function ApprovalsSection({ card }: { card: ModelCard }) {
     return (
         <PanelSection
-            icon={ShieldCheck}
+            icon={IconShieldCheck}
             title="Approvals and deployments"
             description={approvalText(card)}
             bare
@@ -937,7 +941,7 @@ export function ApprovalsSection({ card }: { card: ModelCard }) {
 export function IntegritySection({ sha256, form }: { sha256: string; form: string | undefined }) {
     return (
         <PanelSection
-            icon={Fingerprint}
+            icon={IconFingerprint}
             title="Integrity"
             description="The Markdown and JSON downloads carry this digest, so a reviewer can check the card was not changed."
         >

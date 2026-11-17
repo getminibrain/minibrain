@@ -1,4 +1,4 @@
-import { KeyRound, RefreshCw } from "lucide-react";
+import { IconKey, IconRefresh } from "@tabler/icons-react";
 import {
     Button,
     ConfirmDialog,
@@ -155,7 +155,7 @@ export function RotateToken({
                         : `Make a join token for pool ${pool}`
                 }
             >
-                {exists ? <RefreshCw aria-hidden="true" /> : <KeyRound aria-hidden="true" />}
+                {exists ? <IconRefresh aria-hidden="true" /> : <IconKey aria-hidden="true" />}
                 {exists ? "Rotate" : "Make token"}
             </Button>
             <ConfirmDialog

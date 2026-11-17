@@ -1,5 +1,12 @@
+import {
+    IconAlertCircle,
+    IconChartLine,
+    IconHistory,
+    IconKey,
+    IconLogs,
+    IconStopwatch,
+} from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { ChartLine, CircleAlert, History, KeyRound, Logs, Timer } from "lucide-react";
 import {
     Badge,
     Link,
@@ -147,7 +154,7 @@ function LatencySection({
 }: { row: ModelRow; report: TrafficReport; range: TrafficRange }) {
     const lines = percentileLines(report);
     return (
-        <PanelSection icon={Timer} title="Latency">
+        <PanelSection icon={IconStopwatch} title="Latency">
             <LineChart
                 rows={lines.rows}
                 series={lines.series}
@@ -185,7 +192,7 @@ function ErrorsSection({
     const line = errorLine(report);
     const usual = report.usual_error_rate;
     return (
-        <PanelSection icon={CircleAlert} title="Errors" flush>
+        <PanelSection icon={IconAlertCircle} title="Errors" flush>
             <div className="p-panel">
                 <LineChart
                     rows={line.rows}
@@ -253,7 +260,7 @@ function VersionsSection({ row, report }: { row: ModelRow; report: TrafficReport
     const usual = report.usual_error_rate ?? null;
     return (
         <PanelSection
-            icon={History}
+            icon={IconHistory}
             title="By version"
             tip={`Calls to ${row.key}@N reach that version whether it is deployed or not.`}
             flush
@@ -325,7 +332,7 @@ function CallersSection({
 }: { row: ModelRow; report: TrafficReport; range: TrafficRange }) {
     const total = report.callers.reduce((sum, item) => sum + item.requests, 0);
     return (
-        <PanelSection icon={KeyRound} title="Callers" flush>
+        <PanelSection icon={IconKey} title="Callers" flush>
             {report.callers.length === 0 ? (
                 <p className="p-panel text-muted-foreground">{`No requests ${SPAN[range]}.`}</p>
             ) : (
@@ -399,7 +406,7 @@ function RequestLogSection({ row }: { row: ModelRow }) {
     const kept = detail.data?.request_bodies.kept ?? true;
     return (
         <PanelSection
-            icon={Logs}
+            icon={IconLogs}
             title="Request log"
             tip="Prompts and answers stay on this install."
             description={
@@ -495,7 +502,7 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
             <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
             <PanelSections>
                 <PanelSection
-                    icon={ChartLine}
+                    icon={IconChartLine}
                     title="Traffic"
                     tip={`Changes compare with ${PERIOD[range]}.`}
                     actions={

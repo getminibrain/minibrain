@@ -1,4 +1,4 @@
-import { ChartLine } from "lucide-react";
+import { IconChartLine } from "@tabler/icons-react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { PanelSection } from "~/components/Section";
 import { LineChart, type LineMarker, SERIES_COLORS } from "~/components/charts/LineChart";
@@ -120,7 +120,7 @@ export function ScoresPanel({
     const deployedScored = deployed && byNumber.has(deployed.number) ? deployed : undefined;
     return (
         <PanelSection
-            icon={ChartLine}
+            icon={IconChartLine}
             anchor="scores"
             title="Scores"
             tip={`${metricName(metric)} of each ready version on the held-out rows it never trained on.`}

@@ -1,6 +1,7 @@
+import { IconCubePlus } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { CubePlus, useToast } from "obp-ui";
+import { useToast } from "obp-ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
     type CatalogEntry,
@@ -599,7 +600,7 @@ export function AddModelPage() {
                 }
                 submit={
                     <>
-                        <CubePlus />
+                        <IconCubePlus />
                         {add.isPending ? "Creating…" : "Create model"}
                     </>
                 }

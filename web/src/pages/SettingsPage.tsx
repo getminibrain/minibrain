@@ -1,5 +1,5 @@
+import { IconArrowsSplit, IconBook2, IconCoins, IconScale, IconSchool } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookMarked, Coins, GraduationCap, Scale, Split } from "lucide-react";
 import {
     Button,
     Select,
@@ -63,7 +63,7 @@ function ModelCatalogue() {
         : "Using the catalogue bundled with this release";
     return (
         <SettingsSection
-            icon={BookMarked}
+            icon={IconBook2}
             anchor={CATALOGUE.anchor}
             title={CATALOGUE.title}
             description="The models Discover lists, with their sizes, licences and tasks."
@@ -219,7 +219,7 @@ function ComputePrices() {
     const data = prices.data;
     return (
         <SettingsSection
-            icon={Coins}
+            icon={IconCoins}
             anchor={PRICES.anchor}
             title={PRICES.title}
             description="Scoring measures GPU time per request. A price per hour turns it into cost per 1,000 requests; without one, Evaluations and model cards show the time."
@@ -255,7 +255,7 @@ function JudgeModel() {
     const value = save.isPending ? (save.variables ?? OWN_BASE) : (setting.data?.model ?? OWN_BASE);
     return (
         <SettingsSection
-            icon={Scale}
+            icon={IconScale}
             anchor={JUDGE.anchor}
             title={JUDGE.title}
             description="A judge scores free-text answers from 1 to 5 against a rubric, as its own job on this install, and says why. Chat assistants add a judge score once one is chosen; a model can pick its own on its page."
@@ -312,7 +312,7 @@ export function SettingsPage() {
                 {can.admin && <ComputePrices />}
                 {can.admin && <JudgeModel />}
                 <SettingsSection
-                    icon={GraduationCap}
+                    icon={IconSchool}
                     anchor={GENERAL.recipe.anchor}
                     title={GENERAL.recipe.title}
                     description={GENERAL.recipe.description}
@@ -328,7 +328,7 @@ export function SettingsPage() {
                     </div>
                 </SettingsSection>
                 <SettingsSection
-                    icon={Split}
+                    icon={IconArrowsSplit}
                     anchor={GENERAL.splits.anchor}
                     title={GENERAL.splits.title}
                     description={GENERAL.splits.description}

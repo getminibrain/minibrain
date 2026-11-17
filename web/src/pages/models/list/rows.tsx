@@ -1,23 +1,23 @@
 import {
-    ArrowRightLeft,
-    ChevronRight,
-    CircleX,
-    Copy,
-    Eye,
-    FileText,
-    GitCompare,
-    GraduationCap,
-    MoreHorizontal,
-    PanelRight,
-    Pencil,
-    Play,
-    Plug,
-    PowerOff,
-    Rocket,
-    RotateCcw,
-    Trash2,
-    Wrench,
-} from "lucide-react";
+    IconArrowsLeftRight,
+    IconChevronRight,
+    IconCircleX,
+    IconCopy,
+    IconDots,
+    IconEye,
+    IconFileText,
+    IconGitCompare,
+    IconLayoutSidebarRight,
+    IconPencil,
+    IconPlayerPlay,
+    IconPlug,
+    IconPlugOff,
+    IconRocket,
+    IconRotate,
+    IconSchool,
+    IconTool,
+    IconTrash,
+} from "@tabler/icons-react";
 import {
     Checkbox,
     DropdownMenu,
@@ -197,7 +197,7 @@ function Chevron({
             onClick={onToggle}
         >
             <span className={cn(HIT_FACE, "size-6")}>
-                <ChevronRight
+                <IconChevronRight
                     aria-hidden="true"
                     className={cn(
                         "size-3 transition-transform duration-100 motion-reduce:transition-none",
@@ -347,14 +347,14 @@ function TrainItem({
     if (!blocked) {
         return (
             <DropdownMenuItem onSelect={onSelect}>
-                <GraduationCap />
+                <IconSchool />
                 {label}
             </DropdownMenuItem>
         );
     }
     return (
         <DropdownMenuItem disabled className="items-start">
-            <GraduationCap className="mt-0.5" />
+            <IconSchool className="mt-0.5" />
             <span className="flex flex-col">
                 <span>{label}</span>
                 <span className="max-w-60 text-sm whitespace-normal text-muted-foreground">
@@ -383,13 +383,13 @@ function HealthItems({
         <>
             {retryable && (manages || retryable.kind === "undeploy") && (
                 <DropdownMenuItem onSelect={() => on.retryTeardown(row)}>
-                    <RotateCcw />
+                    <IconRotate />
                     {needsReview(retryable) ? REVIEW_LABEL : RETRY_LABELS[retryable.kind]}
                 </DropdownMenuItem>
             )}
             {fixes.map((action) => (
                 <DropdownMenuItem key={action.kind} onSelect={() => on.health(row, action)}>
-                    <Wrench />
+                    <IconTool />
                     {action.label}
                 </DropdownMenuItem>
             ))}
@@ -408,11 +408,11 @@ function CustomItems({ model, on, can }: { model: ListModel; on: Handlers; can: 
         <>
             <HealthItems row={row} on={on} can={can} />
             <DropdownMenuItem onSelect={() => on.edit(row)}>
-                <Pencil />
+                <IconPencil />
                 Edit
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => on.duplicate(row)}>
-                <Copy />
+                <IconCopy />
                 Duplicate
             </DropdownMenuItem>
             <TrainItem
@@ -421,13 +421,13 @@ function CustomItems({ model, on, can }: { model: ListModel; on: Handlers; can: 
                 onSelect={() => on.open(trainHref(row.key))}
             />
             <DropdownMenuItem onSelect={() => on.switchBase(row, limit?.switch_to?.key ?? null)}>
-                <ArrowRightLeft />
+                <IconArrowsLeftRight />
                 {limit?.switch_to ? `Move to ${limit.switch_to.name}` : "Switch base"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isDeployed(row) && (
                 <DropdownMenuItem variant="destructive" onSelect={() => on.undeploy([row])}>
-                    <PowerOff />
+                    <IconPlugOff />
                     Undeploy
                 </DropdownMenuItem>
             )}
@@ -437,7 +437,7 @@ function CustomItems({ model, on, can }: { model: ListModel; on: Handlers; can: 
                     on.remove([{ key: `custom:${row.key}`, model: row, version: null }])
                 }
             >
-                <Trash2 />
+                <IconTrash />
                 Delete model and all versions
             </DropdownMenuItem>
         </>
@@ -459,7 +459,7 @@ function BaseItems({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
             {single && <HealthItems row={lead} on={on} can={can} />}
             {can.admin && single && (
                 <DropdownMenuItem onSelect={() => on.edit(lead)}>
-                    <Pencil />
+                    <IconPencil />
                     Edit
                 </DropdownMenuItem>
             )}
@@ -472,7 +472,7 @@ function BaseItems({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
             )}
             {single && ready && !lead.health && !isDeployed(lead) && (
                 <DropdownMenuItem onSelect={() => on.deploy([lead])}>
-                    <Rocket />
+                    <IconRocket />
                     Deploy
                 </DropdownMenuItem>
             )}
@@ -481,21 +481,21 @@ function BaseItems({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
                 lead.activity.state === "failed" &&
                 lead.availability.state === "not_downloaded" && (
                     <DropdownMenuItem onSelect={() => on.retryDownload(lead)}>
-                        <RotateCcw />
+                        <IconRotate />
                         Retry download
                     </DropdownMenuItem>
                 )}
             {can.admin &&
                 transferring.map((row) => (
                     <DropdownMenuItem key={row.key} onSelect={() => on.cancelTransfer(row)}>
-                        <CircleX />
+                        <IconCircleX />
                         {single ? "Cancel download" : `Cancel ${row.variant_label ?? row.name}`}
                     </DropdownMenuItem>
                 ))}
             {(live.length > 0 || can.admin) && <DropdownMenuSeparator />}
             {live.length > 0 && (
                 <DropdownMenuItem variant="destructive" onSelect={() => on.undeploy(live)}>
-                    <PowerOff />
+                    <IconPlugOff />
                     {single ? "Undeploy" : "Undeploy every format"}
                 </DropdownMenuItem>
             )}
@@ -512,7 +512,7 @@ function BaseItems({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
                         )
                     }
                 >
-                    <Trash2 />
+                    <IconTrash />
                     {single ? "Delete model" : "Delete model and every format"}
                 </DropdownMenuItem>
             )}
@@ -530,7 +530,7 @@ function MenuTrigger({ label, disabled }: { label: string; disabled?: boolean })
                 className={cn(CELL_HIT, "absolute inset-0 justify-end pr-4")}
             >
                 <span className={cn(HIT_FACE, "size-8")}>
-                    <MoreHorizontal aria-hidden="true" className="size-4" />
+                    <IconDots aria-hidden="true" className="size-4" />
                 </span>
             </button>
         </DropdownMenuTrigger>
@@ -559,11 +559,11 @@ function ModelMenu({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
             />
             <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onSelect={() => on.open(hrefOf(model))}>
-                    <Eye />
+                    <IconEye />
                     View details
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => on.peek(model)}>
-                    <PanelRight />
+                    <IconLayoutSidebarRight />
                     Quick look
                 </DropdownMenuItem>
                 <UseItems model={model} on={on} />
@@ -593,13 +593,13 @@ function UseItems({ model, on }: { model: ListModel; on: Handlers }) {
         <>
             {runnable && (
                 <DropdownMenuItem onSelect={() => on.open(playgroundHref(row.key))}>
-                    <Play />
+                    <IconPlayerPlay />
                     Try it
                 </DropdownMenuItem>
             )}
             {deployed(model) && (
                 <DropdownMenuItem onSelect={() => on.open(modelPageHref(row.key, "api"))}>
-                    <Plug />
+                    <IconPlug />
                     Connect
                 </DropdownMenuItem>
             )}
@@ -793,12 +793,12 @@ function VersionMenu({
                 <DropdownMenuItem
                     onSelect={() => on.open(modelVersionHref(model.key, version.number))}
                 >
-                    <Eye />
+                    <IconEye />
                     {`Open v${version.number}`}
                 </DropdownMenuItem>
                 {can.build && canMakeLive(model, version) && (
                     <DropdownMenuItem onSelect={() => on.makeLive(model, version)}>
-                        <Rocket />
+                        <IconRocket />
                         {`Deploy v${version.number}`}
                     </DropdownMenuItem>
                 )}
@@ -806,7 +806,7 @@ function VersionMenu({
                     <DropdownMenuItem
                         onSelect={() => on.compare(model, [versus.number, version.number])}
                     >
-                        <GitCompare />
+                        <IconGitCompare />
                         {`Compare with live v${versus.number}`}
                     </DropdownMenuItem>
                 )}
@@ -814,7 +814,7 @@ function VersionMenu({
                     <DropdownMenuItem
                         onSelect={() => on.open(playgroundHref(`${model.key}@${version.number}`))}
                     >
-                        <Play />
+                        <IconPlayerPlay />
                         {`Try ${model.key}@${version.number}`}
                     </DropdownMenuItem>
                 )}
@@ -822,7 +822,7 @@ function VersionMenu({
                     <DropdownMenuItem
                         onSelect={() => on.open(modelCardHref(model.key, version.number))}
                     >
-                        <FileText />
+                        <IconFileText />
                         Model card
                     </DropdownMenuItem>
                 )}
@@ -842,7 +842,7 @@ function VersionMenu({
                                 ])
                             }
                         >
-                            <Trash2 />
+                            <IconTrash />
                             {blocked ?? `Delete v${version.number}`}
                         </DropdownMenuItem>
                     </>
@@ -1024,24 +1024,24 @@ export function VariantLine({
                         <MenuTrigger label={`More actions for ${model.name} ${label}`} />
                         <DropdownMenuContent align="end" className="w-64">
                             <DropdownMenuItem onSelect={() => on.open(modelPageHref(row.key))}>
-                                <Eye />
+                                <IconEye />
                                 {`Open ${label}`}
                             </DropdownMenuItem>
                             {row.availability.state === "available" && (
                                 <DropdownMenuItem onSelect={() => on.open(playgroundHref(row.key))}>
-                                    <Play />
+                                    <IconPlayerPlay />
                                     {`Try ${label}`}
                                 </DropdownMenuItem>
                             )}
                             {props.can.build && !live && ready && (
                                 <DropdownMenuItem onSelect={() => on.deploy([row])}>
-                                    <Rocket />
+                                    <IconRocket />
                                     Deploy
                                 </DropdownMenuItem>
                             )}
                             {props.can.build && live && (
                                 <DropdownMenuItem onSelect={() => on.undeploy([row])}>
-                                    <PowerOff />
+                                    <IconPlugOff />
                                     Undeploy
                                 </DropdownMenuItem>
                             )}
@@ -1061,7 +1061,7 @@ export function VariantLine({
                                             ])
                                         }
                                     >
-                                        <Trash2 />
+                                        <IconTrash />
                                         {live ? `${label} is live` : "Delete files"}
                                     </DropdownMenuItem>
                                 </>

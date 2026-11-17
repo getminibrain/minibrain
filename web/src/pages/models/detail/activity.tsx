@@ -1,4 +1,4 @@
-import { History } from "lucide-react";
+import { IconHistory } from "@tabler/icons-react";
 import {
     Link,
     StatusDot,
@@ -363,7 +363,11 @@ export function ActivityPanel({ row }: { row: ModelRow }) {
     const shown = all.slice(0, limit);
     const more = all.length > shown.length;
     return (
-        <PanelSection icon={History} title="Activity" description="Who changed what, newest first.">
+        <PanelSection
+            icon={IconHistory}
+            title="Activity"
+            description="Who changed what, newest first."
+        >
             <div className="flex min-w-0 flex-col gap-3">
                 <ErrorLine error={activity.error} onRetry={activity.refetch} />
                 {activity.isLoading ? (

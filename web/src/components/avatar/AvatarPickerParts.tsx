@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { IconCheck } from "@tabler/icons-react";
 import { Badge, Input, Label, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { AvatarTile } from "./AvatarTile";
@@ -25,7 +25,7 @@ function SelectedTick() {
             aria-hidden="true"
             className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-sm bg-primary text-primary-foreground"
         >
-            <Check className="size-3" strokeWidth={3} />
+            <IconCheck className="size-3" strokeWidth={3} />
         </span>
     );
 }
@@ -314,7 +314,9 @@ export function ColourRow({
                                         className="flex size-6 items-center justify-center rounded-sm text-background"
                                         style={{ backgroundColor: `var(${toneToken(key)})` }}
                                     >
-                                        {checked && <Check className="size-4" strokeWidth={3} />}
+                                        {checked && (
+                                            <IconCheck className="size-4" strokeWidth={3} />
+                                        )}
                                     </span>
                                 </label>
                             </TooltipTrigger>
@@ -513,7 +515,11 @@ export function StylePicker({
                             <span className="min-w-0 truncate font-medium">{item.name}</span>
                             {checked && (
                                 <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                    <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+                                    <IconCheck
+                                        aria-hidden="true"
+                                        className="size-3"
+                                        strokeWidth={3}
+                                    />
                                 </span>
                             )}
                         </label>

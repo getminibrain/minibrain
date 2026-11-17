@@ -1,4 +1,4 @@
-import { KeyRound, MonitorSmartphone, Palette, UserRound } from "lucide-react";
+import { IconDevices, IconKey, IconPalette, IconUser } from "@tabler/icons-react";
 import { Badge, Button, Input, useToast } from "obp-ui";
 import { type FormEvent, useState } from "react";
 import {
@@ -58,7 +58,7 @@ function ProfileSection({ profile }: { profile: Profile }) {
     };
     return (
         <SettingsSection
-            icon={UserRound}
+            icon={IconUser}
             anchor={PROFILE.anchor}
             title={PROFILE.title}
             description="How you appear in the sidebar, on audit events and to admins."
@@ -139,7 +139,7 @@ function PasswordForm({ profile }: { profile: Profile }) {
     };
     return (
         <SettingsSection
-            icon={KeyRound}
+            icon={IconKey}
             anchor={PASSWORD.anchor}
             title={PASSWORD.title}
             description="Needs your current password. Changing it signs you out everywhere else."
@@ -222,7 +222,7 @@ function PasswordSection({ profile }: { profile: Profile }) {
     }
     return (
         <SettingsSection
-            icon={KeyRound}
+            icon={IconKey}
             anchor={PASSWORD.anchor}
             title={PASSWORD.title}
             description="Single sign-on and proxy accounts have no password in minibrain."
@@ -289,7 +289,7 @@ function SessionsSection({ profile }: { profile: Profile }) {
         });
     return (
         <SettingsSection
-            icon={MonitorSmartphone}
+            icon={IconDevices}
             anchor={SESSIONS.anchor}
             title={SESSIONS.title}
             description={
@@ -352,7 +352,7 @@ export function YourAccountPage() {
                 {data && <PasswordSection profile={data} />}
                 {data && <SessionsSection profile={data} />}
                 <SettingsSection
-                    icon={Palette}
+                    icon={IconPalette}
                     anchor={APPEARANCE.anchor}
                     title={APPEARANCE.title}
                     description="Light, dark or your device's setting, for this browser."

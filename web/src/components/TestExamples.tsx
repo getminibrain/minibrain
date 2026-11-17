@@ -1,6 +1,6 @@
+import { IconTrash } from "@tabler/icons-react";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2 } from "lucide-react";
 import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger, useToast } from "obp-ui";
 import { useState } from "react";
 import { type FeedbackInfo, useRemoveTestExample, useTestExamples } from "~/api/feedbackQueries";
@@ -106,7 +106,7 @@ export function TestExamples({ slug }: { slug: string }) {
                                 aria-label={`Remove test example ${lastMessage(item)}`}
                                 onClick={() => ask(item)}
                             >
-                                <Trash2 aria-hidden="true" />
+                                <IconTrash aria-hidden="true" />
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>Remove</TooltipContent>

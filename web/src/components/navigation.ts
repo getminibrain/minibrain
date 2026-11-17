@@ -1,26 +1,26 @@
 import {
-    Activity,
-    Box,
-    Cable,
-    Compass,
-    Database,
-    Gauge,
-    GraduationCap,
-    HardDrive,
-    Home,
-    Info,
-    KeyRound,
-    ListChecks,
-    Play,
-    ScrollText,
-    Server,
-    ShieldCheck,
-    SlidersHorizontal,
-    Table2,
-    ThumbsUp,
-    UserRound,
-    Users,
-} from "lucide-react";
+    IconActivity,
+    IconAdjustmentsHorizontal,
+    IconCompass,
+    IconCube,
+    IconDatabase,
+    IconGauge,
+    IconHome,
+    IconInfoCircle,
+    IconKey,
+    IconListCheck,
+    IconPlayerPlay,
+    IconPlugConnected,
+    IconSchool,
+    IconScript,
+    IconServer,
+    IconServer2,
+    IconShieldCheck,
+    IconTable,
+    IconThumbUp,
+    IconUser,
+    IconUsers,
+} from "@tabler/icons-react";
 import type { IconComponent } from "obp-ui/shell";
 import type { Role } from "~/api/authQueries";
 import { allows } from "~/lib/access";
@@ -30,31 +30,31 @@ export type NavEntry = { label: string; path: string; icon: IconComponent; role?
 export type NavSection = { label: string | null; items: NavEntry[] };
 
 export const SECTIONS: NavSection[] = [
-    { label: null, items: [{ label: "Home", path: "/", icon: Home }] },
+    { label: null, items: [{ label: "Home", path: "/", icon: IconHome }] },
     {
         label: "Explore",
         items: [
-            { label: "Models", path: "/models", icon: Box },
-            { label: "Discover", path: "/discover", icon: Compass, role: "builder" },
-            { label: "Playground", path: "/playground", icon: Play },
+            { label: "Models", path: "/models", icon: IconCube },
+            { label: "Discover", path: "/discover", icon: IconCompass, role: "builder" },
+            { label: "Playground", path: "/playground", icon: IconPlayerPlay },
         ],
     },
     {
         label: "Create",
         items: [
-            { label: "Data", path: "/data", icon: Database, role: "builder" },
-            { label: "Training", path: "/training", icon: GraduationCap, role: "builder" },
-            { label: "Evaluations", path: "/evaluations", icon: Gauge, role: "builder" },
-            { label: "Feedback", path: "/feedback", icon: ThumbsUp, role: "builder" },
+            { label: "Data", path: "/data", icon: IconDatabase, role: "builder" },
+            { label: "Training", path: "/training", icon: IconSchool, role: "builder" },
+            { label: "Evaluations", path: "/evaluations", icon: IconGauge, role: "builder" },
+            { label: "Feedback", path: "/feedback", icon: IconThumbUp, role: "builder" },
         ],
     },
     {
         label: "Operate",
         items: [
-            { label: "Monitoring", path: "/monitor", icon: Activity },
-            { label: "Jobs", path: "/jobs", icon: ListChecks, role: "builder" },
-            { label: "Infrastructure", path: "/infrastructure", icon: Server, role: "admin" },
-            { label: "API keys", path: "/api-keys", icon: KeyRound, role: "builder" },
+            { label: "Monitoring", path: "/monitor", icon: IconActivity },
+            { label: "Jobs", path: "/jobs", icon: IconListCheck, role: "builder" },
+            { label: "Infrastructure", path: "/infrastructure", icon: IconServer, role: "admin" },
+            { label: "API keys", path: "/api-keys", icon: IconKey, role: "builder" },
         ],
     },
 ];
@@ -62,15 +62,15 @@ export const SECTIONS: NavSection[] = [
 export const ACCOUNT_PATH = "/settings/account";
 
 export const SETTINGS_PAGES: NavEntry[] = [
-    { label: "Your account", path: ACCOUNT_PATH, icon: UserRound },
-    { label: "General", path: "/settings", icon: SlidersHorizontal, role: "viewer" },
-    { label: "Security", path: "/settings/security", icon: ShieldCheck, role: "admin" },
-    { label: "Accounts", path: "/settings/accounts", icon: Users, role: "admin" },
-    { label: "Audit log", path: "/settings/audit", icon: ScrollText, role: "admin" },
-    { label: "Data", path: "/settings/data", icon: Table2, role: "admin" },
-    { label: "Storage", path: "/settings/storage", icon: HardDrive, role: "admin" },
-    { label: "Connections", path: "/settings/connections", icon: Cable, role: "admin" },
-    { label: "This install", path: "/settings/install", icon: Info, role: "admin" },
+    { label: "Your account", path: ACCOUNT_PATH, icon: IconUser },
+    { label: "General", path: "/settings", icon: IconAdjustmentsHorizontal, role: "viewer" },
+    { label: "Security", path: "/settings/security", icon: IconShieldCheck, role: "admin" },
+    { label: "Accounts", path: "/settings/accounts", icon: IconUsers, role: "admin" },
+    { label: "Audit log", path: "/settings/audit", icon: IconScript, role: "admin" },
+    { label: "Data", path: "/settings/data", icon: IconTable, role: "admin" },
+    { label: "Storage", path: "/settings/storage", icon: IconServer2, role: "admin" },
+    { label: "Connections", path: "/settings/connections", icon: IconPlugConnected, role: "admin" },
+    { label: "This install", path: "/settings/install", icon: IconInfoCircle, role: "admin" },
 ];
 
 export function visibleTo(role: Role | null | undefined): (entry: NavEntry) => boolean {

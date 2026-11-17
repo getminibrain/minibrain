@@ -1,4 +1,4 @@
-import { Check, Copy } from "lucide-react";
+import { IconCheck, IconCopy } from "@tabler/icons-react";
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { useState } from "react";
 
@@ -39,9 +39,9 @@ export function CopyButton({
                     onBlur={() => setState("idle")}
                 >
                     {state === "copied" ? (
-                        <Check aria-hidden="true" />
+                        <IconCheck aria-hidden="true" />
                     ) : (
-                        <Copy aria-hidden="true" />
+                        <IconCopy aria-hidden="true" />
                     )}
                     {labelled && label}
                 </Button>

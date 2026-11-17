@@ -1,6 +1,6 @@
+import { IconDots, IconKey, IconUserPlus, IconUsers } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { KeyRound, MoreHorizontal, UserPlus, Users } from "lucide-react";
 import {
     Badge,
     Button,
@@ -186,7 +186,7 @@ function AddPersonDialog({
                             Cancel
                         </Button>
                         <Button type="submit" disabled={add.isPending}>
-                            <UserPlus />
+                            <IconUserPlus />
                             Invite
                         </Button>
                     </DialogFooter>
@@ -342,7 +342,7 @@ function PersonMenu({
                     size="icon-xs"
                     aria-label={`Actions for ${person.email ?? person.name}`}
                 >
-                    <MoreHorizontal />
+                    <IconDots />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
@@ -476,13 +476,13 @@ function People() {
     });
     return (
         <SettingsSection
-            icon={Users}
+            icon={IconUsers}
             anchor={PEOPLE.anchor}
             title={PEOPLE.title}
             description="Everyone who can sign in. Turning someone off signs them out at once."
             actions={
                 <Button variant="outline" onClick={() => setAdding(true)}>
-                    <UserPlus />
+                    <IconUserPlus />
                     {PEOPLE.settings.invite.label}
                 </Button>
             }
@@ -525,7 +525,7 @@ function SignInSources() {
         info && info.default_role !== "none" ? ROLE_LABELS[info.default_role] : "No role";
     return (
         <SettingsSection
-            icon={KeyRound}
+            icon={IconKey}
             anchor={ACCOUNTS.signIn.anchor}
             title={ACCOUNTS.signIn.title}
             description="Set in minibrain.yaml on the server, so they cannot be changed here."

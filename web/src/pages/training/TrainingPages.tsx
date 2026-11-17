@@ -1,6 +1,6 @@
+import { IconSchool } from "@tabler/icons-react";
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { GraduationCap } from "lucide-react";
 import {
     Button,
     CheckboxSelect,
@@ -352,7 +352,7 @@ export function TrainingListPage() {
                 actions={
                     can.build && (
                         <Button onClick={() => setPicking(true)}>
-                            <GraduationCap />
+                            <IconSchool />
                             Train a model
                         </Button>
                     )

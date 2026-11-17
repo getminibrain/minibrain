@@ -1,5 +1,5 @@
+import { IconZoomCancel } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { SearchX } from "lucide-react";
 import {
     DataGrid,
     SegmentedTabs,
@@ -203,7 +203,7 @@ export function FailuresPanel({ row, versions }: { row: ModelRow; versions: Vers
     const rows = failuresOf(all, metric, mode);
     return (
         <PanelSection
-            icon={SearchX}
+            icon={IconZoomCancel}
             anchor="failures"
             title="Where it fails"
             tip={

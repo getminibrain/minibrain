@@ -1,10 +1,10 @@
 import {
-    CircleAlert,
-    CircleCheck,
-    CircleDashed,
-    LoaderCircle,
-    type LucideIcon,
-} from "lucide-react";
+    IconAlertCircle,
+    IconCircleCheck,
+    IconCircleDashed,
+    IconLoader2,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
@@ -171,12 +171,12 @@ function deploymentShown(row: ModelRow, brief = false): Shown {
     }
 }
 
-const STATUS_ICONS: Record<Tone, { icon: LucideIcon; className: string }> = {
-    success: { icon: CircleCheck, className: "text-success" },
-    info: { icon: LoaderCircle, className: "animate-spin text-info motion-reduce:animate-none" },
-    warning: { icon: CircleAlert, className: "text-warning" },
-    destructive: { icon: CircleAlert, className: "text-destructive" },
-    neutral: { icon: CircleDashed, className: "text-muted-foreground" },
+const STATUS_ICONS: Record<Tone, { icon: TablerIcon; className: string }> = {
+    success: { icon: IconCircleCheck, className: "text-success" },
+    info: { icon: IconLoader2, className: "animate-spin text-info motion-reduce:animate-none" },
+    warning: { icon: IconAlertCircle, className: "text-warning" },
+    destructive: { icon: IconAlertCircle, className: "text-destructive" },
+    neutral: { icon: IconCircleDashed, className: "text-muted-foreground" },
 };
 
 export function DeploymentStatus({ row, brief = false }: { row: ModelRow; brief?: boolean }) {

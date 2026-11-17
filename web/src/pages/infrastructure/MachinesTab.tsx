@@ -1,4 +1,4 @@
-import { TriangleAlert } from "lucide-react";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -107,7 +107,7 @@ function ProblemBadge({ problems }: { problems: Problem[] }) {
             <TooltipTrigger asChild>
                 <button type="button" aria-label={label} className="shrink-0 rounded-sm">
                     <Badge variant={tone} className="tabular-nums">
-                        <TriangleAlert aria-hidden="true" />
+                        <IconAlertTriangle aria-hidden="true" />
                         {problems.length > 1 ? count(problems.length) : null}
                     </Badge>
                 </button>

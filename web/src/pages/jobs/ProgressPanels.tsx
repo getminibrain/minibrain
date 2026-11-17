@@ -1,4 +1,4 @@
-import { Gauge, Hourglass } from "lucide-react";
+import { IconGauge, IconHourglass } from "@tabler/icons-react";
 import { Button, Link } from "obp-ui";
 import type { ReactNode } from "react";
 import type { JobDetail, JobMetrics, ModelVersionRow, VersionInfo } from "~/api/client";
@@ -116,7 +116,7 @@ export function ProgressSection({
     const note = quietNote(job, facts);
     return (
         <PanelSection
-            icon={Hourglass}
+            icon={IconHourglass}
             title="Progress"
             description="Where the job is and how fast it moves."
         >
@@ -223,7 +223,7 @@ export function ScoresSection({ job }: { job: JobDetail }) {
         job.version !== undefined;
     return (
         <PanelSection
-            icon={Gauge}
+            icon={IconGauge}
             title="Scores"
             description={
                 done

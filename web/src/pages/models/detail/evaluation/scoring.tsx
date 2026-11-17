@@ -1,6 +1,6 @@
+import { IconScale } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Scale } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -196,7 +196,7 @@ export function ScoringPanel({
     const blocked = names.length === 0;
     return (
         <PanelSection
-            icon={Scale}
+            icon={IconScale}
             anchor="scoring"
             title="How it's scored"
             actions={

@@ -1,5 +1,11 @@
+import {
+    IconDownload,
+    IconFingerprint,
+    IconGitBranch,
+    IconHourglass,
+    IconRotate,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Download, Fingerprint, GitBranch, Hourglass, RotateCcw } from "lucide-react";
 import { Button, Link, cn, useToast } from "obp-ui";
 import type { ReactNode } from "react";
 import {
@@ -224,7 +230,7 @@ function RetryRun({ slug, version }: { slug: string; version: VersionInfo }) {
     }
     return (
         <Button variant="outline" disabled={again.isPending} onClick={() => again.mutate()}>
-            <RotateCcw aria-hidden="true" />
+            <IconRotate aria-hidden="true" />
             Retry
         </Button>
     );
@@ -452,7 +458,7 @@ export function TrainingSection({
     );
     if (version.kind === "prompt") {
         return (
-            <PanelSection icon={Hourglass} title="Training" actions={actions}>
+            <PanelSection icon={IconHourglass} title="Training" actions={actions}>
                 <div className="flex flex-col gap-3">
                     <Stats>
                         <Stat label="Method" value="Instructions only" />
@@ -540,7 +546,7 @@ export function TrainingSection({
     }
     return (
         <PanelSection
-            icon={Hourglass}
+            icon={IconHourglass}
             title="Training"
             tip="Supervised fine-tuning of a LoRA adapter: training and held-out loss per step."
             actions={actions}
@@ -642,7 +648,7 @@ export function LineageSection({
     );
     return (
         <PanelSection
-            icon={GitBranch}
+            icon={IconGitBranch}
             title="Lineage"
             tip="The base it runs on, the data it learnt from and the version its settings started from."
         >
@@ -713,7 +719,7 @@ export function DetailsSection({
                 download
                 className="inline-flex h-5 items-center gap-1.5 text-primary hover:underline"
             >
-                <Download aria-hidden="true" className="size-4" />
+                <IconDownload aria-hidden="true" className="size-4" />
                 {`Adapter, ${bytes(files.data?.size)} · safetensors in a tar`}
             </a>
         ) : (
@@ -726,7 +732,7 @@ export function DetailsSection({
             </span>
         );
     return (
-        <PanelSection icon={Fingerprint} title="Details">
+        <PanelSection icon={IconFingerprint} title="Details">
             <Facts
                 items={[
                     [

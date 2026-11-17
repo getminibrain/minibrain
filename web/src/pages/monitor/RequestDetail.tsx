@@ -1,4 +1,4 @@
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { IconThumbDown, IconThumbUp } from "@tabler/icons-react";
 import {
     Badge,
     Dialog,
@@ -151,7 +151,7 @@ function Bodies({ detail }: { detail: RequestDetail }) {
 }
 
 function FeedbackItem({ item, linked }: { item: RequestFeedback; linked: boolean }) {
-    const Icon = item.rating === "up" ? ThumbsUp : ThumbsDown;
+    const Icon = item.rating === "up" ? IconThumbUp : IconThumbDown;
     const extra = [
         item.correction ? `Right answer: ${item.correction}` : null,
         item.comment ? `Comment: ${item.comment}` : null,

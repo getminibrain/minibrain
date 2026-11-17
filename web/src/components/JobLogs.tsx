@@ -1,4 +1,4 @@
-import { Logs } from "lucide-react";
+import { IconLogs } from "@tabler/icons-react";
 import { LogViewer } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import { isActiveJob } from "~/api/queries";
@@ -9,7 +9,7 @@ export function JobLogsSection({ job, anchor }: { job: JobInfo; anchor?: string 
     const entries = useJobEvents(job.id);
     return (
         <PanelSection
-            icon={Logs}
+            icon={IconLogs}
             anchor={anchor}
             title="Logs"
             tip={`What job #${job.id} printed, newest at the bottom.`}

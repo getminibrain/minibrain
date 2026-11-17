@@ -1,4 +1,4 @@
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { IconThumbDown, IconThumbUp } from "@tabler/icons-react";
 import {
     Button,
     Input,
@@ -36,7 +36,7 @@ function RateButton({
     onClick: () => void;
     disabled: boolean;
 }) {
-    const Icon = rating === "up" ? ThumbsUp : ThumbsDown;
+    const Icon = rating === "up" ? IconThumbUp : IconThumbDown;
     const label = rating === "up" ? "Right answer" : "Wrong answer";
     return (
         <Tooltip>

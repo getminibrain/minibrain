@@ -1,14 +1,14 @@
 import {
-    Cpu,
-    GraduationCap,
-    ListOrdered,
-    MemoryStick,
-    Play,
-    Rows3,
-    ScrollText,
-    Server,
-    Timer,
-} from "lucide-react";
+    IconCpu,
+    IconLayoutRows,
+    IconListNumbers,
+    IconMemory,
+    IconPlayerPlay,
+    IconSchool,
+    IconScript,
+    IconServer,
+    IconStopwatch,
+} from "@tabler/icons-react";
 import { useFeedbackTrainingRows } from "~/api/feedbackQueries";
 import {
     BlockedReasons,
@@ -119,19 +119,19 @@ function ScoreSummary({
         <SummaryCard>
             <SummarySection title="Estimate">
                 <SummaryFacts>
-                    <SummaryFact icon={Timer} label="Scores in">
+                    <SummaryFact icon={IconStopwatch} label="Scores in">
                         {blocked || !run.chosen ? "–" : scoreTime(run)}
                     </SummaryFact>
-                    <SummaryFact icon={Rows3} label="Held out">
+                    <SummaryFact icon={IconLayoutRows} label="Held out">
                         {count(run.heldOut)}
                     </SummaryFact>
-                    <SummaryFact icon={ScrollText} label="Instructions">
+                    <SummaryFact icon={IconScript} label="Instructions">
                         {changed ? "Changed" : "Unchanged"}
                     </SummaryFact>
                 </SummaryFacts>
             </SummarySection>
             <SummarySection title="Result">
-                <SummaryLine icon={Play} className="tabular-nums">
+                <SummaryLine icon={IconPlayerPlay} className="tabular-nums">
                     {`v${run.number} · instructions only, ${heldOutText(run)}`}
                 </SummaryLine>
             </SummarySection>
@@ -152,7 +152,7 @@ function ResultLine({ slug, run }: { slug: string; run: TrainRun }) {
     const feedback = useFeedbackTrainingRows(slug, run.chosen?.id ?? null).data?.rows ?? 0;
     const rows = run.info?.rows ?? run.available;
     return (
-        <SummaryLine icon={GraduationCap} className="tabular-nums">
+        <SummaryLine icon={IconSchool} className="tabular-nums">
             {`v${run.number} · ${trainedOn(rows, feedback)}, ${heldOutText(run)}`}
         </SummaryLine>
     );
@@ -182,19 +182,19 @@ export function RunSummary({
         <SummaryCard>
             <SummarySection title="Estimate">
                 <SummaryFacts>
-                    <SummaryFact icon={Timer} label="Time">
+                    <SummaryFact icon={IconStopwatch} label="Time">
                         {estimateOf(run, blocked)}
                     </SummaryFact>
-                    <SummaryFact icon={Server} label="Pool">
+                    <SummaryFact icon={IconServer} label="Pool">
                         <PoolFact run={run} />
                     </SummaryFact>
                     <SummaryFact
-                        icon={Cpu}
+                        icon={IconCpu}
                         label={machine?.kind === "cpu" ? "CPU-hours" : "GPU-hours"}
                     >
                         {minutes === null ? "–" : hoursText(minutes)}
                     </SummaryFact>
-                    <SummaryFact icon={ListOrdered} label="Queue">
+                    <SummaryFact icon={IconListNumbers} label="Queue">
                         {info
                             ? info.queue.ahead > 0
                                 ? `${info.queue.ahead} ahead`
@@ -211,7 +211,7 @@ export function RunSummary({
                         pool={run.pickedMachine?.pool ?? null}
                     />
                 ) : (
-                    <SummaryLine icon={MemoryStick} className="text-muted-foreground">
+                    <SummaryLine icon={IconMemory} className="text-muted-foreground">
                         {run.planning ? "Planning…" : "Not planned yet"}
                     </SummaryLine>
                 )}

@@ -1,12 +1,12 @@
 import {
-    Archive,
-    ExternalLink,
-    GraduationCap,
-    HardDrive,
-    type LucideIcon,
-    MemoryStick,
-    Play,
-} from "lucide-react";
+    IconArchive,
+    IconExternalLink,
+    IconMemory,
+    IconPlayerPlay,
+    IconSchool,
+    IconServer2,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import {
     Button,
     Checkbox,
@@ -86,7 +86,7 @@ export function Formats({
     );
 }
 
-function Amount({ icon: Icon, value }: { icon: LucideIcon; value: string }) {
+function Amount({ icon: Icon, value }: { icon: TablerIcon; value: string }) {
     return (
         <span className="inline-flex items-center gap-1.5">
             <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
@@ -109,20 +109,20 @@ function Requirements({
     const train = servesOnly ? (
         "Can't be trained"
     ) : trainFit?.qlora_bytes ? (
-        <Amount icon={MemoryStick} value={`${bytes(trainFit.qlora_bytes)} (QLoRA)`} />
+        <Amount icon={IconMemory} value={`${bytes(trainFit.qlora_bytes)} (QLoRA)`} />
     ) : (
         "Unknown"
     );
     return (
         <SummaryFacts>
-            <SummaryFact icon={Play} label="Run">
-                {fit ? <Amount icon={MemoryStick} value={bytes(fit.needed_bytes)} /> : "Unknown"}
+            <SummaryFact icon={IconPlayerPlay} label="Run">
+                {fit ? <Amount icon={IconMemory} value={bytes(fit.needed_bytes)} /> : "Unknown"}
             </SummaryFact>
-            <SummaryFact icon={GraduationCap} label="Train">
+            <SummaryFact icon={IconSchool} label="Train">
                 {train}
             </SummaryFact>
-            <SummaryFact icon={Archive} label="Storage">
-                {storage ? <Amount icon={HardDrive} value={bytes(storage)} /> : "Unknown"}
+            <SummaryFact icon={IconArchive} label="Storage">
+                {storage ? <Amount icon={IconServer2} value={bytes(storage)} /> : "Unknown"}
             </SummaryFact>
         </SummaryFacts>
     );
@@ -185,7 +185,7 @@ function ReadLink({ href }: { href: string }) {
     return (
         <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
             Read it
-            <ExternalLink className="ml-0.5 inline size-3.5" />
+            <IconExternalLink className="ml-0.5 inline size-3.5" />
         </a>
     );
 }

@@ -1,5 +1,5 @@
+import { IconCheck, IconX } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X } from "lucide-react";
 import {
     Button,
     Link,
@@ -212,12 +212,12 @@ export function Checklist({ checks }: { checks: NonNullable<Inspection["checks"]
             {checks.map((check) => (
                 <li key={check.label} className="flex items-start gap-2">
                     {check.ok ? (
-                        <Check
+                        <IconCheck
                             aria-hidden="true"
                             className="mt-0.5 size-4 flex-none text-success"
                         />
                     ) : (
-                        <X
+                        <IconX
                             aria-hidden="true"
                             className="mt-0.5 size-4 flex-none text-destructive"
                         />

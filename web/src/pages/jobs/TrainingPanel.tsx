@@ -1,4 +1,10 @@
-import { ChartLine, Hourglass, Minus, TrendingDown, TriangleAlert } from "lucide-react";
+import {
+    IconAlertTriangle,
+    IconChartLine,
+    IconHourglass,
+    IconMinus,
+    IconTrendingDown,
+} from "@tabler/icons-react";
 import {
     SegmentedTabs,
     Select,
@@ -294,7 +300,7 @@ function rateTip(training: Training | null | undefined): string {
 
 export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
     return (
-        <PanelSection icon={ChartLine} title="Loss" tip={lossTip(job, metrics)}>
+        <PanelSection icon={IconChartLine} title="Loss" tip={lossTip(job, metrics)}>
             <LossBody job={job} metrics={metrics} />
         </PanelSection>
     );
@@ -318,11 +324,11 @@ function useComparison(job: JobDetail, fallback: Previous | null | undefined) {
 }
 
 const VERDICT_ICONS = {
-    overfit: TriangleAlert,
-    waiting: Hourglass,
-    single: Hourglass,
-    flat: Minus,
-    falling: TrendingDown,
+    overfit: IconAlertTriangle,
+    waiting: IconHourglass,
+    single: IconHourglass,
+    flat: IconMinus,
+    falling: IconTrendingDown,
 } as const;
 
 function VerdictLine({ verdict }: { verdict: Verdict }) {

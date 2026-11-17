@@ -1,4 +1,4 @@
-import { Plug } from "lucide-react";
+import { IconPlug } from "@tabler/icons-react";
 import { Button } from "obp-ui";
 import { useState } from "react";
 import type { KeyCreated, ModelRow } from "~/api/client";
@@ -19,7 +19,7 @@ export function KeysTab({ row }: { row: ModelRow }) {
                     onCreated={setCreated}
                     secretActions={
                         <Button variant="outline" onClick={() => setConnecting(true)}>
-                            <Plug aria-hidden="true" />
+                            <IconPlug aria-hidden="true" />
                             Connect
                         </Button>
                     }

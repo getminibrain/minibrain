@@ -1,6 +1,13 @@
+import {
+    IconChevronDown,
+    IconPlayerPlay,
+    IconPlug,
+    IconRocket,
+    IconSchool,
+    IconSquarePlus,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { ChevronDown, GraduationCap, Play, Plug, Rocket, SquarePlus } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -200,7 +207,7 @@ function DeployButton({
         <>
             <Tip tip={blocked}>
                 <Button variant="outline" disabled={Boolean(blocked)} onClick={open}>
-                    <Rocket />
+                    <IconRocket />
                     Deploy
                 </Button>
             </Tip>
@@ -232,9 +239,9 @@ function UseMenu({ row }: { row: ModelRow }) {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline">
-                        <Play />
+                        <IconPlayerPlay />
                         Use
-                        <ChevronDown aria-hidden="true" />
+                        <IconChevronDown aria-hidden="true" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -242,11 +249,11 @@ function UseMenu({ row }: { row: ModelRow }) {
                         disabled={!row.can_test}
                         onSelect={() => router.history.push(playgroundHref(row.key))}
                     >
-                        <Play />
+                        <IconPlayerPlay />
                         Playground
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setConnecting(true)}>
-                        <Plug />
+                        <IconPlug />
                         API Connect
                     </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -281,7 +288,7 @@ function TrainButton({
                     )
                 }
             >
-                <GraduationCap />
+                <IconSchool />
                 Train
             </Button>
         </Tip>
@@ -310,7 +317,7 @@ export function ModelActions({
             ) : (
                 <Button variant="outline" asChild>
                     <Link href={`/models/new?base=${encodeURIComponent(row.key)}`}>
-                        <SquarePlus />
+                        <IconSquarePlus />
                         Create custom model
                     </Link>
                 </Button>

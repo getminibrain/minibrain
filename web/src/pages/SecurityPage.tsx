@@ -1,16 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-    Box,
-    FolderLock,
-    Globe,
-    KeyRound,
-    LogIn,
-    type LucideIcon,
-    Radar,
-    ScrollText,
-    ShieldCheck,
-    Timer,
-} from "lucide-react";
+    IconCube,
+    IconFolderLock,
+    IconKey,
+    IconLogin,
+    IconRadar,
+    IconScript,
+    IconShieldCheck,
+    IconStopwatch,
+    IconWorld,
+    type TablerIcon,
+} from "@tabler/icons-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
     Checkbox,
@@ -55,7 +55,7 @@ const INSTALL_PATH = "/settings/install";
 type Policies = Map<string, PolicyInfo>;
 
 type Group = {
-    icon: LucideIcon;
+    icon: TablerIcon;
     section: IndexedSection;
     description?: ReactNode;
     own?: (policies: Policies) => ReactNode;
@@ -65,30 +65,30 @@ const NESTED = new Set(["licences"]);
 
 const GROUPS: Group[] = [
     {
-        icon: Globe,
+        icon: IconWorld,
         section: SECURITY.network,
         description: "Which outside hosts this install may reach.",
     },
     {
-        icon: Box,
+        icon: IconCube,
         section: SECURITY.models,
         description:
             "Which models may be downloaded or imported, by source, licence and file format.",
     },
     {
-        icon: FolderLock,
+        icon: IconFolderLock,
         section: SECURITY.data,
         description: "Server folders that data sources may read.",
     },
-    { icon: LogIn, section: SECURITY.signIn, description: "Applies when accounts are on." },
+    { icon: IconLogin, section: SECURITY.signIn, description: "Applies when accounts are on." },
     {
-        icon: KeyRound,
+        icon: IconKey,
         section: SECURITY.requestLogs,
         description:
             "Every /v1 call's time, model, version, key, status, latency, tokens and response ID are always logged; they hold no content.",
     },
     {
-        icon: ScrollText,
+        icon: IconScript,
         section: SECURITY.auditExport,
         description: (
             <>
@@ -100,9 +100,9 @@ const GROUPS: Group[] = [
             </>
         ),
     },
-    { icon: ShieldCheck, section: SECURITY.auditIntegrity, own: () => <AuditIntegrity /> },
+    { icon: IconShieldCheck, section: SECURITY.auditIntegrity, own: () => <AuditIntegrity /> },
     {
-        icon: Timer,
+        icon: IconStopwatch,
         section: SECURITY.auditRetention,
         own: (policies) => {
             const policy = policies.get(RETENTION);
@@ -110,7 +110,7 @@ const GROUPS: Group[] = [
         },
     },
     {
-        icon: Radar,
+        icon: IconRadar,
         section: SECURITY.otel,
         description: (
             <>

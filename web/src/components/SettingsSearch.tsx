@@ -1,6 +1,6 @@
+import { IconSearch } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Search } from "lucide-react";
 import { HighlightText, SearchMenu, type SearchMenuGroup, foldText, searchTerms } from "obp-ui";
 import { NavItem, useRail } from "obp-ui/shell";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -189,7 +189,7 @@ export function SettingsSearch() {
     if (rail.collapsed) {
         return (
             <NavItem
-                icon={Search}
+                icon={IconSearch}
                 label="Search settings"
                 title="Search settings"
                 onClick={focus}

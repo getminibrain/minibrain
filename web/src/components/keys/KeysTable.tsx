@@ -1,5 +1,5 @@
+import { IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -57,21 +57,21 @@ function KeyMenu({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-xs" aria-label={`Actions for key ${item.name}`}>
-                    <MoreHorizontal />
+                    <IconDots />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
                 {onEdit && (
                     <>
                         <DropdownMenuItem onSelect={onEdit}>
-                            <Pencil />
+                            <IconPencil />
                             Edit scope
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                     </>
                 )}
                 <DropdownMenuItem variant="destructive" onSelect={onRevoke}>
-                    <Trash2 />
+                    <IconTrash />
                     Revoke
                 </DropdownMenuItem>
             </DropdownMenuContent>

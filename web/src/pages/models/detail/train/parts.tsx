@@ -1,4 +1,4 @@
-import { MemoryStick } from "lucide-react";
+import { IconMemory } from "@tabler/icons-react";
 import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { SummaryLine } from "~/components/CreateLayout";
@@ -114,7 +114,7 @@ export function MemorySummary({
                 }))}
             />
             <SummaryLine
-                icon={MemoryStick}
+                icon={IconMemory}
                 className={cn("tabular-nums", !ok && "text-destructive")}
             >
                 {ok

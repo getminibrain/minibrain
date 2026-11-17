@@ -1,4 +1,4 @@
-import { Network } from "lucide-react";
+import { IconSitemap } from "@tabler/icons-react";
 import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
@@ -89,7 +89,7 @@ export function SetupDiagram({
     const separate = info?.setup === "distributed";
     return (
         <PanelSection
-            icon={Network}
+            icon={IconSitemap}
             title="Setup"
             description={setup ? `${setup.title}. ${setup.body}` : undefined}
         >

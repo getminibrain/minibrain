@@ -1,4 +1,4 @@
-import { Check, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { IconCheck, IconThumbDown, IconThumbUp, IconX } from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -128,7 +128,7 @@ function Related({ items }: { items: FeedbackInfo[] }) {
 }
 
 function Answer({ item }: { item: FeedbackDetail }) {
-    const Icon = item.rating === "up" ? ThumbsUp : ThumbsDown;
+    const Icon = item.rating === "up" ? IconThumbUp : IconThumbDown;
     return (
         <Block label="The model answered">
             <div className="flex flex-wrap items-center gap-2">
@@ -348,7 +348,7 @@ function Review({ item, ids, hasMore, loadMore, onOpen }: Props & { item: Feedba
                     <AnswerField item={item} value={answer} onChange={setAnswer} inputRef={field} />
                     <div className="flex flex-wrap items-center gap-2">
                         <Button type="button" onClick={accept} disabled={busy || !item.suggestion}>
-                            <Check aria-hidden="true" />
+                            <IconCheck aria-hidden="true" />
                             Accept <Kbd>A</Kbd>
                         </Button>
                         <Button type="submit" variant="outline" disabled={busy}>
@@ -360,7 +360,7 @@ function Review({ item, ids, hasMore, loadMore, onOpen }: Props & { item: Feedba
                             onClick={() => decide("reject")}
                             disabled={busy}
                         >
-                            <X aria-hidden="true" />
+                            <IconX aria-hidden="true" />
                             Reject <Kbd>R</Kbd>
                         </Button>
                         <span className="flex-1" />

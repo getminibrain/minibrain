@@ -1,12 +1,12 @@
-import { useRouterState } from "@tanstack/react-router";
 import {
-    ChevronRight,
-    type LucideIcon,
-    SearchX,
-    ShieldX,
-    TriangleAlert,
-    WifiOff,
-} from "lucide-react";
+    IconAlertTriangle,
+    IconChevronRight,
+    IconShieldX,
+    IconWifiOff,
+    IconZoomCancel,
+    type TablerIcon,
+} from "@tabler/icons-react";
+import { useRouterState } from "@tanstack/react-router";
 import { Button, Link, cn } from "obp-ui";
 import { type ReactNode, useId } from "react";
 import { errorStatus, isUnreachable } from "~/api/client";
@@ -56,7 +56,7 @@ export function ErrorState({
     heading: Heading = "h1",
     className,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     title: string;
     children?: ReactNode;
     detail?: ReactNode;
@@ -167,7 +167,7 @@ export function NotFoundState({
     }
     return (
         <ErrorState
-            icon={SearchX}
+            icon={IconZoomCancel}
             title={title}
             detail={detail}
             primary={primary}
@@ -189,7 +189,7 @@ export function ForbiddenState({
 }) {
     return (
         <ErrorState
-            icon={ShieldX}
+            icon={IconShieldX}
             title="You don't have access"
             primary={GO_HOME}
             code="403 Forbidden"
@@ -230,7 +230,7 @@ export function QueryError({
     const again = retry ? { label: "Try again", onClick: () => void retry() } : undefined;
     return (
         <ErrorState
-            icon={isUnreachable(error) ? WifiOff : TriangleAlert}
+            icon={isUnreachable(error) ? IconWifiOff : IconAlertTriangle}
             title="Couldn't load this page"
             primary={again ?? GO_HOME}
             secondary={again ? GO_HOME : undefined}
@@ -288,7 +288,7 @@ export function CrashPage({ error }: { error: unknown }) {
     return (
         <ErrorPage fallback="Something went wrong">
             <ErrorState
-                icon={TriangleAlert}
+                icon={IconAlertTriangle}
                 title="This page hit an unexpected error"
                 heading="h2"
                 primary={{ label: "Reload", onClick: reload }}
@@ -296,7 +296,7 @@ export function CrashPage({ error }: { error: unknown }) {
                 detail={
                     <details className="group mt-2 rounded-lg border bg-background">
                         <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
-                            <ChevronRight
+                            <IconChevronRight
                                 aria-hidden="true"
                                 className="size-3.5 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none"
                             />

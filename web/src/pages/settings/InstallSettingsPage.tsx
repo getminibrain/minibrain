@@ -1,5 +1,13 @@
+import {
+    IconBook2,
+    IconCpu,
+    IconFolders,
+    IconPackage,
+    IconRadar,
+    IconServer,
+    IconWorld,
+} from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { BookMarked, Cpu, FolderTree, Globe, Package, Radar, Server } from "lucide-react";
 import {
     Badge,
     Button,
@@ -146,7 +154,7 @@ function Software({ info }: { info: InstallInfo }) {
     const software = info.software;
     return (
         <SettingsSection
-            icon={Package}
+            icon={IconPackage}
             anchor={INSTALL.software.anchor}
             title={INSTALL.software.title}
             description="Versions of minibrain and the libraries it runs on."
@@ -190,7 +198,7 @@ function Software({ info }: { info: InstallInfo }) {
                 <SoftwareRow
                     text={SOFTWARE.arch}
                     mark="cpu"
-                    fallback={<Cpu className="text-muted-foreground" />}
+                    fallback={<IconCpu className="text-muted-foreground" />}
                 >
                     <Text>{software.arch}</Text>
                 </SoftwareRow>
@@ -216,7 +224,7 @@ function Locations({ info }: { info: InstallInfo }) {
     const s3 = places.storage_kind === "s3";
     return (
         <SettingsSection
-            icon={FolderTree}
+            icon={IconFolders}
             anchor={INSTALL.locations.anchor}
             title={INSTALL.locations.title}
             description="Where this install keeps its settings, database and files."
@@ -274,7 +282,7 @@ function Catalogue({ info }: { info: InstallInfo }) {
     const current = catalogue.snapshot ?? catalogue.bundled_snapshot;
     return (
         <SettingsSection
-            icon={BookMarked}
+            icon={IconBook2}
             anchor={INSTALL.catalogue.anchor}
             title={INSTALL.catalogue.title}
             description="The model information Discover shows, and when it was last checked."
@@ -335,7 +343,7 @@ function Compute({ info }: { info: InstallInfo }) {
     const compute = info.compute;
     return (
         <SettingsSection
-            icon={Server}
+            icon={IconServer}
             anchor={INSTALL.compute.anchor}
             title={INSTALL.compute.title}
             description="Pools, machines, workers and model servers this install sees."
@@ -375,7 +383,7 @@ function NetworkSection({ info }: { info: InstallInfo }) {
     const lock = LOCK_SOURCES[network.source];
     return (
         <SettingsSection
-            icon={Globe}
+            icon={IconWorld}
             anchor={INSTALL.network.anchor}
             title={INSTALL.network.title}
             description="Where this install may connect."
@@ -452,7 +460,7 @@ function Observability({ info }: { info: InstallInfo }) {
     const observability = info.observability;
     return (
         <SettingsSection
-            icon={Radar}
+            icon={IconRadar}
             anchor={INSTALL.observability.anchor}
             title={INSTALL.observability.title}
             description="Metrics, traces and logs for your own monitoring."

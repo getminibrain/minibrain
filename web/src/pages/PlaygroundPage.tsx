@@ -1,14 +1,14 @@
-import { useRouter } from "@tanstack/react-router";
 import {
-    Code,
-    FlaskConical,
-    History,
-    MoreHorizontal,
-    PanelLeft,
-    PanelRight,
-    SlidersHorizontal,
-    SquarePen,
-} from "lucide-react";
+    IconAdjustmentsHorizontal,
+    IconCode,
+    IconDots,
+    IconEdit,
+    IconFlask,
+    IconHistory,
+    IconLayoutSidebar,
+    IconLayoutSidebarRight,
+} from "@tabler/icons-react";
+import { useRouter } from "@tanstack/react-router";
 import {
     Button,
     Card,
@@ -400,7 +400,7 @@ export function PlaygroundPage() {
                                 disabled={busy || turns.length === 0}
                                 onClick={newChat}
                             >
-                                <SquarePen />
+                                <IconEdit />
                                 New chat
                             </Button>
                             <DropdownMenu>
@@ -410,12 +410,12 @@ export function PlaygroundPage() {
                                         size="icon"
                                         aria-label="More Playground actions"
                                     >
-                                        <MoreHorizontal />
+                                        <IconDots />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuItem onSelect={showRecent}>
-                                        {widest ? <PanelLeft /> : <History />}
+                                        {widest ? <IconLayoutSidebar /> : <IconHistory />}
                                         {widest
                                             ? recentPanel
                                                 ? "Hide recent chats"
@@ -423,7 +423,11 @@ export function PlaygroundPage() {
                                             : "Recent chats"}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={showSettings}>
-                                        {wide ? <PanelRight /> : <SlidersHorizontal />}
+                                        {wide ? (
+                                            <IconLayoutSidebarRight />
+                                        ) : (
+                                            <IconAdjustmentsHorizontal />
+                                        )}
                                         {wide
                                             ? panel
                                                 ? "Hide settings"
@@ -431,7 +435,7 @@ export function PlaygroundPage() {
                                             : "Settings"}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => setCode(true)}>
-                                        <Code />
+                                        <IconCode />
                                         View code
                                     </DropdownMenuItem>
                                     {examples && (
@@ -441,7 +445,7 @@ export function PlaygroundPage() {
                                                 wholeChat && setExampleFor(wholeChat.id)
                                             }
                                         >
-                                            <FlaskConical />
+                                            <IconFlask />
                                             Save as test example
                                         </DropdownMenuItem>
                                     )}

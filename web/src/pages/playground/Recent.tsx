@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
 import {
     Button,
     ConfirmDialog,
@@ -99,7 +99,7 @@ function ChatActions({
                 <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon-xs" aria-label={label}>
-                            <MoreHorizontal aria-hidden="true" />
+                            <IconDots aria-hidden="true" />
                         </Button>
                     </DropdownMenuTrigger>
                 </TooltipTrigger>
@@ -107,12 +107,12 @@ function ChatActions({
             </Tooltip>
             <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onSelect={onRename}>
-                    <Pencil />
+                    <IconPencil />
                     Rename
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                    <Trash2 />
+                    <IconTrash />
                     Delete
                 </DropdownMenuItem>
             </DropdownMenuContent>

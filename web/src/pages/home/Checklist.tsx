@@ -1,4 +1,4 @@
-import { ArrowRight, Check, X } from "lucide-react";
+import { IconArrowRight, IconCheck, IconX } from "@tabler/icons-react";
 import { Button, Link, cn } from "obp-ui";
 import { useState } from "react";
 import type { ModelRow } from "~/api/client";
@@ -116,7 +116,7 @@ function StepRow({ step, next }: { step: Step; next: boolean }) {
                     !step.done && next && "border-primary",
                 )}
             >
-                {step.done && <Check className="size-3.5" strokeWidth={3} />}
+                {step.done && <IconCheck className="size-3.5" strokeWidth={3} />}
             </span>
             <div className="flex min-w-0 flex-1 flex-col">
                 <span className={cn("font-medium", step.done && "text-muted-foreground")}>
@@ -131,7 +131,7 @@ function StepRow({ step, next }: { step: Step; next: boolean }) {
                 <Button asChild variant={next ? "default" : "outline"}>
                     <Link href={step.href}>
                         {step.action}
-                        {next && <ArrowRight aria-hidden="true" />}
+                        {next && <IconArrowRight aria-hidden="true" />}
                     </Link>
                 </Button>
             )}
@@ -161,7 +161,7 @@ export function Checklist({ models }: { models: ModelRow[] }) {
             caption={`${done} of ${steps.length} done. From your data to an app calling your own model.`}
             actions={
                 <Button variant="ghost" onClick={dismiss}>
-                    <X aria-hidden="true" />
+                    <IconX aria-hidden="true" />
                     Dismiss
                 </Button>
             }

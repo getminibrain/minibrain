@@ -1,5 +1,12 @@
+import {
+    IconArchive,
+    IconEraser,
+    IconFiles,
+    IconServer,
+    IconServer2,
+    IconStack2,
+} from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Archive, Eraser, FileStack, HardDrive, Layers, Server } from "lucide-react";
 import { DataGrid, Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
@@ -204,7 +211,7 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
     return (
         <PanelSection
             flush
-            icon={Server}
+            icon={IconServer}
             title="Disks on other machines"
             description="The disk each worker and engine keeps model copies and job files on, as each last reported."
         >
@@ -315,7 +322,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection
             flush
-            icon={HardDrive}
+            icon={IconServer2}
             title="Disks on main"
             description="What minibrain keeps on each disk, and what is left."
         >
@@ -395,7 +402,7 @@ function FreeUpSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection
             bare
-            icon={Eraser}
+            icon={IconEraser}
             title="Free up space"
             description={
                 rows.length > 0
@@ -411,7 +418,7 @@ function FreeUpSection({ info }: { info: InfrastructureInfo | undefined }) {
 function StoresSection({ info }: { info: InfrastructureInfo | undefined }) {
     const home = info?.home ?? "";
     return (
-        <PanelSection bare icon={Layers} title="Stores">
+        <PanelSection bare icon={IconStack2} title="Stores">
             <div className="flex flex-col gap-3">
                 <DataGrid columns={storeColumns(home)} rows={info?.stores ?? []} />
                 <p className="flex min-w-0 items-baseline gap-1 text-sm text-muted-foreground">
@@ -433,7 +440,7 @@ function LargestSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection
             bare
-            icon={FileStack}
+            icon={IconFiles}
             title="Largest items"
             description="Base model files on main, dataset versions, adapters, uploads and job logs, biggest first."
         >
@@ -446,7 +453,7 @@ function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined })
     const usage = info?.dataset_versions;
     return (
         <PanelSection
-            icon={Archive}
+            icon={IconArchive}
             title="Dataset versions"
             description="Saved copies of dataset rows that models train and score on, and the copies that add accepted feedback. Identical rows are stored once."
         >

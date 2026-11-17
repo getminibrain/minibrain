@@ -1,5 +1,12 @@
+import {
+    IconArrowLeft,
+    IconBook,
+    IconLogout,
+    IconSettings,
+    IconSunMoon,
+    IconUser,
+} from "@tabler/icons-react";
 import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, LogOut, Settings, SunMoon, UserRound } from "lucide-react";
 import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
 import {
     AccountButton,
@@ -80,7 +87,7 @@ function SettingsNavigation({ pathname }: { pathname: string }) {
         <>
             <SettingsSearch />
             <NavItem
-                icon={ArrowLeft}
+                icon={IconArrowLeft}
                 label="Back"
                 href={appPageToReturnTo()}
                 active={false}
@@ -113,18 +120,18 @@ function Account() {
     const name = person?.name ?? "";
     const sub = person?.email ?? (person?.role ? ROLE_LABELS[person.role] : "No role");
     const items: AccountMenuItem[] = [
-        { icon: <UserRound />, label: "Your account", href: ACCOUNT_PATH },
+        { icon: <IconUser />, label: "Your account", href: ACCOUNT_PATH },
         ...(person?.role
             ? [
-                  { icon: <Settings />, label: "Settings", href: "/settings" },
-                  { icon: <BookOpen />, label: "API reference", href: API_REFERENCE_PATH },
+                  { icon: <IconSettings />, label: "Settings", href: "/settings" },
+                  { icon: <IconBook />, label: "API reference", href: API_REFERENCE_PATH },
               ]
             : []),
-        { kind: "theme", icon: <SunMoon />, label: "Theme" },
+        { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
         ...(signsOut
             ? [
                   {
-                      icon: <LogOut />,
+                      icon: <IconLogout />,
                       label: "Sign out",
                       separatorBefore: true,
                       disabled: signOut.isPending,

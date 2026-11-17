@@ -1,13 +1,13 @@
 import {
-    Boxes,
-    ChevronDown,
-    ExternalLink,
-    GraduationCap,
-    HardDrive,
-    type LucideIcon,
-    MemoryStick,
-    Plus,
-} from "lucide-react";
+    IconChevronDown,
+    IconExternalLink,
+    IconMemory,
+    IconPackages,
+    IconPlus,
+    IconSchool,
+    IconServer2,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -101,7 +101,7 @@ function Amount({
     help,
     bytes,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     label: string;
     help: string;
     bytes: number;
@@ -143,7 +143,7 @@ function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
         <span className="flex items-center gap-3 text-muted-foreground tabular-nums">
             {memory ? (
                 <Amount
-                    icon={MemoryStick}
+                    icon={IconMemory}
                     label="Memory to run"
                     help="Memory to run: GPU or unified memory it takes to serve"
                     bytes={memory}
@@ -151,7 +151,7 @@ function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
             ) : null}
             {training ? (
                 <Amount
-                    icon={GraduationCap}
+                    icon={IconSchool}
                     label="Memory to train (QLoRA)"
                     help={trainHelp(option, pool)}
                     bytes={training}
@@ -159,7 +159,7 @@ function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
             ) : null}
             {disk ? (
                 <Amount
-                    icon={HardDrive}
+                    icon={IconServer2}
                     label={installState(option) ? "On disk" : "Download"}
                     help={
                         installState(option)
@@ -198,7 +198,7 @@ function Details({ entry }: { entry: CatalogEntry }) {
             }}
         >
             Details
-            <ExternalLink aria-hidden="true" className="size-3.5" />
+            <IconExternalLink aria-hidden="true" className="size-3.5" />
             <span className="sr-only"> for {entry.name} (opens in a new tab)</span>
         </a>
     );
@@ -316,7 +316,7 @@ function ImportsList({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground tabular-nums">{summary}</span>
                 <Button type="button" variant="outline" onClick={onImport}>
-                    <Plus />
+                    <IconPlus />
                     Import a model
                 </Button>
             </div>
@@ -367,7 +367,7 @@ function Trigger({ value }: { value: PickerValue }) {
                     <PublisherLogo publisher={logoPublisher(option)} name={option.name} size="lg" />
                 ) : (
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
-                        <Boxes aria-hidden="true" className="size-4" />
+                        <IconPackages aria-hidden="true" className="size-4" />
                     </span>
                 )}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -406,7 +406,7 @@ function Trigger({ value }: { value: PickerValue }) {
                         </>
                     )}
                 </span>
-                <ChevronDown
+                <IconChevronDown
                     aria-hidden="true"
                     className="size-6 shrink-0 self-center text-primary"
                 />
@@ -600,7 +600,7 @@ export function BasePicker({
                         className="inline-flex items-center gap-1 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                         Explore in Discover
-                        <ExternalLink aria-hidden="true" className="size-3.5" />
+                        <IconExternalLink aria-hidden="true" className="size-3.5" />
                     </a>
                 </DialogHeader>
                 <TabbedSearchList

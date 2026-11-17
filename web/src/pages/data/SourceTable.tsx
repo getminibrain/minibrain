@@ -1,6 +1,6 @@
+import { IconTrash, IconX } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Trash2, X } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -474,7 +474,7 @@ export function SourceTable({
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
                     <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
                     <Button variant="outline" size="sm" onClick={clear}>
-                        <X />
+                        <IconX />
                         Clear selection
                     </Button>
                     <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -482,7 +482,7 @@ export function SourceTable({
                             Make a dataset
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => setDeleting(chosen)}>
-                            <Trash2 />
+                            <IconTrash />
                             Delete
                         </Button>
                     </div>

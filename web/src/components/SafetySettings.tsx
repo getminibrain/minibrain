@@ -1,5 +1,5 @@
+import { IconShieldCheck } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck } from "lucide-react";
 import {
     Link,
     Select,
@@ -65,7 +65,7 @@ export function InstallSafety() {
         : Boolean(setting.data?.answers);
     return (
         <PanelSection
-            icon={ShieldCheck}
+            icon={IconShieldCheck}
             anchor={SAFETY.anchor}
             title={SAFETY.title}
             description="A guard model on this install checks each request before the model answers it, and can check answers too. A blocked call gets a refusal with the categories found, and is logged and audited. Each model can pick its own on its Deployments page."
@@ -150,7 +150,7 @@ export function ModelSafety({ detail }: { detail: ModelDetail }) {
     };
     return (
         <PanelSection
-            icon={ShieldCheck}
+            icon={IconShieldCheck}
             title="Safety model"
             tip={
                 safety.effective

@@ -1,6 +1,6 @@
+import { IconAdjustmentsHorizontal, IconDots, IconTrash } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { MoreHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -158,7 +158,7 @@ function MoreActions({ job }: { job: JobDetail }) {
                         size="icon"
                         aria-label={`More actions for job #${job.id}`}
                     >
-                        <MoreHorizontal />
+                        <IconDots />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
@@ -168,7 +168,7 @@ function MoreActions({ job }: { job: JobDetail }) {
                         className={refusal ? "items-start [&>svg]:mt-0.5" : undefined}
                         onSelect={() => setDeleting([job])}
                     >
-                        <Trash2 />
+                        <IconTrash />
                         <span className="flex flex-col">
                             <span>Delete job</span>
                             {refusal && (
@@ -501,7 +501,7 @@ function SettingsSection({ job }: { job: JobDetail }) {
     const facts = setupFacts(job);
     return (
         <PanelSection
-            icon={SlidersHorizontal}
+            icon={IconAdjustmentsHorizontal}
             title="Settings and data"
             tip="What this job read and the settings it ran with."
         >

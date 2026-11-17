@@ -1,5 +1,5 @@
+import { IconPlugConnected, IconPuzzle } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Cable, Puzzle } from "lucide-react";
 import {
     Badge,
     Button,
@@ -534,7 +534,7 @@ function Extensions() {
     const missing = data?.extensions.filter((item) => !item.installed) ?? [];
     return (
         <SettingsSection
-            icon={Puzzle}
+            icon={IconPuzzle}
             anchor={CONNECTIONS.extensions.anchor}
             title={CONNECTIONS.extensions.title}
             description="S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
@@ -613,7 +613,7 @@ export function ConnectionsSettingsPage() {
             <ErrorLine error={connections.error} onRetry={connections.refetch} />
             <SettingsSections>
                 <SettingsSection
-                    icon={Cable}
+                    icon={IconPlugConnected}
                     anchor={CONNECTIONS.connections.anchor}
                     title={CONNECTIONS.connections.title}
                     description="Each endpoint must be allowed by the network policy. Secrets are write-only."

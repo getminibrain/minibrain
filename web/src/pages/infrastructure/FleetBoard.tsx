@@ -1,4 +1,4 @@
-import { Server } from "lucide-react";
+import { IconServer } from "@tabler/icons-react";
 import { Link } from "obp-ui";
 import type { ReactNode } from "react";
 import { PanelSection } from "~/components/Section";
@@ -209,7 +209,7 @@ export function FleetBoard({ pools }: { pools: PoolInfo[] }) {
     return (
         <PanelSection
             bare
-            icon={Server}
+            icon={IconServer}
             title="Machines"
             description="Every pool and what each machine is doing. Memory is measured where the machine reports it, else estimated from weight and adapter files and each training plan."
         >

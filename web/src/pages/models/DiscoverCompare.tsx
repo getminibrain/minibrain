@@ -1,5 +1,11 @@
+import {
+    IconChevronLeft,
+    IconChevronRight,
+    IconExternalLink,
+    IconPlus,
+    IconX,
+} from "@tabler/icons-react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, ExternalLink, Plus, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -258,7 +264,7 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                                 className="text-primary hover:underline"
                             >
                                 {licenceOf(entry)}
-                                <ExternalLink
+                                <IconExternalLink
                                     aria-hidden="true"
                                     className="ml-1 inline size-3.5 align-[-2px]"
                                 />
@@ -528,7 +534,7 @@ function ModelHeader({
                     focus="remove"
                     onClick={onRemove}
                 >
-                    <X />
+                    <IconX />
                 </IconAction>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -542,7 +548,7 @@ function ModelHeader({
                             disabled={index === 0}
                             onClick={() => onMove(-1)}
                         >
-                            <ChevronLeft />
+                            <IconChevronLeft />
                         </IconAction>
                         <IconAction
                             label={`Move ${entry.name} right`}
@@ -551,7 +557,7 @@ function ModelHeader({
                             disabled={index === count - 1}
                             onClick={() => onMove(1)}
                         >
-                            <ChevronRight />
+                            <IconChevronRight />
                         </IconAction>
                     </div>
                 )}
@@ -607,7 +613,7 @@ function AddToCompare({
 }) {
     return (
         <Button variant={variant} disabled={count >= COMPARE_MAX} onClick={onAdd}>
-            <Plus />
+            <IconPlus />
             Add model to compare
         </Button>
     );

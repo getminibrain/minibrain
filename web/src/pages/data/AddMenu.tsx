@@ -1,5 +1,11 @@
+import {
+    IconArrowMerge,
+    IconArrowRight,
+    IconFolderPlus,
+    IconLayoutGridAdd,
+    IconPlus,
+} from "@tabler/icons-react";
 import { useRouter } from "@tanstack/react-router";
-import { ArrowRight, Combine, FolderPlus, Grid2x2Plus, Plus } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -201,7 +207,7 @@ export function AddMenu({
         <DropdownMenu open={open && idle} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild data-slot="button">
                 <Button disabled={!idle} aria-keyshortcuts="n">
-                    <Plus />
+                    <IconPlus />
                     {label}
                     {idle && <Kbd aria-hidden="true">N</Kbd>}
                 </Button>
@@ -210,15 +216,15 @@ export function AddMenu({
                 <DropdownMenuGroup>
                     <DropdownMenuLabel>Dataset</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={onNewDataset}>
-                        <Grid2x2Plus />
+                        <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onNewFolder}>
-                        <FolderPlus />
+                        <IconFolderPlus />
                         New folder
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onFromSources}>
-                        <Combine />
+                        <IconArrowMerge />
                         {picked > 0 ? `From ${plural(picked, "selected source")}` : "From sources…"}
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
@@ -231,7 +237,7 @@ export function AddMenu({
                             key={fix}
                             onSelect={() => router.history.push(FIXES[fix].href)}
                         >
-                            <ArrowRight />
+                            <IconArrowRight />
                             {FIXES[fix].label}
                         </DropdownMenuItem>
                     ))}

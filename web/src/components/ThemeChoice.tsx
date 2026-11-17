@@ -1,11 +1,11 @@
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { IconCheck, IconDeviceDesktop, IconMoon, IconSun } from "@tabler/icons-react";
 import { type ThemePref, cn, getThemePref, setThemePref } from "obp-ui";
 import { useState } from "react";
 
-const MODES: { key: ThemePref; label: string; hint: string; icon: typeof Sun }[] = [
-    { key: "light", label: "Light", hint: "Always light", icon: Sun },
-    { key: "dark", label: "Dark", hint: "Always dark", icon: Moon },
-    { key: "system", label: "System", hint: "Follows your device", icon: Monitor },
+const MODES: { key: ThemePref; label: string; hint: string; icon: typeof IconSun }[] = [
+    { key: "light", label: "Light", hint: "Always light", icon: IconSun },
+    { key: "dark", label: "Dark", hint: "Always dark", icon: IconMoon },
+    { key: "system", label: "System", hint: "Follows your device", icon: IconDeviceDesktop },
 ];
 
 export function ThemeChoice() {
@@ -50,7 +50,7 @@ export function ThemeChoice() {
                             <span className="text-sm text-muted-foreground">{option.hint}</span>
                         </span>
                         {selected && (
-                            <Check
+                            <IconCheck
                                 aria-hidden="true"
                                 className="absolute top-3 right-3 size-4 text-primary"
                             />

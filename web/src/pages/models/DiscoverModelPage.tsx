@@ -1,7 +1,13 @@
+import {
+    IconCubePlus,
+    IconExternalLink,
+    IconInfoCircle,
+    IconScale,
+    IconStack2,
+} from "@tabler/icons-react";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Info, Layers, Scale } from "lucide-react";
-import { Button, CubePlus, DataGrid, Link, Skeleton } from "obp-ui";
+import { Button, DataGrid, Link, Skeleton } from "obp-ui";
 import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
@@ -41,7 +47,7 @@ function external(href: string, text: string) {
     return (
         <a href={href} target="_blank" rel="noreferrer" className="text-primary hover:underline">
             {text}
-            <ExternalLink className="ml-0.5 inline size-3.5" />
+            <IconExternalLink className="ml-0.5 inline size-3.5" />
         </a>
     );
 }
@@ -51,7 +57,7 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
         ? catalog.entries.find((item) => item.id === entry.superseded_by)
         : undefined;
     return (
-        <PanelSection icon={Info} title="About">
+        <PanelSection icon={IconInfoCircle} title="About">
             <div className="flex flex-col gap-4">
                 {entry.description && <p className="text-base">{entry.description}</p>}
                 <Facts
@@ -180,7 +186,7 @@ function variantColumns(
                             disabled={!allowed}
                             onClick={() => onDownload(row.original)}
                         >
-                            <CubePlus />
+                            <IconCubePlus />
                             Add model
                         </Button>
                     </Tip>
@@ -192,7 +198,7 @@ function variantColumns(
 
 function Licence({ entry }: { entry: CatalogEntry }) {
     return (
-        <PanelSection icon={Scale} title="Licence">
+        <PanelSection icon={IconScale} title="Licence">
             <div className="flex flex-col gap-2">
                 <span className="font-semibold">{entry.license_name}</span>
                 <p className="text-muted-foreground">{entry.license_summary}</p>
@@ -284,7 +290,10 @@ export function DiscoverModelPage() {
                     />
                     <PanelSections>
                         {entry.gated && (
-                            <PanelSection icon={Info} title="Needs access from the publisher">
+                            <PanelSection
+                                icon={IconInfoCircle}
+                                title="Needs access from the publisher"
+                            >
                                 <div id="access" className="flex flex-col gap-2">
                                     <StatusText tone="warning">
                                         {data.token_configured
@@ -297,7 +306,7 @@ export function DiscoverModelPage() {
                         )}
                         <About entry={entry} catalog={data} />
                         <PanelSection
-                            icon={Layers}
+                            icon={IconStack2}
                             title="Formats"
                             description="Memory needed is estimated from the weights' size; real use also depends on context length and batch size."
                             bare

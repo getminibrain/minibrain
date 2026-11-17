@@ -1,4 +1,4 @@
-import { HardDrive, type LucideIcon, Server } from "lucide-react";
+import { IconServer, IconServer2, type TablerIcon } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
 import { SummaryLine } from "~/components/CreateLayout";
@@ -10,7 +10,7 @@ import type { DiskNeed } from "./BaseSummary";
 import { type PoolFit, runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
-function Figures({ icon, children }: { icon: LucideIcon; children: ReactNode }) {
+function Figures({ icon, children }: { icon: TablerIcon; children: ReactNode }) {
     return (
         <SummaryLine icon={icon} className="tabular-nums">
             {children}
@@ -20,7 +20,7 @@ function Figures({ icon, children }: { icon: LucideIcon; children: ReactNode }) 
 
 function Where({ children }: { children: ReactNode }) {
     return (
-        <SummaryLine icon={Server} className="text-muted-foreground">
+        <SummaryLine icon={IconServer} className="text-muted-foreground">
             {children}
         </SummaryLine>
     );
@@ -66,7 +66,9 @@ export function DiskGauge({
                 : `${bytes(store.stagingFree)} free on main's disk to pass through`;
         return (
             <>
-                <Figures icon={HardDrive}>{[amount, staging].filter(Boolean).join(" · ")}</Figures>
+                <Figures icon={IconServer2}>
+                    {[amount, staging].filter(Boolean).join(" · ")}
+                </Figures>
                 <Where>{`${store.label}: S3 reports no free space, so the bucket's quota is the limit.`}</Where>
             </>
         );
@@ -74,7 +76,7 @@ export function DiskGauge({
     if (free === null || free === undefined || !total) {
         return (
             <>
-                <Figures icon={HardDrive}>{`${amount} · free space unknown`}</Figures>
+                <Figures icon={IconServer2}>{`${amount} · free space unknown`}</Figures>
                 {place}
             </>
         );

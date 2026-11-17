@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { IconChevronRight } from "@tabler/icons-react";
 import { Link } from "obp-ui";
 import { Fragment } from "react";
 
@@ -10,7 +10,7 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
             {items.map((item, index) => (
                 <Fragment key={item.label}>
                     {index > 0 && (
-                        <ChevronRight aria-hidden="true" className="size-3.5 text-faint" />
+                        <IconChevronRight aria-hidden="true" className="size-3.5 text-faint" />
                     )}
                     {item.href ? (
                         <Link

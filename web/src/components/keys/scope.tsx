@@ -1,4 +1,4 @@
-import { Globe } from "lucide-react";
+import { IconWorld } from "@tabler/icons-react";
 import { Checkbox, Label, SearchInput } from "obp-ui";
 import { useMemo, useState } from "react";
 import type { KeyInfo, ModelAvatar, ModelRef } from "~/api/client";
@@ -68,7 +68,7 @@ export function AllModelsLabel() {
                 aria-hidden="true"
                 className="flex size-5 shrink-0 items-center justify-center rounded-md border bg-background"
             >
-                <Globe className="size-3.5 text-muted-foreground" />
+                <IconWorld className="size-3.5 text-muted-foreground" />
             </span>
             All models
         </span>

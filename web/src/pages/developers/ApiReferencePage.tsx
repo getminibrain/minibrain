@@ -1,9 +1,9 @@
 import { ApiReferenceReact } from "@scalar/api-reference-react";
 import "@scalar/api-reference-react/style.css";
 import "./scalar.css";
+import { IconKey } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
-import { KeyRound } from "lucide-react";
 import { Button, Link, TabNav, type TabNavItem, getTheme, onThemeChange } from "obp-ui";
 import { type ComponentProps, useMemo, useSyncExternalStore } from "react";
 import { usePerson } from "~/api/authQueries";
@@ -162,7 +162,7 @@ export function ApiReferencePage() {
                     can.build && (
                         <Button variant="outline" asChild>
                             <Link href={API_KEYS_PATH}>
-                                <KeyRound aria-hidden="true" />
+                                <IconKey aria-hidden="true" />
                                 API keys
                             </Link>
                         </Button>

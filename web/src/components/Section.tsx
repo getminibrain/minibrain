@@ -1,4 +1,4 @@
-import { CircleAlert, type LucideIcon, RotateCw } from "lucide-react";
+import { IconAlertCircle, IconRotateClockwise, type TablerIcon } from "@tabler/icons-react";
 import {
     Button,
     Card,
@@ -59,7 +59,7 @@ export function PanelSection({
     flush = false,
     children,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     anchor?: string;
     title: string;
     description?: ReactNode;
@@ -135,12 +135,12 @@ export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => 
     return (
         <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="flex min-w-0 items-start gap-2 text-destructive">
-                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <IconAlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 <span className="min-w-0 break-words">{message}</span>
             </p>
             {onRetry && (
                 <Button variant="outline" size="sm" onClick={() => void onRetry()}>
-                    <RotateCw aria-hidden="true" />
+                    <IconRotateClockwise aria-hidden="true" />
                     Retry
                 </Button>
             )}

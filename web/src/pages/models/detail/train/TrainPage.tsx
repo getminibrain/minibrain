@@ -1,5 +1,5 @@
+import { IconSchool, IconScript } from "@tabler/icons-react";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { GraduationCap, ScrollText } from "lucide-react";
 import { ConfirmDialog, Textarea, cn } from "obp-ui";
 import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
@@ -415,7 +415,7 @@ function TrainForm({
         />
     );
     const training = method === "sft";
-    const SubmitIcon = training ? GraduationCap : ScrollText;
+    const SubmitIcon = training ? IconSchool : IconScript;
     const serveOnly = detail.serve_only ?? row.serve_only;
     const form = (
         <>

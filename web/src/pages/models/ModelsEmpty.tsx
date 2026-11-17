@@ -1,6 +1,6 @@
+import { IconPackages } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Boxes } from "lucide-react";
 import { Button, useToast } from "obp-ui";
 import { api, unwrap } from "~/api/client";
 import { errorMessage } from "~/components/Section";
@@ -40,7 +40,11 @@ export function ModelsEmpty() {
     });
     return (
         <div className="flex flex-col items-center gap-4 py-10">
-            <Boxes aria-hidden="true" className="size-10 text-muted-foreground" strokeWidth={1.5} />
+            <IconPackages
+                aria-hidden="true"
+                className="size-10 text-muted-foreground"
+                strokeWidth={1.5}
+            />
             <div className="flex flex-col items-center gap-1">
                 <h2 className="text-lg font-semibold">No models yet</h2>
                 <p className="text-base text-muted-foreground">

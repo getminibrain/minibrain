@@ -1,5 +1,5 @@
+import { IconPackages, IconServer2 } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Boxes, HardDrive } from "lucide-react";
 import {
     Button,
     Input,
@@ -268,7 +268,7 @@ function UsageLink() {
 function LocationSection({ actions, children }: { actions?: ReactNode; children?: ReactNode }) {
     return (
         <SettingsSection
-            icon={HardDrive}
+            icon={IconServer2}
             anchor={STORAGE.location.anchor}
             title={STORAGE.location.title}
             description="Uploads, dataset versions, adapters, logs and base model files. New ones go to the place chosen here; ones already stored stay readable where they are."
@@ -303,7 +303,7 @@ export function StorageSettingsPage() {
             <SettingsSections>
                 {settings.data ? <StorageForm settings={settings.data} /> : <LocationSection />}
                 <SettingsSection
-                    icon={Boxes}
+                    icon={IconPackages}
                     anchor={STORAGE.models.anchor}
                     title={STORAGE.models.title}
                     description="Downloads, imports and repairs write base model files to the place chosen above."

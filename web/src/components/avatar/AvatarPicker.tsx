@@ -1,4 +1,4 @@
-import { Dices } from "lucide-react";
+import { IconDice5 } from "@tabler/icons-react";
 import {
     Button,
     Dialog,
@@ -166,7 +166,7 @@ export function PickerDialog({
                                         variant="outline"
                                         onClick={() => update(deal)}
                                     >
-                                        <Dices aria-hidden="true" />
+                                        <IconDice5 aria-hidden="true" />
                                         Shuffle
                                         <Kbd className="hidden sm:inline-flex">R</Kbd>
                                     </Button>

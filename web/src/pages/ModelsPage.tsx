@@ -1,5 +1,6 @@
+import { IconCubePlus } from "@tabler/icons-react";
 import { useRouter } from "@tanstack/react-router";
-import { Button, CubePlus, Link } from "obp-ui";
+import { Button, Link } from "obp-ui";
 import { PageHeader } from "~/components/PageHeader";
 import { Page } from "~/components/Section";
 import { useCan } from "~/lib/access";
@@ -20,7 +21,7 @@ export function ModelsPage() {
                         {can.build && (
                             <Button asChild>
                                 <Link href="/models/new">
-                                    <CubePlus />
+                                    <IconCubePlus />
                                     Add model
                                 </Link>
                             </Button>

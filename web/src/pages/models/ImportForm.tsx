@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Download } from "lucide-react";
+import { IconArrowLeft, IconCheck, IconDownload } from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -420,7 +420,7 @@ function PathPreview({
             </Fact>
             <Fact label="Checks">
                 <span className="inline-flex items-center gap-1.5">
-                    <Check aria-hidden="true" className="size-4 text-success" />
+                    <IconCheck aria-hidden="true" className="size-4 text-success" />
                     {`All ${found.checks?.length ?? 0} passed`}
                 </span>
             </Fact>
@@ -805,12 +805,12 @@ export function ImportForm({
                 <span className="ml-auto flex items-center gap-2">
                     {onBack && (
                         <Button type="button" variant="ghost" onClick={onBack}>
-                            <ArrowLeft />
+                            <IconArrowLeft />
                             Your imports
                         </Button>
                     )}
                     <Button type="button" disabled={!usable} onClick={use}>
-                        <Download />
+                        <IconDownload />
                         Import and use
                     </Button>
                 </span>

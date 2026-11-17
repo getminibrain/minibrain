@@ -1,5 +1,5 @@
+import { IconGitCompare } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
-import { GitCompare } from "lucide-react";
 import { Button, Link, cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { type ExampleAnswer, type VersionInfo, api, unwrap } from "~/api/client";
@@ -364,7 +364,7 @@ export function ChangesSection({
     const scoredWith = phase === "ready" && version.score !== null;
     return (
         <PanelSection
-            icon={GitCompare}
+            icon={IconGitCompare}
             title="Changes"
             tip={
                 reference

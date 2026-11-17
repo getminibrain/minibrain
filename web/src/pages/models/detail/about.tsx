@@ -1,5 +1,5 @@
+import { IconAdjustmentsHorizontal, IconInfoCircle, IconPencil } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
-import { Info, Pencil, SlidersHorizontal } from "lucide-react";
 import {
     Button,
     Input,
@@ -122,7 +122,7 @@ function EditPencil({ row, kind }: { row: ModelRow; kind: EditKind }) {
                             aria-label={label}
                             className={PENCIL}
                         >
-                            <Pencil />
+                            <IconPencil />
                         </Button>
                     </PopoverTrigger>
                 </TooltipTrigger>
@@ -147,7 +147,7 @@ function EditLink({ href, label }: { href: string; label: string }) {
                     asChild
                 >
                     <Link href={href}>
-                        <Pencil />
+                        <IconPencil />
                     </Link>
                 </Button>
             </TooltipTrigger>
@@ -164,7 +164,7 @@ function useEdit(row: ModelRow) {
 
 function AboutSection({ children }: { children: ReactNode }) {
     return (
-        <PanelSection icon={Info} title="About">
+        <PanelSection icon={IconInfoCircle} title="About">
             <div className="@container">
                 <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>
             </div>
@@ -174,7 +174,7 @@ function AboutSection({ children }: { children: ReactNode }) {
 
 function DetailsSection({ children }: { children: ReactNode }) {
     return (
-        <PanelSection icon={SlidersHorizontal} title="Details" flush>
+        <PanelSection icon={IconAdjustmentsHorizontal} title="Details" flush>
             <div className="@container flex flex-col divide-y py-1">{children}</div>
         </PanelSection>
     );

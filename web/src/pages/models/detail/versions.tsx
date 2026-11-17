@@ -1,16 +1,16 @@
+import {
+    IconDots,
+    IconGitCompare,
+    IconHistory,
+    IconLogs,
+    IconRepeat,
+    IconRocket,
+    IconRotate,
+    IconTrash,
+    IconX,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import {
-    GitCompare,
-    History,
-    Logs,
-    MoreHorizontal,
-    Repeat,
-    Rocket,
-    RotateCcw,
-    Trash2,
-    X,
-} from "lucide-react";
 import {
     Badge,
     Button,
@@ -317,13 +317,13 @@ function RowMenu({
                     size="icon"
                     aria-label={`More actions for v${version.number}`}
                 >
-                    <MoreHorizontal />
+                    <IconDots />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger disabled={!comparable}>
-                        <GitCompare />
+                        <IconGitCompare />
                         Compare with…
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-48">
@@ -357,7 +357,7 @@ function RowMenu({
                             router.history.push(trainHref(row.key, { from: version.number }))
                         }
                     >
-                        <Repeat />
+                        <IconRepeat />
                         Train again
                     </DropdownMenuItem>
                 )}
@@ -365,7 +365,7 @@ function RowMenu({
                     disabled={!job}
                     onSelect={() => job && router.history.push(jobLogsHref(job))}
                 >
-                    <Logs />
+                    <IconLogs />
                     {job ? `Logs · job #${job.id}` : "Logs"}
                 </DropdownMenuItem>
                 {can.build && (
@@ -376,7 +376,7 @@ function RowMenu({
                             disabled={isLive || baseline}
                             onSelect={onDelete}
                         >
-                            <Trash2 />
+                            <IconTrash />
                             {baseline
                                 ? "Delete (v0 is the baseline)"
                                 : isLive
@@ -479,13 +479,13 @@ function VersionRow({
                             disabled={again.isPending}
                             onClick={() => again.mutate()}
                         >
-                            <RotateCcw aria-hidden="true" />
+                            <IconRotate aria-hidden="true" />
                             Retry
                         </Button>
                     )}
                     {can.build && live && !blocked && (
                         <Button variant="outline" onClick={onLive}>
-                            <Rocket aria-hidden="true" />
+                            <IconRocket aria-hidden="true" />
                             {`Deploy v${version.number}`}
                         </Button>
                     )}
@@ -578,13 +578,13 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
         });
     return (
         <PanelSection
-            icon={History}
+            icon={IconHistory}
             title="Versions"
             actions={
                 picked.length > 0 && (
                     <>
                         <Button variant="outline" onClick={() => setPicked([])}>
-                            <X aria-hidden="true" />
+                            <IconX aria-hidden="true" />
                             Clear
                         </Button>
                         <Tip
@@ -603,7 +603,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                                     )
                                 }
                             >
-                                <GitCompare aria-hidden="true" />
+                                <IconGitCompare aria-hidden="true" />
                                 {sorted.length === 2
                                     ? `Compare v${sorted[0]} and v${sorted[1]}`
                                     : "Compare"}
@@ -624,7 +624,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                                         remove(deletable, chosen.length > deletable.length)
                                     }
                                 >
-                                    <Trash2 aria-hidden="true" />
+                                    <IconTrash aria-hidden="true" />
                                     {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
                                 </Button>
                             </Tip>

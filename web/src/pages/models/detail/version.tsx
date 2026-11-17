@@ -1,16 +1,16 @@
+import {
+    IconBook,
+    IconChevronLeft,
+    IconChevronRight,
+    IconCopy,
+    IconDots,
+    IconDownload,
+    IconGitCompare,
+    IconPlayerPlay,
+    IconTrash,
+} from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "@tanstack/react-router";
-import {
-    BookOpen,
-    ChevronLeft,
-    ChevronRight,
-    Copy,
-    Download,
-    GitCompare,
-    MoreHorizontal,
-    Play,
-    Trash2,
-} from "lucide-react";
 import {
     Badge,
     Button,
@@ -146,7 +146,7 @@ function ExportDialog({
                                 <Button variant="outline" disabled={!sha} asChild={Boolean(sha)}>
                                     {sha ? (
                                         <a href={artifactHref(sha)} download>
-                                            <Download aria-hidden="true" />
+                                            <IconDownload aria-hidden="true" />
                                             Download
                                         </a>
                                     ) : (
@@ -223,7 +223,7 @@ function VersionMenu({
                         size="icon"
                         aria-label={`More actions for v${version.number}`}
                     >
-                        <MoreHorizontal />
+                        <IconDots />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
@@ -233,12 +233,12 @@ function VersionMenu({
                             router.history.push(versionPlaygroundHref(row.key, version.number))
                         }
                     >
-                        <Play />
+                        <IconPlayerPlay />
                         Try in Playground
                     </DropdownMenuItem>
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger disabled={!ready || others.length === 0}>
-                            <GitCompare />
+                            <IconGitCompare />
                             Compare with…
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="w-48">
@@ -273,7 +273,7 @@ function VersionMenu({
                             )
                         }
                     >
-                        <Copy />
+                        <IconCopy />
                         <span>
                             Copy <span className="font-mono">{callable}</span>
                         </span>
@@ -281,7 +281,7 @@ function VersionMenu({
                     <DropdownMenuItem
                         onSelect={() => router.history.push(modelCardHref(row.key, version.number))}
                     >
-                        <BookOpen />
+                        <IconBook />
                         Model card
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -289,7 +289,7 @@ function VersionMenu({
                         className={exportable ? undefined : "items-start"}
                         onSelect={() => setExporting(true)}
                     >
-                        <Download className={exportable ? undefined : "mt-0.5"} />
+                        <IconDownload className={exportable ? undefined : "mt-0.5"} />
                         <span className="flex flex-col">
                             <span>Export…</span>
                             {!exportable && (
@@ -309,7 +309,7 @@ function VersionMenu({
                                 disabled={isLive || baseline}
                                 onSelect={remove}
                             >
-                                <Trash2 />
+                                <IconTrash />
                                 {baseline
                                     ? "Delete version (v0 is the baseline)"
                                     : isLive
@@ -442,7 +442,7 @@ function StepLink({
     number,
     direction,
 }: { slug: string; number: number | null; direction: "previous" | "next" }) {
-    const Icon = direction === "previous" ? ChevronLeft : ChevronRight;
+    const Icon = direction === "previous" ? IconChevronLeft : IconChevronRight;
     const word = direction === "previous" ? "Previous" : "Next";
     if (number === null) {
         return (

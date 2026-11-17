@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { IconX } from "@tabler/icons-react";
 import {
     Button,
     NumberField,
@@ -187,7 +187,7 @@ function ThresholdRow({
                         aria-label="Remove threshold"
                         onClick={onRemove}
                     >
-                        <X aria-hidden="true" />
+                        <IconX aria-hidden="true" />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>Remove threshold</TooltipContent>

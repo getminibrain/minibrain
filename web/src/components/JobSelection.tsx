@@ -1,5 +1,5 @@
+import { IconCircleX, IconRotate, IconTrash, IconX, type TablerIcon } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleX, type LucideIcon, RotateCcw, Trash2, X } from "lucide-react";
 import {
     Button,
     type ToastOptions,
@@ -103,7 +103,7 @@ function BulkButton({
     pending,
     onClick,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     label: string;
     jobs: JobInfo[];
     none: string;
@@ -170,12 +170,12 @@ function JobSelectionBar({
         <div className={cn("flex min-h-8 flex-wrap items-center gap-2", className)}>
             <span className="font-medium tabular-nums">{`${jobs.length.toLocaleString()} selected`}</span>
             <Button variant="outline" onClick={onClear}>
-                <X />
+                <IconX />
                 Clear selection
             </Button>
             <div className="ml-auto flex flex-wrap items-center gap-2">
                 <BulkButton
-                    icon={RotateCcw}
+                    icon={IconRotate}
                     label="Retry"
                     jobs={retriable}
                     none="Only failed or cancelled jobs whose model still exists can be retried."
@@ -183,7 +183,7 @@ function JobSelectionBar({
                     onClick={() => retry.mutate()}
                 />
                 <BulkButton
-                    icon={CircleX}
+                    icon={IconCircleX}
                     label="Cancel"
                     jobs={cancellable}
                     variant="destructive-outline"
@@ -195,7 +195,7 @@ function JobSelectionBar({
                     }
                 />
                 <BulkButton
-                    icon={Trash2}
+                    icon={IconTrash}
                     label="Delete"
                     jobs={deletable}
                     variant="destructive"

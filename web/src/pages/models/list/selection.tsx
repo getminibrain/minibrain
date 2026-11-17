@@ -1,4 +1,4 @@
-import { GitCompare, PowerOff, Trash2, X } from "lucide-react";
+import { IconGitCompare, IconPlugOff, IconTrash, IconX } from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -129,7 +129,7 @@ export function SelectionBar({
         <div className="flex min-h-8 flex-wrap items-center gap-2">
             <span className="font-medium tabular-nums">{selectionText(versions, variants)}</span>
             <Button variant="outline" onClick={onClear}>
-                <X aria-hidden="true" />
+                <IconX aria-hidden="true" />
                 Clear selection
             </Button>
             {can.build && kept.length > 0 && (
@@ -159,7 +159,7 @@ export function SelectionBar({
                                 ])
                             }
                         >
-                            <GitCompare aria-hidden="true" />
+                            <IconGitCompare aria-hidden="true" />
                             Compare
                         </Button>
                     </Tip>
@@ -181,7 +181,7 @@ export function SelectionBar({
                                 disabled={liveVariants.length === 0}
                                 onClick={() => on.undeploy(liveVariants.map((item) => item.row))}
                             >
-                                <PowerOff aria-hidden="true" />
+                                <IconPlugOff aria-hidden="true" />
                                 Undeploy
                             </Button>
                         </Tip>
@@ -205,7 +205,7 @@ export function SelectionBar({
                                 disabled={going.length === 0}
                                 onClick={() => on.remove(going)}
                             >
-                                <Trash2 aria-hidden="true" />
+                                <IconTrash aria-hidden="true" />
                                 {variants.length > 0 && versions.length === 0
                                     ? "Delete files"
                                     : "Delete"}

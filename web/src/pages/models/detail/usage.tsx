@@ -1,4 +1,4 @@
-import { ChartLine } from "lucide-react";
+import { IconChartLine } from "@tabler/icons-react";
 import {
     CheckboxSelect,
     Select,
@@ -289,7 +289,7 @@ export function UsagePanel({ row, versions }: { row: ModelRow; versions: Version
     const shown = ALL_METRICS.filter((metric) => metrics.includes(metric));
     return (
         <PanelSection
-            icon={ChartLine}
+            icon={IconChartLine}
             title="Usage"
             description={
                 row.kind === "base"

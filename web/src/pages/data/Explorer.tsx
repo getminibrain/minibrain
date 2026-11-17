@@ -1,16 +1,16 @@
-import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
-    ArrowRight,
-    Folder,
-    FolderInput,
-    FolderPlus,
-    Grid2x2Plus,
-    Import,
-    Layers,
-    Pencil,
-    Table2,
-    Trash2,
-} from "lucide-react";
+    IconArrowRight,
+    IconFileImport,
+    IconFolder,
+    IconFolderDown,
+    IconFolderPlus,
+    IconLayoutGridAdd,
+    IconPencil,
+    IconStack2,
+    IconTable,
+    IconTrash,
+} from "@tabler/icons-react";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
     Badge,
     DropZone,
@@ -173,7 +173,7 @@ function folderNodes(index: FolderIndex, parent: number | null): TreeNode[] {
     const folders = (index.folders.get(parent) ?? []).map((folder) => ({
         id: itemKey({ kind: "folder", id: folder.id }),
         label: folder.name,
-        icon: <Folder />,
+        icon: <IconFolder />,
         meta: datasetsInside(index, folder.id).length,
         draggable: true,
         droppable: true,
@@ -182,7 +182,7 @@ function folderNodes(index: FolderIndex, parent: number | null): TreeNode[] {
     const datasets = (index.datasets.get(parent) ?? []).map((dataset) => ({
         id: itemKey({ kind: "dataset", id: dataset.slug }),
         label: dataset.name,
-        icon: <Table2 />,
+        icon: <IconTable />,
         draggable: true,
     }));
     return [...folders, ...datasets];
@@ -196,7 +196,7 @@ function buildTree(
     const datasetGroup: TreeNode = {
         id: itemKey(DATASETS_GROUP),
         label: "Datasets",
-        icon: <Layers />,
+        icon: <IconStack2 />,
         meta: datasets.length,
         droppable: true,
         children: folderNodes(index, null),
@@ -214,7 +214,7 @@ function buildTree(
     const sourcesGroup: TreeNode = {
         id: itemKey(SOURCES_GROUP),
         label: "Sources",
-        icon: <Import />,
+        icon: <IconFileImport />,
         meta: sources.length,
         children: sourceGroups,
     };
@@ -337,7 +337,7 @@ function GroupDetail({
 function DeleteItem({ blocked, onSelect }: { blocked: string | null; onSelect: () => void }) {
     return (
         <DropdownMenuItem variant="destructive" disabled={blocked !== null} onSelect={onSelect}>
-            <Trash2 />
+            <IconTrash />
             Delete
             {blocked && (
                 <span className="ml-auto pl-3 text-sm text-muted-foreground">{blocked}</span>
@@ -533,7 +533,7 @@ export function DataExplorer() {
         const label = `Actions for ${name}`;
         const open = (
             <DropdownMenuItem onSelect={() => select(item)}>
-                <ArrowRight />
+                <IconArrowRight />
                 Open
             </DropdownMenuItem>
         );
@@ -541,13 +541,13 @@ export function DataExplorer() {
             return (
                 <TreeRowMenu label={label}>
                     <DropdownMenuItem onSelect={() => createIn(DATASETS_GROUP, "new")}>
-                        <Grid2x2Plus />
+                        <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         onSelect={() => setAction({ kind: "new-folder", parentId: null })}
                     >
-                        <FolderPlus />
+                        <IconFolderPlus />
                         New folder
                     </DropdownMenuItem>
                 </TreeRowMenu>
@@ -572,17 +572,17 @@ export function DataExplorer() {
             return (
                 <TreeRowMenu label={label}>
                     <DropdownMenuItem onSelect={() => createIn(item, itemKey(item))}>
-                        <Grid2x2Plus />
+                        <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         onSelect={() => setAction({ kind: "new-folder", parentId: folder.id })}
                     >
-                        <FolderPlus />
+                        <IconFolderPlus />
                         New folder
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setAction({ kind: "rename-folder", folder })}>
-                        <Pencil />
+                        <IconPencil />
                         Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -593,7 +593,7 @@ export function DataExplorer() {
                             })
                         }
                     >
-                        <FolderInput />
+                        <IconFolderDown />
                         Move to…
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -601,7 +601,7 @@ export function DataExplorer() {
                         variant="destructive"
                         onSelect={() => setAction({ kind: "delete-folder", folder })}
                     >
-                        <Trash2 />
+                        <IconTrash />
                         Delete
                     </DropdownMenuItem>
                 </TreeRowMenu>
@@ -618,7 +618,7 @@ export function DataExplorer() {
                     <DropdownMenuItem
                         onSelect={() => setAction({ kind: "rename-dataset", dataset })}
                     >
-                        <Pencil />
+                        <IconPencil />
                         Rename
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -633,7 +633,7 @@ export function DataExplorer() {
                             })
                         }
                     >
-                        <FolderInput />
+                        <IconFolderDown />
                         Move to…
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -653,11 +653,11 @@ export function DataExplorer() {
             <TreeRowMenu label={label}>
                 {open}
                 <DropdownMenuItem onSelect={() => createIn(item, source.id)}>
-                    <Grid2x2Plus />
+                    <IconLayoutGridAdd />
                     New dataset
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setAction({ kind: "rename-source", source })}>
-                    <Pencil />
+                    <IconPencil />
                     Rename
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

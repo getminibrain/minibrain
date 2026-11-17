@@ -1,5 +1,5 @@
+import { IconCheck } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Check } from "lucide-react";
 import { Button, DataGrid, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { useState } from "react";
 import type { BaseModelDetail, ModelRow } from "~/api/client";
@@ -120,7 +120,7 @@ function FileHash({ file }: { file: FileRow }) {
             <Tooltip>
                 <TooltipTrigger asChild>
                     <span className="inline-flex items-center gap-1.5 rounded-sm">
-                        <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
+                        <IconCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
                         <span className="sr-only">Matches: </span>
                         {hash}
                     </span>

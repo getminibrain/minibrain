@@ -1,4 +1,11 @@
-import { ChevronDown, Gem, type LucideIcon, Scale, SlidersHorizontal, Zap } from "lucide-react";
+import {
+    IconAdjustmentsHorizontal,
+    IconBolt,
+    IconChevronDown,
+    IconDiamond,
+    IconScale,
+    type TablerIcon,
+} from "@tabler/icons-react";
 import { Card, Collapsible, CollapsibleContent, CollapsibleTrigger, cn } from "obp-ui";
 import { PickSelect } from "~/components/PickSelect";
 import { Advanced } from "./advanced";
@@ -6,10 +13,10 @@ import { timeText } from "./parts";
 import { QUALITIES, presetText } from "./recipe";
 import type { TrainRun } from "./useTrainRun";
 
-const PRESET_ICONS: Record<(typeof QUALITIES)[number]["id"], LucideIcon> = {
-    fast: Zap,
-    balanced: Scale,
-    quality: Gem,
+const PRESET_ICONS: Record<(typeof QUALITIES)[number]["id"], TablerIcon> = {
+    fast: IconBolt,
+    balanced: IconScale,
+    quality: IconDiamond,
 };
 
 function PresetSelect({ run }: { run: TrainRun }) {
@@ -34,7 +41,7 @@ function PresetSelect({ run }: { run: TrainRun }) {
                 {
                     value: "custom",
                     label: "Custom",
-                    icon: <SlidersHorizontal className="size-5" />,
+                    icon: <IconAdjustmentsHorizontal className="size-5" />,
                     description: "Set each parameter yourself",
                     separated: true,
                 },
@@ -88,7 +95,7 @@ export function TrainingCard({ run }: { run: TrainRun }) {
                                 <span className="text-sm">
                                     {run.open ? "Hide parameters" : "Show parameters"}
                                 </span>
-                                <ChevronDown
+                                <IconChevronDown
                                     aria-hidden="true"
                                     className={cn(
                                         "size-4 shrink-0 transition-transform duration-100 motion-reduce:transition-none",

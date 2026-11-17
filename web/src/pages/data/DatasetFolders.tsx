@@ -1,6 +1,13 @@
+import {
+    IconFolder,
+    IconFolderDown,
+    IconStack2,
+    IconTable,
+    IconTrash,
+    IconX,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Folder, FolderInput, Layers, Table2, Trash2, X } from "lucide-react";
 import {
     Button,
     ConfirmDialog,
@@ -313,7 +320,7 @@ function folderChoices(
         .map((folder) => ({
             id: itemKey({ kind: "folder", id: folder.id }),
             label: folder.name,
-            icon: <Folder />,
+            icon: <IconFolder />,
             meta: folder.id === current ? "Current" : undefined,
             children: folderChoices(index, folder.id, blocked, current),
         }));
@@ -370,7 +377,7 @@ export function MoveDialog({
         {
             id: itemKey(DATASETS_GROUP),
             label: "Datasets",
-            icon: <Layers />,
+            icon: <IconStack2 />,
             meta: together && from === null ? "Current" : undefined,
             children: folderChoices(index, null, blocked, from),
         },
@@ -441,7 +448,7 @@ const CONTENT_COLUMNS: ColumnDef<ContentRow, unknown>[] = [
         cell: ({ row }) => (
             <span className="flex min-w-0 items-center gap-2">
                 <span aria-hidden="true" className="shrink-0 text-muted-foreground [&>svg]:size-4">
-                    {row.original.folder ? <Folder /> : <Table2 />}
+                    {row.original.folder ? <IconFolder /> : <IconTable />}
                 </span>
                 <Link href={itemHref(row.original.item)} className="truncate">
                     {row.original.name}
@@ -563,7 +570,7 @@ function DeleteContentsDialog({
                                 aria-hidden="true"
                                 className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground [&>svg]:size-4"
                             >
-                                {row.folder ? <Folder /> : <Table2 />}
+                                {row.folder ? <IconFolder /> : <IconTable />}
                             </span>
                             <span className="flex min-w-0 flex-col">
                                 <span className="truncate font-medium">{row.name}</span>
@@ -620,7 +627,7 @@ export function FolderContents({
                 <div className="flex min-h-8 flex-wrap items-center gap-2">
                     <span className="font-medium tabular-nums">{`${chosen.length} selected`}</span>
                     <Button variant="outline" size="sm" onClick={clear}>
-                        <X />
+                        <IconX />
                         Clear selection
                     </Button>
                     <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -637,11 +644,11 @@ export function FolderContents({
                                 )
                             }
                         >
-                            <FolderInput />
+                            <IconFolderDown />
                             Move to…
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => setDeleting(chosen)}>
-                            <Trash2 />
+                            <IconTrash />
                             Delete
                         </Button>
                     </div>

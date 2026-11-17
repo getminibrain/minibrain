@@ -1,4 +1,4 @@
-import { type LucideIcon, X } from "lucide-react";
+import { IconX, type TablerIcon } from "@tabler/icons-react";
 import { Button, Card, cn } from "obp-ui";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { FORM_GROUP_GAP } from "./FormRows";
@@ -44,7 +44,7 @@ export function CreateLayout({
                 {status}
             </p>
             <Button type="button" variant="outline" className="ml-auto" onClick={onCancel}>
-                <X aria-hidden="true" />
+                <IconX aria-hidden="true" />
                 Cancel
             </Button>
             <Button type="submit" disabled={disabled}>
@@ -105,7 +105,7 @@ export function SummarySection({
     );
 }
 
-export function SummaryIcon({ icon: Icon }: { icon: LucideIcon }) {
+export function SummaryIcon({ icon: Icon }: { icon: TablerIcon }) {
     return (
         <span aria-hidden="true" className="flex h-lh shrink-0 items-center">
             <Icon className="size-4 text-muted-foreground" />
@@ -118,7 +118,7 @@ export function SummaryLine({
     className,
     children,
 }: {
-    icon: LucideIcon;
+    icon: TablerIcon;
     className?: string;
     children: ReactNode;
 }) {
@@ -139,7 +139,7 @@ export function SummaryFact({
     label,
     children,
 }: {
-    icon?: LucideIcon;
+    icon?: TablerIcon;
     label: string;
     children: ReactNode;
 }) {

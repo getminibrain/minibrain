@@ -1,5 +1,13 @@
+import {
+    IconAlertTriangle,
+    IconBook,
+    IconCheck,
+    IconCircleCheck,
+    IconCircleX,
+    IconKey,
+    IconSend,
+} from "@tabler/icons-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BookOpen, Check, CircleCheck, CircleX, KeyRound, Send, TriangleAlert } from "lucide-react";
 import {
     Button,
     CodeBlock,
@@ -108,7 +116,7 @@ function StepMarker({ number, state }: { number: number; state: StepState }) {
                 state === "next" && "border-input text-muted-foreground",
             )}
         >
-            {state === "done" ? <Check aria-hidden="true" className="size-3.5" /> : number}
+            {state === "done" ? <IconCheck aria-hidden="true" className="size-3.5" /> : number}
             <span className="sr-only">{state === "done" ? `Step ${number}, done` : ""}</span>
         </span>
     );
@@ -196,7 +204,7 @@ function ExistingKeys({
 function NewKey({ secret }: { secret: string }) {
     return (
         <div className="flex h-9 min-w-0 items-center gap-3 rounded-md border bg-muted pr-0.5 pl-3">
-            <KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <IconKey aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate font-mono text-sm">{secret}</span>
             <CopyButton value={secret} label="Copy the API key" />
         </div>
@@ -249,7 +257,7 @@ function KeyStep({
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <Button type="button" disabled={create.isPending} onClick={() => create.mutate()}>
-                    <KeyRound aria-hidden="true" />
+                    <IconKey aria-hidden="true" />
                     {create.isPending ? "Creating…" : "Create a key"}
                 </Button>
                 <ExistingKeys row={row} href={keysHref} onLeave={onLeave} />
@@ -374,7 +382,7 @@ function LiveStatus({
         return (
             <StatusLine
                 tone="text-destructive"
-                icon={<CircleX aria-hidden="true" className="size-4" />}
+                icon={<IconCircleX aria-hidden="true" className="size-4" />}
                 text={test.message}
             />
         );
@@ -387,7 +395,7 @@ function LiveStatus({
         return (
             <StatusLine
                 tone="text-success"
-                icon={<CircleCheck aria-hidden="true" className="size-4" />}
+                icon={<IconCircleCheck aria-hidden="true" className="size-4" />}
                 text={arrived ? "Connected: a request arrived" : "Connected"}
                 detail={detail.filter(Boolean).join(" · ")}
             />
@@ -442,7 +450,7 @@ function LiveCheck({
             </div>
             {blocked ? (
                 <BlockedButton reason={blocked} variant="outline">
-                    <Send aria-hidden="true" />
+                    <IconSend aria-hidden="true" />
                     {label}
                 </BlockedButton>
             ) : (
@@ -452,7 +460,7 @@ function LiveCheck({
                     disabled={send.isPending}
                     onClick={() => send.mutate()}
                 >
-                    <Send aria-hidden="true" />
+                    <IconSend aria-hidden="true" />
                     {label}
                 </Button>
             )}
@@ -511,7 +519,7 @@ export function ConnectDialog({
                         aside={
                             secret && (
                                 <span className="flex items-center gap-1.5 text-sm text-warning">
-                                    <TriangleAlert aria-hidden="true" className="size-3.5" />
+                                    <IconAlertTriangle aria-hidden="true" className="size-3.5" />
                                     Shown once: copy it now
                                 </span>
                             )
@@ -560,7 +568,7 @@ export function ConnectDialog({
                 <DialogFooter className="border-t px-7 py-4 sm:justify-between">
                     <Button variant="ghost" asChild>
                         <Link href={API_REFERENCE_PATH} onClick={close}>
-                            <BookOpen aria-hidden="true" />
+                            <IconBook aria-hidden="true" />
                             API reference
                         </Link>
                     </Button>

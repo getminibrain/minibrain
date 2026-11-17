@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { IconX } from "@tabler/icons-react";
 import {
     Button,
     Collapsible,
@@ -218,7 +218,7 @@ function FunctionEditor({
                             aria-label="Remove function"
                             onClick={onRemove}
                         >
-                            <X />
+                            <IconX />
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>Remove function</TooltipContent>
@@ -375,7 +375,7 @@ function StopControl({ settings, onChange }: { settings: Settings; onChange: Cha
                                     })
                                 }
                             >
-                                <X className="size-3.5" aria-hidden="true" />
+                                <IconX className="size-3.5" aria-hidden="true" />
                             </button>
                         </span>
                     ))}

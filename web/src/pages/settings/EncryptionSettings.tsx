@@ -1,5 +1,5 @@
+import { IconLock } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock } from "lucide-react";
 import {
     Badge,
     Button,
@@ -440,7 +440,7 @@ export function EncryptionSettings() {
     const status = useEncryption();
     return (
         <SettingsSection
-            icon={Lock}
+            icon={IconLock}
             anchor={SECURITY.encryption.anchor}
             title={SECURITY.encryption.title}
             description="Each stored file has its own data key; the master key here wraps it. Uploads, dataset versions, adapters, logs and staging copies are encrypted."

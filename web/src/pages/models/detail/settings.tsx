@@ -1,6 +1,11 @@
+import {
+    IconAdjustmentsHorizontal,
+    IconAlertTriangle,
+    IconPower,
+    IconStack2,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Layers, Power, Settings2, TriangleAlert } from "lucide-react";
 import { Button, Input, Textarea, useToast } from "obp-ui";
 import { useState } from "react";
 import { type ModelDetail, type ModelRow, api, unwrap } from "~/api/client";
@@ -67,7 +72,7 @@ function General({ row }: { row: ModelRow }) {
     });
     return (
         <SettingsSection
-            icon={Settings2}
+            icon={IconAdjustmentsHorizontal}
             anchor="general"
             title="General"
             description="How this model is named and described across minibrain."
@@ -184,7 +189,7 @@ function Deployment({ row }: { row: ModelRow }) {
     const busy = busyTearingDown(row) ? (row.teardown?.label ?? "Busy") : null;
     return (
         <SettingsSection
-            icon={Power}
+            icon={IconPower}
             anchor="deployment"
             title="Deployment"
             description="How many replicas serve it, and taking it off its pool."
@@ -228,7 +233,7 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
         <>
             {custom && (
                 <SettingsSection
-                    icon={Layers}
+                    icon={IconStack2}
                     anchor="base"
                     title="Base and copies"
                     description="Move it to another base model, or start a copy with the same settings."
@@ -267,7 +272,7 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
                 </SettingsSection>
             )}
             <SettingsSection
-                icon={TriangleAlert}
+                icon={IconAlertTriangle}
                 anchor="danger"
                 title="Danger zone"
                 description="Deleting a model cannot be undone."

@@ -1,4 +1,4 @@
-import { Hourglass } from "lucide-react";
+import { IconHourglass } from "@tabler/icons-react";
 import {
     Button,
     Dialog,
@@ -175,7 +175,7 @@ export function JoinRequests({ pools }: { pools: PoolInfo[] }) {
     return (
         <PanelSection
             flush
-            icon={Hourglass}
+            icon={IconHourglass}
             anchor="waiting-for-approval"
             title="Waiting for approval"
             description="Machines that ran minibrain worker without a join token. Approve one only if it shows the same code."

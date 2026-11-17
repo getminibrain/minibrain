@@ -1,5 +1,5 @@
+import { IconLoader2, IconPlus } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle, Plus } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -102,7 +102,7 @@ function Watch({ target, pools }: { target: Target; pools: PoolInfo[] }) {
     }
     return (
         <output className="inline-flex items-center gap-2 text-muted-foreground">
-            <LoaderCircle
+            <IconLoader2
                 aria-hidden="true"
                 className="size-4 animate-spin motion-reduce:animate-none"
             />
@@ -278,7 +278,7 @@ export function AddMachine({ pools }: { pools: PoolInfo[] }) {
     return (
         <>
             <Button onClick={() => setOpen(true)}>
-                <Plus aria-hidden="true" />
+                <IconPlus aria-hidden="true" />
                 Add machine
             </Button>
             <AddMachineDialog pools={pools} open={open} onOpenChange={setOpen} />

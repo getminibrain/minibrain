@@ -1,5 +1,5 @@
+import { IconDeviceFloppy, IconKey } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Save } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -308,9 +308,9 @@ export function KeyDialog({
                             disabled={empty || save.isPending || (touched && Boolean(problem))}
                         >
                             {creating ? (
-                                <KeyRound aria-hidden="true" />
+                                <IconKey aria-hidden="true" />
                             ) : (
-                                <Save aria-hidden="true" />
+                                <IconDeviceFloppy aria-hidden="true" />
                             )}
                             {creating ? "Create key" : "Save"}
                         </Button>

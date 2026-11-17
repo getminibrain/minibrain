@@ -1,5 +1,5 @@
+import { IconThumbDown, IconThumbUp } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
 import {
     Button,
     Card,
@@ -92,14 +92,14 @@ function FeedbackMark({ row }: { row: RequestRow }) {
         <span className="flex items-center gap-2 tabular-nums">
             {row.feedback_down > 0 && (
                 <span className="flex items-center gap-1 text-warning">
-                    <ThumbsDown aria-hidden="true" className="size-3.5" />
+                    <IconThumbDown aria-hidden="true" className="size-3.5" />
                     <span className="sr-only">Marked wrong</span>
                     {row.feedback_down > 1 && row.feedback_down}
                 </span>
             )}
             {row.feedback_up > 0 && (
                 <span className="flex items-center gap-1 text-success">
-                    <ThumbsUp aria-hidden="true" className="size-3.5" />
+                    <IconThumbUp aria-hidden="true" className="size-3.5" />
                     <span className="sr-only">Marked right</span>
                     {row.feedback_up > 1 && row.feedback_up}
                 </span>

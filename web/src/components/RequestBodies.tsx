@@ -1,6 +1,6 @@
+import { IconLogs } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
-import { Logs } from "lucide-react";
 import {
     Badge,
     Link,
@@ -86,7 +86,7 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
     const requests = `${REQUESTS_PATH}?model=${encodeURIComponent(detail.slug)}`;
     return (
         <SettingsSection
-            icon={Logs}
+            icon={IconLogs}
             anchor="request-content"
             title="Request content"
             description={
