@@ -53,7 +53,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder, Data › folder › New dataset, Data › folder › … › Rename, Data › dataset › … › Move to · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
 - **Data links** · shipped · product, ml
-  Open any dataset, folder, source or group by its own path.
+  Datasets, folders, sources and groups have paths; open them in new tabs.
   UI: Data › Datasets, Data › Sources, Data › dataset, Data › source
 - **Unique names** · shipped · product, ml
   No two datasets share a name in a folder, nor two sources.

@@ -17,7 +17,6 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     FileName,
-    Link,
     SearchInput,
     Tooltip,
     TooltipContent,
@@ -31,7 +30,6 @@ import {
 import {
     type CSSProperties,
     type KeyboardEvent,
-    type MouseEvent,
     type ReactNode,
     useEffect,
     useMemo,
@@ -95,31 +93,8 @@ import { FILL, useDataRefresh } from "./parts";
 const TREE_WIDTH = { key: "minibrain.data.treeWidth", initial: 288, min: 200, max: 520 };
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
 
-function openElsewhere(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        event.stopPropagation();
-        return;
-    }
-    event.preventDefault();
-}
-
 function linked(node: TreeNode): TreeNode {
-    return {
-        ...node,
-        textValue: node.textValue ?? (typeof node.label === "string" ? node.label : undefined),
-        label: (
-            <Link
-                href={node.id}
-                tabIndex={-1}
-                draggable={false}
-                onClick={openElsewhere}
-                className="block truncate"
-            >
-                {node.label}
-            </Link>
-        ),
-        children: node.children?.map(linked),
-    };
+    return { ...node, href: node.id, children: node.children?.map(linked) };
 }
 
 function sourceNode(source: SourceSummary): TreeNode {
