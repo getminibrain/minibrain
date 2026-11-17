@@ -20914,6 +20914,18 @@
             "title": "Eta Seconds",
             "description": "Time left a running training run reports."
           },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "Pool the job ran in, or the pool a queued job waits for."
+          },
           "attempts": {
             "items": {
               "$ref": "#/components/schemas/AttemptInfo"
@@ -20961,17 +20973,6 @@
               }
             ],
             "title": "Host"
-          },
-          "pool": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pool"
           },
           "live": {
             "type": "boolean",
@@ -21361,6 +21362,18 @@
             ],
             "title": "Eta Seconds",
             "description": "Time left a running training run reports."
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "Pool the job ran in, or the pool a queued job waits for."
           }
         },
         "type": "object",

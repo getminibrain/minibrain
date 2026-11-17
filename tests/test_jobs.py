@@ -348,3 +348,14 @@ def test_expiry_fails_a_running_job_without_its_attempt_and_keeps_expiring_the_r
     failed = job(harness, broken["job_id"])
     assert (failed["status"], failed["error"]) == ("failed", "its run has no attempt 1 on record")
     assert job(harness, other_id)["attempts"][0]["outcome"] == "lost"
+
+
+def test_job_lists_name_the_pool_a_job_ran_in(harness: Harness) -> None:
+    lora_job(harness)
+    queued = harness.client.get("/api/jobs").json()["items"][0]
+    assert queued["status"] == "queued"
+    claim = harness.claim(["train"], worker_id="w-rack", pool="rack")
+    assert claim is not None
+    listed = harness.client.get("/api/jobs").json()["items"][0]
+    assert (listed["id"], listed["pool"]) == (claim["job_id"], "rack")
+    assert job(harness, claim["job_id"])["pool"] == "rack"

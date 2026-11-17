@@ -6390,6 +6390,11 @@ export interface components {
              * @description Time left a running training run reports.
              */
             eta_seconds?: number | null;
+            /**
+             * Pool
+             * @description Pool the job ran in, or the pool a queued job waits for.
+             */
+            pool?: string | null;
             /** Attempts */
             attempts: components["schemas"]["AttemptInfo"][];
             /** Result */
@@ -6404,8 +6409,6 @@ export interface components {
             device?: string | null;
             /** Host */
             host?: string | null;
-            /** Pool */
-            pool?: string | null;
             /**
              * Live
              * @default false
@@ -6551,6 +6554,11 @@ export interface components {
              * @description Time left a running training run reports.
              */
             eta_seconds?: number | null;
+            /**
+             * Pool
+             * @description Pool the job ran in, or the pool a queued job waits for.
+             */
+            pool?: string | null;
         };
         /** JobMetrics */
         JobMetrics: {

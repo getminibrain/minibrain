@@ -218,7 +218,7 @@ def worker_place(session: Session, job: Job) -> dict[str, str | None]:
     attempt = max(job.attempts, key=lambda item: item.number, default=None)
     worker = session.get(Worker, attempt.worker) if attempt is not None else None
     if worker is None:
-        return {"host": None, "pool": None}
+        return {"host": None, "pool": job.pool}
     return {"host": worker.host, "pool": pool_of_host(session, worker.host)}
 
 

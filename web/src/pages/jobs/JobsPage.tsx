@@ -17,6 +17,7 @@ import {
     DURATION_COLUMN,
     ID_COLUMN,
     OWNER_COLUMN,
+    POOL_COLUMN,
     STARTED_COLUMN,
     STATUS_COLUMN,
     jobName,
@@ -39,8 +40,9 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
     },
     OWNER_COLUMN,
     STATUS_COLUMN,
+    POOL_COLUMN,
     STARTED_COLUMN,
-    { ...DURATION_COLUMN, header: "Took" },
+    DURATION_COLUMN,
     ATTEMPT_COLUMN,
 ]);
 

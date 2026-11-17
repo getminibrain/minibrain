@@ -9,7 +9,18 @@ from minibrain.api.job_facts import number
 from minibrain.api.schemas import DeviceTime, ScoreReference, TrainedOn
 from minibrain.data.dataset_versions import version_number
 from minibrain.jobs.metrics import STEP
-from minibrain.registry.models import BaseModel, Job, JobEvent, JobKind, JobStatus, Model, Version, VersionStatus
+from minibrain.registry.models import (
+    BaseModel,
+    Job,
+    JobAttempt,
+    JobEvent,
+    JobKind,
+    JobStatus,
+    Model,
+    Version,
+    VersionStatus,
+    Worker,
+)
 from minibrain.tasks.service import held_out_score
 
 
@@ -59,6 +70,23 @@ def etas(session: Session, jobs: Sequence[Job]) -> dict[int, float]:
     return {job_id: eta for job_id, eta in found.items() if eta is not None and eta > 0}
 
 
+def pools(session: Session, jobs: Sequence[Job]) -> dict[int, str | None]:
+    if not jobs:
+        return {}
+    latest = (
+        select(func.max(JobAttempt.id))
+        .where(JobAttempt.job_id.in_([job.id for job in jobs]))
+        .group_by(JobAttempt.job_id)
+    )
+    rows = session.execute(
+        select(JobAttempt.job_id, Worker.pool)
+        .join(Worker, Worker.id == JobAttempt.worker)
+        .where(JobAttempt.id.in_(latest))
+    )
+    ran = {job_id: pool for job_id, pool in rows}
+    return {job.id: ran.get(job.id) or job.pool for job in jobs}
+
+
 def trained_on(job: Job, names: dict[str, str]) -> TrainedOn | None:
     version = job.version
     if job.kind != JobKind.TRAIN or version is None:
@@ -99,12 +127,14 @@ def list_extras(session: Session, jobs: Sequence[Job], scores: dict[int, float |
     names = base_names(session, {version.base_model for version in versions})
     peers = peers_of(session, {version.model_id for version in versions})
     left = etas(session, jobs)
+    places = pools(session, jobs)
     return {
         job.id: {
             "trained_on": trained_on(job, names),
             "compared_with": compared_with(job, scores.get(job.id), peers),
             "device_time": device_time(job),
             "eta_seconds": left.get(job.id),
+            "pool": places.get(job.id),
         }
         for job in jobs
     }

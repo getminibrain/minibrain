@@ -27,32 +27,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Link,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
     cn,
     useToast,
 } from "obp-ui";
 import { useState } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
-import { useDatasetVersions } from "~/api/dataQueries";
 import { useJobMetrics } from "~/api/jobPageQueries";
-import {
-    isActiveJob,
-    useJob,
-    useJobs,
-    useModel,
-    useVersionFiles,
-    useVersions,
-} from "~/api/queries";
+import { isActiveJob, useJob, useJobs, useVersionFiles, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, PanelSections } from "~/components/Section";
-import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { ruleText } from "~/lib/judging";
 import {
     modelCardHref,
     modelCompareHref,
@@ -68,15 +55,9 @@ import { DeployVersionDialog, liveBlock, versionLabel } from "./makeLive";
 import { EvaluationSection } from "./versionEvaluation";
 import { VersionNote } from "./versionNote";
 import { TrainingSection } from "./versionRun";
-import {
-    type Peers,
-    type Phase,
-    type RulePart,
-    peersOf,
-    phaseOf,
-    verdictLine,
-} from "./versionState";
+import { type Peers, type Phase, peersOf, phaseOf } from "./versionState";
 import { SummarySection } from "./versionSummary";
+import { VerdictLine } from "./versionVerdict";
 import { VersionStatus, runJob } from "./versions";
 
 function artifactHref(id: string): string {
@@ -431,77 +412,6 @@ function DeployButton({
                 />
             )}
         </>
-    );
-}
-
-function useHeldOutRows(version: VersionInfo, enabled: boolean): number | null {
-    const data = useDatasetVersions(version.dataset_slug ?? "", enabled);
-    const found = data.data?.find((item) => item.id === version.dataset_version_id);
-    return found?.counts.eval ?? null;
-}
-
-function RuleText({ rule, text }: { rule: RulePart; text: string }) {
-    if (rule.met === null) {
-        return <span className="shrink-0">no deploy rule set</span>;
-    }
-    const term = (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="cursor-help underline decoration-dotted underline-offset-4">
-                    deploy rule
-                </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs whitespace-normal">{text}</TooltipContent>
-        </Tooltip>
-    );
-    return (
-        <span className="min-w-0 truncate">
-            {rule.met ? "meets your " : "doesn't meet your "}
-            {term}
-            {rule.missed ? `: ${rule.missed}` : ""}
-        </span>
-    );
-}
-
-function VerdictLine({
-    row,
-    version,
-    phase,
-    peers,
-    eta,
-}: {
-    row: ModelRow;
-    version: VersionInfo;
-    phase: Phase;
-    peers: Peers;
-    eta: number | null | undefined;
-}) {
-    const rows = useHeldOutRows(version, phase === "scoring");
-    const model = useModel(version.promotion ? row.key : "");
-    const verdict = verdictLine({ version, phase, peers, eta, heldOutRows: rows });
-    const rule = model.data ? ruleText(model.data.promotion) : "Loading the rule…";
-    return (
-        <p className="flex h-6 min-w-0 items-center" aria-live="polite">
-            <StatusText
-                tone={verdict.tone}
-                active={verdict.active}
-                waiting={verdict.waiting}
-                progress={verdict.progress}
-                className="min-w-0"
-            >
-                <span className="flex min-w-0 items-baseline gap-1 tabular-nums">
-                    <span className="truncate" title={verdict.text}>
-                        {verdict.text}
-                    </span>
-                    {verdict.rule && (
-                        <>
-                            <span className="shrink-0">·</span>
-                            <RuleText rule={verdict.rule} text={rule} />
-                        </>
-                    )}
-                </span>
-            </StatusText>
-        </p>
     );
 }
 

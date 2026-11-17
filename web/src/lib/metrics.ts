@@ -19,6 +19,12 @@ export function metricName(metric: string | null | undefined): string {
     return NAMES[metric] ?? metric.replaceAll("_", " ");
 }
 
+const SHORT_NAMES: Record<string, string> = { label_accuracy: "Accuracy" };
+
+export function shortMetricName(metric: string | null | undefined): string {
+    return (metric && SHORT_NAMES[metric]) || metricName(metric);
+}
+
 export function metricOf(
     split: Split | null | undefined,
     metric: string | null | undefined,

@@ -633,10 +633,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Browse every /v1 call live, filtered, with its kept input.
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Jobs** · shipped · ml, admin
-  Every job of every kind, by status; cancel, retry or delete.
+  Every job by status and pool; cancel, retry or delete.
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
 - **Job page** · shipped · product, ml, admin
-  One job's progress, settings, data, loss and log; delete it.
+  One job's progress, inputs, loss, result and log; delete it.
   UI: Training › job, Jobs › job, Models › model › Versions › version · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, DELETE /api/jobs/{job_id}
 - **Job log** · shipped · ml, admin
   Read a job's own events apart from library output, by level.

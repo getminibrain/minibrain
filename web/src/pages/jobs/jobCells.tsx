@@ -3,6 +3,7 @@ import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import type { JobOrder } from "~/api/jobQueries";
 import { ModelName, withDeleted } from "~/components/ModelName";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { When } from "~/components/When";
 import { StatusText, type Tone } from "~/components/models/StatusText";
@@ -153,6 +154,18 @@ export const DURATION_COLUMN: JobColumn = {
     header: "Duration",
     accessorFn: jobSeconds,
     cell: ({ row }) => <span className="tabular-nums">{jobDuration(row.original)}</span>,
+};
+
+export const POOL_COLUMN: JobColumn = {
+    id: "pool",
+    header: "Pool",
+    accessorFn: (job) => job.pool ?? "",
+    cell: ({ row }) =>
+        row.original.pool ? (
+            <PoolLink name={row.original.pool} />
+        ) : (
+            <span className="text-muted-foreground">–</span>
+        ),
 };
 
 export const ATTEMPT_COLUMN: JobColumn = {

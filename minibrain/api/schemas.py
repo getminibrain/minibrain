@@ -572,6 +572,7 @@ class JobInfo(BaseModel):
     )
     device_time: DeviceTime | None = Field(default=None, description="Device time of a finished run, on job lists.")
     eta_seconds: float | None = Field(default=None, description="Time left a running training run reports.")
+    pool: str | None = Field(default=None, description="Pool the job ran in, or the pool a queued job waits for.")
 
 
 class JobPage(BaseModel):
@@ -659,7 +660,6 @@ class JobDetail(JobInfo):
     outputs: dict[str, str]
     device: str | None = None
     host: str | None = None
-    pool: str | None = None
     live: bool = False
     setup: JobSetup | None = None
 

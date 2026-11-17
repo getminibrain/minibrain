@@ -37,9 +37,9 @@ import {
     modelVersionHref,
 } from "~/lib/modelLinks";
 import { useScrollToHash } from "~/lib/scrollToHash";
-import { bytes, relativeTime } from "~/lib/time";
+import { bytes } from "~/lib/time";
 import { labelOf, presetChanges, recordedRun } from "../models/detail/train/recipe";
-import { ProgressSection, ScoresSection } from "./ProgressPanels";
+import { ProgressSection, ResultSection } from "./ProgressPanels";
 import { LossSection } from "./TrainingPanel";
 import { JobState } from "./jobCells";
 
@@ -133,12 +133,10 @@ function Subject({ job }: { job: JobDetail }) {
 }
 
 function Context({ job }: { job: JobDetail }) {
-    const moment = job.started_at ?? job.created_at;
     return (
         <span>
             {`${kindVerb(job.kind)} `}
             <Subject job={job} />
-            {` · ${job.started_at ? "started" : "queued"} ${relativeTime(moment)}`}
         </span>
     );
 }
@@ -234,6 +232,13 @@ function Actions({ job }: { job: JobDetail }) {
     );
 }
 
+function placeLabel(job: JobDetail): string {
+    if (job.status === "queued" && !job.host) {
+        return "Queued for";
+    }
+    return job.status === "running" ? "Runs on" : "Ran on";
+}
+
 function Summary({ job }: { job: JobDetail }) {
     return (
         <div className="flex flex-wrap gap-x-10 gap-y-3">
@@ -242,7 +247,7 @@ function Summary({ job }: { job: JobDetail }) {
             <Stat label="Attempt" value={`${Math.max(1, job.attempt)} of ${job.max_attempts}`} />
             {(job.pool || job.host) && (
                 <Stat
-                    label={job.status === "running" ? "Runs on" : "Ran on"}
+                    label={placeLabel(job)}
                     value={
                         <span className="font-normal">
                             {job.pool ? (
@@ -497,13 +502,13 @@ function setupFacts(job: JobDetail): Fact[] {
     return MODEL_JOB_KINDS.includes(job.kind) ? versionFacts(job, setup) : baseFacts(job, setup);
 }
 
-function SettingsSection({ job }: { job: JobDetail }) {
+function InputsSection({ job }: { job: JobDetail }) {
     const facts = setupFacts(job);
     return (
         <PanelSection
             icon={IconAdjustmentsHorizontal}
-            title="Settings and data"
-            tip="What this job read and the settings it ran with."
+            title="Inputs"
+            description="What this job ran with."
         >
             {facts.length > 0 ? (
                 <Facts items={facts} />
@@ -532,12 +537,12 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
             <Serving job={job} />
             <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
             <PanelSections>
-                <div className="grid items-start gap-x-6 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                <div className="grid items-start gap-x-6 gap-y-10 xl:grid-cols-2">
                     <ProgressSection job={job} metrics={metrics.data} />
-                    <SettingsSection job={job} />
+                    <InputsSection job={job} />
                 </div>
                 {training && <LossSection job={job} metrics={metrics.data} />}
-                {job.kind === "eval" && <ScoresSection job={job} />}
+                {(training || job.kind === "eval") && <ResultSection job={job} />}
                 <JobLogsSection key={job.id} job={job} anchor={JOB_LOGS_ID} />
             </PanelSections>
         </>

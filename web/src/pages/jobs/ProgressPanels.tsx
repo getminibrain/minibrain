@@ -7,12 +7,13 @@ import { Facts } from "~/components/Facts";
 import { ErrorLine, PanelSection, Stat } from "~/components/Section";
 import { When } from "~/components/When";
 import { ProgressBar } from "~/components/models/StatusText";
-import { PromotionDecision } from "~/components/models/VersionResults";
 import { useCan } from "~/lib/access";
 import { count, percent, pointsSize } from "~/lib/format";
-import { metricName, metricOf } from "~/lib/metrics";
+import { metricOf, shortMetricName } from "~/lib/metrics";
 import { bytes } from "~/lib/time";
 import { DeployButton, usePromote } from "../EvaluationsPage";
+import { peersOf, phaseOf } from "../models/detail/versionState";
+import { VerdictLine } from "../models/detail/versionVerdict";
 import { trainingFacts } from "./TrainingPanel";
 
 type Fact = [string, ReactNode];
@@ -160,32 +161,46 @@ function reviewHref(slug: string, number: number): string {
     return `/evaluations?version=${encodeURIComponent(`${slug}@${number}`)}`;
 }
 
-function Scores({ slug, number }: { slug: string; number: number }) {
+function Result({ slug, number }: { slug: string; number: number }) {
     const versions = useVersions(slug);
     const models = useAllModels();
     const promote = usePromote();
     const can = useCan();
-    const info = versions.data?.find((item) => item.number === number);
+    const list = versions.data ?? [];
+    const info = list.find((item) => item.number === number);
     const row = models.data?.find((item) => item.key === slug);
     const line = row?.versions?.find((item) => item.number === number);
     const live = row?.versions?.find((item) => item.live);
-    if (!info) {
-        return <ErrorLine error={versions.error} onRetry={versions.refetch} />;
+    if (!info || !row) {
+        return (
+            <ErrorLine
+                error={versions.error ?? models.error}
+                onRetry={versions.error ? versions.refetch : models.refetch}
+            />
+        );
     }
-    const metric = metricName(info.main_metric).toLowerCase();
     return (
         <div className="flex flex-col gap-4">
+            <VerdictLine
+                row={row}
+                version={info}
+                phase={phaseOf(info)}
+                peers={peersOf(row, list, info)}
+                eta={undefined}
+            />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
-                <Stat label={`Held-out ${metric}`} value={percent(info.score)} />
+                <Stat
+                    label={`${shortMetricName(info.main_metric)} (held-out)`}
+                    value={percent(info.score)}
+                />
                 <Stat
                     label={live && live.number !== number ? `Live v${live.number}` : "Live version"}
                     value={live && live.number !== number ? percent(live.score) : "–"}
                 />
                 <Stat label="vs live" value={<Versus version={info} live={live} />} />
                 <Stat label="Test set" value={percent(metricOf(info.golden, info.main_metric))} />
-                <Stat label="Breaks the contract" value={percent(info.held_out?.invalid_rate)} />
+                <Stat label="Invalid answers" value={percent(info.held_out?.invalid_rate)} />
             </div>
-            {info.promotion && <PromotionDecision decision={info.promotion} />}
             <ErrorLine error={promote.error} />
             <div className="flex flex-wrap items-center gap-2">
                 {can.build && line && (
@@ -203,7 +218,16 @@ function Scores({ slug, number }: { slug: string; number: number }) {
     );
 }
 
-export function ScoresSection({ job }: { job: JobDetail }) {
+function pendingText(job: JobDetail): string {
+    if (!isActiveJob(job)) {
+        return "No scores.";
+    }
+    return job.kind === "train"
+        ? "The new version is scored when training finishes."
+        : "Scores appear when scoring finishes.";
+}
+
+export function ResultSection({ job }: { job: JobDetail }) {
     const done =
         job.status === "succeeded" &&
         job.model &&
@@ -214,19 +238,13 @@ export function ScoresSection({ job }: { job: JobDetail }) {
     return (
         <PanelSection
             icon={IconGauge}
-            title="Scores"
-            description={
-                done
-                    ? "This version against the live one, and whether the deploy rule lets it go live."
-                    : "The held-out and test rows are answered first; the scores follow when it finishes."
-            }
+            title="Result"
+            description="What it produced and whether it can go live."
         >
             {done && job.model ? (
-                <Scores slug={job.model} number={job.version ?? 0} />
+                <Result slug={job.model} number={job.version ?? 0} />
             ) : (
-                <p className="text-muted-foreground">
-                    {isActiveJob(job) ? "Scores appear when scoring finishes." : "No scores."}
-                </p>
+                <p className="text-muted-foreground">{pendingText(job)}</p>
             )}
         </PanelSection>
     );
