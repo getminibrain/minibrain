@@ -1891,6 +1891,30 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`):
       the last step before tagging v1
 
+### Before release (added 2026-11-17)
+
+Each page gets a review pass (layout, empty, loading and error states, light and dark at 1024–1440px) and the fixes
+it finds:
+
+- [ ] Infrastructure: Overview, Machines, Storage
+- [ ] Data: catalogue, sources, datasets, versions
+- [ ] Monitoring: the global page and each model's Monitoring tab
+- [ ] Feedback page
+- [ ] Evaluations: the global page and each model's Evaluation tab
+- [ ] Home page
+- [ ] Playground
+- [ ] Settings: every section checked against what it controls
+- [ ] Security review: auth, roles, joining, worker and engine tokens, secrets, audit; an outside review if possible
+- [ ] Documentation: install, first model, joining machines, training, serving, API, security, upgrades
+- [ ] Logo and icon set
+- [ ] Website: product page, docs, install, contact
+- [ ] Core journey end to end on a fresh install, scripted as a release check
+- [ ] A real GPU run: gpt-oss-20b serving and LoRA training on an NVIDIA box
+- [ ] Offline install bundle tested on an air-gapped machine, then an upgrade with rollback
+- [ ] Backup and restore, tested and documented
+- [ ] Licences: third-party notices, model licences shown before download, LICENSE and the CLA
+- [ ] Release process: versioning, changelog, signed artefacts
+
 ## v2
 
 - Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers):
