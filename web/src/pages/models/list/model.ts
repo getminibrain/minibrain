@@ -268,7 +268,7 @@ export function scoreNote(model: ListModel, version: ModelVersionRow): ScoreNote
     if (version.promotion?.passed === false) {
         const missed = version.promotion.checks.filter((check) => !check.passed);
         const reason = missed.map((check) => `${check.name}: ${check.detail}`).join("; ");
-        return { kind: "below", reason: reason || "The promotion rule was not met." };
+        return { kind: "below", reason: reason || "The deploy rule was not met." };
     }
     const delta = deltaOf(model, version);
     return delta !== null && delta > SAME ? { kind: "beats", delta } : null;

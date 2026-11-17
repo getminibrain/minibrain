@@ -364,6 +364,7 @@ def version_info(model: Model, version: Version, prices: DevicePrices | None = N
         device_time=DeviceTime.model_validate(version.device_time) if version.device_time else None,
         base_model=version.base_model,
         base_refusal=refusal_of(model, version),
+        note=version.note,
     )
 
 

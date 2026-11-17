@@ -1,7 +1,6 @@
 import {
     IconBook,
-    IconChevronLeft,
-    IconChevronRight,
+    IconChevronDown,
     IconCopy,
     IconDots,
     IconDownload,
@@ -23,10 +22,9 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Link,
     Tooltip,
@@ -41,9 +39,9 @@ import { useDatasetVersions } from "~/api/dataQueries";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import {
     isActiveJob,
-    useAllModels,
     useJob,
     useJobs,
+    useModel,
     useVersionFiles,
     useVersions,
 } from "~/api/queries";
@@ -53,6 +51,8 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
+import { percent } from "~/lib/format";
+import { ruleText } from "~/lib/judging";
 import {
     modelCardHref,
     modelCompareHref,
@@ -63,12 +63,20 @@ import {
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
-import { Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
+import { Tip, isDeployed, modelCrumbs } from "./header";
 import { DeployVersionDialog, liveBlock, versionLabel } from "./makeLive";
-import { ChangesSection } from "./versionChanges";
-import { DetailsSection, LineageSection, TrainingSection } from "./versionRun";
-import { ScoreSection } from "./versionScore";
-import { type Peers, type Phase, peersOf, phaseOf, verdictLine } from "./versionState";
+import { EvaluationSection } from "./versionEvaluation";
+import { VersionNote } from "./versionNote";
+import { TrainingSection } from "./versionRun";
+import {
+    type Peers,
+    type Phase,
+    type RulePart,
+    peersOf,
+    phaseOf,
+    verdictLine,
+} from "./versionState";
+import { SummarySection } from "./versionSummary";
 import { VersionStatus, runJob } from "./versions";
 
 function artifactHref(id: string): string {
@@ -173,6 +181,25 @@ function copyText(value: string): Promise<void> {
         : Promise.reject(new Error("blocked"));
 }
 
+function shown(versions: VersionInfo[]): VersionInfo[] {
+    return versions
+        .filter((item) => item.status !== "deleting")
+        .sort((a, b) => b.number - a.number);
+}
+
+function compareTarget(
+    row: ModelRow,
+    versions: VersionInfo[],
+    version: VersionInfo,
+): number | null {
+    const others = shown(versions).filter(
+        (item) => item.number !== version.number && item.status === "ready",
+    );
+    const live = isDeployed(row) ? others.find((item) => item.current) : undefined;
+    const older = others.find((item) => item.number < version.number);
+    return (live ?? older ?? others[0])?.number ?? null;
+}
+
 function VersionMenu({
     row,
     versions,
@@ -189,9 +216,7 @@ function VersionMenu({
     const exportable = ready && version.kind === "lora";
     const isLive = isDeployed(row) && row.current_version === version.number;
     const baseline = version.number === 0;
-    const others = versions
-        .filter((item) => item.number !== version.number && item.status === "ready")
-        .sort((a, b) => b.number - a.number);
+    const other = compareTarget(row, versions, version);
     const remove = () =>
         setConfirmation({
             title: `Delete ${versionLabel(version)} of ${row.name}?`,
@@ -236,35 +261,16 @@ function VersionMenu({
                         <IconPlayerPlay />
                         Try in Playground
                     </DropdownMenuItem>
-                    <DropdownMenuSub>
-                        <DropdownMenuSubTrigger disabled={!ready || others.length === 0}>
-                            <IconGitCompare />
-                            Compare with…
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-48">
-                            {others.map((item) => (
-                                <DropdownMenuItem
-                                    key={item.number}
-                                    onSelect={() =>
-                                        router.history.push(
-                                            modelCompareHref(
-                                                row.key,
-                                                Math.min(item.number, version.number),
-                                                Math.max(item.number, version.number),
-                                            ),
-                                        )
-                                    }
-                                >
-                                    {versionLabel(item)}
-                                    {item.current && isDeployed(row) && (
-                                        <span className="ml-auto text-sm text-muted-foreground">
-                                            Live
-                                        </span>
-                                    )}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuSubContent>
-                    </DropdownMenuSub>
+                    <DropdownMenuItem
+                        disabled={other === null}
+                        onSelect={() =>
+                            other !== null &&
+                            router.history.push(modelCompareHref(row.key, other, version.number))
+                        }
+                    >
+                        <IconGitCompare />
+                        Compare with…
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                         onSelect={() =>
                             copyText(callable).then(
@@ -334,6 +340,43 @@ function VersionMenu({
     );
 }
 
+function VersionPicker({
+    row,
+    versions,
+    version,
+}: { row: ModelRow; versions: VersionInfo[]; version: VersionInfo }) {
+    const router = useRouter();
+    const live = isDeployed(row) ? row.current_version : null;
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" aria-label={`Version v${version.number}, pick another`}>
+                    <span className="tabular-nums">{`v${version.number}`}</span>
+                    <IconChevronDown aria-hidden="true" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-96 w-64">
+                <DropdownMenuRadioGroup
+                    value={String(version.number)}
+                    onValueChange={(value) =>
+                        router.history.push(modelVersionHref(row.key, Number(value)))
+                    }
+                >
+                    {shown(versions).map((item) => (
+                        <DropdownMenuRadioItem key={item.number} value={String(item.number)}>
+                            <span className="tabular-nums">{versionLabel(item)}</span>
+                            <span className="ml-auto flex items-center gap-2 text-sm text-muted-foreground tabular-nums">
+                                {item.number === live && <span className="text-success">Live</span>}
+                                {item.score === null ? "–" : percent(item.score)}
+                            </span>
+                        </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function deployReason(
     row: ModelRow,
     version: VersionInfo,
@@ -397,16 +440,48 @@ function useHeldOutRows(version: VersionInfo, enabled: boolean): number | null {
     return found?.counts.eval ?? null;
 }
 
+function RuleText({ rule, text }: { rule: RulePart; text: string }) {
+    if (rule.met === null) {
+        return <span className="shrink-0">no deploy rule set</span>;
+    }
+    const term = (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="cursor-help underline decoration-dotted underline-offset-4">
+                    deploy rule
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">{text}</TooltipContent>
+        </Tooltip>
+    );
+    return (
+        <span className="min-w-0 truncate">
+            {rule.met ? "meets your " : "doesn't meet your "}
+            {term}
+            {rule.missed ? `: ${rule.missed}` : ""}
+        </span>
+    );
+}
+
 function VerdictLine({
+    row,
     version,
     phase,
     peers,
     eta,
-}: { version: VersionInfo; phase: Phase; peers: Peers; eta: number | null | undefined }) {
+}: {
+    row: ModelRow;
+    version: VersionInfo;
+    phase: Phase;
+    peers: Peers;
+    eta: number | null | undefined;
+}) {
     const rows = useHeldOutRows(version, phase === "scoring");
+    const model = useModel(version.promotion ? row.key : "");
     const verdict = verdictLine({ version, phase, peers, eta, heldOutRows: rows });
+    const rule = model.data ? ruleText(model.data.promotion) : "Loading the rule…";
     return (
-        <p className="flex min-h-6 min-w-0 items-center" aria-live="polite">
+        <p className="flex h-6 min-w-0 items-center" aria-live="polite">
             <StatusText
                 tone={verdict.tone}
                 active={verdict.active}
@@ -414,86 +489,33 @@ function VerdictLine({
                 progress={verdict.progress}
                 className="min-w-0"
             >
-                <span className="truncate tabular-nums" title={verdict.text}>
-                    {verdict.text}
+                <span className="flex min-w-0 items-baseline gap-1 tabular-nums">
+                    <span className="truncate" title={verdict.text}>
+                        {verdict.text}
+                    </span>
+                    {verdict.rule && (
+                        <>
+                            <span className="shrink-0">·</span>
+                            <RuleText rule={verdict.rule} text={rule} />
+                        </>
+                    )}
                 </span>
             </StatusText>
         </p>
     );
 }
 
-function neighbours(
-    versions: VersionInfo[],
-    number: number,
-): { previous: number | null; next: number | null } {
-    const numbers = versions
-        .filter((item) => item.status !== "deleting")
-        .map((item) => item.number);
-    const before = numbers.filter((item) => item < number);
-    const after = numbers.filter((item) => item > number);
-    return {
-        previous: before.length > 0 ? Math.max(...before) : null,
-        next: after.length > 0 ? Math.min(...after) : null,
-    };
-}
-
-function StepLink({
-    slug,
-    number,
-    direction,
-}: { slug: string; number: number | null; direction: "previous" | "next" }) {
-    const Icon = direction === "previous" ? IconChevronLeft : IconChevronRight;
-    const word = direction === "previous" ? "Previous" : "Next";
-    if (number === null) {
-        return (
-            <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled
-                aria-label={`No ${word.toLowerCase()} version`}
-            >
-                <Icon />
-            </Button>
-        );
-    }
-    const label = `v${number}`;
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" asChild>
-                    <Link
-                        href={modelVersionHref(slug, number)}
-                        aria-label={`${word} version ${label}`}
-                        className="tabular-nums"
-                    >
-                        {direction === "previous" && <Icon aria-hidden="true" />}
-                        {label}
-                        {direction === "next" && <Icon aria-hidden="true" />}
-                    </Link>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent>{`${word} version ${label}`}</TooltipContent>
-        </Tooltip>
-    );
-}
-
-function VersionStepper({
-    slug,
-    versions,
-    number,
-}: { slug: string; versions: VersionInfo[]; number: number }) {
-    const { previous, next } = neighbours(versions, number);
-    return (
-        <nav aria-label="Other versions" className="flex items-center text-muted-foreground">
-            <StepLink slug={slug} number={previous} direction="previous" />
-            <span aria-hidden="true">·</span>
-            <StepLink slug={slug} number={next} direction="next" />
-        </nav>
-    );
+function captionOf(version: VersionInfo): string {
+    const kind =
+        version.kind === "lora"
+            ? "Trained"
+            : version.number === 0
+              ? "Baseline, prompt only"
+              : "Prompt only";
+    return `${kind} · created ${relativeTime(version.created_at)}`;
 }
 
 export function VersionView({ row, number }: { row: ModelRow; number: number | null }) {
-    const models = useAllModels();
     const versions = useVersions(row.key);
     const jobs = useJobs(row.key);
     const list = versions.data ?? [];
@@ -533,22 +555,21 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
     }
     const phase = phaseOf(version);
     const peers = peersOf(row, list, version);
-    const base = baseNameOf(models.data, version.base_model || row.base_model);
     const trainMetrics = trained ? metrics.data : undefined;
+    const active = version.job && isActiveJob(version.job) ? version.job : undefined;
     return (
         <Page wide>
             <PageHeader
-                title={versionLabel(version)}
+                title={`${row.name} v${version.number}`}
                 crumbs={crumbs}
-                badge={
-                    <span className="flex items-center gap-3">
-                        <VersionStepper slug={row.key} versions={list} number={version.number} />
-                        <VersionStatus row={row} version={version} />
-                    </span>
-                }
-                caption={`${row.name} on ${base} · created ${relativeTime(version.created_at)}`}
+                badge={<VersionStatus row={row} version={version} />}
+                caption={captionOf(version)}
                 actions={
                     <>
+                        <VersionPicker row={row} versions={list} version={version} />
+                        <Button variant="outline" asChild>
+                            <Link href={modelCardHref(row.key, version.number)}>Model card</Link>
+                        </Button>
                         <DeployButton
                             row={row}
                             versions={list}
@@ -560,15 +581,26 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                     </>
                 }
             />
-            <VerdictLine
-                version={version}
-                phase={phase}
-                peers={peers}
-                eta={trainMetrics?.training?.eta_seconds}
-            />
+            <div className="flex flex-col gap-1">
+                <VerdictLine
+                    row={row}
+                    version={version}
+                    phase={phase}
+                    peers={peers}
+                    eta={trainMetrics?.training?.eta_seconds}
+                />
+                <VersionNote slug={row.key} version={version} />
+            </div>
             <PanelSections>
-                <ScoreSection version={version} versions={list} phase={phase} peers={peers} />
-                <ChangesSection slug={row.key} version={version} phase={phase} peers={peers} />
+                <SummarySection
+                    row={row}
+                    version={version}
+                    versions={list}
+                    phase={phase}
+                    peers={peers}
+                    job={active ?? run}
+                    detail={detail}
+                />
                 <TrainingSection
                     slug={row.key}
                     versions={list}
@@ -581,8 +613,13 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                     metricsError={trained ? metrics.error : null}
                     onRetry={metrics.refetch}
                 />
-                <LineageSection row={row} version={version} peers={peers} />
-                <DetailsSection row={row} version={version} phase={phase} />
+                <EvaluationSection
+                    slug={row.key}
+                    version={version}
+                    versions={list}
+                    phase={phase}
+                    peers={peers}
+                />
             </PanelSections>
         </Page>
     );

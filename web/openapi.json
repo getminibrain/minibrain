@@ -1516,7 +1516,7 @@
         "tags": [
           "Evaluations"
         ],
-        "summary": "Change a custom model's promotion rule",
+        "summary": "Change a custom model's deploy rule",
         "operationId": "update_promotion_api_models__name__promotion_put",
         "parameters": [
           {
@@ -6420,6 +6420,68 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JobInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{name}/versions/{number}/note": {
+      "put": {
+        "tags": [
+          "Versions"
+        ],
+        "summary": "Edit a version's note",
+        "description": "One line on why the version exists. It shows on the version page and in the model card.",
+        "operationId": "edit_note_api_models__name__versions__number__note_put",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionNoteEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
                 }
               }
             }
@@ -13949,6 +14011,11 @@
               }
             ],
             "title": "Created By"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
           }
         },
         "type": "object",
@@ -32735,6 +32802,18 @@
             ],
             "title": "Base Refusal",
             "description": "Why the version can't be deployed: it was made on a base the model has left."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "One line on why this version exists."
           }
         },
         "type": "object",
@@ -32762,6 +32841,21 @@
           "score"
         ],
         "title": "VersionInfo"
+      },
+      "VersionNoteEdit": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Note",
+            "description": "One line on why this version exists; empty clears it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "VersionNoteEdit"
       },
       "VersionOrigin": {
         "properties": {

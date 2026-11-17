@@ -62,8 +62,8 @@ export function liveBlock(row: ModelRow, version: VersionInfo): string | null {
 export function ruleReason(version: VersionInfo): string {
     const failed = version.promotion?.checks.filter((check) => !check.passed) ?? [];
     return failed.length > 0
-        ? `Below the promotion rule: ${failed.map((check) => check.detail).join("; ")}.`
-        : "Below the promotion rule.";
+        ? `Doesn't meet your deploy rule: ${failed.map((check) => check.detail).join("; ")}.`
+        : "Doesn't meet your deploy rule.";
 }
 
 export function canGoLive(row: ModelRow, version: VersionInfo): boolean {

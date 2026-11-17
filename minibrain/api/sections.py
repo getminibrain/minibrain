@@ -60,7 +60,7 @@ TRAINING = Section(
 )
 EVALUATIONS = Section(
     "Evaluations",
-    "A custom model's contract, graders, judge and promotion rule, and the answers a version was scored on.",
+    "A custom model's contract, graders, judge and deploy rule, and the answers a version was scored on.",
     (
         f"{MODEL}/contract",
         f"{MODEL}/graders",

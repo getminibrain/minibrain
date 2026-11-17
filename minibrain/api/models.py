@@ -539,7 +539,7 @@ def rescore_versions(name: str, session: SessionDep, settings: SettingsDep, queu
     return RescoreResult(versions=numbers, jobs=[job.id for job in jobs])
 
 
-@router.put("/{name}/promotion", dependencies=[Depends(builder)], summary="Change a custom model's promotion rule")
+@router.put("/{name}/promotion", dependencies=[Depends(builder)], summary="Change a custom model's deploy rule")
 def update_promotion(name: str, body: PromotionInfo, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, name)
     facts = {"name": model.name, "from": dict(model.promotion)}

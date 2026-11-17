@@ -37,6 +37,7 @@ SPDX_IDS = {"apache-2.0": "Apache-2.0", "mit": "MIT"}
 TASKS = {"classify": "text-classification", "custom": "text-generation"}
 MIME_TYPES = {"tar": "application/x-tar", "file": "application/octet-stream"}
 UPLOAD = "upload"
+EDITS = ("version.card", "version.note")
 SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 Values = list[tuple[str, Any]]
@@ -70,7 +71,8 @@ def adapter_of(session: Session, version: Version) -> Adapter | None:
 
 
 def edited_at(session: Session, target: str) -> str | None:
-    query = select(func.max(AuditEvent.at)).where(AuditEvent.action == "version.card", AuditEvent.target == target)
+    edits = AuditEvent.action.in_(EDITS)
+    query = select(func.max(AuditEvent.at)).where(edits, AuditEvent.target == target)
     return stamp(session.scalar(query))
 
 
@@ -355,6 +357,7 @@ def version_values(card: ModelCard) -> Values:
         ("version:status", version.status),
         ("version:created_at", version.created_at),
         ("version:created_by", version.created_by),
+        ("version:note", version.note),
         ("use:owner", card.use.owner),
     ]
     scored: Values = [("evaluation:scored", card.evaluation.scored)]

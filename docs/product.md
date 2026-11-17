@@ -160,11 +160,14 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Traffic, latency, errors, versions, callers and requests of one model.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
 - **Version page** · shipped · product, ml
-  One fixed layout in every state: verdict, score, changes, training, lineage.
+  One fixed layout in every state: summary, training, evaluation.
   UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel
-- **Step between versions** · shipped · product, ml
-  Previous and next arrows beside a version's title skip deleted numbers.
+- **Version picker** · shipped · product, ml
+  A menu beside the title jumps to any version, newest first.
   UI: Models › model › Versions › version · API: GET /api/models/{name}/versions
+- **Version note** · shipped · product, ml, admin
+  One line on why a version exists, audited and on its card.
+  UI: Models › model › Versions › version, Models › model › Versions, Models › model › Overview › About · API: PUT /api/models/{name}/versions/{number}/note, GET /api/models/{name}/versions/{number}/card
 - **Started-from lineage** · shipped · product, ml, admin
   Each run records the version its settings came from.
   UI: Models › model › Train, Models › model › Versions › version · API: POST /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/card, GET /api/models/{name}/versions/{number}/aibom.json
@@ -247,7 +250,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Edit the system prompt with each new version, which keeps its copy.
   UI: Models › model › Train › Instructions · API: POST /api/models/{name}/versions, PUT /api/models/{name}/instructions
 - **Task engine** · shipped · ml
-  One engine for chat examples, contracts, graders and promotion rules.
+  One engine for chat examples, contracts, graders and deploy rules.
   UI: Models › model › Evaluation › How it's scored
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema; breaking changes confirmed once live.
@@ -364,7 +367,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Judge model** · shipped · ml, admin
   Pick the base that judges free-text answers, per install or model.
   UI: Settings › General › Judge model, Models › model › Evaluation › How it's scored · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{name}/judge
-- **Promotion rule** · partial · ml, engineer
+- **Deploy rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
   UI: Models › model › Evaluation › How it's scored, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
 - **Evaluation tab** · shipped · product, ml
@@ -707,7 +710,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Use cases
 - **Trade break triage** · partial · uses: Classify preset, Dataset versions, Scores
 - **Term sheet extraction** · planned · uses: Extract preset, Structured output
-- **Communications surveillance** · partial · uses: Classify preset, Promotion rule, Review queue
+- **Communications surveillance** · partial · uses: Classify preset, Deploy rule, Review queue
 - **Research notes in house style** · planned · uses: General preset, Graders
 - **Claims triage** · partial · uses: Classify preset, Dataset versions
 - **Contract clause extraction** · planned · uses: Extract preset, Structured output

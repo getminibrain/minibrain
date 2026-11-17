@@ -30,7 +30,7 @@ function ruleLevel(detail: ModelDetail | undefined, metric: string | null): Line
         (item) => item.metric === metric && RULE_OPS.has(item.op),
     );
     return threshold
-        ? { at: threshold.value * 100, label: `Promotion rule ${percent(threshold.value)}` }
+        ? { at: threshold.value * 100, label: `Deploy rule ${percent(threshold.value)}` }
         : null;
 }
 
@@ -44,8 +44,8 @@ function ruleText(version: VersionInfo): { text: string; tone: string } | null {
         return null;
     }
     return version.promotion.passed
-        ? { text: "passes the rule", tone: "text-success" }
-        : { text: "below the rule", tone: "text-destructive" };
+        ? { text: "meets the deploy rule", tone: "text-success" }
+        : { text: "misses the deploy rule", tone: "text-destructive" };
 }
 
 function Headline({

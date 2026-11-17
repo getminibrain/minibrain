@@ -70,6 +70,7 @@ def copied_version(session: Session, model: Model, source: Model, version: Versi
         device_time=deepcopy(version.device_time),
         intended_use=version.intended_use,
         known_limits=version.known_limits,
+        note=version.note,
         duplicated_from=provenance(source, version),
     )
     session.add(copy)

@@ -22,6 +22,7 @@ class CardVersion(BaseModel):
     status: str
     created_at: str
     created_by: str | None
+    note: str = ""
 
 
 class CardPurpose(BaseModel):

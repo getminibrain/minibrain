@@ -31,6 +31,7 @@ import {
 import {
     type CurveRow,
     type Previous,
+    SMOOTHING,
     type Training,
     type Verdict,
     bestHeld,
@@ -58,7 +59,11 @@ const RAW = "raw";
 const SMOOTH = "smooth";
 const SMOOTHING_TABS = [
     { key: RAW, label: "Raw" },
-    { key: SMOOTH, label: "Smoothed" },
+    {
+        key: SMOOTH,
+        label: "Smoothed",
+        tip: `Exponential moving average (weight ${SMOOTHING}), as in TensorBoard. The faint line is the raw value.`,
+    },
 ];
 
 type Comparable = NonNullable<JobMetrics["comparable"]>[number];
@@ -255,7 +260,11 @@ function waiting(job: JobDetail): string {
         : "This run recorded no training steps.";
 }
 
-export function LossBody({ job, metrics }: { job: JobDetail; metrics: JobMetrics | undefined }) {
+export function LossBody({
+    job,
+    metrics,
+    lossHeight,
+}: { job: JobDetail; metrics: JobMetrics | undefined; lossHeight?: number }) {
     const training = metrics?.training;
     if (!training || training.points.length === 0) {
         return <p className="text-muted-foreground">{waiting(job)}</p>;
@@ -266,6 +275,7 @@ export function LossBody({ job, metrics }: { job: JobDetail; metrics: JobMetrics
             training={training}
             fallback={metrics?.previous}
             comparable={metrics?.comparable ?? []}
+            lossHeight={lossHeight}
         />
     );
 }
@@ -538,11 +548,13 @@ function LossChart({
     training,
     fallback,
     comparable,
+    lossHeight,
 }: {
     job: JobDetail;
     training: TrainingMetrics;
     fallback: Previous | null | undefined;
     comparable: Comparable[];
+    lossHeight?: number;
 }) {
     const { previous, value, setChoice, compared } = useComparison(job, fallback);
     const [smoothing, setSmoothing] = useSmoothing();
@@ -599,6 +611,7 @@ function LossChart({
                 rateFormat={RATE}
                 rateColor={RATE_LINE}
                 label={summary(job, training, result.text)}
+                lossHeight={lossHeight}
             />
         </div>
     );

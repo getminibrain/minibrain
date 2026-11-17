@@ -121,3 +121,52 @@ export function checkSentence(check: RuleCheck): string {
     }
     return `Beats the live v${check.live} on ${metric}: ${scored(check.actual)} against ${scored(check.target)}.`;
 }
+
+const OPERATOR_SIGNS: Record<ThresholdInfo["op"], string> = {
+    ">=": "≥",
+    "<=": "≤",
+    "==": "=",
+    ">": ">",
+    "<": "<",
+};
+
+const MISSED_WORDS: Record<ThresholdInfo["op"], string> = {
+    ">=": "below",
+    "<=": "above",
+    "==": "not",
+    ">": "not above",
+    "<": "not below",
+};
+
+function targetText(value: number): string {
+    return value <= 1 ? wholePercent(value) : String(value);
+}
+
+export function ruleText(rule: PromotionInfo): string {
+    const parts = (rule.thresholds ?? []).map(
+        (item) => `${metricName(item.metric)} ${OPERATOR_SIGNS[item.op]} ${targetText(item.value)}`,
+    );
+    if (rule.beats_live ?? true) {
+        parts.push("better than live");
+    }
+    const text = parts.join(", ");
+    return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "None";
+}
+
+function isLiveCheck(check: RuleCheck): boolean {
+    return check.live !== null && check.live !== undefined;
+}
+
+export function missedText(checks: RuleCheck[]): string | null {
+    const failed = checks.filter((check) => !check.passed);
+    const threshold = failed.find((check) => !isLiveCheck(check) && check.metric);
+    if (threshold) {
+        const metric = metricName(threshold.metric).toLowerCase();
+        if (threshold.actual === null || threshold.actual === undefined) {
+            return `no ${metric} score`;
+        }
+        return `${metric} ${MISSED_WORDS[threshold.op ?? ">="]} ${targetText(threshold.target ?? 0)}`;
+    }
+    const behind = failed.find(isLiveCheck);
+    return behind ? `worse than live v${behind.live}` : (failed[0]?.detail ?? null);
+}

@@ -84,6 +84,7 @@ def test_card_is_built_from_the_stored_version_its_data_and_scores(harness: Harn
         "status": "ready",
         "created_at": None,
         "created_by": "admin@example.com",
+        "note": "",
     }
     assert card["purpose"] == {"description": "", "task": "classify", "labels": sorted(LABELS)}
     base = card["base_model"]
@@ -226,3 +227,28 @@ def test_edits_are_stored_per_version_and_audited(harness: Harness) -> None:
     assert harness.client.get(f"{CARD}/1/card").json()["card"]["limits"]["known_limits"] == ""
     too_long = harness.client.put(f"{CARD}/1/card", json={"intended_use": "x" * 2001})
     assert too_long.status_code == 422
+
+
+def test_a_version_note_is_one_line_audited_and_on_the_card(harness: Harness) -> None:
+    before = trained_card(harness)
+    saved = harness.client.put(f"{CARD}/1/note", json={"note": "  Added 400 refund\n tickets  "})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["note"] == "Added 400 refund tickets"
+    assert harness.client.put(f"{CARD}/1/note", json={"note": "Added 400 refund tickets"}).status_code == 200
+    listed = {item["number"]: item["note"] for item in harness.client.get(CARD).json()}
+    assert listed == {1: "Added 400 refund tickets", 0: None}
+    exported = harness.client.get(f"{CARD}/1/card").json()
+    assert exported["card"]["version"]["note"] == "Added 400 refund tickets"
+    assert exported["sha256"] != before["sha256"]
+    assert "\nWhy this version exists: Added 400 refund tickets\n" in harness.client.get(f"{CARD}/1/card.md").text
+    bom = harness.client.get(f"{CARD}/1/aibom.json").json()
+    properties = {item["name"]: item["value"] for item in bom["metadata"]["component"]["properties"]}
+    assert properties["minibrain:version:note"] == "Added 400 refund tickets"
+    assert harness.client.put(f"{CARD}/1/note", json={"note": ""}).json()["note"] is None
+    events = harness.client.get("/api/audit", params={"action": ["version.note"]}).json()["events"]
+    assert [(event["target"], event["detail"]["from"], event["detail"]["to"]) for event in reversed(events)] == [
+        (f"{SLUG}@1", "", "Added 400 refund tickets"),
+        (f"{SLUG}@1", "Added 400 refund tickets", ""),
+    ]
+    assert harness.client.put(f"{CARD}/1/note", json={"note": "x" * 201}).status_code == 422
+    assert harness.client.put(f"{CARD}/9/note", json={"note": "Missing"}).status_code == 404

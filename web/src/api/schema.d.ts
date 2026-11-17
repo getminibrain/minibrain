@@ -555,7 +555,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change a custom model's promotion rule */
+        /** Change a custom model's deploy rule */
         put: operations["update_promotion_api_models__name__promotion_put"];
         post?: never;
         delete?: never;
@@ -2057,6 +2057,26 @@ export interface paths {
          * @description Trains it again when its training failed, otherwise scores it again.
          */
         post: operations["retry_version_api_models__name__versions__number__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/versions/{number}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a version's note
+         * @description One line on why the version exists. It shows on the version page and in the model card.
+         */
+        put: operations["edit_note_api_models__name__versions__number__note_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4036,6 +4056,11 @@ export interface components {
             created_at: string;
             /** Created By */
             created_by: string | null;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
         };
         /** CatalogEntry */
         CatalogEntry: {
@@ -10311,6 +10336,19 @@ export interface components {
              * @description Why the version can't be deployed: it was made on a base the model has left.
              */
             base_refusal?: string | null;
+            /**
+             * Note
+             * @description One line on why this version exists.
+             */
+            note?: string | null;
+        };
+        /** VersionNoteEdit */
+        VersionNoteEdit: {
+            /**
+             * Note
+             * @description One line on why this version exists; empty clears it.
+             */
+            note: string;
         };
         /** VersionOrigin */
         VersionOrigin: {
@@ -14870,6 +14908,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_note_api_models__name__versions__number__note_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionNoteEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionInfo"];
                 };
             };
             /** @description Validation Error */

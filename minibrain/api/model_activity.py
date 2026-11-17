@@ -145,6 +145,8 @@ def version_said(owner: Owner, event: AuditEvent) -> Said:
         return Said(f"started scoring {name} again", link)
     if event.action == "version.card":
         return Said(f"edited the {name} model card", link)
+    if event.action == "version.note":
+        return Said(f"edited the {name} note", link)
     return Said(f"{humanised(event.action)} {name}", link)
 
 
@@ -269,7 +271,7 @@ SENTENCES: dict[str, Callable[[Owner, AuditEvent], Said]] = {
     "model.delete": deleted,
     "model.instructions": fixed("changed the instructions"),
     "model.graders": fixed("changed the graders"),
-    "model.promotion": fixed("changed the promotion rule"),
+    "model.promotion": fixed("changed the deploy rule"),
     "model.rescore": rescored,
     "model.contract": fixed("changed the answers"),
     "model.judge": fixed("changed the judge"),

@@ -22,7 +22,7 @@ import { Licence } from "./AddModelSummary";
 import { useSourcePlan } from "./BaseSource";
 
 const KEPT =
-    "Its name, API address and keys, instructions, answers, graders, promotion rule, training data, feedback and test examples stay. New versions are made on the base you pick, starting with a prompt-only version that is scored at once.";
+    "Its name, API address and keys, instructions, answers, graders, deploy rule, training data, feedback and test examples stay. New versions are made on the base you pick, starting with a prompt-only version that is scored at once.";
 
 const CARD =
     "flex cursor-pointer rounded-lg border px-3 py-2.5 font-normal leading-snug hover:bg-secondary has-[[data-checked]]:border-primary has-[[data-checked]]:bg-accent has-[[data-disabled]]:cursor-default has-[[data-disabled]]:opacity-60 has-[[data-disabled]]:hover:bg-transparent";

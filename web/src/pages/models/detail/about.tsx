@@ -29,6 +29,7 @@ import { ErrorLine, PanelSection } from "~/components/Section";
 import { TAGS_HINT, editableTags, isSystemTag } from "~/components/Tags";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
+import { ruleText } from "~/lib/judging";
 import { metricName } from "~/lib/metrics";
 import {
     evaluationHref,
@@ -331,23 +332,18 @@ export function About({
             <Fact label="Updated">
                 <Clipped text={relativeTime(row.updated_at)} />
             </Fact>
+            <Fact label="Live version note" wide>
+                {live?.note ? (
+                    <Clipped text={live.note} href={modelVersionHref(row.key, live.number)} />
+                ) : (
+                    <Muted>{live ? "No note" : "Not deployed"}</Muted>
+                )}
+            </Fact>
             <Fact label="Description" edit={edit("description")} wide>
                 {row.description ? <Clipped text={row.description} /> : <Muted>None</Muted>}
             </Fact>
         </AboutSection>
     );
-}
-
-function rulesText(detail: ModelDetail): string {
-    const thresholds = detail.promotion.thresholds ?? [];
-    const parts = thresholds.map(
-        (item) =>
-            `${metricName(item.metric)} ${item.op} ${item.value <= 1 ? percent(item.value) : item.value}`,
-    );
-    if (detail.promotion.beats_live) {
-        parts.push("better than live");
-    }
-    return parts.length > 0 ? parts.join(", ") : "None";
 }
 
 function gradersText(detail: ModelDetail): string {
@@ -432,10 +428,10 @@ export function Details({
                     <Clipped text={gradersText(detail)} />
                 </Row>
                 <Row
-                    label="Promotion rule"
-                    edit={editLink(evaluationHref(row.key), "Edit promotion rule")}
+                    label="Deploy rule"
+                    edit={editLink(evaluationHref(row.key), "Edit deploy rule")}
                 >
-                    <Clipped text={rulesText(detail)} />
+                    <Clipped text={ruleText(detail.promotion)} />
                 </Row>
             </Group>
             <Group title="Data">

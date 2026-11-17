@@ -254,7 +254,7 @@ export function ScoringPanel({
                 <RubricRow detail={detail} />
                 <FormRow
                     id="scoring-rule"
-                    label="Promotion rule"
+                    label="Deploy rule"
                     align="start"
                     tip="A version can be deployed only when every threshold holds on its held-out rows. Changing it does not re-score."
                 >

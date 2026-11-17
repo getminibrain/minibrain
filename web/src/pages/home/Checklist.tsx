@@ -89,7 +89,7 @@ function stepsOf(models: ModelRow[], datasets: number): Step[] {
         {
             id: "deploy",
             title: "Deploy",
-            detail: "Make the version that passes the promotion rule live.",
+            detail: "Make the version that meets the deploy rule live.",
             action: "Deploy",
             href: modelHref("overview"),
             done: models.some((model) => model.current_version !== null),

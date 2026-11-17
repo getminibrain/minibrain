@@ -35,7 +35,7 @@ function copiedVersion(row: ModelRow): number | null {
 function whatCopies(row: ModelRow): string {
     const version = copiedVersion(row);
     const settings =
-        "Same base, avatar, answers, instructions, graders, promotion rule, training data, description and tags.";
+        "Same base, avatar, answers, instructions, graders, deploy rule, training data, description and tags.";
     return version === null
         ? `${settings} It has no ready version to copy, so the copy starts at v0. Nothing is deployed.`
         : `${settings} Its v${version} becomes the copy's v1 with its scores, sharing the same stored files. Nothing is deployed.`;

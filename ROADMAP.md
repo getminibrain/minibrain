@@ -1981,6 +1981,7 @@ it finds:
   hardware. Opt-in per install, never the default: installs stay self-hosted and air-gapped by default, and the UI says
   plainly that data and weights leave the customer's network when a managed pool is used. Jobs and deployments place
   onto it with the same pool rules; usage is metered per pool.
+- [ ] Keyboard shortcuts `[` and `]` for previous and next version on the version page.
 
 ## Fixes
 

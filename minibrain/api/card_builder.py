@@ -602,6 +602,7 @@ def build_card(session: Session, settings: Settings, model: Model, version: Vers
             status=version.status,
             created_at=stamp(version.created_at) or "",
             created_by=creator,
+            note=version.note or "",
         ),
         purpose=CardPurpose(
             description=model.description, task=model.preset, labels=sorted(version.dataset_version.labels)

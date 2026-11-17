@@ -217,7 +217,7 @@ export function ScoresSection({ job }: { job: JobDetail }) {
             title="Scores"
             description={
                 done
-                    ? "This version against the live one, and whether the promotion rule lets it go live."
+                    ? "This version against the live one, and whether the deploy rule lets it go live."
                     : "The held-out and test rows are answered first; the scores follow when it finishes."
             }
         >

@@ -8,6 +8,7 @@ from minibrain.models.rules import LicenceUse
 
 PresetKey = Literal["general", "classify", "custom"]
 JudgeSource = Literal["model", "install", "base"]
+NOTE_LENGTH = 200
 MetricName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][\w.]*$", max_length=80)]
 
 
@@ -853,10 +854,15 @@ class VersionInfo(BaseModel):
     base_refusal: str | None = Field(
         default=None, description="Why the version can't be deployed: it was made on a base the model has left."
     )
+    note: str | None = Field(default=None, description="One line on why this version exists.")
 
 
 TeardownKindName = Literal["delete", "undeploy"]
 TeardownState = Literal["running", "failed"]
+
+
+class VersionNoteEdit(BaseModel):
+    note: str = Field(max_length=NOTE_LENGTH, description="One line on why this version exists; empty clears it.")
 
 
 class TeardownInfo(BaseModel):

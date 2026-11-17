@@ -70,7 +70,7 @@ export function PromotionDecision({ decision }: { decision: Decision }) {
             </div>
             {decision.checks.length === 0 ? (
                 <p className="text-muted-foreground">
-                    The promotion rule asks for nothing, so any ready version can go live.
+                    The deploy rule asks for nothing, so any ready version can go live.
                 </p>
             ) : (
                 <ul className="flex flex-col gap-1">

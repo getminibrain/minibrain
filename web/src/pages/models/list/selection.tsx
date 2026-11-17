@@ -270,9 +270,9 @@ function rowsOf(pair: ModelVersionRow[]): CompareRow[] {
         ),
         textRow(
             "rule",
-            "Promotion rule",
+            "Deploy rule",
             pair.map((version) =>
-                version.promotion ? (version.promotion.passed ? "Passes" : "Below rule") : "–",
+                version.promotion ? (version.promotion.passed ? "Meets" : "Misses") : "–",
             ),
         ),
         numeric(

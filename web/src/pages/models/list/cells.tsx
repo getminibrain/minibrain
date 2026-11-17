@@ -235,7 +235,7 @@ export function ScoreBadge({ model, version }: { model: ListModel; version: Mode
         <Tooltip>
             <TooltipTrigger asChild>
                 <Badge variant="neutral" className="relative z-10" tabIndex={0}>
-                    below rule
+                    misses deploy rule
                 </Badge>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs whitespace-normal">{note.reason}</TooltipContent>

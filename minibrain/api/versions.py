@@ -22,6 +22,7 @@ from minibrain.api.schemas import (
     VersionCreate,
     VersionFiles,
     VersionInfo,
+    VersionNoteEdit,
     VersionTest,
     VersionTestResult,
 )
@@ -339,6 +340,28 @@ def retry_version(name: str, number: int, session: SessionDep, settings: Setting
     return job_info(again)
 
 
+def one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+@router.put(
+    "/models/{name}/versions/{number}/note",
+    dependencies=[Depends(builder)],
+    summary="Edit a version's note",
+    description="One line on why the version exists. It shows on the version page and in the model card.",
+)
+def edit_note(name: str, number: int, body: VersionNoteEdit, session: SessionDep) -> VersionInfo:
+    model = get_model(session, name)
+    version = get_version(model, number)
+    before = version.note or ""
+    after = one_line(body.note)
+    if after != before:
+        version.note = after or None
+        audit_version(session, model, number=number, action="version.note", **{"from": before, "to": after})
+        session.commit()
+    return version_info(model, version, load_prices(session))
+
+
 def deleting(model: Model, version: Version) -> JSONResponse:
     return JSONResponse(status_code=202, content=version_info(model, version).model_dump(mode="json"))
 
@@ -373,7 +396,7 @@ def promote_version(
     if version.live_at is None:
         found = decision(model, version)
         if not found.passed:
-            raise ConflictError(f"{name}@{number} does not pass the promotion rule: {found.reason()}")
+            raise ConflictError(f"{name}@{number} does not meet the deploy rule: {found.reason()}")
     previous, was_deployed = model.current_version, model.deployed
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number

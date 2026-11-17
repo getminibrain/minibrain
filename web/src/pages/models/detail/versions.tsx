@@ -248,7 +248,7 @@ export function ScoreBadge({
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Badge variant="neutral" tabIndex={0}>
-                        below rule
+                        misses deploy rule
                     </Badge>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs whitespace-normal">
@@ -437,12 +437,14 @@ function VersionRow({
                 />
             </TableCell>
             <TableCell className="whitespace-nowrap">
-                <Link
-                    href={modelVersionHref(row.key, version.number)}
-                    className="font-medium tabular-nums hover:underline"
-                >
-                    {versionLabel(version)}
-                </Link>
+                <Tip tip={version.note}>
+                    <Link
+                        href={modelVersionHref(row.key, version.number)}
+                        className="font-medium tabular-nums hover:underline"
+                    >
+                        {versionLabel(version)}
+                    </Link>
+                </Tip>
                 {isBaseline(version) && (
                     <span className="ml-2 text-sm text-muted-foreground">untrained</span>
                 )}

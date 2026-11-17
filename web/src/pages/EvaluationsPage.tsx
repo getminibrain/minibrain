@@ -165,7 +165,7 @@ function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[
         },
         {
             id: "rule",
-            header: "Promotion rule",
+            header: "Deploy rule",
             accessorFn: (line) =>
                 line.version.promotion ? Number(line.version.promotion.passed) : -1,
             cell: ({ row }) => <RuleCell version={row.original.version} />,
@@ -248,7 +248,7 @@ function blockedReason(version: ModelVersionRow): string | null {
         return version.base_refusal;
     }
     const failed = (version.promotion?.checks ?? []).filter((check) => !check.passed);
-    return failed.map(checkSentence).join(" ") || "It does not pass the promotion rule.";
+    return failed.map(checkSentence).join(" ") || "It doesn't meet the deploy rule.";
 }
 
 export function DeployButton({
@@ -498,7 +498,7 @@ export function EvaluationsPage() {
         <Page wide>
             <PageHeader
                 title="Evaluations"
-                caption="Every version of every model, scored by its graders on its test set and held-out rows. A version goes live only when it passes its model's promotion rule."
+                caption="Every version of every model, scored by its graders on its test set and held-out rows. A version goes live only when it meets its model's deploy rule."
             />
             <div className="flex flex-wrap items-center gap-2">
                 <CheckboxSelect

@@ -179,6 +179,7 @@ export function LossFigure({
     rateFormat,
     rateColor,
     label,
+    lossHeight = LOSS_HEIGHT,
 }: {
     sync: string;
     rows: CurveRow[];
@@ -194,13 +195,14 @@ export function LossFigure({
     rateFormat: (value: number) => string;
     rateColor: string;
     label: string;
+    lossHeight?: number;
 }) {
     const rates = rows.map((row) => row.rate).filter((value) => typeof value === "number");
     const peak = rates.length > 0 ? Math.max(...rates) : 0;
     const top = epochs.length > 0 && epochs.length <= MAX_EPOCH_LABELS ? 24 : 12;
     return (
         <figure aria-label={label} className="m-0 flex w-full flex-col text-sm tabular-nums">
-            <div style={{ height: LOSS_HEIGHT }}>
+            <div style={{ height: lossHeight }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                         data={rows}

@@ -106,6 +106,12 @@ function Summary({ card, live }: { card: ModelCard; live: boolean }) {
                 />
                 <Stat label="Created" value={<Updated value={version.created_at} />} />
                 <Stat label="Owner" value={card.use.owner} />
+                {version.note && (
+                    <p className="basis-full truncate" title={version.note}>
+                        <span className="text-muted-foreground">Why this version exists: </span>
+                        {version.note}
+                    </p>
+                )}
             </CardContent>
         </Card>
     );

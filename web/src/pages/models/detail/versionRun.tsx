@@ -1,10 +1,4 @@
-import {
-    IconDownload,
-    IconFingerprint,
-    IconGitBranch,
-    IconHourglass,
-    IconRotate,
-} from "@tabler/icons-react";
+import { IconHourglass, IconRotate } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Link, cn, useToast } from "obp-ui";
 import type { ReactNode } from "react";
@@ -12,33 +6,21 @@ import {
     type JobDetail,
     type JobInfo,
     type JobMetrics,
-    type ModelRow,
     type VersionInfo,
     api,
     unwrap,
 } from "~/api/client";
 import { useDatasetVersions } from "~/api/dataQueries";
-import { keys, useAllModels, useVersionFiles } from "~/api/queries";
-import { CopyButton } from "~/components/CopyButton";
-import { Facts } from "~/components/Facts";
+import { keys } from "~/api/queries";
 import { canCancel } from "~/components/JobSelection";
 import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
-import { deviceHoursText, durationText, jobDuration } from "~/lib/jobs";
-import {
-    jobHref,
-    jobLogsHref,
-    modelCardHref,
-    modelPageHref,
-    modelVersionHref,
-} from "~/lib/modelLinks";
-import { bytes } from "~/lib/time";
+import { durationText, jobDuration } from "~/lib/jobs";
+import { jobLogsHref } from "~/lib/modelLinks";
 import { LossBody, stepText } from "../../jobs/TrainingPanel";
-import { datasetHref } from "./about";
-import { Tip, baseNameOf } from "./header";
 import {
     type RunValues,
     type SettingChange,
@@ -50,7 +32,8 @@ import {
 import type { Peers, Phase } from "./versionState";
 import { failureReason, finishedBeforeCancel, retry } from "./versions";
 
-const CHART_HEIGHT = "min-h-[29.25rem] xl:min-h-[27.4375rem]";
+const CHART_BOX = "h-[26rem]";
+const LOSS_LANE = 184;
 
 const SETTINGS: Record<string, [string, (value: unknown) => string]> = {
     strategy: ["adapter", (value) => (value === "qlora" ? "QLoRA" : "LoRA")],
@@ -69,7 +52,7 @@ const SETTINGS: Record<string, [string, (value: unknown) => string]> = {
     seed: ["seed", String],
 };
 
-type Available = (version: VersionInfo) => number | null;
+export type Available = (version: VersionInfo) => number | null;
 
 function recipeOf(version: VersionInfo): Record<string, unknown> {
     return version.recipe as Record<string, unknown>;
@@ -149,7 +132,7 @@ function runValues(version: VersionInfo, available: Available): RunValues {
     };
 }
 
-function presetText(version: VersionInfo, available: Available): string {
+export function presetText(version: VersionInfo, available: Available): string {
     const run = runValues(version, available);
     if (!recordedRun(run)) {
         return "Default settings";
@@ -181,25 +164,6 @@ function changedText(
     return parts.length === 0
         ? `Same settings and data as ${label}`
         : `vs ${label}: ${parts.join(", ")}`;
-}
-
-function DeviceHours({ version }: { version: VersionInfo }) {
-    const time = version.device_time;
-    if (!time) {
-        return <Stat label="GPU-hours" value="–" />;
-    }
-    const label = time.kind === "cpu" ? "CPU-hours" : "GPU-hours";
-    const devices = time.kind === "gpu" && time.devices > 1 ? ` on ${time.devices} GPUs` : "";
-    return (
-        <Stat
-            label={label}
-            value={
-                <span title={`${durationText(time.seconds)} of wall time${devices}`}>
-                    {deviceHoursText(time)}
-                </span>
-            }
-        />
-    );
 }
 
 function RetryRun({ slug, version }: { slug: string; version: VersionInfo }) {
@@ -260,9 +224,9 @@ function CancelRun({ slug, job }: { slug: string; job: JobInfo }) {
     );
 }
 
-type RanOn = { pool: string | null; machine: string | null };
+export type RanOn = { pool: string | null; machine: string | null };
 
-function ranOn(version: VersionInfo, job: JobDetail | undefined): RanOn | null {
+export function ranOn(version: VersionInfo, job: JobDetail | undefined): RanOn | null {
     const parts = [job?.host, job?.device].filter(Boolean);
     if (parts.length > 0) {
         return { pool: job?.pool ?? null, machine: parts.join(" · ") };
@@ -283,7 +247,7 @@ function RanOnText({ place }: { place: RanOn | null }) {
     return <PoolLink name={place.pool} machine={place.machine} className="max-w-72" />;
 }
 
-function useAvailableRows(version: VersionInfo): Available {
+export function useAvailableRows(version: VersionInfo): Available {
     const data = useDatasetVersions(version.dataset_slug ?? "", version.kind === "lora");
     return (item) => {
         const found = data.data?.find((entry) => entry.id === item.dataset_version_id);
@@ -359,15 +323,15 @@ function Note({
 }
 
 function ChartBox({ children }: { children: ReactNode }) {
-    return <div className={cn("flex flex-col", CHART_HEIGHT)}>{children}</div>;
+    return <div className={cn("flex flex-col overflow-hidden", CHART_BOX)}>{children}</div>;
 }
 
 function Empty({ children }: { children: ReactNode }) {
     return (
         <div
             className={cn(
-                "flex items-center justify-center rounded-md border border-dashed px-3 text-center text-muted-foreground",
-                CHART_HEIGHT,
+                "flex items-center justify-center rounded-md border px-3 text-center text-muted-foreground",
+                CHART_BOX,
             )}
         >
             {children}
@@ -380,7 +344,7 @@ function Chart({
     metrics,
 }: { detail: JobDetail | undefined; metrics: JobMetrics | undefined }) {
     if (!detail) {
-        return <Empty>Loading the training run…</Empty>;
+        return <Empty>No training run to chart.</Empty>;
     }
     if (!metrics?.training?.points.length) {
         return (
@@ -393,8 +357,60 @@ function Chart({
     }
     return (
         <ChartBox>
-            <LossBody job={detail} metrics={metrics} />
+            <LossBody job={detail} metrics={metrics} lossHeight={LOSS_LANE} />
         </ChartBox>
+    );
+}
+
+function phaseStats(
+    phase: Phase,
+    version: VersionInfo,
+    run: JobInfo | undefined,
+    training: JobMetrics["training"],
+    place: RanOn | null,
+    rows: number | null,
+): ReactNode {
+    if (phase === "queued") {
+        return (
+            <>
+                <Progress version={version} label="Training" />
+                <Stat label="Status" value="Waiting for a worker" />
+            </>
+        );
+    }
+    if (phase === "training") {
+        const eta = training?.eta_seconds;
+        return (
+            <>
+                <Progress version={version} label="Training" />
+                <Stat label="Step" value={training ? stepText(training) : "–"} />
+                <Stat label="Elapsed" value={run ? jobDuration(run) : "–"} />
+                <Stat label="Time left" value={typeof eta === "number" ? durationText(eta) : "–"} />
+                <Stat label="Ran on" value={<RanOnText place={place} />} />
+            </>
+        );
+    }
+    if (phase === "failed" || phase === "cancelled") {
+        const stopped =
+            phase === "failed"
+                ? "Failed after"
+                : finishedBeforeCancel(version)
+                  ? "Finished in"
+                  : "Cancelled after";
+        return (
+            <>
+                <Stat label={stopped} value={run ? jobDuration(run) : "–"} />
+                <Stat label="Reached step" value={training ? stepText(training) : "–"} />
+                <Stat label="Ran on" value={<RanOnText place={place} />} />
+            </>
+        );
+    }
+    return (
+        <>
+            <Stat label="Rows trained" value={rows === null ? "–" : count(rows)} />
+            <Stat label="Steps" value={training ? stepText(training) : "–"} />
+            <Stat label="Ran on" value={<RanOnText place={place} />} />
+        </>
     );
 }
 
@@ -424,115 +440,46 @@ export function TrainingSection({
     const rows = useTrainedRows(version);
     const available = useAvailableRows(version);
     const active = version.job && canCancel(version.job) ? version.job : undefined;
-    const shownJob = active ?? run;
-    const training = metrics?.training;
     const startedFrom = versions.find((item) => item.number === version.from_version);
     const compareTo = startedFrom ?? peers.live ?? previousTrained(versions, version);
     const liveLabel = !startedFrom && compareTo === peers.live ? "live " : "";
     const compareLabel = compareTo ? `${liveLabel}v${compareTo.number}` : "";
     const actions = (
-        <>
+        <span className="flex h-8 items-center gap-2">
             {active && <CancelRun slug={slug} job={active} />}
             <RetryRun slug={slug} version={version} />
-            {shownJob ? (
-                <Button variant="outline" asChild>
-                    <Link href={jobHref(shownJob)}>{`Job #${shownJob.id}`}</Link>
-                </Button>
-            ) : (
-                <Button variant="outline" disabled>
-                    No job
-                </Button>
-            )}
-        </>
+        </span>
     );
-    if (version.kind === "prompt") {
-        return (
-            <PanelSection icon={IconHourglass} title="Training" actions={actions}>
-                <div className="flex flex-col gap-3">
-                    <Stats>
-                        <Stat label="Method" value="Instructions only" />
-                        <Stat label="Scored in" value={run ? jobDuration(run) : "–"} />
-                    </Stats>
-                    <Note>The base model with its instructions; no weights of its own.</Note>
-                    <Empty>
-                        {version.number === 0
-                            ? "v0 is the prompt-only baseline; it isn't trained."
-                            : `v${version.number} is prompt-only; it isn't trained.`}
-                    </Empty>
-                </div>
-            </PanelSection>
-        );
-    }
-    const place = ranOn(version, detail);
-    let stats: ReactNode;
-    let note: ReactNode;
-    if (phase === "queued") {
-        stats = (
-            <>
-                <Progress version={version} label="Training" />
-                <Stat label="Status" value="Waiting for a worker" />
-            </>
-        );
-        note = <Note>{changedText(version, compareTo, compareLabel, available)}</Note>;
-    } else if (phase === "training") {
-        const eta = training?.eta_seconds;
-        stats = (
-            <>
-                <Progress version={version} label="Training" />
-                <Stat label="Step" value={training ? stepText(training) : "–"} />
-                <Stat label="Elapsed" value={run ? jobDuration(run) : "–"} />
-                <Stat label="Time left" value={typeof eta === "number" ? durationText(eta) : "–"} />
-                <Stat label="Ran on" value={<RanOnText place={place} />} />
-            </>
-        );
-        note = <Note>{changedText(version, compareTo, compareLabel, available)}</Note>;
-    } else if (phase === "failed" || phase === "cancelled") {
-        stats = (
-            <>
-                <Stat
-                    label={
-                        phase === "failed"
-                            ? "Failed after"
-                            : finishedBeforeCancel(version)
-                              ? "Finished in"
-                              : "Cancelled after"
-                    }
-                    value={run ? jobDuration(run) : "–"}
-                />
-                <Stat label="Reached step" value={training ? stepText(training) : "–"} />
-                <Stat label="Ran on" value={<RanOnText place={place} />} />
-            </>
-        );
-        note = (
-            <Note tone={phase === "failed" ? "destructive" : "muted"}>
-                <span title={failureReason(version)}>{failureReason(version)}</span>
-                {run && (
-                    <>
-                        {" "}
-                        <Link href={jobLogsHref(run)} className="text-primary hover:underline">
-                            View logs
-                        </Link>
-                    </>
-                )}
-            </Note>
-        );
-    } else {
-        stats = (
-            <>
-                <Stat label="Took" value={run ? jobDuration(run) : "–"} />
-                <Stat label="Ran on" value={<RanOnText place={place} />} />
-                <Stat label="Rows trained" value={rows === null ? "–" : count(rows)} />
-                <DeviceHours version={version} />
-            </>
-        );
-        note = (
-            <Note>
-                <span title={changedText(version, compareTo, compareLabel, available)}>
-                    {changedText(version, compareTo, compareLabel, available)}
-                </span>
-            </Note>
-        );
-    }
+    const prompt = version.kind === "prompt";
+    const stopped = phase === "failed" || phase === "cancelled";
+    const changes = changedText(version, compareTo, compareLabel, available);
+    const stats = prompt ? (
+        <>
+            <Stat label="Method" value="Instructions only" />
+            <Stat label="Few-shot examples" value={count(version.shots)} />
+        </>
+    ) : (
+        phaseStats(phase, version, run, metrics?.training, ranOn(version, detail), rows)
+    );
+    const note = prompt ? (
+        <Note>The base model with its instructions; no weights of its own.</Note>
+    ) : stopped ? (
+        <Note tone={phase === "failed" ? "destructive" : "muted"}>
+            <span title={failureReason(version)}>{failureReason(version)}</span>
+            {run && (
+                <>
+                    {" "}
+                    <Link href={jobLogsHref(run)} className="text-primary hover:underline">
+                        View logs
+                    </Link>
+                </>
+            )}
+        </Note>
+    ) : (
+        <Note>
+            <span title={changes}>{changes}</span>
+        </Note>
+    );
     return (
         <PanelSection
             icon={IconHourglass}
@@ -544,209 +491,16 @@ export function TrainingSection({
                 <Stats>{stats}</Stats>
                 {note}
                 <ErrorLine error={metricsError} onRetry={onRetry} />
-                <Chart detail={detail} metrics={metrics} />
-            </div>
-        </PanelSection>
-    );
-}
-
-function Arrow() {
-    return (
-        <span aria-hidden="true" className="text-faint">
-            →
-        </span>
-    );
-}
-
-export function LineageSection({
-    row,
-    version,
-    peers,
-}: {
-    row: ModelRow;
-    version: VersionInfo;
-    peers: Peers;
-}) {
-    const models = useAllModels();
-    const baseKey = version.base_model || row.base_model || "";
-    const data =
-        version.dataset_version_number !== null && version.dataset_version_number !== undefined;
-    const items: ReactNode[] = [
-        <Link key="base" href={modelPageHref(baseKey)} className="text-primary hover:underline">
-            {baseNameOf(models.data, baseKey)}
-        </Link>,
-        data && version.dataset_slug ? (
-            <Link
-                key="data"
-                href={datasetHref(version.dataset_slug)}
-                className="text-primary hover:underline"
-            >
-                {`${version.dataset_slug} v${version.dataset_version_number}`}
-                <span className="text-muted-foreground tabular-nums">{` · ${count(version.dataset_version_rows ?? 0)} rows`}</span>
-            </Link>
-        ) : (
-            <span key="data" className="text-muted-foreground">
-                {data ? `data v${version.dataset_version_number}` : "No data"}
-            </span>
-        ),
-    ];
-    if (version.duplicated_from) {
-        items.push(
-            <Link
-                key="copy"
-                href={modelVersionHref(
-                    version.duplicated_from.slug,
-                    version.duplicated_from.number,
+                {prompt ? (
+                    <Empty>
+                        {version.number === 0
+                            ? "v0 is the prompt-only baseline; it isn't trained."
+                            : `v${version.number} is prompt-only; it isn't trained.`}
+                    </Empty>
+                ) : (
+                    <Chart detail={detail} metrics={metrics} />
                 )}
-                className="text-primary hover:underline"
-            >
-                {`copied from ${version.duplicated_from.name} v${version.duplicated_from.number}`}
-            </Link>,
-        );
-    }
-    if (version.from_version !== null && version.from_version !== undefined) {
-        items.push(
-            <Link
-                key="from"
-                href={modelVersionHref(row.key, version.from_version)}
-                className="text-primary hover:underline"
-            >
-                {`started from v${version.from_version}`}
-            </Link>,
-        );
-    }
-    items.push(
-        <span key="this" aria-current="page" className="font-semibold">
-            {`v${version.number}`}
-        </span>,
-    );
-    const live = peers.isLive ? (
-        <span className="text-success">live now</span>
-    ) : peers.live ? (
-        <span>
-            <span className="text-muted-foreground">live is </span>
-            <Link
-                href={modelVersionHref(row.key, peers.live.number)}
-                className="text-primary hover:underline"
-            >
-                {`v${peers.live.number}`}
-            </Link>
-        </span>
-    ) : (
-        <span className="text-muted-foreground">nothing live</span>
-    );
-    return (
-        <PanelSection
-            icon={IconGitBranch}
-            title="Lineage"
-            tip="The base it runs on, the data it learnt from and the version its settings started from."
-        >
-            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                {items.map((item, index) => (
-                    <span
-                        key={(item as { key: string }).key}
-                        className="inline-flex items-baseline gap-2"
-                    >
-                        {index > 0 && <Arrow />}
-                        {item}
-                    </span>
-                ))}
-                <span aria-hidden="true" className="text-faint">
-                    ·
-                </span>
-                {live}
-            </p>
-        </PanelSection>
-    );
-}
-
-function artifactHref(id: string): string {
-    return `/api/artifacts/${id}`;
-}
-
-export function DetailsSection({
-    row,
-    version,
-    phase,
-}: {
-    row: ModelRow;
-    version: VersionInfo;
-    phase: Phase;
-}) {
-    const pending =
-        phase === "failed" || phase === "cancelled"
-            ? "None: training did not finish"
-            : "Once training finishes";
-    const can = useCan();
-    const callable = `${row.key}@${version.number}`;
-    const files = useVersionFiles(
-        row.key,
-        version.kind === "lora" && version.status === "ready" ? version.number : null,
-    );
-    const sha = files.data?.artifact_id;
-    const adapter =
-        version.kind === "prompt" ? (
-            <span className="text-muted-foreground">
-                None: a prompt-only version has no weights
-            </span>
-        ) : sha ? (
-            <span className="flex min-w-0 items-center gap-1">
-                <Tip tip={sha}>
-                    <span className="cursor-default font-mono text-sm">{`sha256:${sha.slice(0, 12)}`}</span>
-                </Tip>
-                <span className="-my-1.5">
-                    <CopyButton value={sha} label="Copy SHA-256" />
-                </span>
-            </span>
-        ) : (
-            <span className="text-muted-foreground">{pending}</span>
-        );
-    const exported =
-        sha && can.build ? (
-            <a
-                href={artifactHref(sha)}
-                download
-                className="inline-flex h-5 items-center gap-1.5 text-primary hover:underline"
-            >
-                <IconDownload aria-hidden="true" className="size-4" />
-                {`Adapter, ${bytes(files.data?.size)} · safetensors in a tar`}
-            </a>
-        ) : (
-            <span className="text-muted-foreground">
-                {version.kind === "prompt"
-                    ? "Nothing to export"
-                    : sha
-                      ? "Builders can download the adapter"
-                      : pending}
-            </span>
-        );
-    return (
-        <PanelSection icon={IconFingerprint} title="Details">
-            <Facts
-                items={[
-                    [
-                        "API name",
-                        <span key="api" className="flex items-center gap-0.5">
-                            <span className="font-mono text-sm">{callable}</span>
-                            <span className="-my-1.5">
-                                <CopyButton value={callable} label={`Copy ${callable}`} />
-                            </span>
-                        </span>,
-                    ],
-                    ["Adapter", adapter],
-                    ["Export", exported],
-                    [
-                        "Model card",
-                        <Link
-                            key="card"
-                            href={modelCardHref(row.key, version.number)}
-                            className="text-primary hover:underline"
-                        >
-                            {`Model card of v${version.number} →`}
-                        </Link>,
-                    ],
-                ]}
-            />
+            </div>
         </PanelSection>
     );
 }
