@@ -1,4 +1,4 @@
-import { IconDeviceSdCard, IconFileText, IconPackages } from "@tabler/icons-react";
+import { IconCylinder, IconFileText, IconPackages } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
@@ -271,7 +271,7 @@ function UsageLink() {
 function LocationSection({ actions, children }: { actions?: ReactNode; children?: ReactNode }) {
     return (
         <SettingsSection
-            icon={IconDeviceSdCard}
+            icon={IconCylinder}
             anchor={STORAGE.location.anchor}
             title={STORAGE.location.title}
             description="Uploads, dataset versions, adapters, logs and base model files. New ones go to the place chosen here; ones already stored stay readable where they are."

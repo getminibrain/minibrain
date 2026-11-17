@@ -1,6 +1,6 @@
 import {
     IconArchive,
-    IconDeviceSdCard,
+    IconCylinder,
     IconExternalLink,
     IconMemory,
     IconPlayerPlay,
@@ -122,7 +122,7 @@ function Requirements({
                 {train}
             </SummaryFact>
             <SummaryFact icon={IconArchive} label="Storage">
-                {storage ? <Amount icon={IconDeviceSdCard} value={bytes(storage)} /> : "Unknown"}
+                {storage ? <Amount icon={IconCylinder} value={bytes(storage)} /> : "Unknown"}
             </SummaryFact>
         </SummaryFacts>
     );

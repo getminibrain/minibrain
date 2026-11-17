@@ -1,6 +1,6 @@
 import {
     IconChevronDown,
-    IconDeviceSdCard,
+    IconCylinder,
     IconExternalLink,
     IconMemory,
     IconPackages,
@@ -159,7 +159,7 @@ function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
             ) : null}
             {disk ? (
                 <Amount
-                    icon={IconDeviceSdCard}
+                    icon={IconCylinder}
                     label={installState(option) ? "On disk" : "Download"}
                     help={
                         installState(option)

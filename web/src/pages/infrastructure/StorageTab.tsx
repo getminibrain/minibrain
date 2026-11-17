@@ -1,4 +1,4 @@
-import { IconDeviceSdCard, IconServer, IconStack2 } from "@tabler/icons-react";
+import { IconCylinder, IconServer, IconStack2 } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid } from "obp-ui";
 import type { ReactNode } from "react";
@@ -287,7 +287,7 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     return (
         <PanelSection
             flush
-            icon={IconDeviceSdCard}
+            icon={IconCylinder}
             title="Disks on main"
             description="What minibrain keeps on each disk, and what is left."
         >

@@ -3,8 +3,8 @@ import {
     IconAdjustmentsHorizontal,
     IconCompass,
     IconCube,
+    IconCylinder,
     IconDatabase,
-    IconDeviceSdCard,
     IconGauge,
     IconHome,
     IconInfoCircle,
@@ -68,7 +68,7 @@ export const SETTINGS_PAGES: NavEntry[] = [
     { label: "Accounts", path: "/settings/accounts", icon: IconUsers, role: "admin" },
     { label: "Audit log", path: "/settings/audit", icon: IconScript, role: "admin" },
     { label: "Data", path: "/settings/data", icon: IconTable, role: "admin" },
-    { label: "Storage", path: "/settings/storage", icon: IconDeviceSdCard, role: "admin" },
+    { label: "Storage", path: "/settings/storage", icon: IconCylinder, role: "admin" },
     { label: "Connections", path: "/settings/connections", icon: IconPlugConnected, role: "admin" },
     { label: "This install", path: "/settings/install", icon: IconInfoCircle, role: "admin" },
 ];
