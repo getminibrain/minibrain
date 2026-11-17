@@ -6,7 +6,7 @@ from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import ExportInfo, ExportRequest, PackedFileInfo
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
-from minibrain.jobs.queue import enqueue
+from minibrain.jobs.queue import JobStateError, enqueue
 from minibrain.ml.planner import merge_fits, merge_pool, merge_refusal
 from minibrain.models.hardware import NodeReport
 from minibrain.models.health import base_changed
@@ -16,6 +16,7 @@ from minibrain.registry.compute import pools
 from minibrain.registry.models import (
     Artifact,
     AuditEvent,
+    Job,
     JobKind,
     Model,
     Version,
@@ -26,7 +27,7 @@ from minibrain.registry.models import (
 )
 from minibrain.registry.service import ConflictError, get_model, get_version
 from minibrain.settings import Settings
-from minibrain.tasks.exports import export_params, export_state, find_export, trained_pool
+from minibrain.tasks.exports import export_of, export_params, export_state, find_export, trained_pool
 from minibrain.teardown import require_idle
 
 router = APIRouter(prefix="/api")
@@ -71,6 +72,26 @@ def exportable(session: Session, settings: Settings, model: Model, version: Vers
     if mismatch is not None:
         raise ConflictError(mismatch)
     return current or ""
+
+
+def reused_export(session: Session, settings: Settings, store: ArtifactStore, job: Job) -> Job | None:
+    export = export_of(session, job)
+    if export is None:
+        return None
+    version = export.version
+    try:
+        current = exportable(session, settings, version.model, version)
+    except ConflictError as refused:
+        raise JobStateError(str(refused)) from refused
+    if export.base_hash != current:
+        base = version.base_model
+        raise JobStateError(
+            f"job {job.id} merged onto {base} files {export.base_hash[:12]}; {base} now has files {current[:12]}. "
+            "Export the version again instead."
+        )
+    if export_state(export, store) != "ready" or export.job_id is None:
+        return None
+    return session.get(Job, export.job_id)
 
 
 def export_pool(session: Session, settings: Settings, node: NodeReport, version: Version) -> str | None:

@@ -120,6 +120,47 @@ def test_retrying_a_failed_export_job_still_lands_on_the_version(
     assert (ready["state"], ready["job_id"]) == ("ready", retried.json()["id"])
 
 
+def failed_then_ready(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> tuple[int, int]:
+    ready_v1(harness)
+    first = start(harness)
+    monkeypatch.setenv("FAKE_EXPORT_FAIL", "1")
+    run_export(harness)
+    monkeypatch.delenv("FAKE_EXPORT_FAIL")
+    again = start(harness)
+    run_export(harness)
+    return first["job_id"], again["job_id"]
+
+
+def test_retrying_an_old_failed_export_reuses_the_newer_ready_one(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old, newer = failed_then_ready(harness, monkeypatch)
+    [ready] = harness.client.get(EXPORTS).json()
+    retried = harness.client.post(f"/api/jobs/{old}/retry")
+    assert retried.status_code == 201 and retried.json()["id"] == newer
+    [bulk] = harness.client.post("/api/jobs/retry", json={"ids": [old]}).json()
+    assert bulk["done"] and bulk["retry"]["id"] == newer
+    assert [job.id for job in export_jobs(harness)] == [old, newer]
+    assert harness.client.get(EXPORTS).json() == [ready]
+    with harness.sessions() as session:
+        assert list(session.scalars(select(Artifact.id).where(Artifact.kind == "export"))) == [ready["artifact_id"]]
+
+
+def test_retrying_an_export_refuses_once_the_base_files_changed(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ready_v1(harness)
+    first = start(harness)
+    monkeypatch.setenv("FAKE_EXPORT_FAIL", "1")
+    run_export(harness)
+    monkeypatch.delenv("FAKE_EXPORT_FAIL")
+    monkeypatch.setattr("minibrain.api.exports.base_hash", lambda session, key: "f" * 64)
+    refused = harness.client.post(f"/api/jobs/{first['job_id']}/retry")
+    assert refused.status_code == 409
+    assert "now has files ffffffffffff" in refused.json()["detail"]
+    assert [job.id for job in export_jobs(harness)] == [first["job_id"]]
+
+
 def test_deleting_the_version_deletes_its_export(harness: Harness) -> None:
     ready_v1(harness)
     start(harness)

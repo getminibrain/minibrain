@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 
 from minibrain.api.access import builder, facts_of, sees_rows, still_allowed, viewer
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.exports import reused_export
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
 from minibrain.api.job_rows import list_extras
 from minibrain.api.job_sorting import JobSort, job_keyset
@@ -30,11 +31,12 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.sorting import CURSOR_PATTERN, Order, keyset_rows
 from minibrain.api.views import job_detail, job_info
+from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.auth.roles import Role
 from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
-from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state
+from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state, refuse_orphan
 from minibrain.jobs.removal import DeleteRefused, Leftovers, active_refusal, kept_by, remove_job
 from minibrain.registry.compute import pool_of_host
 from minibrain.registry.models import (
@@ -48,6 +50,7 @@ from minibrain.registry.models import (
     Job,
     JobEvent,
     JobKind,
+    JobStatus,
     Model,
     Version,
     VersionExport,
@@ -313,6 +316,15 @@ def retry(session: Session, queue: SqlJobQueue, job: Job) -> Job:
     return again
 
 
+def retry_or_reuse(session: Session, queue: SqlJobQueue, settings: Settings, store: ArtifactStore, job: Job) -> Job:
+    if job.kind == JobKind.EXPORT and job.status in (JobStatus.FAILED, JobStatus.CANCELLED):
+        refuse_orphan(job)
+        found = reused_export(session, settings, store, job)
+        if found is not None:
+            return found
+    return retry(session, queue, job)
+
+
 def each_job(session: Session, ids: list[int], act: Callable[[Job], Job | None]) -> list[JobActionResult]:
     results: list[JobActionResult] = []
     for job_id in dict.fromkeys(ids):
@@ -337,8 +349,10 @@ def cancel_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobA
 
 
 @router.post("/jobs/retry", dependencies=[Depends(builder)], summary="Retry jobs")
-def retry_jobs(body: JobIds, session: SessionDep, queue: QueueDep) -> list[JobActionResult]:
-    return each_job(session, body.ids, lambda job: retry(session, queue, job))
+def retry_jobs(
+    body: JobIds, session: SessionDep, queue: QueueDep, settings: SettingsDep, store: StoreDep
+) -> list[JobActionResult]:
+    return each_job(session, body.ids, lambda job: retry_or_reuse(session, queue, settings, store, job))
 
 
 @router.post("/jobs/{job_id}/cancel", dependencies=[Depends(builder)], summary="Cancel a job")
@@ -350,8 +364,8 @@ def cancel_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
 
 
 @router.post("/jobs/{job_id}/retry", status_code=201, dependencies=[Depends(builder)], summary="Retry a job")
-def retry_job(job_id: int, session: SessionDep, queue: QueueDep) -> JobInfo:
-    again = retry(session, queue, get_job(session, job_id))
+def retry_job(job_id: int, session: SessionDep, queue: QueueDep, settings: SettingsDep, store: StoreDep) -> JobInfo:
+    again = retry_or_reuse(session, queue, settings, store, get_job(session, job_id))
     session.commit()
     return job_info(again)
 
