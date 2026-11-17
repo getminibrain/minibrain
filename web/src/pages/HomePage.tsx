@@ -1,3 +1,4 @@
+import { IconListCheck } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
@@ -5,7 +6,14 @@ import { useModels, useRecentJobs } from "~/api/queries";
 import { ModelName } from "~/components/ModelName";
 import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
-import { Page, Section, Stat } from "~/components/Section";
+import {
+    FLUSH_GRID,
+    Page,
+    PanelColumns,
+    PanelSection,
+    PanelSections,
+    Stat,
+} from "~/components/Section";
 import { JobStatus, jobStatusRank } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { count, dateTime, percent } from "~/lib/format";
@@ -54,6 +62,20 @@ const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     },
 ];
 
+function Overview({
+    models,
+    serving,
+    running,
+}: { models: number | undefined; serving: number; running: number }) {
+    return (
+        <div className="flex gap-6">
+            <Stat label="Models" value={count(models)} />
+            <Stat label="Serving" value={count(serving)} />
+            <Stat label="Jobs running" value={count(running)} />
+        </div>
+    );
+}
+
 export function HomePage() {
     const can = useCan();
     const { data: models } = useModels();
@@ -61,23 +83,23 @@ export function HomePage() {
     const serving = (models ?? []).filter((item) => item.current_version !== null).length;
     const running = (models ?? []).reduce((total, item) => total + item.active_jobs, 0);
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Home"
                 caption="Models of any size, trained on your data and served on an OpenAI-compatible endpoint. Everything runs on your own hardware."
+                actions={<Overview models={models?.length} serving={serving} running={running} />}
             />
-            {can.build && models && <Checklist models={models} />}
-            <NeedsAttention compact />
-            <Section title="Overview">
-                <div className="flex flex-wrap gap-8">
-                    <Stat label="Models" value={count(models?.length)} />
-                    <Stat label="Serving" value={count(serving)} />
-                    <Stat label="Jobs running" value={count(running)} />
-                </div>
-            </Section>
-            <Section title="Recent jobs" flush>
-                <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
-            </Section>
+            <PanelSections>
+                <PanelColumns>
+                    {can.build && models && <Checklist models={models} />}
+                    <NeedsAttention description="Problems across models, machines and training runs." />
+                </PanelColumns>
+                <PanelSection flush icon={IconListCheck} title="Recent jobs">
+                    <div className={FLUSH_GRID}>
+                        <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
+                    </div>
+                </PanelSection>
+            </PanelSections>
         </Page>
     );
 }

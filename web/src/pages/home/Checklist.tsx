@@ -1,9 +1,9 @@
-import { IconArrowRight, IconCheck, IconX } from "@tabler/icons-react";
+import { IconArrowRight, IconCheck, IconRocket, IconX } from "@tabler/icons-react";
 import { Button, Link, cn } from "obp-ui";
 import { useState } from "react";
 import type { ModelRow } from "~/api/client";
 import { useDatasets } from "~/api/queries";
-import { Section } from "~/components/Section";
+import { PanelSection } from "~/components/Section";
 import { type ModelTab, modelPageHref } from "~/lib/modelLinks";
 
 const DISMISSED_KEY = "minibrain.home.checklist.dismissed";
@@ -156,22 +156,23 @@ export function Checklist({ models }: { models: ModelRow[] }) {
         setDismissed(true);
     };
     return (
-        <Section
+        <PanelSection
+            flush
+            icon={IconRocket}
             title="Get started"
-            caption={`${done} of ${steps.length} done. From your data to an app calling your own model.`}
+            description={`${done} of ${steps.length} done, from your data to an app calling your model.`}
             actions={
                 <Button variant="ghost" onClick={dismiss}>
                     <IconX aria-hidden="true" />
                     Dismiss
                 </Button>
             }
-            flush
         >
             <ol className="divide-y">
                 {steps.map((step) => (
                     <StepRow key={step.id} step={step} next={step === next} />
                 ))}
             </ol>
-        </Section>
+        </PanelSection>
     );
 }
