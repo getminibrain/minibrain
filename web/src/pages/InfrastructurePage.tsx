@@ -14,6 +14,7 @@ import { JoinRequests } from "./infrastructure/JoinRequests";
 import { MachinesTab } from "./infrastructure/MachinesTab";
 import { SetupDiagram } from "./infrastructure/SetupDiagram";
 import { StorageTab } from "./infrastructure/StorageTab";
+import { StoresSection } from "./infrastructure/StoresSection";
 import type { InfrastructureInfo, PoolInfo } from "./infrastructure/parts";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
@@ -117,6 +118,7 @@ function SetupTab({
                     empty="Nothing loaded yet; the first request loads the base model."
                 />
             </PanelSection>
+            <StoresSection info={info} />
         </PanelSections>
     );
 }

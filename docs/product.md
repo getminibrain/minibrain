@@ -547,8 +547,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep base weights in the bucket; machines fetch them by signed links.
   UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
-  See space by base, adapter, dataset, upload, job and database.
-  UI: Infrastructure › Storage · API: GET /api/system/infrastructure, GET /api/compute/pools
+  Disks and space per group; open a group for its items.
+  UI: Infrastructure › Storage › What's using it · API: GET /api/system/infrastructure, GET /api/compute/pools
+- **Stores** · shipped · admin
+  See where each kind of file and record lives.
+  UI: Infrastructure › Setup › Stores · API: GET /api/system/infrastructure · Config: MINIBRAIN_HOME
 - **Free up space** · shipped · admin
   Suggest unused items to delete, each on its own page.
   UI: Infrastructure › Storage › Free up space · API: GET /api/system/infrastructure, POST /api/system/job-logs/purge

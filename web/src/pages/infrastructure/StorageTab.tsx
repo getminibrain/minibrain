@@ -1,6 +1,4 @@
-import { IconCylinder, IconServer, IconStack2 } from "@tabler/icons-react";
-import type { ColumnDef } from "@tanstack/react-table";
-import { DataGrid } from "obp-ui";
+import { IconCylinder, IconServer } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MiddleTruncate } from "~/components/MiddleTruncate";
@@ -26,12 +24,8 @@ const CATEGORY_KIND: Record<string, GaugeKind> = {
     "Uploads, adapters and results": "uploads",
 };
 
-const STORE_KIND: Record<StoreInfo["kind"], string> = {
-    sqlite: "SQLite file",
-    postgres: "Postgres",
-    folder: "Folder",
-    s3: "S3 bucket",
-};
+const LOW_FREE_SHARE = 0.1;
+const LOW_FREE_BYTES = 10 * 1024 ** 3;
 
 type Disk = { key: string; free: number; total: number; stores: StoreInfo[] };
 
@@ -89,56 +83,69 @@ function commonFolder(paths: string[]): string {
     return shared.join("/") || "/";
 }
 
-const LOW_FREE_SHARE = 0.1;
-const LOW_FREE_BYTES = 10 * 1024 ** 3;
-
 function lowSpace(free: number, total: number): boolean {
     return total > 0 && (free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE);
 }
 
-type DiskView = {
-    mount: string;
-    where: string;
-    free: number;
-    total: number;
-    ours: number;
-    share: GaugeSegment[];
-    heading?: ReactNode;
-    footer?: ReactNode;
-};
+function usedText(free: number, total: number): string {
+    return `${total > 0 ? Math.round(((total - free) / total) * 100) : 0}% used`;
+}
 
-function DiskCard({ view }: { view: DiskView }) {
-    const { mount, where, free, total, ours, share } = view;
-    const low = lowSpace(free, total);
-    const left = `${bytes(free)} free of ${bytes(total)}`;
+function freeText(free: number, total: number): string {
+    return `${bytes(free)} free of ${bytes(total)}`;
+}
+
+function DiskSpace({ free, total, text }: { free: number; total: number; text: string }) {
     return (
-        <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
-            <div className="flex min-w-0 flex-col gap-0.5">
-                {view.heading}
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <span className="min-w-0 truncate font-mono font-medium">{mount}</span>
-                    <span className="text-sm tabular-nums">
-                        {low ? (
-                            <StatusText tone="warning">{left}</StatusText>
-                        ) : (
-                            <span className="text-muted-foreground">{left}</span>
-                        )}
-                    </span>
-                </div>
-                <MiddleTruncate text={where} className="text-sm text-muted-foreground" />
+        <span className="shrink-0 text-sm tabular-nums">
+            {lowSpace(free, total) ? (
+                <StatusText tone="warning">{text}</StatusText>
+            ) : (
+                <span className="text-muted-foreground">{text}</span>
+            )}
+        </span>
+    );
+}
+
+function PathLine({ path, label, tail = 20 }: { path: string; label: string; tail?: number }) {
+    return (
+        <span className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+            <MiddleTruncate text={path} tail={tail} />
+            <CopyButton value={path} label={label} />
+        </span>
+    );
+}
+
+function MainDisk({ disk }: { disk: Disk }) {
+    const share = shareSegments(disk);
+    const where = commonFolder(disk.stores.map((store) => store.location));
+    const mount = disk.stores[0]?.mount ?? where;
+    const ours = share.reduce((sum, segment) => sum + segment.bytes, 0);
+    return (
+        <div className="flex min-w-0 flex-col gap-2 px-4 py-3">
+            <div className="flex min-w-0 items-baseline justify-between gap-4">
+                <span className="min-w-0 truncate font-mono font-medium">{mount}</span>
+                <DiskSpace
+                    free={disk.free}
+                    total={disk.total}
+                    text={`${usedText(disk.free, disk.total)} · ${freeText(disk.free, disk.total)}`}
+                />
             </div>
+            <PathLine path={where} label={`Copy the path of minibrain's files on ${mount}`} />
             <UsageGauge
-                segments={diskSegments(free, total, ours)}
-                capacity={total}
-                low={low}
+                size="sm"
+                segments={diskSegments(disk.free, disk.total, ours)}
+                capacity={disk.total}
+                low={lowSpace(disk.free, disk.total)}
                 label={`Disk use of ${mount}`}
             />
             {share.length > 1 && ours > 0 && (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2 pt-1">
                     <p className="text-sm text-muted-foreground tabular-nums">
                         {`minibrain's share · ${bytes(ours)}`}
                     </p>
                     <UsageGauge
+                        size="sm"
                         segments={share}
                         capacity={ours}
                         free={false}
@@ -146,25 +153,45 @@ function DiskCard({ view }: { view: DiskView }) {
                     />
                 </div>
             )}
-            {view.footer}
         </div>
     );
 }
 
-function mainDiskView(disk: Disk): DiskView {
-    const share = shareSegments(disk);
-    const where = commonFolder(disk.stores.map((store) => store.location));
-    return {
-        mount: disk.stores[0]?.mount ?? where,
-        where,
-        free: disk.free,
-        total: disk.total,
-        ours: share.reduce((sum, segment) => sum + segment.bytes, 0),
-        share,
-    };
+function MainDisksSection({ info }: { info: InfrastructureInfo | undefined }) {
+    const disks = disksOf(info?.stores ?? []);
+    return (
+        <PanelSection
+            flush
+            icon={IconCylinder}
+            title="Disks on main"
+            description="What minibrain keeps on each disk, and what is left."
+        >
+            {disks.length === 0 ? (
+                <p className="px-4 py-3 text-muted-foreground">
+                    {info ? "No store is on a local disk." : "…"}
+                </p>
+            ) : (
+                <div className="flex flex-col divide-y">
+                    {disks.map((disk) => (
+                        <MainDisk key={disk.key} disk={disk} />
+                    ))}
+                </div>
+            )}
+        </PanelSection>
+    );
 }
 
-type MachineDisk = { key: string; node: NodeInfo; pool: string; view: DiskView };
+type MachineDisk = {
+    key: string;
+    node: NodeInfo;
+    pool: string;
+    path: string;
+    free: number;
+    total: number;
+    ours: number;
+    cache: number | null | undefined;
+    reported: string | null | undefined;
+};
 
 function machineDisks(pools: PoolInfo[]): MachineDisk[] {
     return pools.flatMap((pool) =>
@@ -178,15 +205,12 @@ function machineDisks(pools: PoolInfo[]): MachineDisk[] {
                                   key: `${node.id}-${disk.path}`,
                                   node,
                                   pool: pool.name,
-                                  view: {
-                                      mount: disk.mount ?? disk.path,
-                                      where: disk.path,
-                                      free: disk.free_bytes,
-                                      total: disk.total_bytes,
-                                      ours: disk.minibrain_bytes ?? 0,
-                                      share: [],
-                                      footer: <CacheLine cache={disk.cache_bytes} />,
-                                  },
+                                  path: disk.path,
+                                  free: disk.free_bytes,
+                                  total: disk.total_bytes,
+                                  ours: disk.minibrain_bytes ?? 0,
+                                  cache: disk.cache_bytes,
+                                  reported: disk.reported_at,
                               },
                           ]
                         : [],
@@ -195,13 +219,48 @@ function machineDisks(pools: PoolInfo[]): MachineDisk[] {
     );
 }
 
-function CacheLine({ cache }: { cache: number | null | undefined }) {
+function cacheText(cache: number | null | undefined): string {
+    return cache === null || cache === undefined ? "cache not reported" : `cache ${bytes(cache)}`;
+}
+
+function MachineDiskRow({ disk }: { disk: MachineDisk }) {
     return (
-        <p className="text-sm text-muted-foreground tabular-nums">
-            {cache === null || cache === undefined
-                ? "Cache not reported; this machine runs an older minibrain."
-                : `Cache · ${bytes(cache)} of model copies and downloads it can fetch again`}
-        </p>
+        <div className="flex min-w-0 flex-col gap-1.5 px-4 py-2.5">
+            <div className="flex min-w-0 items-baseline justify-between gap-4">
+                <span className="flex min-w-0 items-baseline gap-x-2">
+                    <MachineName node={disk.node} />
+                    <PoolLink name={disk.pool} className="shrink-0" />
+                    {!disk.node.online && disk.reported && (
+                        <span className="shrink-0 text-sm text-muted-foreground">
+                            {`reported ${relativeTime(disk.reported)}`}
+                        </span>
+                    )}
+                </span>
+                <DiskSpace
+                    free={disk.free}
+                    total={disk.total}
+                    text={usedText(disk.free, disk.total)}
+                />
+            </div>
+            <UsageGauge
+                size="sm"
+                legend={false}
+                segments={diskSegments(disk.free, disk.total, disk.ours)}
+                capacity={disk.total}
+                low={lowSpace(disk.free, disk.total)}
+                label={`Disk use of ${disk.node.host}`}
+            />
+            <div className="flex min-w-0 items-center justify-between gap-4 text-sm text-muted-foreground">
+                <PathLine
+                    path={disk.path}
+                    tail={12}
+                    label={`Copy the disk path of ${disk.node.host}`}
+                />
+                <span className="shrink-0 tabular-nums">
+                    {`${freeText(disk.free, disk.total)} · ${cacheText(disk.cache)}`}
+                </span>
+            </div>
+        </div>
     );
 }
 
@@ -212,7 +271,8 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
             flush
             icon={IconServer}
             title="Disks on other machines"
-            description="The disk each worker and engine keeps model copies, downloads and job files on, as each last reported."
+            description="Where each worker and engine keeps model copies, downloads and job files."
+            tip="As each machine last reported. The cache holds model copies and downloads it can fetch again."
         >
             {disks.length === 0 ? (
                 <p className="px-4 py-3 text-muted-foreground">
@@ -221,21 +281,7 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
             ) : (
                 <div className="flex flex-col divide-y">
                     {disks.map((disk) => (
-                        <DiskCard
-                            key={disk.key}
-                            view={{
-                                ...disk.view,
-                                heading: (
-                                    <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground">
-                                        <MachineName node={disk.node} />
-                                        <PoolLink name={disk.pool} />
-                                        {!disk.node.online && disk.node.disks?.[0]?.reported_at && (
-                                            <span>{`reported ${relativeTime(disk.node.disks[0].reported_at)}`}</span>
-                                        )}
-                                    </span>
-                                ),
-                            }}
-                        />
+                        <MachineDiskRow key={disk.key} disk={disk} />
                     ))}
                 </div>
             )}
@@ -243,84 +289,9 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
     );
 }
 
-function inHome(location: string, home: string): string {
-    if (!home || !location.startsWith(`${home}/`)) {
-        return location;
-    }
-    const name = home.split("/").filter(Boolean).pop() ?? home;
-    return `${name}${location.slice(home.length)}`;
-}
-
-function storeColumns(home: string): ColumnDef<StoreInfo, unknown>[] {
-    return [
-        { header: "Holds", accessorKey: "name" },
-        { header: "Kind", id: "kind", cell: ({ row }) => STORE_KIND[row.original.kind] },
-        {
-            header: "Where",
-            id: "location",
-            cell: ({ row }) => (
-                <span className="flex min-w-0 items-center gap-1">
-                    <MiddleTruncate
-                        text={inHome(row.original.location, home)}
-                        className="max-w-72"
-                    />
-                    <CopyButton
-                        value={row.original.location}
-                        label={`Copy the full path of ${row.original.name}`}
-                    />
-                </span>
-            ),
-        },
-        {
-            header: "Used",
-            id: "used",
-            cell: ({ row }) => (
-                <span className="tabular-nums">{bytes(row.original.used_bytes)}</span>
-            ),
-        },
-    ];
-}
-
-function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const stores = info?.stores ?? [];
-    const disks = disksOf(stores);
+function Columns({ children }: { children: ReactNode }) {
     return (
-        <PanelSection
-            flush
-            icon={IconCylinder}
-            title="Disks on main"
-            description="What minibrain keeps on each disk, and what is left."
-        >
-            {disks.length === 0 ? (
-                <p className="px-4 py-3 text-muted-foreground">No store is on a local disk.</p>
-            ) : (
-                <div className="flex flex-col divide-y">
-                    {disks.map((disk) => (
-                        <DiskCard key={disk.key} view={mainDiskView(disk)} />
-                    ))}
-                </div>
-            )}
-        </PanelSection>
-    );
-}
-
-function StoresSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const home = info?.home ?? "";
-    return (
-        <PanelSection bare icon={IconStack2} title="Stores">
-            <div className="flex flex-col gap-3">
-                <DataGrid columns={storeColumns(home)} rows={info?.stores ?? []} />
-                <p className="flex min-w-0 items-baseline gap-1 text-sm text-muted-foreground">
-                    <span className="shrink-0">Everything lives under</span>
-                    <MiddleTruncate text={home || "…"} className="text-foreground" />
-                    <span className="shrink-0">
-                        {"· set "}
-                        <span className="font-mono text-foreground">MINIBRAIN_HOME</span>
-                        {" to move it"}
-                    </span>
-                </p>
-            </div>
-        </PanelSection>
+        <div className="grid items-start gap-x-panel-gap gap-y-10 xl:grid-cols-2">{children}</div>
     );
 }
 
@@ -333,11 +304,14 @@ export function StorageTab({
 }) {
     return (
         <PanelSections>
-            <StorageSection info={info} />
-            <UsageSection info={info} />
-            <FreeUpSection info={info} />
-            <MachineDisksSection pools={pools} />
-            <StoresSection info={info} />
+            <Columns>
+                <MainDisksSection info={info} />
+                <MachineDisksSection pools={pools} />
+            </Columns>
+            <Columns>
+                <UsageSection info={info} />
+                <FreeUpSection info={info} />
+            </Columns>
         </PanelSections>
     );
 }

@@ -1,7 +1,6 @@
 import { IconEraser } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Button, ConfirmDialog, DataGrid } from "obp-ui";
+import { Button, ConfirmDialog } from "obp-ui";
 import type { ReactNode } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
@@ -23,23 +22,6 @@ type FreeRow = {
     size: number;
     action: ReactNode;
 };
-
-const COLUMNS: ColumnDef<FreeRow, unknown>[] = [
-    { header: "What", id: "what", size: 260, cell: ({ row }) => row.original.what },
-    {
-        header: "Why it is safe",
-        id: "why",
-        size: 420,
-        cell: ({ row }) => <span className="text-muted-foreground">{row.original.why}</span>,
-    },
-    {
-        header: "Size",
-        id: "size",
-        size: 100,
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.size)}</span>,
-    },
-    { header: "Delete", id: "action", size: 180, cell: ({ row }) => row.original.action },
-];
 
 function usePurgeLogs() {
     const client = useQueryClient();
@@ -83,7 +65,7 @@ function rowOf(
             ...base,
             what: <TextLink href={modelPageHref(item.key)}>{item.name}</TextLink>,
             why: "No model is built on it, it judges and checks nothing, and it is not deployed.",
-            action: <TextLink href={modelPageHref(item.key)}>On its page</TextLink>,
+            action: <TextLink href={modelPageHref(item.key)}>Delete on its page</TextLink>,
         };
     }
     if (item.kind === "dataset") {
@@ -96,7 +78,7 @@ function rowOf(
                 </span>
             ),
             why: "No model version trained on these, and none is the dataset's latest.",
-            action: <TextLink href="/settings/data">Retention</TextLink>,
+            action: <TextLink href="/settings/data">Set retention</TextLink>,
         };
     }
     if (item.kind === "source") {
@@ -104,7 +86,7 @@ function rowOf(
             ...base,
             what: <TextLink href={sourceHref(item.key)}>{item.name}</TextLink>,
             why: "No dataset uses this upload.",
-            action: <TextLink href={sourceHref(item.key)}>On its page</TextLink>,
+            action: <TextLink href={sourceHref(item.key)}>Delete on its page</TextLink>,
         };
     }
     const kept = keepDays > 0 ? `; kept ${count(keepDays)} days, then removed` : "";
@@ -120,6 +102,37 @@ function rowOf(
     };
 }
 
+function FreeRowLine({ row }: { row: FreeRow }) {
+    return (
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5">
+            <span className="min-w-0 truncate">{row.what}</span>
+            <span className="text-right tabular-nums">{bytes(row.size)}</span>
+            <span className="min-w-0 text-sm text-muted-foreground">{row.why}</span>
+            <span className="justify-self-end text-sm">{row.action}</span>
+        </div>
+    );
+}
+
+function FreeUpBody({ rows, loading }: { rows: FreeRow[]; loading: boolean }) {
+    if (loading) {
+        return <p className="px-4 py-3 text-muted-foreground">…</p>;
+    }
+    if (rows.length === 0) {
+        return (
+            <p className="px-4 py-3 text-muted-foreground">
+                Nothing to free up: everything stored is in use.
+            </p>
+        );
+    }
+    return (
+        <div className="flex flex-col divide-y">
+            {rows.map((row) => (
+                <FreeRowLine key={row.key} row={row} />
+            ))}
+        </div>
+    );
+}
+
 export function FreeUpSection({ info }: { info: InfrastructureInfo | undefined }) {
     const can = useCan();
     const purge = usePurgeLogs();
@@ -130,24 +143,22 @@ export function FreeUpSection({ info }: { info: InfrastructureInfo | undefined }
     const total = items.reduce((sum, item) => sum + item.size_bytes, 0);
     return (
         <PanelSection
-            bare
+            flush
             icon={IconEraser}
             title="Free up space"
             description={
                 rows.length > 0
-                    ? `${bytes(total)} could go without breaking any model, dataset or source. Each is deleted on its own page, which refuses anything in use.`
+                    ? `${bytes(total)} could go without breaking any model, dataset or source.`
                     : "What could go without breaking any model, dataset or source."
             }
+            tip="Each is deleted on its own page, which refuses anything in use."
         >
-            <div className="flex flex-col gap-3">
-                <DataGrid
-                    columns={COLUMNS}
-                    rows={rows}
-                    loading={!info}
-                    empty="Nothing to free up: everything stored is in use."
-                />
-                <ErrorLine error={purge.error} />
-            </div>
+            <FreeUpBody rows={rows} loading={!info} />
+            {purge.error ? (
+                <div className="border-t px-4 py-3">
+                    <ErrorLine error={purge.error} />
+                </div>
+            ) : null}
         </PanelSection>
     );
 }

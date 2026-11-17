@@ -8,8 +8,8 @@ import {
     IconUpload,
     type TablerIcon,
 } from "@tabler/icons-react";
-import { Link, Table, TableBody, TableCell, TableRow } from "obp-ui";
-import { Fragment, type ReactNode } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger, Link, cn } from "obp-ui";
+import type { ReactNode } from "react";
 import type { components } from "~/api/schema";
 import { PanelSection } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -130,66 +130,60 @@ const KINDS: Record<UsageKind, KindView> = {
 
 const ORDER: UsageKind[] = ["bases", "adapters", "datasets", "uploads", "jobs", "database"];
 
-function GroupRows({ kind, group }: { kind: UsageKind; group: UsageGroup | undefined }) {
-    const view = KINDS[kind];
-    const Icon = view.icon;
-    const items = group?.items ?? [];
-    const rest = (group?.count ?? 0) - items.length;
-    const restBytes =
-        (group?.size_bytes ?? 0) - items.reduce((sum, item) => sum + item.size_bytes, 0);
+const ITEM_ROW = "flex min-w-0 items-baseline gap-3 py-1.5 pr-4 pl-16";
+
+function GroupItems({ view, group }: { view: KindView; group: UsageGroup }) {
+    const items = group.items;
+    const rest = group.count - items.length;
+    const restBytes = group.size_bytes - items.reduce((sum, item) => sum + item.size_bytes, 0);
     return (
-        <>
-            <TableRow className="bg-muted hover:bg-muted">
-                <TableCell colSpan={2} className="font-medium">
-                    <span className="flex items-center gap-2">
-                        <Icon
-                            aria-hidden="true"
-                            className="size-4 shrink-0 text-muted-foreground"
-                        />
-                        {view.label}
-                        {group && group.count > 0 && (
-                            <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                                {count(group.count)}
-                            </span>
-                        )}
-                    </span>
-                </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
-                    {group ? bytes(group.size_bytes) : "…"}
-                </TableCell>
-            </TableRow>
-            {group && items.length === 0 && (
-                <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={3} className="pl-9 text-muted-foreground">
-                        {view.empty}
-                    </TableCell>
-                </TableRow>
+        <div className="flex flex-col pb-2">
+            {items.length === 0 && (
+                <p className={cn(ITEM_ROW, "text-muted-foreground")}>{view.empty}</p>
             )}
             {items.map((item) => (
-                <TableRow key={item.key} className="hover:bg-transparent">
-                    <TableCell className="truncate pl-9">{view.name(item)}</TableCell>
-                    <TableCell className="truncate text-muted-foreground">
+                <div key={item.key} className={ITEM_ROW}>
+                    <span className="max-w-[45%] shrink-0 truncate">{view.name(item)}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
                         {view.detail(item)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                        {bytes(item.size_bytes)}
-                    </TableCell>
-                </TableRow>
+                    </span>
+                    <span className="shrink-0 tabular-nums">{bytes(item.size_bytes)}</span>
+                </div>
             ))}
             {rest > 0 && (
-                <TableRow className="hover:bg-transparent">
-                    <TableCell
-                        colSpan={2}
-                        className="pl-9 text-sm text-muted-foreground tabular-nums"
-                    >
-                        {`${count(rest)} smaller`}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        {bytes(restBytes)}
-                    </TableCell>
-                </TableRow>
+                <p className={cn(ITEM_ROW, "text-sm text-muted-foreground tabular-nums")}>
+                    <span className="flex-1">{`${count(rest)} smaller`}</span>
+                    <span className="shrink-0">{bytes(restBytes)}</span>
+                </p>
             )}
-        </>
+        </div>
+    );
+}
+
+function GroupRow({ kind, group }: { kind: UsageKind; group: UsageGroup | undefined }) {
+    const view = KINDS[kind];
+    const Icon = view.icon;
+    return (
+        <Collapsible>
+            <CollapsibleTrigger
+                disabled={!group}
+                className="flex w-full gap-2 rounded-none px-4 py-2 font-normal hover:bg-secondary focus-visible:ring-inset focus-visible:ring-offset-0"
+            >
+                <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+                <span>{view.label}</span>
+                {group && group.count > 0 && (
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                        {count(group.count)}
+                    </span>
+                )}
+                <span className="ml-auto font-medium tabular-nums">
+                    {group ? bytes(group.size_bytes) : "…"}
+                </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+                {group && <GroupItems view={view} group={group} />}
+            </CollapsibleContent>
+        </Collapsible>
     );
 }
 
@@ -200,22 +194,13 @@ export function UsageSection({ info }: { info: InfrastructureInfo | undefined })
             flush
             icon={IconChartPie}
             title="What's using it"
-            description="minibrain's files and records by what they belong to, biggest first."
+            description="minibrain's files and records by what they belong to. Open a group for its biggest items."
         >
-            <Table className="table-fixed">
-                <colgroup>
-                    <col className="w-[38%]" />
-                    <col />
-                    <col className="w-28" />
-                </colgroup>
-                <TableBody>
-                    {ORDER.map((kind) => (
-                        <Fragment key={kind}>
-                            <GroupRows kind={kind} group={info ? groups.get(kind) : undefined} />
-                        </Fragment>
-                    ))}
-                </TableBody>
-            </Table>
+            <div className="flex flex-col divide-y">
+                {ORDER.map((kind) => (
+                    <GroupRow key={kind} kind={kind} group={info ? groups.get(kind) : undefined} />
+                ))}
+            </div>
         </PanelSection>
     );
 }
