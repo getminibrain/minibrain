@@ -32,6 +32,7 @@ ACTION_LABELS = {
     "connection.delete": "Connection deleted",
     "connection.update": "Connection changed",
     "dataset.delete": "Dataset deleted",
+    "dataset.full": "Full dataset version saved",
     "dataset.move": "Dataset moved",
     "dataset.sample": "Dataset version sampled",
     "dataset_folder.create": "Dataset folder created",
