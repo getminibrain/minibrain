@@ -398,7 +398,7 @@ export function SummarySection({
                     <Fact label="API name">
                         <span className="truncate font-mono text-sm">{callable}</span>
                         <span className="-my-1.5">
-                            <CopyButton value={callable} label={`Copy ${callable}`} />
+                            <CopyButton value={callable} label="Copy API name" />
                         </span>
                     </Fact>
                     <Fact label="Adapter">
