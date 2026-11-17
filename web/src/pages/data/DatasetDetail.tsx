@@ -653,7 +653,11 @@ export function DatasetDetail({
                     tip="Rows per label across the whole dataset. Rare labels are the ones a model gets wrong."
                 >
                     {preview.data ? (
-                        <LabelBalance counts={preview.data.label_counts} />
+                        <LabelBalance
+                            counts={preview.data.label_counts}
+                            labels={preview.data.quality.labels}
+                            rows={preview.data.quality.rows - preview.data.quality.empty}
+                        />
                     ) : (
                         <p className="text-muted-foreground">
                             {preview.isLoading ? "Loading…" : "–"}

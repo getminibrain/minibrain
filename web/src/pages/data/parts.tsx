@@ -320,9 +320,20 @@ export function DeleteMenuItem({
 
 const SHOWN_LABELS = 10;
 
-export function LabelBalance({ counts }: { counts: LabelCount[] }) {
+export function LabelBalance({
+    counts,
+    labels,
+    rows,
+}: {
+    counts: LabelCount[];
+    labels: number;
+    rows: number;
+}) {
     const [all, setAll] = useState(false);
-    const total = counts.reduce((sum, item) => sum + item.rows, 0);
+    const total = Math.max(
+        rows,
+        counts.reduce((sum, item) => sum + item.rows, 0),
+    );
     const largest = counts[0]?.rows ?? 0;
     const shown = all ? counts : counts.slice(0, SHOWN_LABELS);
     const hidden = counts.length - shown.length;
@@ -376,7 +387,9 @@ export function LabelBalance({ counts }: { counts: LabelCount[] }) {
                     <Button variant="link" className="h-auto px-0" onClick={() => setAll(!all)}>
                         {all
                             ? "Show the top 10"
-                            : `Show all ${counts.length.toLocaleString()} labels`}
+                            : labels > counts.length
+                              ? `Show the top ${counts.length.toLocaleString()} of ${labels.toLocaleString()} labels`
+                              : `Show all ${counts.length.toLocaleString()} labels`}
                     </Button>
                 </div>
             )}
