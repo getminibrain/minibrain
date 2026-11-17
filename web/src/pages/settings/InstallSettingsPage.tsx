@@ -1,6 +1,7 @@
 import {
     IconBook2,
     IconCpu,
+    IconDownload,
     IconFolders,
     IconPackage,
     IconRadar,
@@ -138,19 +139,6 @@ function version(value: string | null | undefined): ReactNode {
     return value ? <Text>{value}</Text> : <Muted>Not installed</Muted>;
 }
 
-function versionsText(info: InstallInfo): string {
-    const software = info.software;
-    const build = software.commit ? ` (build ${software.commit.slice(0, SHORT_COMMIT)})` : "";
-    return [
-        `minibrain ${software.minibrain}${build}`,
-        `Python ${software.python}`,
-        `DuckDB ${software.duckdb ?? "not installed"}`,
-        `PyTorch ${software.torch ?? "not installed"}`,
-        `Transformers ${software.transformers ?? "not installed"}`,
-        `${software.system}, ${software.arch}`,
-    ].join("\n");
-}
-
 function Software({ info }: { info: InstallInfo }) {
     const software = info.software;
     return (
@@ -159,7 +147,6 @@ function Software({ info }: { info: InstallInfo }) {
             anchor={INSTALL.software.anchor}
             title={INSTALL.software.title}
             description="Versions of minibrain and the libraries it runs on."
-            actions={<CopyButton value={versionsText(info)} label="Copy versions" labelled />}
         >
             <SettingsGroup>
                 <SoftwareRow text={SOFTWARE.minibrain} mark="minibrain">
@@ -341,7 +328,10 @@ function Compute({ info }: { info: InstallInfo }) {
             description="Pools, machines, workers and model servers this install sees."
             actions={
                 <Button variant="outline" asChild>
-                    <Link href="/infrastructure">Open Infrastructure</Link>
+                    <Link href="/infrastructure">
+                        <IconServer />
+                        Open Infrastructure
+                    </Link>
                 </Button>
             }
         >
@@ -508,6 +498,7 @@ export function InstallSettingsPage() {
                     </InfoTip>
                     <Button variant="outline" asChild>
                         <a href={DIAGNOSTICS} download>
+                            <IconDownload />
                             {INSTALL.diagnostics.settings.download.label}
                         </a>
                     </Button>
