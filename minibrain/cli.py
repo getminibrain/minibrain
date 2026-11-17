@@ -355,9 +355,7 @@ def extensions(args: argparse.Namespace) -> None:
     names = getattr(args, "names", None) or list(duck.PURPOSES)
     try:
         if args.action == "install":
-            source = args.source or duck.repository()
-            if not source:
-                raise SystemExit(f"give --from <folder or mirror URL>, or set {duck.REPOSITORY_ENV}")
+            source = args.source or duck.repository() or duck.OFFICIAL
             if "://" in source:
                 check_outbound(source)
             wanted = args.names or duck.bundled(source)
@@ -617,8 +615,15 @@ def main() -> None:
     )
     actions = extensions_command.add_subparsers(dest="action")
     actions.add_parser("status", help="show which extensions are installed")
-    install_command = actions.add_parser("install", help="install from a local folder or an internal mirror")
-    install_command.add_argument("--from", dest="source", default=None, help="folder or mirror URL")
+    install_command = actions.add_parser(
+        "install", help="install from DuckDB's repository, an internal mirror or a local folder"
+    )
+    install_command.add_argument(
+        "--from",
+        dest="source",
+        default=None,
+        help="folder or mirror URL; defaults to MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY, then extensions.duckdb.org",
+    )
     install_command.add_argument("names", nargs="*")
     download_command = actions.add_parser("download", help="save extensions to a folder on a connected machine")
     download_command.add_argument("--to", type=Path, required=True)

@@ -1,6 +1,7 @@
 [tasks.setup]
-description = "Install Python and web dependencies"
-run = ["uv sync --all-extras", "pnpm --dir web install"]
+description = "Install Python and web dependencies, and the DuckDB extensions into .minibrain/"
+run = ["uv sync --all-extras", "pnpm --dir web install", "uv run minibrain extensions install"]
+env = { MINIBRAIN_HOME = "{{config_root}}/.minibrain" }
 
 [tasks."dev:api"]
 description = "API and job worker on :8000, restarted on Python changes; pages redirect to the web UI on :5173"

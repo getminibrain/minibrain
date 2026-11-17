@@ -19,7 +19,8 @@ PURPOSES = {
     "delta": "Delta Lake sources",
 }
 NEEDS = {"iceberg": ("avro",)}
-INSTALL_HINT = "minibrain extensions install --from <folder>"
+DEFAULT_SET = ("httpfs", "postgres_scanner", "iceberg", "avro", "delta")
+INSTALL_HINT = "minibrain extensions install (add --from <folder> on a server without internet)"
 
 
 class ExtensionMissingError(Exception):
@@ -154,7 +155,7 @@ def missing(names: Iterable[str]) -> list[str]:
 
 def bundled(source: str) -> list[str]:
     if "://" in source:
-        return list(PURPOSES)
+        return list(DEFAULT_SET)
     folder = Path(source).expanduser()
     versioned = folder / engine_version() / platform()
     files = (*folder.glob("*.duckdb_extension"), *versioned.glob("*.duckdb_extension*"))

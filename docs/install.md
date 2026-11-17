@@ -572,8 +572,15 @@ Copy the folder across and add it with **Models → Add model → Folder**. In D
 ### DuckDB extensions
 
 The Docker image already has them. Native installs do not: the wheel leaves them out because one set is tens of MB per
-platform and DuckDB release. On a connected machine with the same minibrain version, download them for the target's
-platform (`linux_amd64`, `linux_arm64`, `osx_arm64`, `osx_amd64` or `windows_amd64`):
+platform and DuckDB release. On a server with internet access, one command installs the default set (httpfs,
+postgres_scanner, iceberg, avro, delta) from extensions.duckdb.org, if the network policy allows that host:
+
+```sh
+minibrain extensions install
+```
+
+On a server without internet, use a connected machine with the same minibrain version to download them for the
+target's platform (`linux_amd64`, `linux_arm64`, `osx_arm64`, `osx_amd64` or `windows_amd64`):
 
 ```sh
 minibrain extensions download --to ./duckdb-extensions --platform linux_amd64 httpfs postgres_scanner iceberg avro delta
