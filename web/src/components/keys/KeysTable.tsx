@@ -88,7 +88,7 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
             accessorFn: (key) => key.name.toLowerCase(),
             size: 220,
             cell: ({ row }) => (
-                <span className="block max-w-56 truncate font-medium" title={row.original.name}>
+                <span className="block max-w-48 truncate font-medium" title={row.original.name}>
                     {row.original.name}
                 </span>
             ),
