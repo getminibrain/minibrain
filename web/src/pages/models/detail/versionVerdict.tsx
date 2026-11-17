@@ -53,7 +53,7 @@ export function VerdictLine({
     const verdict = verdictLine({ version, phase, peers, eta, heldOutRows: rows });
     const rule = model.data ? ruleText(model.data.promotion) : "Loading the rule…";
     return (
-        <p className="flex h-6 min-w-0 items-center" aria-live="polite">
+        <p className="flex h-6 min-w-0 max-w-full items-center" aria-live="polite">
             <StatusText
                 tone={verdict.tone}
                 active={verdict.active}
