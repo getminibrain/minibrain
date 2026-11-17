@@ -6,7 +6,7 @@ from sqlalchemy import ColumnElement, Float, SQLColumnExpression, String, and_, 
 from sqlalchemy.orm import aliased
 
 from minibrain.api.job_facts import SCORED_KINDS
-from minibrain.api.sorting import Keyset, Order, cursor_anchor, seconds_between
+from minibrain.api.sorting import Keyset, Order, cursor_anchor, pool_of_node, seconds_between
 from minibrain.registry.models import (
     BaseModel,
     Dataset,
@@ -57,15 +57,20 @@ def status_parts() -> tuple[SQLColumnExpression[Any], ...]:
 
 
 def pool_parts() -> tuple[SQLColumnExpression[Any], ...]:
-    ran = (
-        select(Worker.pool)
-        .join(JobAttempt, JobAttempt.worker == Worker.id)
-        .where(JobAttempt.job_id == Job.id)
-        .order_by(JobAttempt.id.desc())
+    attempt = aliased(JobAttempt)
+    latest = (
+        select(attempt.id)
+        .where(attempt.job_id == Job.id)
+        .correlate(Job)
+        .order_by(attempt.id.desc())
         .limit(1)
         .scalar_subquery()
     )
-    return (lowered(func.coalesce(ran, Job.pool)),)
+    node = select(JobAttempt.node_id).where(JobAttempt.id == latest).scalar_subquery()
+    worker = (
+        select(Worker.pool).join(JobAttempt, JobAttempt.worker == Worker.id).where(JobAttempt.id == latest)
+    ).scalar_subquery()
+    return (lowered(func.coalesce(func.nullif(pool_of_node(node), ""), worker, Job.pool)),)
 
 
 def started_parts() -> tuple[SQLColumnExpression[Any], ...]:

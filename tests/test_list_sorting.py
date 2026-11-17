@@ -16,6 +16,7 @@ from minibrain.registry.models import (
     BaseModelStatus,
     Dataset,
     DatasetVersion,
+    JobAttempt,
     JobKind,
     JobStatus,
     Model,
@@ -23,6 +24,7 @@ from minibrain.registry.models import (
     Version,
     VersionKind,
     VersionStatus,
+    Worker,
     now,
 )
 from tests.conftest import Harness, blank_dataset
@@ -328,3 +330,16 @@ def test_duration_pages_hold_running_jobs_still_while_the_clock_moves(
     items = walk(harness, "/api/jobs", {"sort": "duration", "order": "desc" if descending else "asc", "limit": 3})
     assert len(items) == 12
     assert len({item["id"] for item in items}) == 12
+
+
+def test_pool_is_where_each_job_ran_after_its_worker_joins_another_pool(harness: Harness) -> None:
+    with harness.sessions() as session:
+        session.add(Worker(id="w-move", host="box", kinds=["eval"], pool="zulu"))
+        for index, ran_in in enumerate(("alpha", "zulu", "beta")):
+            job = enqueue(session, JobKind.EVAL, {"n": index})
+            job.status = JobStatus.SUCCEEDED
+            session.flush()
+            session.add(JobAttempt(job_id=job.id, number=1, worker="w-move", node_id=f"{ran_in}/box"))
+        session.commit()
+    items = walk(harness, "/api/jobs", {"sort": "pool", "order": "asc", "limit": 2})
+    assert [item["pool"] for item in items] == ["alpha", "beta", "zulu"]

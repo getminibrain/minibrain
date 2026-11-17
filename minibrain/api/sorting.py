@@ -7,7 +7,18 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import HTTPException
-from sqlalchemy import ColumnElement, DateTime, Float, Select, SQLColumnExpression, TypeDecorator, and_, literal, or_
+from sqlalchemy import (
+    ColumnElement,
+    DateTime,
+    Float,
+    Select,
+    SQLColumnExpression,
+    String,
+    TypeDecorator,
+    and_,
+    literal,
+    or_,
+)
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import coercions, roles
@@ -35,6 +46,27 @@ def sqlite_seconds(element: SecondsBetween, compiler: SQLCompiler, **kw: Any) ->
 def postgres_seconds(element: SecondsBetween, compiler: SQLCompiler, **kw: Any) -> str:
     start, end = (compiler.process(argument, **kw) for argument in element.clauses)
     return f"ROUND(CAST(EXTRACT(EPOCH FROM ({end} - {start})) AS NUMERIC), 3)"
+
+
+class PoolOfNode(FunctionElement[str]):
+    type = String()
+    inherit_cache = True
+
+
+@compiles(PoolOfNode)
+def sqlite_pool(element: PoolOfNode, compiler: SQLCompiler, **kw: Any) -> str:
+    node = compiler.process(next(iter(element.clauses)), **kw)
+    return f"substr({node}, 1, instr({node}, '/') - 1)"
+
+
+@compiles(PoolOfNode, "postgresql")
+def postgres_pool(element: PoolOfNode, compiler: SQLCompiler, **kw: Any) -> str:
+    node = compiler.process(next(iter(element.clauses)), **kw)
+    return f"split_part({node}, '/', 1)"
+
+
+def pool_of_node(node: SQLColumnExpression[Any]) -> PoolOfNode:
+    return PoolOfNode(node)
 
 
 def seconds_between(start: SQLColumnExpression[Any], end: SQLColumnExpression[Any]) -> SecondsBetween:

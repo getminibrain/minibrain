@@ -79,11 +79,11 @@ def pools(session: Session, jobs: Sequence[Job]) -> dict[int, str | None]:
         .group_by(JobAttempt.job_id)
     )
     rows = session.execute(
-        select(JobAttempt.job_id, Worker.pool)
-        .join(Worker, Worker.id == JobAttempt.worker)
+        select(JobAttempt.job_id, JobAttempt.node_id, Worker.pool)
+        .outerjoin(Worker, Worker.id == JobAttempt.worker)
         .where(JobAttempt.id.in_(latest))
     )
-    ran = {job_id: pool for job_id, pool in rows}
+    ran = {job_id: (node.split("/", 1)[0] if node else None) or pool for job_id, node, pool in rows}
     return {job.id: ran.get(job.id) or job.pool for job in jobs}
 
 
