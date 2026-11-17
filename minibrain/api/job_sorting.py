@@ -21,7 +21,9 @@ from minibrain.registry.models import (
     now,
 )
 
-JobSort = Literal["id", "kind", "model", "status", "pool", "started", "duration", "score", "trained_on", "gpu_hours"]
+JobSort = Literal[
+    "id", "kind", "model", "version", "status", "pool", "started", "duration", "score", "trained_on", "gpu_hours"
+]
 STATUS_RANK = {
     JobStatus.RUNNING: 0,
     JobStatus.QUEUED: 1,
@@ -50,6 +52,11 @@ def model_parts() -> tuple[SQLColumnExpression[Any], ...]:
     base = select(BaseModel.name).where(BaseModel.id == Job.base_model_id).scalar_subquery()
     name = func.coalesce(custom, Job.model_name, base, Job.model_slug, Job.base_model_key)
     return (lowered(name),)
+
+
+def version_parts() -> tuple[SQLColumnExpression[Any], ...]:
+    linked = select(Version.number).where(Version.id == Job.version_id).scalar_subquery()
+    return (func.coalesce(linked, Job.version_number, -1),)
 
 
 def status_parts() -> tuple[SQLColumnExpression[Any], ...]:
@@ -131,6 +138,7 @@ PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
     "id": tuple,
     "kind": kind_parts,
     "model": model_parts,
+    "version": version_parts,
     "status": status_parts,
     "pool": pool_parts,
     "started": started_parts,

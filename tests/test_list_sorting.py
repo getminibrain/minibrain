@@ -30,7 +30,19 @@ from minibrain.registry.models import (
 from tests.conftest import Harness, blank_dataset
 
 STATUS_RANK = {"running": 0, "queued": 1, "succeeded": 2, "failed": 3, "cancelled": 4}
-JOB_SORTS = ["id", "kind", "model", "status", "pool", "started", "duration", "score", "trained_on", "gpu_hours"]
+JOB_SORTS = [
+    "id",
+    "kind",
+    "model",
+    "version",
+    "status",
+    "pool",
+    "started",
+    "duration",
+    "score",
+    "trained_on",
+    "gpu_hours",
+]
 REQUEST_SORTS = ["at", "model", "kind", "key", "status", "latency", "tokens"]
 AUDIT_SORTS = ["at", "actor", "action"]
 
@@ -61,6 +73,7 @@ JOB_KEYS: dict[str, Callable[[dict[str, Any]], Any]] = {
     "id": lambda job: (),
     "kind": lambda job: (job["kind"], -1 if job["version"] is None else job["version"]),
     "model": lambda job: (owner(job),),
+    "version": lambda job: (-1 if job["version"] is None else job["version"],),
     "status": lambda job: (STATUS_RANK[job["status"]],),
     "pool": lambda job: ((job["pool"] or "").lower(),),
     "started": lambda job: (when(job["started_at"]) or when(job["created_at"]),),

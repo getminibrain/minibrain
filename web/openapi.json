@@ -9038,6 +9038,7 @@
                 "id",
                 "kind",
                 "model",
+                "version",
                 "status",
                 "pool",
                 "started",

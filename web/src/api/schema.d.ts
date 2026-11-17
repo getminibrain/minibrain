@@ -16707,7 +16707,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
-                sort?: "id" | "kind" | "model" | "status" | "pool" | "started" | "duration" | "score" | "trained_on" | "gpu_hours";
+                sort?: "id" | "kind" | "model" | "version" | "status" | "pool" | "started" | "duration" | "score" | "trained_on" | "gpu_hours";
                 order?: "asc" | "desc";
                 model?: string[] | null;
                 kind?: string[] | null;

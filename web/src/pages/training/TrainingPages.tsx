@@ -60,6 +60,7 @@ const KEYS = ["model", "status", "method", "q", "job", ...SORT_KEYS] as const;
 const SORTS: JobSortKey[] = [
     "id",
     "model",
+    "version",
     "status",
     "score",
     "trained_on",
@@ -79,16 +80,16 @@ const METHODS = [
 
 function VersionLine({ job }: { job: JobInfo }) {
     if (job.version === null || job.version === undefined) {
-        return <span className="text-sm text-muted-foreground">No version</span>;
+        return <span className="text-muted-foreground">–</span>;
     }
     const label = `v${job.version}`;
     if (job.deleted || job.version_deleted || !job.model) {
-        return <span className="text-sm text-muted-foreground tabular-nums">{label}</span>;
+        return <span className="text-muted-foreground tabular-nums">{label}</span>;
     }
     return (
         <Link
             href={modelVersionHref(job.model, job.version)}
-            className="w-fit text-sm text-muted-foreground tabular-nums hover:text-foreground hover:underline"
+            className="text-primary tabular-nums hover:underline"
         >
             {label}
         </Link>
@@ -100,8 +101,8 @@ function TrainedModel({ job }: { job: JobInfo }) {
     const title = <ModelName name={name} deleted={job.deleted} className="truncate font-medium" />;
     return (
         <span className="flex min-w-0 items-center gap-2">
-            <PublisherLogo name={name} modelKey={job.model ?? undefined} />
-            <span className="flex min-w-0 flex-col">
+            <PublisherLogo name={name} modelKey={job.model ?? undefined} size="sm" />
+            <span className="flex min-w-0">
                 {job.deleted || !job.model ? (
                     title
                 ) : (
@@ -112,7 +113,6 @@ function TrainedModel({ job }: { job: JobInfo }) {
                         {title}
                     </Link>
                 )}
-                <VersionLine job={job} />
             </span>
         </span>
     );
@@ -125,6 +125,12 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
         header: "Model",
         accessorFn: (job) => ownerName(job).toLowerCase(),
         cell: ({ row }) => <TrainedModel job={row.original} />,
+    },
+    {
+        id: "version",
+        header: "Version",
+        accessorFn: (job) => job.version ?? -1,
+        cell: ({ row }) => <VersionLine job={row.original} />,
     },
     STATUS_COLUMN,
     SCORE_COLUMN,
