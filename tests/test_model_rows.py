@@ -331,3 +331,13 @@ def test_base_variants_name_their_catalogue_model_format_and_whether_they_train(
     assert (full["catalog_name"], full["variant_label"], full["serve_only"]) == ("Qwen3 0.6B", "BF16", None)
     assert (gguf["catalog_name"], gguf["variant_label"]) == ("Qwen3 0.6B", "GGUF Q8_0")
     assert gguf["serve_only"]["format"] == "GGUF" and gguf["serve_only"]["switch_to"]["key"] == "qwen3-0.6b"
+
+
+def test_a_version_row_says_when_it_was_last_scored(harness: Harness) -> None:
+    create_on_data(harness)
+    assert custom_row(harness, SLUG)["versions"][0]["scored_at"] is None
+    finish(harness, "eval", accuracy=0.8)
+    scored = custom_row(harness, SLUG)["versions"][0]
+    assert scored["status"] == "ready"
+    assert scored["scored_at"] is not None
+    assert scored["scored_at"] >= scored["created_at"]

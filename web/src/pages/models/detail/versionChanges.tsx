@@ -112,7 +112,7 @@ export function ExampleList({
     );
 }
 
-type LabelChange = { label: string; mine: number; theirs: number; moved: number };
+export type LabelChange = { label: string; mine: number; theirs: number | null; moved: number };
 
 function recall(item: { support: number; correct: number }): number {
     return item.support > 0 ? item.correct / item.support : 0;
@@ -134,9 +134,26 @@ export function labelChanges(version: VersionInfo, reference: VersionInfo): Labe
         .sort(
             (left, right) =>
                 Math.abs(right.moved) - Math.abs(left.moved) ||
-                Math.abs(right.mine - right.theirs) - Math.abs(left.mine - left.theirs) ||
+                Math.abs(right.mine - (right.theirs ?? 0)) -
+                    Math.abs(left.mine - (left.theirs ?? 0)) ||
                 left.label.localeCompare(right.label),
         );
+}
+
+export function worstLabels(version: VersionInfo, reference: VersionInfo | null): LabelChange[] {
+    const theirs = new Map((reference?.held_out?.labels ?? []).map((item) => [item.label, item]));
+    return (version.held_out?.labels ?? [])
+        .filter((item) => item.support > 0)
+        .map((item) => {
+            const other = theirs.get(item.label);
+            return {
+                label: item.label,
+                mine: recall(item),
+                theirs: other && other.support > 0 ? recall(other) : null,
+                moved: item.correct - (other?.correct ?? 0),
+            };
+        })
+        .sort((left, right) => left.mine - right.mine || left.label.localeCompare(right.label));
 }
 
 function Reserved({ children }: { children: ReactNode }) {
@@ -159,13 +176,27 @@ function changeTone(delta: number, text: string): string {
     return delta > 0 ? "text-success" : "text-destructive";
 }
 
-function LabelBar({ change, mine, theirs }: { change: LabelChange; mine: string; theirs: string }) {
-    const delta = change.mine - change.theirs;
+export function LabelBar({
+    change,
+    mine,
+    theirs,
+}: {
+    change: LabelChange;
+    mine: string;
+    theirs: string | null;
+}) {
+    const against = theirs === null ? null : change.theirs;
+    const delta = change.mine - (against ?? change.mine);
     const text = pts(delta);
     return (
         <li
             className="grid h-7 grid-cols-[minmax(0,9rem)_minmax(0,1fr)_5.5rem] items-center gap-3"
-            title={`${change.label}: ${mine} ${percent(change.mine)}, ${theirs} ${percent(change.theirs)}`}
+            title={[
+                `${change.label}: ${mine} ${percent(change.mine)}`,
+                against === null ? null : `${theirs} ${percent(against)}`,
+            ]
+                .filter(Boolean)
+                .join(", ")}
         >
             <span className="truncate font-mono text-sm">{change.label}</span>
             <span className="relative h-2 rounded-sm bg-secondary" aria-hidden="true">
@@ -173,15 +204,22 @@ function LabelBar({ change, mine, theirs }: { change: LabelChange; mine: string;
                     className="absolute inset-y-0 left-0 rounded-sm bg-primary"
                     style={{ width: `${change.mine * 100}%` }}
                 />
-                <span
-                    className="absolute -inset-y-1 w-0.5 -translate-x-1/2 bg-foreground"
-                    style={{ left: `${change.theirs * 100}%` }}
-                />
+                {against !== null && (
+                    <span
+                        className="absolute -inset-y-1 w-0.5 -translate-x-1/2 bg-foreground"
+                        style={{ left: `${against * 100}%` }}
+                    />
+                )}
             </span>
             <span className="text-right text-sm whitespace-nowrap tabular-nums">
-                {percent(change.mine)}{" "}
-                <span className={changeTone(delta, text)}>{text.replace(" pts", "")}</span>
-                <span className="sr-only">{` points vs ${theirs}`}</span>
+                {percent(change.mine)}
+                {against !== null && (
+                    <>
+                        {" "}
+                        <span className={changeTone(delta, text)}>{text.replace(" pts", "")}</span>
+                        <span className="sr-only">{` points vs ${theirs}`}</span>
+                    </>
+                )}
             </span>
         </li>
     );

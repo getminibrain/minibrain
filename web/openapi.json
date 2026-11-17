@@ -33249,6 +33249,19 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "scored_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored At",
+            "description": "When its latest scoring finished."
+          },
           "health": {
             "anyOf": [
               {

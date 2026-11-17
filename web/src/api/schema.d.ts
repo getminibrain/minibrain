@@ -10505,6 +10505,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Scored At
+             * @description When its latest scoring finished.
+             */
+            scored_at?: string | null;
             health?: components["schemas"]["Health"] | null;
             /** Latency P50 Ms */
             latency_p50_ms?: number | null;

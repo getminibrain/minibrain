@@ -1513,6 +1513,7 @@ class VersionRow(BaseModel):
     error: str | None
     usage: Usage | None
     created_at: datetime
+    scored_at: datetime | None = Field(default=None, description="When its latest scoring finished.")
     health: Health | None = None
     latency_p50_ms: float | None = None
     latency_p95_ms: float | None = None

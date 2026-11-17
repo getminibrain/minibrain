@@ -16,11 +16,13 @@ import { ErrorLine, PanelSection } from "~/components/Section";
 import { count, percent } from "~/lib/format";
 import { isDeployed } from "../header";
 import { liveOf, versionLabel } from "../makeLive";
-import { inputOf, useAnswers, verdictOf } from "../versionChanges";
+import { LabelBar, inputOf, useAnswers, verdictOf, worstLabels } from "../versionChanges";
 import { AnswerSheet, type Change, type FailureRow, rightOf } from "./answerSheet";
 import { scoredVersions } from "./scores";
 
-type Mode = "wrong" | "changed";
+type Mode = "wrong" | "changed" | "labels";
+
+const HEIGHT = "h-112";
 
 function changeOf(answer: ExampleAnswer, metric: string | null | undefined): Change | null {
     const verdict = verdictOf(answer, metric);
@@ -176,11 +178,59 @@ function VersionPicker({
     );
 }
 
-function emptyText(mode: Mode, picked: number, against: number | null): string {
+function emptyText(mode: Mode, picked: number, against: number | null, rowsKnown: boolean): string {
+    if (!rowsKnown) {
+        return `Per-row results aren't available for v${picked}.`;
+    }
     if (mode === "changed") {
         return `v${picked} answers every held-out row the way deployed v${against} does.`;
     }
     return `v${picked} gets every held-out row right.`;
+}
+
+function ByLabel({ version, reference }: { version: VersionInfo; reference: VersionInfo | null }) {
+    const labels = worstLabels(version, reference);
+    if (labels.length === 0) {
+        return (
+            <div
+                className={cn(
+                    HEIGHT,
+                    "flex items-center justify-center rounded-md border px-3 text-muted-foreground",
+                )}
+            >
+                {`Per-label results aren't available for v${version.number}.`}
+            </div>
+        );
+    }
+    return (
+        <ul
+            className={cn(
+                HEIGHT,
+                "flex flex-col gap-1 overflow-auto rounded-md border px-3 py-2.5",
+            )}
+            aria-label={`Recall by label for v${version.number}, worst first`}
+        >
+            {labels.map((change) => (
+                <LabelBar
+                    key={change.label}
+                    change={change}
+                    mine={`v${version.number}`}
+                    theirs={reference ? `deployed v${reference.number}` : null}
+                />
+            ))}
+        </ul>
+    );
+}
+
+function tipFor(mode: Mode, picked: VersionInfo | undefined, shown: number, total: number) {
+    if (!picked) {
+        return "Held-out rows the latest scored version gets wrong.";
+    }
+    if (mode === "labels") {
+        return `Recall per label for v${picked.number} on held-out rows, worst first.`;
+    }
+    const counted = total > 0 ? `: ${count(shown)} of ${count(total)}` : "";
+    return `Held-out rows v${picked.number} does not get fully right${counted}. Open a row for the whole conversation and the grader's reason.`;
 }
 
 export function FailuresPanel({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
@@ -195,37 +245,34 @@ export function FailuresPanel({ row, versions }: { row: ModelRow; versions: Vers
         deployed !== undefined &&
         deployed.score !== null &&
         deployed.number !== picked.number;
-    const mode: Mode = comparable ? wanted : "wrong";
+    const mode: Mode = comparable || wanted !== "changed" ? wanted : "wrong";
     const against = mode === "changed" && deployed ? deployed.number : null;
     const answers = useAnswers(row.key, picked?.number ?? 0, against, picked !== undefined);
     const metric = answers.data?.metric;
     const all = answers.data?.examples ?? [];
     const rows = failuresOf(all, metric, mode);
+    const rowsKnown = answers.isSuccess && all.length > 0;
+    const tabs = [
+        { key: "wrong", label: "Wrong" },
+        ...(comparable ? [{ key: "changed", label: `Changed vs v${deployed.number}` }] : []),
+        { key: "labels", label: "By label" },
+    ];
     return (
         <PanelSection
             icon={IconZoomCancel}
             anchor="failures"
             title="Where it fails"
-            tip={
-                picked
-                    ? `Held-out rows v${picked.number} does not get fully right${all.length > 0 ? `: ${count(rows.length)} of ${count(all.length)}` : ""}. Open a row for the whole conversation and the grader's reason.`
-                    : "Held-out rows the latest scored version gets wrong."
-            }
+            tip={tipFor(mode, picked, rows.length, all.length)}
             actions={
                 picked && (
                     <div className="flex flex-wrap items-center gap-2">
-                        {comparable && (
-                            <SegmentedTabs
-                                tabs={[
-                                    { key: "wrong", label: "Wrong" },
-                                    { key: "changed", label: `Changed vs v${deployed.number}` },
-                                ]}
-                                active={mode}
-                                onSelect={(next) =>
-                                    setWanted(next === "changed" ? "changed" : "wrong")
-                                }
-                            />
-                        )}
+                        <SegmentedTabs
+                            tabs={tabs}
+                            active={mode}
+                            onSelect={(next) =>
+                                setWanted(next === "changed" || next === "labels" ? next : "wrong")
+                            }
+                        />
                         <VersionPicker
                             versions={scored}
                             value={picked.number}
@@ -238,19 +285,29 @@ export function FailuresPanel({ row, versions }: { row: ModelRow; versions: Vers
             bare
         >
             <div className="flex flex-col gap-2">
-                <DataGrid
-                    columns={columnsFor(metric, mode, picked?.number ?? 0, against)}
-                    rows={rows}
-                    loading={answers.isLoading}
-                    getRowId={(item) => item.id}
-                    onOpen={setOpen}
-                    rowLabel={(item) => `Held-out row ${inputOf(item.answer)}`}
-                    maxHeight="28rem"
-                    empty={
-                        picked ? emptyText(mode, picked.number, against) : "No version scored yet."
-                    }
-                />
-                <ErrorLine error={answers.error} onRetry={answers.refetch} />
+                {mode === "labels" && picked ? (
+                    <ByLabel
+                        version={picked}
+                        reference={comparable && deployed ? deployed : null}
+                    />
+                ) : (
+                    <DataGrid
+                        className={HEIGHT}
+                        columns={columnsFor(metric, mode, picked?.number ?? 0, against)}
+                        rows={rows}
+                        loading={answers.isLoading}
+                        getRowId={(item) => item.id}
+                        onOpen={setOpen}
+                        rowLabel={(item) => `Held-out row ${inputOf(item.answer)}`}
+                        maxHeight="28rem"
+                        empty={
+                            picked
+                                ? emptyText(mode, picked.number, against, rowsKnown)
+                                : "No version scored yet."
+                        }
+                    />
+                )}
+                {mode !== "labels" && <ErrorLine error={answers.error} onRetry={answers.refetch} />}
             </div>
             <AnswerSheet
                 row={open}

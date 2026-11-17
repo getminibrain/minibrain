@@ -44,8 +44,8 @@ function ruleText(version: VersionInfo): { text: string; tone: string } | null {
         return null;
     }
     return version.promotion.passed
-        ? { text: "meets the deploy rule", tone: "text-success" }
-        : { text: "misses the deploy rule", tone: "text-destructive" };
+        ? { text: "meets your deploy rule", tone: "text-success" }
+        : { text: "doesn't meet your deploy rule", tone: "text-destructive" };
 }
 
 function Headline({
@@ -123,7 +123,7 @@ export function ScoresPanel({
             icon={IconChartLine}
             anchor="scores"
             title="Scores"
-            tip={`${metricName(metric)} of each ready version on the held-out rows it never trained on.`}
+            tip={`${metricName(metric)} of each ready version on the held-out rows it never trained on. A hollow dot doesn't meet your deploy rule.`}
         >
             <div className="flex flex-col gap-3">
                 <Headline
@@ -139,6 +139,7 @@ export function ScoresPanel({
                             label: metricName(metric),
                             color: SERIES_COLORS[0],
                             dots: true,
+                            hollow: (value) => byNumber.get(value)?.promotion?.passed === false,
                         },
                     ]}
                     format={readPercent}

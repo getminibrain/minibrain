@@ -232,6 +232,18 @@ def usage_index(session: Session) -> UsageIndex:
     )
 
 
+SCORING_KINDS = (JobKind.EVAL, JobKind.JUDGE)
+
+
+def scored_at(version: Version, jobs: list[Job]) -> datetime | None:
+    finished = [
+        job.finished_at
+        for job in jobs
+        if job.version_id == version.id and job.kind in SCORING_KINDS and job.status == JobStatus.SUCCEEDED
+    ]
+    return max((moment for moment in finished if moment is not None), default=None)
+
+
 def version_rows(
     model: Model,
     jobs: list[Job],
@@ -260,6 +272,7 @@ def version_rows(
                 error=job.error if job is not None and version.status == VersionStatus.FAILED else None,
                 usage=version_usage.get((model.id, version.number)),
                 created_at=version.created_at,
+                scored_at=scored_at(version, jobs),
                 health=version_health(model, version, (hashes or {}).get(version.base_model)),
                 base_model=version.base_model,
                 base_refusal=refusal_of(model, version),

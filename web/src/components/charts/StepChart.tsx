@@ -14,6 +14,7 @@ export type StepSeries = {
     label: string;
     color: string;
     dots?: boolean;
+    hollow?: (step: number) => boolean;
     width?: number;
 };
 export type StepRow = { step: number; [series: string]: number | null };
@@ -26,6 +27,36 @@ const SURFACE = "var(--card)";
 const STEPS = new Intl.NumberFormat();
 
 type ReadoutEntry = { dataKey?: unknown; value?: unknown };
+
+type DotProps = { cx?: number; cy?: number; index?: number; payload?: StepRow };
+
+function seriesDot(item: StepSeries) {
+    if (!item.dots) {
+        return false;
+    }
+    const hollow = item.hollow;
+    if (!hollow) {
+        return { r: 3, strokeWidth: 2, stroke: SURFACE, fill: item.color };
+    }
+    return ({ cx, cy, index, payload }: DotProps) => {
+        const key = `${item.key}-${index}`;
+        if (cx === undefined || cy === undefined || payload?.[item.key] == null) {
+            return <g key={key} />;
+        }
+        const open = hollow(payload.step);
+        return (
+            <circle
+                key={key}
+                cx={cx}
+                cy={cy}
+                r={open ? 3.5 : 4}
+                strokeWidth={2}
+                stroke={open ? item.color : SURFACE}
+                fill={open ? SURFACE : item.color}
+            />
+        );
+    };
+}
 
 function Readout({
     active,
@@ -214,11 +245,7 @@ export function StepChart({
                             strokeWidth={item.width ?? 2}
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            dot={
-                                item.dots
-                                    ? { r: 3, strokeWidth: 2, stroke: SURFACE, fill: item.color }
-                                    : false
-                            }
+                            dot={seriesDot(item)}
                             activeDot={{ r: 4, stroke: SURFACE, strokeWidth: 2 }}
                             connectNulls={connectNulls}
                             isAnimationActive={false}

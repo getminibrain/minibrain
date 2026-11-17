@@ -1,5 +1,6 @@
+import { IconChevronRight } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
     Button,
     CheckboxSelect,
@@ -12,12 +13,14 @@ import {
     DialogTitle,
     InfoTip,
     Link,
+    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
-import { useMemo } from "react";
-import { type ModelRow, type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
+import { useMemo, useState } from "react";
+import { type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useAllModels, useVersions } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { modelOption } from "~/components/PublisherLogo";
@@ -43,30 +46,32 @@ import { metricName, metricOf } from "~/lib/metrics";
 import { modelCardHref, modelPageHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { DataVersus } from "./data/versionData";
+import {
+    type Group,
+    type Line,
+    byPriority,
+    change,
+    commonMetric,
+    groupsOf,
+    lineKey,
+    linesOf,
+    mixedMetrics,
+    moved,
+    scoredTime,
+} from "./evaluations/lines";
 import { Updated } from "./models/MyModels";
 
 const PATH = "/evaluations";
-const KEYS = ["model", "status", "version"] as const;
+const KEYS = ["model", "status", "version", "all"] as const;
+const HIDDEN = ["kind", "created", "p50", "p95", "cost"];
 
 const KIND_NAMES: Record<string, string> = { lora: "Trained", prompt: "Prompt-only" };
 
-type Line = { model: ModelRow; version: ModelVersionRow; live: ModelVersionRow | undefined };
-
 type Target = { slug: string; number: number };
 
-function linesOf(rows: ModelRow[]): Line[] {
-    return rows
-        .filter((row) => row.kind === "custom")
-        .flatMap((model) => {
-            const versions = model.versions ?? [];
-            const live = versions.find((version) => version.live);
-            return versions.map((version) => ({ model, version, live }));
-        });
-}
+type GridRow = { id: string; line: Line; group: Group | null; child: boolean };
 
-function lineKey(line: Line): string {
-    return `${line.model.key}@${line.version.number}`;
-}
+type Value = string | number;
 
 function readTarget(value: string | undefined): Target | null {
     const at = value?.lastIndexOf("@") ?? -1;
@@ -76,24 +81,17 @@ function readTarget(value: string | undefined): Target | null {
         : null;
 }
 
-function change(line: Line): number | null {
-    const { version, live } = line;
-    if (!live || live === version || version.score === null || live.score === null) {
-        return null;
-    }
-    return version.metric === live.metric ? version.score - live.score : null;
-}
-
 function Change({ line }: { line: Line }) {
     const delta = change(line);
-    if (delta === null) {
+    const direction = moved(line);
+    if (delta === null || direction === null) {
         return <span className="text-muted-foreground">–</span>;
     }
     const points = pointsSize(delta);
-    if (points === "0.0") {
+    if (direction === "same") {
         return <span className="tabular-nums text-muted-foreground">Same</span>;
     }
-    return delta > 0 ? (
+    return direction === "better" ? (
         <span className="tabular-nums text-success">{`+${points} pts`}</span>
     ) : (
         <span className="tabular-nums text-destructive">{`−${points} pts`}</span>
@@ -121,101 +119,225 @@ function lineHeadline(line: Line): string | null {
     return base ? headline(base, line.version) : null;
 }
 
-function versionColumns(href: (line: Line) => string): ColumnDef<Line, unknown>[] {
+function Score({ version, metric }: { version: ModelVersionRow; metric: string | null }) {
+    const other = version.score !== null && version.metric !== metric;
+    return (
+        <span className="tabular-nums">
+            {percent(version.score)}
+            {other && (
+                <span className="text-muted-foreground">{` ${metricName(version.metric).toLowerCase()}`}</span>
+            )}
+        </span>
+    );
+}
+
+function LiveCell({ row, metric }: { row: GridRow; metric: string | null }) {
+    if (row.child) {
+        return null;
+    }
+    const live = row.line.live;
+    if (!live) {
+        return <span className="text-muted-foreground">–</span>;
+    }
+    return (
+        <span className="flex items-baseline gap-2 whitespace-nowrap tabular-nums">
+            <span className="text-muted-foreground">{`v${live.number}`}</span>
+            <Score version={live} metric={metric} />
+        </span>
+    );
+}
+
+function ModelCell({ row, open, href }: { row: GridRow; open: boolean; href: string }) {
+    if (row.child) {
+        return null;
+    }
+    if (!row.group) {
+        return (
+            <Link href={href} className="block max-w-48 truncate font-semibold text-foreground">
+                {row.line.model.name}
+            </Link>
+        );
+    }
+    return (
+        <span className="flex min-w-0 items-center gap-1.5">
+            <IconChevronRight
+                aria-hidden="true"
+                className={cn(
+                    "size-4 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+                    open && "rotate-90",
+                )}
+            />
+            <span className="max-w-44 truncate font-semibold text-foreground">
+                {row.line.model.name}
+            </span>
+        </span>
+    );
+}
+
+function scoreHeader(metric: string | null, mixed: boolean) {
+    const info = mixed
+        ? `Each version's main metric on held-out rows it never trained on. Versions scored by another metric name it next to the score.`
+        : "Each version's main metric on held-out rows it never trained on.";
+    return { header: metric ? metricName(metric) : "Held-out score", info };
+}
+
+const SORTS: Record<string, (row: GridRow) => Value> = {
+    model: (row) => row.line.model.name.toLowerCase(),
+    live: (row) => row.line.live?.score ?? -1,
+    version: (row) => row.line.version.number,
+    kind: (row) => KIND_NAMES[row.line.version.kind] ?? row.line.version.kind,
+    score: (row) => row.line.version.score ?? -1,
+    rule: (row) => (row.line.version.promotion ? Number(row.line.version.promotion.passed) : -1),
+    change: (row) => change(row.line) ?? Number.NEGATIVE_INFINITY,
+    p50: (row) => row.line.version.latency_p50_ms ?? Number.POSITIVE_INFINITY,
+    p95: (row) => row.line.version.latency_p95_ms ?? Number.POSITIVE_INFINITY,
+    cost: (row) => costSortValue(row.line.version.cost),
+    scored: (row) => scoredTime(row.line.version),
+    created: (row) => row.line.version.created_at,
+    status: (row) => versionState(row.line.version),
+};
+
+function compareValues(left: Value, right: Value): number {
+    if (typeof left === "number" && typeof right === "number") {
+        return Math.sign(left - right) || 0;
+    }
+    return String(left).localeCompare(String(right));
+}
+
+function sortGroups(groups: Group[], sorting: SortingState): Group[] {
+    const rule = sorting[0];
+    const value = rule ? SORTS[rule.id] : undefined;
+    if (!rule || !value) {
+        return groups;
+    }
+    const of = (group: Group) => value({ id: "", line: group.summary, group, child: false });
+    const sign = rule.desc ? -1 : 1;
+    return [...groups].sort(
+        (left, right) => sign * compareValues(of(left), of(right)) || byPriority(left, right),
+    );
+}
+
+function gridColumns({
+    grouped,
+    metric,
+    mixed,
+    expanded,
+    href,
+}: {
+    grouped: boolean;
+    metric: string | null;
+    mixed: boolean;
+    expanded: Set<string>;
+    href: (line: Line) => string;
+}): ColumnDef<GridRow, unknown>[] {
+    const score = scoreHeader(metric, mixed);
+    const sorted = (id: string) => ({ id, accessorFn: SORTS[id] });
     return [
         {
-            id: "model",
+            ...sorted("model"),
             header: "Model",
             enableHiding: false,
-            accessorFn: (line) => line.model.name.toLowerCase(),
+            cell: ({ row }) => (
+                <ModelCell
+                    row={row.original}
+                    open={expanded.has(row.original.line.model.key)}
+                    href={href(row.original.line)}
+                />
+            ),
+        },
+        ...(grouped
+            ? [
+                  {
+                      ...sorted("live"),
+                      header: "Live",
+                      meta: { info: "The version serving requests now, and its score." },
+                      cell: ({ row }: { row: { original: GridRow } }) => (
+                          <LiveCell row={row.original} metric={metric} />
+                      ),
+                  } satisfies ColumnDef<GridRow, unknown>,
+              ]
+            : []),
+        {
+            ...sorted("version"),
+            header: "Version",
+            meta: grouped ? { info: "A model's row shows its latest scored version." } : undefined,
             cell: ({ row }) => (
                 <Link
-                    href={href(row.original)}
-                    className="block max-w-48 truncate font-semibold text-foreground"
-                >
-                    {row.original.model.name}
-                </Link>
-            ),
-        },
-        {
-            id: "version",
-            header: "Version",
-            accessorFn: (line) => line.version.number,
-            cell: ({ row }) => (
-                <span className="tabular-nums">{`v${row.original.version.number}`}</span>
-            ),
-        },
-        {
-            id: "kind",
-            header: "Kind",
-            accessorFn: (line) => KIND_NAMES[line.version.kind] ?? line.version.kind,
-        },
-        {
-            id: "score",
-            header: "Held-out score",
-            accessorFn: (line) => line.version.score ?? -1,
-            cell: ({ row }) => (
-                <span className="tabular-nums">
-                    {percent(row.original.version.score)}
-                    {row.original.version.score !== null && (
-                        <span className="text-muted-foreground">{` ${metricName(row.original.version.metric).toLowerCase()}`}</span>
+                    href={href(row.original.line)}
+                    className={cn(
+                        "tabular-nums text-foreground hover:underline",
+                        row.original.child && "pl-2",
                     )}
-                </span>
+                >{`v${row.original.line.version.number}`}</Link>
             ),
         },
         {
-            id: "rule",
-            header: "Deploy rule",
-            accessorFn: (line) =>
-                line.version.promotion ? Number(line.version.promotion.passed) : -1,
-            cell: ({ row }) => <RuleCell version={row.original.version} />,
+            ...sorted("kind"),
+            header: "Kind",
         },
         {
-            id: "change",
+            ...sorted("score"),
+            header: score.header,
+            meta: { info: score.info },
+            cell: ({ row }) => <Score version={row.original.line.version} metric={metric} />,
+        },
+        {
+            ...sorted("change"),
             header: "vs live",
-            accessorFn: (line) => change(line) ?? Number.NEGATIVE_INFINITY,
-            cell: ({ row }) => <Change line={row.original} />,
+            cell: ({ row }) => <Change line={row.original.line} />,
         },
         {
-            id: "p50",
+            ...sorted("rule"),
+            header: "Deploy rule",
+            cell: ({ row }) => <RuleCell version={row.original.line.version} />,
+        },
+        {
+            ...sorted("p50"),
             header: "p50",
-            accessorFn: (line) => line.version.latency_p50_ms ?? Number.POSITIVE_INFINITY,
             cell: ({ row }) => (
                 <span className="tabular-nums">
-                    {milliseconds(row.original.version.latency_p50_ms)}
+                    {milliseconds(row.original.line.version.latency_p50_ms)}
                 </span>
             ),
         },
         {
-            id: "p95",
+            ...sorted("p95"),
             header: "p95",
-            accessorFn: (line) => line.version.latency_p95_ms ?? Number.POSITIVE_INFINITY,
             cell: ({ row }) => (
                 <span className="tabular-nums">
-                    {milliseconds(row.original.version.latency_p95_ms)}
+                    {milliseconds(row.original.line.version.latency_p95_ms)}
                 </span>
             ),
         },
         {
-            id: "cost",
+            ...sorted("cost"),
             header: "Cost / 1M tokens",
             meta: { info: COST_INFO },
-            accessorFn: (line) => costSortValue(line.version.cost),
             cell: ({ row }) => (
-                <span className="tabular-nums">{costText(row.original.version.cost)}</span>
+                <span className="tabular-nums">{costText(row.original.line.version.cost)}</span>
             ),
         },
         {
-            id: "created",
-            header: "Created",
-            accessorFn: (line) => line.version.created_at,
-            cell: ({ row }) => <Updated value={row.original.version.created_at} />,
+            ...sorted("scored"),
+            header: "Scored",
+            cell: ({ row }) => {
+                const at = row.original.line.version.scored_at;
+                return at ? (
+                    <Updated value={at} />
+                ) : (
+                    <span className="text-muted-foreground">–</span>
+                );
+            },
         },
         {
-            id: "status",
+            ...sorted("created"),
+            header: "Created",
+            cell: ({ row }) => <Updated value={row.original.line.version.created_at} />,
+        },
+        {
+            ...sorted("status"),
             header: "Status",
-            accessorFn: (line) => versionState(line.version),
-            cell: ({ row }) => <VersionState version={row.original.version} />,
+            cell: ({ row }) => <VersionState version={row.original.line.version} />,
         },
     ];
 }
@@ -454,11 +576,67 @@ function VersionDialog({
     );
 }
 
+function rowLabelOf(row: GridRow, open: boolean): string {
+    const { model, version, live } = row.line;
+    const state = versionStateLabel(versionState(version));
+    if (!row.group) {
+        return `${model.name} v${version.number}, ${percent(version.score)} held-out, ${state}`;
+    }
+    const serving = live ? `live v${live.number} ${percent(live.score)}` : "nothing live";
+    return `${model.name}, ${serving}, latest v${version.number} ${percent(version.score)}, ${open ? "expanded" : "collapsed"}`;
+}
+
+function gridRows(groups: Group[], expanded: Set<string>): GridRow[] {
+    return groups.flatMap((group) => [
+        { id: group.model.key, line: group.summary, group, child: false },
+        ...(expanded.has(group.model.key)
+            ? group.lines.map((line) => ({ id: lineKey(line), line, group: null, child: true }))
+            : []),
+    ]);
+}
+
+function Empty({
+    filtering,
+    grouped,
+    onClear,
+}: {
+    filtering: boolean;
+    grouped: boolean;
+    onClear: () => void;
+}) {
+    if (filtering) {
+        return (
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="text-muted-foreground">
+                    {grouped
+                        ? "No models match these filters."
+                        : "No versions match these filters."}
+                </p>
+                <Button variant="outline" onClick={onClear}>
+                    Clear filters
+                </Button>
+            </div>
+        );
+    }
+    return (
+        <p className="text-muted-foreground">
+            No versions yet. Score or train one from{" "}
+            <Link href="/training" className="text-primary hover:underline">
+                Training
+            </Link>
+            .
+        </p>
+    );
+}
+
 export function EvaluationsPage() {
     const { search, update } = useListSearch(PATH, KEYS);
     const models = useAllModels();
     const promote = usePromote();
     const can = useCan();
+    const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+    const [sorting, setSorting] = useState<SortingState>([]);
+    const grouped = search.all !== "1";
     const all = useMemo(() => linesOf(models.data ?? []), [models.data]);
     const chosenModels = splitList(search.model);
     const statuses = splitList(search.status);
@@ -474,10 +652,30 @@ export function EvaluationsPage() {
               (line) => line.model.key === target.slug && line.version.number === target.number,
           )
         : undefined;
+    const metric = commonMetric(visible);
+    const mixed = mixedMetrics(visible);
     const columns = useMemo(
-        () => versionColumns((line) => listHref(PATH, { ...search, version: lineKey(line) })),
-        [search],
+        () =>
+            gridColumns({
+                grouped,
+                metric,
+                mixed,
+                expanded,
+                href: (line) => listHref(PATH, { ...search, version: lineKey(line) }),
+            }),
+        [grouped, metric, mixed, expanded, search],
     );
+    const rows: GridRow[] = grouped
+        ? gridRows(sortGroups(groupsOf(visible), sorting), expanded)
+        : visible.map((line) => ({ id: lineKey(line), line, group: null, child: false }));
+    const toggle = (key: string) =>
+        setExpanded((current) => {
+            const next = new Set(current);
+            if (!next.delete(key)) {
+                next.add(key);
+            }
+            return next;
+        });
     const modelOptions = (models.data ?? [])
         .filter((row) => row.kind === "custom")
         .map((row) =>
@@ -498,7 +696,7 @@ export function EvaluationsPage() {
         <Page wide>
             <PageHeader
                 title="Evaluations"
-                caption="Every version of every model, scored by its graders on its test set and held-out rows. A version goes live only when it meets its model's deploy rule."
+                caption="Every model's live and latest scored version, scored by its graders on held-out rows. A version goes live only when it meets its model's deploy rule."
             />
             <div className="flex flex-wrap items-center gap-2">
                 <CheckboxSelect
@@ -522,55 +720,48 @@ export function EvaluationsPage() {
                         Clear filters
                     </Button>
                 )}
+                <label htmlFor="all-versions" className="ml-auto flex items-center gap-2">
+                    <Switch
+                        id="all-versions"
+                        checked={!grouped}
+                        onCheckedChange={(checked) => update({ all: checked ? "1" : "" })}
+                    />
+                    Show all versions
+                </label>
             </div>
             <ErrorLine error={models.error ?? promote.error} />
             <DataGrid
+                key={grouped ? "models" : "versions"}
                 columns={columns}
-                rows={visible}
+                rows={rows}
                 loading={models.isLoading}
-                getRowId={lineKey}
-                initialSort={[{ id: "created", desc: true }]}
+                getRowId={(row) => row.id}
+                initialSort={grouped ? [] : [{ id: "scored", desc: true }]}
+                sorting={grouped ? sorting : undefined}
+                onSortingChange={grouped ? setSorting : undefined}
                 storageKey="minibrain.evaluations.columns"
+                hiddenColumns={HIDDEN}
                 columnPicker
-                onOpen={(line) => update({ version: lineKey(line) })}
-                rowLabel={(line) =>
-                    `${line.model.name} v${line.version.number}, ${percent(line.version.score)} held-out, ${versionStateLabel(versionState(line.version))}`
+                onOpen={(row) =>
+                    row.group ? toggle(row.line.model.key) : update({ version: lineKey(row.line) })
                 }
-                rowActions={(line) =>
+                rowLabel={(row) => rowLabelOf(row, expanded.has(row.line.model.key))}
+                rowActions={(row) =>
                     can.build ? (
                         <DeployButton
-                            version={line.version}
+                            version={row.line.version}
+                            size={row.child ? "xs" : undefined}
                             pending={promote.isPending}
                             onDeploy={() =>
                                 promote.mutate({
-                                    slug: line.model.key,
-                                    number: line.version.number,
+                                    slug: row.line.model.key,
+                                    number: row.line.version.number,
                                 })
                             }
                         />
                     ) : null
                 }
-                empty={
-                    filtering ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-muted-foreground">
-                                No versions match these filters.
-                            </p>
-                            <Button variant="outline" onClick={clear}>
-                                Clear filters
-                            </Button>
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground">
-                            No versions yet. Score or train one from{" "}
-                            <Link href="/training" className="text-primary hover:underline">
-                                Training
-                            </Link>
-                            .
-                        </p>
-                    )
-                }
-                minWidth="min-w-[1000px]"
+                empty={<Empty filtering={filtering} grouped={grouped} onClear={clear} />}
             />
             <VersionDialog
                 target={target}

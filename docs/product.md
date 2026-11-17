@@ -337,6 +337,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Scores** · shipped · product, ml
   Score every version on the test set and held-out split.
   UI: Evaluations · API: GET /api/models/{name}/golden
+- **Evaluations by model** · shipped · product, ml
+  One row per model: live vs latest score, ready ones first.
+  UI: Evaluations · API: GET /api/models
 - **Mistakes and side by side** · shipped · product, ml
   Read held-out mistakes and compare answers with the base.
   UI: Evaluations › version
@@ -371,7 +374,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Gate a version on thresholds over its grader scores, in CI.
   UI: Models › model › Evaluation › How it's scored, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
 - **Evaluation tab** · shipped · product, ml
-  Score by version against the rule, failing rows, test set and scoring.
+  Scores against the rule, failing rows, recall by label, tests, scoring.
   UI: Models › model › Evaluation · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers
 - **Score diff** · shipped · product, ml
   Compare two versions' scores, settings and held-out answers.
