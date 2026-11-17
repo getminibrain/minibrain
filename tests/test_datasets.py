@@ -41,6 +41,26 @@ def test_a_sql_dataset_joins_several_sources_by_table_name(harness: Harness) -> 
     assert blocked.status_code == 409 and "Routing" in blocked.json()["detail"]
 
 
+def test_the_source_alias_is_refused_alike_by_run_and_save_once_a_query_reads_several_sources(
+    harness: Harness,
+) -> None:
+    tickets = upload(harness, "tickets.csv", tickets_csv())
+    upload(harness, "teams.csv", LABELS_CSV)
+    harness.client.post(
+        "/api/datasets",
+        json={"name": "Tickets", "source_id": tickets["id"], "input_column": "text", "label_column": "category"},
+    )
+    sql = "SELECT s.text AS input, teams.team AS label FROM source s JOIN teams ON teams.label = s.category"
+    ran = harness.client.post("/api/datasets/tickets/query", json={"sql": sql})
+    saved = harness.client.put("/api/datasets/tickets/mapping", json={"sql": sql})
+    for response in (ran, saved):
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"].endswith("use their table names: teams, tickets")
+    alone = "SELECT text AS input, category AS label FROM source"
+    assert harness.client.post("/api/datasets/tickets/query", json={"sql": alone}).status_code == 200
+    assert harness.client.put("/api/datasets/tickets/mapping", json={"sql": alone}).status_code == 200
+
+
 def test_column_mode_generates_the_select_over_the_picked_source(harness: Harness) -> None:
     tickets = upload(harness, "tickets.csv", tickets_csv())
     other = upload(harness, "other tickets.csv", tickets_csv(40))

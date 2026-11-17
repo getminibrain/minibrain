@@ -546,7 +546,14 @@ def sources_in(session: Session, sql: str, fallback: Sequence[Source] = ()) -> l
         found.append(fallback[0])
     if not found:
         raise SourceError("the query reads no source: use one of the table names listed beside the editor")
-    return sorted(found, key=lambda source: source.table_name)
+    found.sort(key=lambda source: source.table_name)
+    if SOURCE_TABLE in names and len(found) > 1:
+        tables = ", ".join(source.table_name for source in found)
+        raise SourceError(
+            f"{SOURCE_TABLE} stands for the only source of a one-source query; with several sources, "
+            f"use their table names: {tables}"
+        )
+    return found
 
 
 def dataset_of(model: Model) -> Dataset:
