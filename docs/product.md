@@ -90,13 +90,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Quality score
 - **Teacher labelling** · planned · product, ml
   Label unlabelled rows with a local teacher, then review a sample.
-  Roadmap: Labelling
+  Roadmap: v2
 - **Generated Q&A** · planned · product, ml
   Turn documents into checked question and answer pairs.
-  Roadmap: Labelling
+  Roadmap: v2
 - **Distillation data** · planned · ml
   Use a teacher's logged answers as training examples.
-  Roadmap: Task types
+  Roadmap: v2
 - **Zero-copy lakehouse versions** · planned · ml
   Pin Iceberg and Delta snapshot ids instead of copying rows.
   Roadmap: Dataset versions
@@ -445,13 +445,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   CLI: minibrain gateway · Config: MINIBRAIN_GATEWAY_TOKEN
 - **Teacher pool** · planned · ml, admin
   Keep a larger local teacher loaded; API teachers only by opt-in.
-  Roadmap: Serving
+  Roadmap: v2
 - **Private frontier endpoint** · planned · engineer, admin
   Offer the large teacher model privately, with scoped keys.
-  Roadmap: API and access
+  Roadmap: v2
 - **Upstream routes** · planned · engineer
   Forward calls to a teacher and log them for distillation.
-  Roadmap: API and access
+  Roadmap: v2
 - **Retrieval index** · planned · product, engineer
   Answer from a synced per-model index, with citations and access filters.
   Roadmap: Retrieval

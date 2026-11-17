@@ -1733,8 +1733,8 @@ Two modes, same code, same adapter format (PEFT safetensors).
 
 - One task type: Extract or Classify
 - Sources: Postgres, files
-- Golden set, prompt-only version 0 on a local teacher, teacher labelling with review queue
-- Training; eval vs base and teacher with cost and latency; promote
+- Golden set, prompt-only version 0 on the base, data that already has answers
+- Training; eval vs base with cost and latency; promote
 - `transformers` and `sglang` backends
 - Gateway: chat completions, `response_format`, scoped API keys
 - Air-gapped install bundle
@@ -1768,16 +1768,12 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 ## v1 scope
 
 - [x] models: create, list, select, delete
-- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Distill, Answer (the engine, General, Classify and Custom done;
+- [ ] Task types: Classify, Extract, Rewrite, Text-to-SQL, Answer (the engine, General, Classify and Custom done;
       the rest come as presets)
 - [ ] Index per model: chunks, local embeddings, hybrid search, incremental sync, per-user access filter,
       citations
 - [ ] Golden set authoring; eval-first flow
-- [ ] Prompt-only version 0 on the teacher pool (version 0 on the base at creation done; the teacher pool not yet)
-- [ ] Teacher pool, permanent or temporary; API teacher opt-in, off by default
-- [ ] `generate_qa` with check pass
-- [ ] Teacher labelling with review queue
-- [ ] Gateway upstream routes for distillation
+- [x] Prompt-only version 0 on the base at creation (on the teacher pool in v2)
 - [ ] `response_format` with `json_schema` (built: SGLang gets EBNF or `json_schema`, llama.cpp grammars, MLX and
       `transformers` token tries for labels and finite schemas, every JSON answer checked in the gateway; llama.cpp,
       MLX and `transformers` verified on Qwen3-0.6B, SGLang only against a fake process: verify on a GPU box)
@@ -1790,7 +1786,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       write-only secrets; DuckDB extensions, delta included, installed offline and baked into the image
 - [ ] Auto-mapping proposal, mapping editor compiled to SQL, SQL editor (column picker and SQL over several sources
       done; CodeMirror editor and auto-mapping not yet)
-- [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near`, `generate_qa`
+- [ ] Built-in steps: `strip_html`, `chunk`, `pii_scrub`, `dedupe_near` (`generate_qa` in v2)
 - [ ] Preview of 5–10 examples as chat transcripts (the preview shows the query's first 20 rows as a table, with
       label counts; chat transcripts not yet)
 - [ ] Quality score and PII report (version checks with pattern-based PII done; Presidio and near duplicates
@@ -1873,7 +1869,6 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [ ] Offline install bundle; air-gap CI test
 - [ ] Signed offline update bundles (app and base models) with rollback (release files are signed with cosign
       now; bundles will reuse that signing)
-- [ ] Private frontier endpoint: the teacher model through the gateway, scoped keys
 - [x] Switch base: per model, live traffic stays on its own base until a version on the new one is deployed
 - [ ] Rebase: rebuild every model on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
@@ -1898,6 +1893,12 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 
 ## v2
 
+- Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers):
+  - Teacher pool, permanent or temporary; API teacher opt-in, off by default; prompt-only version 0 on it
+  - Teacher labelling with the review queue, uncertain rows first
+  - `generate_qa` with check pass: documents into checked question and answer pairs
+  - Distill: gateway upstream routes log a teacher's answers; distil what you run into a smaller model
+  - Private frontier endpoint: the teacher model through the gateway, scoped keys
 - Split into services: data, train, serve, gateway
 - Adapters trained to answer from retrieved context and cite it
 - dlt API connectors: Zendesk, Jira, Confluence, Salesforce, HubSpot
@@ -1934,7 +1935,6 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - Later, kept simple until the engine settles:
   - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base
   - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency
-  - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
   - [ ] Recipes: worked use cases, designed properly later.
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
   - [ ] Change a model's dataset: re-point a custom model to another dataset, built only if users ask; Duplicate
