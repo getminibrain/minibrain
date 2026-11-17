@@ -434,6 +434,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                 onSortingChange={(next) => update(sortSearch(next, NEWEST_REQUESTS))}
                 storageKey="minibrain.requests.columns"
                 columnPicker
+                hiddenColumns={["finish", "response"]}
                 hasMore={list.hasMore}
                 loadingMore={list.loadingMore}
                 onLoadMore={list.loadMore}
@@ -443,7 +444,7 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                     `Request ${row.id}, ${withDeleted(modelLabel(row), row.deleted)}, status ${row.status}, ${exactTime(row.at)}`
                 }
                 empty={empty}
-                minWidth="min-w-[1040px]"
+                minWidth="min-w-[900px]"
             />
             <RequestDialog id={selected} loaded={loaded} onClose={() => update({ request: "" })} />
         </>
