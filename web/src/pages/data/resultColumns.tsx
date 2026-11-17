@@ -49,7 +49,7 @@ function numberOf(text: string): number | undefined {
 }
 
 function timeOf(text: string): number {
-    const iso = text.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00");
+    const iso = text.replace(" ", "T").replace(/(T[\d:.]+[+-]\d{2})$/, "$1:00");
     return Date.parse(iso);
 }
 
