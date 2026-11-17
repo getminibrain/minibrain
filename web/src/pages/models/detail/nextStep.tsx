@@ -6,7 +6,7 @@ import { StatusText, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { trainHref } from "~/lib/modelLinks";
 import { Tip, deployBlock, isDeployed } from "./header";
-import { DeployVersionDialog } from "./makeLive";
+import { DeployVersionDialog, readyToDeploy } from "./makeLive";
 import { UNSCORED, phaseOf } from "./versionState";
 
 const SLOT = "flex h-8 min-w-0 items-center gap-3";
@@ -35,7 +35,7 @@ function Scoring({ version }: { version: VersionInfo }) {
 
 function bestReady(versions: VersionInfo[]): VersionInfo | undefined {
     return versions
-        .filter((version) => phaseOf(version) === "ready")
+        .filter((version) => readyToDeploy(version, undefined))
         .sort(
             (left, right) => (right.score ?? -1) - (left.score ?? -1) || right.number - left.number,
         )[0];
