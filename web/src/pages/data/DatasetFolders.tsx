@@ -705,7 +705,7 @@ export function removalText(index: FolderIndex, folder: DatasetFolder): string {
         folders.some((child) => siblingNamed(index, folder.parent_id, child.name, folder.id)) ||
         datasets.some((dataset) => datasetNamed(above, dataset.name, dataset.slug));
     const parent = folder.parent_id === null ? "Datasets" : folderPath(index, folder.parent_id);
-    return `Its ${parts.join(" and ")} move up to ${parent}; nothing inside is deleted.${clash ? " One whose name is taken there gets a number added." : ""}`;
+    return `Its ${parts.join(" and ")} ${folders.length + datasets.length === 1 ? "moves" : "move"} up to ${parent}; nothing inside is deleted.${clash ? " One whose name is taken there gets a number added." : ""}`;
 }
 
 export function FolderDetail({
