@@ -1,5 +1,6 @@
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
+import { GraduationCap } from "lucide-react";
 import {
     Button,
     CheckboxSelect,
@@ -287,10 +288,12 @@ function Runs() {
                     value={statuses}
                     onValueChange={(next) => update({ status: next.join(",") })}
                 />
-                <MethodFilter
-                    value={method}
-                    onChange={(next) => update({ method: next === ANY ? "" : next })}
-                />
+                {METHODS.filter((item) => item.ready).length > 1 && (
+                    <MethodFilter
+                        value={method}
+                        onChange={(next) => update({ method: next === ANY ? "" : next })}
+                    />
+                )}
                 {filtering && (
                     <Button variant="ghost" onClick={clear}>
                         Clear filters
@@ -308,7 +311,7 @@ function Runs() {
                 loading={jobs.isLoading}
                 storageKey="minibrain.training.runs"
                 columnPicker
-                hiddenColumns={["attempt"]}
+                hiddenColumns={["attempt", "method"]}
                 sorting={sortingFor(order)}
                 onSortingChange={(next) => setOrder(orderFrom(next))}
                 hasMore={jobs.hasMore}
@@ -347,7 +350,12 @@ export function TrainingListPage() {
                 title="Training"
                 caption="Every training run across your models."
                 actions={
-                    can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
+                    can.build && (
+                        <Button onClick={() => setPicking(true)}>
+                            <GraduationCap />
+                            Train a model
+                        </Button>
+                    )
                 }
             />
             <Runs />
