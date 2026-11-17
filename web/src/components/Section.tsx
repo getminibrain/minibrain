@@ -193,7 +193,7 @@ export function Page({
             className={cn(
                 pageFrame(wide ? "wide" : "normal"),
                 "flex flex-col gap-4",
-                fill ? "flex-1 pb-6" : "pb-12",
+                fill ? "min-h-0 flex-1 pb-6" : "pb-12",
             )}
         >
             {children}

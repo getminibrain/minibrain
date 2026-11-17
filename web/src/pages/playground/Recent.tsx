@@ -23,7 +23,7 @@ import {
     cn,
     useToast,
 } from "obp-ui";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { useChats, useDeleteChat, useSaveChat } from "~/api/playgroundQueries";
 import { ErrorLine } from "~/components/Section";
 import type { ChatSummary } from "~/lib/playground";
@@ -163,12 +163,14 @@ export function Recent({
     onOpen,
     onDeleted,
     titled = true,
+    action,
 }: {
     current: number | null;
     note: string | null;
     onOpen: (id: number) => void;
     onDeleted: (id: number) => void;
     titled?: boolean;
+    action?: ReactNode;
 }) {
     const toast = useToast();
     const chats = useChats();
@@ -180,8 +182,9 @@ export function Recent({
     const shown = items.filter((chat) => matches(chat, filter));
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            {(titled || items.length > 0 || note) && (
+            {(titled || action || items.length > 0 || note) && (
                 <div className="flex flex-col gap-3 border-b px-4 py-3">
+                    {action}
                     {titled && <h2 className="text-base font-semibold">Recent</h2>}
                     {items.length > 0 && (
                         <SearchInput

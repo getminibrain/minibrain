@@ -338,7 +338,10 @@ export function PlaygroundPage() {
     };
     useEffect(() => {
         if (turns.length > 0) {
-            end.current?.scrollIntoView({ block: "end" });
+            const box = end.current?.closest('[role="log"]')?.parentElement;
+            if (box) {
+                box.scrollTop = box.scrollHeight;
+            }
         }
     }, [turns]);
     const preview = useMemo(
@@ -376,9 +379,21 @@ export function PlaygroundPage() {
             onPreset={setPreset}
         />
     );
+    const newChatButton = (wideButton: boolean) => (
+        <Button
+            variant="outline"
+            className={wideButton ? "w-full" : undefined}
+            disabled={busy || turns.length === 0}
+            onClick={newChat}
+        >
+            <IconEdit />
+            New chat
+        </Button>
+    );
     const recentBody = (titled: boolean) => (
         <Recent
             titled={titled}
+            action={titled ? newChatButton(true) : undefined}
             current={chatId}
             note={target && !target.chats_saved ? (target.chats_note ?? null) : null}
             onOpen={open}
@@ -397,14 +412,7 @@ export function PlaygroundPage() {
                 actions={
                     target && (
                         <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                disabled={busy || turns.length === 0}
-                                onClick={newChat}
-                            >
-                                <IconEdit />
-                                New chat
-                            </Button>
+                            {!recentColumn && newChatButton(false)}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
