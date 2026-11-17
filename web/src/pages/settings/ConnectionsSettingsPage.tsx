@@ -5,6 +5,12 @@ import {
     Button,
     CodeBlock,
     ConfirmDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     EmptyState,
     Input,
     Link,
@@ -402,7 +408,9 @@ function ConnectionForm({
                 )}
                 <SecretRow draft={draft} saved={Boolean(editing?.secret_set)} onChange={set} />
             </SettingsGroup>
-            <div className="flex flex-wrap items-center gap-2">
+            {test.data && <CheckLine ok={test.data.ok} message={test.data.message} />}
+            <ErrorLine error={test.error ?? save.error} />
+            <DialogFooter className="sm:justify-between">
                 <Button
                     type="button"
                     variant="outline"
@@ -411,15 +419,15 @@ function ConnectionForm({
                 >
                     {test.isPending ? "Testing…" : "Test connection"}
                 </Button>
-                <Button type="submit" disabled={save.isPending || !draft.name.trim()}>
-                    {save.isPending ? "Saving…" : editing ? "Save" : "Add connection"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={onDone}>
-                    Cancel
-                </Button>
-            </div>
-            {test.data && <CheckLine ok={test.data.ok} message={test.data.message} />}
-            <ErrorLine error={test.error ?? save.error} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" onClick={onDone}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={save.isPending || !draft.name.trim()}>
+                        {save.isPending ? "Saving…" : editing ? "Save" : "Add connection"}
+                    </Button>
+                </div>
+            </DialogFooter>
         </form>
     );
 }
@@ -594,7 +602,6 @@ export function ConnectionsSettingsPage() {
     const connections = useConnections();
     const [editing, setEditing] = useState<ConnectionInfo | "new" | null>(null);
     const list = connections.data ?? [];
-    const formOpen = editing !== null;
     return (
         <SettingsLayout
             title="Connections"
@@ -618,38 +625,24 @@ export function ConnectionsSettingsPage() {
                     title={CONNECTIONS.connections.title}
                     description="Each endpoint must be allowed by the network policy. Secrets are write-only."
                     actions={
-                        !formOpen && (
-                            <Button onClick={() => setEditing("new")}>
-                                {CONNECTIONS.connections.settings.add.label}
-                            </Button>
-                        )
+                        <Button onClick={() => setEditing("new")}>
+                            {CONNECTIONS.connections.settings.add.label}
+                        </Button>
                     }
                     flush
                 >
-                    {formOpen && (
-                        <div className="p-panel not-last:border-b">
-                            <h3 className="mb-4 text-base font-semibold">
-                                {editing === "new" ? "New connection" : `Edit ${editing.name}`}
-                            </h3>
-                            <ConnectionForm
-                                key={editing === "new" ? "new" : editing.id}
-                                editing={editing === "new" ? null : editing}
-                                onDone={() => setEditing(null)}
-                            />
-                        </div>
-                    )}
-                    {connections.data && list.length === 0 && !formOpen ? (
-                        <EmptyState
-                            variant="panel"
-                            title="No connections yet"
-                            className="mx-0 mt-0 max-w-none rounded-none border-0"
-                        >
-                            Add an S3-compatible bucket, a PostgreSQL or a MySQL database to read
-                            data in place or import models from a bucket. Locked-down installs can
-                            declare them in minibrain.yaml instead.
-                        </EmptyState>
-                    ) : (
-                        list.length > 0 && (
+                    <div className="h-80 overflow-y-auto">
+                        {connections.data && list.length === 0 ? (
+                            <EmptyState
+                                variant="panel"
+                                title="No connections yet"
+                                className="mx-0 mt-0 h-full max-w-none rounded-none border-0"
+                            >
+                                Add an S3-compatible bucket, a PostgreSQL or a MySQL database to
+                                read data in place or import models from a bucket. Locked-down
+                                installs can declare them in minibrain.yaml instead.
+                            </EmptyState>
+                        ) : (
                             <ul className="flex flex-col divide-y">
                                 {list.map((connection) => (
                                     <ConnectionRow
@@ -659,11 +652,33 @@ export function ConnectionsSettingsPage() {
                                     />
                                 ))}
                             </ul>
-                        )
-                    )}
+                        )}
+                    </div>
                 </SettingsSection>
                 <Extensions />
             </SettingsSections>
+            <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {editing === null || editing === "new"
+                                ? "New connection"
+                                : `Edit ${editing.name}`}
+                        </DialogTitle>
+                        <DialogDescription>
+                            The endpoint must be allowed by the network policy. Secrets are
+                            write-only.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editing !== null && (
+                        <ConnectionForm
+                            key={editing === "new" ? "new" : editing.id}
+                            editing={editing === "new" ? null : editing}
+                            onDone={() => setEditing(null)}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </SettingsLayout>
     );
 }
