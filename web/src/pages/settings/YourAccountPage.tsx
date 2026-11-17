@@ -142,7 +142,7 @@ function PasswordForm({ profile }: { profile: Profile }) {
             icon={IconKey}
             anchor={PASSWORD.anchor}
             title={PASSWORD.title}
-            description="Needs your current password. Changing it signs you out everywhere else."
+            description="Changing it signs you out everywhere else."
             actions={
                 <Button type="submit" form={PASSWORD_FORM} disabled={!ready || change.isPending}>
                     {change.isPending ? "Changing…" : "Change password"}
