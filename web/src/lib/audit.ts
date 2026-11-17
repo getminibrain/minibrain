@@ -36,6 +36,8 @@ const ACTIONS: Record<string, string> = {
     "feedback.example": "Feedback added to test examples",
     "feedback.example_remove": "Test example removed",
     "job.delete": "Job deleted",
+    "job_logs.purge": "Old job logs deleted",
+    "job_logs.retention": "Job log retention changed",
     "model.contract": "Output format changed",
     "model.create": "Model created",
     "model.graders": "Graders changed",
@@ -173,6 +175,7 @@ const CHANGED_FIELDS: Record<string, string> = {
     "dataset_folder.move": "Location",
     "dataset_folder.rename": "Name",
     "model.relocate": "Location",
+    "job_logs.retention": "Keep job logs for (days)",
 };
 
 const STORAGE_KINDS: Record<string, string> = { local: "Local folder", s3: "S3-compatible bucket" };
@@ -358,6 +361,9 @@ export function targetLabel(event: AuditEvent, policies: Map<string, PolicyInfo>
     if (event.action === "audit.prune") {
         return "Audit log";
     }
+    if (event.action.startsWith("job_logs.")) {
+        return "Job logs";
+    }
     const name = typeof detail.name === "string" && detail.name ? detail.name : event.target;
     const version = event.action.startsWith("version.") ? event.target.split("@")[1] : undefined;
     return version && name !== event.target ? `${name} v${version}` : name;
@@ -450,6 +456,8 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}${
             typeof detail.cut_seq === "number" ? `, up to seq ${plainValue(detail.cut_seq)}` : ""
         }`,
+    "job_logs.purge": (detail) =>
+        `${plainValue(detail.jobs)} jobs finished over ${plainValue(detail.days)} days ago`,
     "feedback.accept": (detail) => `Right answer: ${plainValue(detail.label)}`,
     "feedback.fix": (detail) => `Fixed to ${plainValue(detail.label)}`,
     "feedback.reject": () => "Kept out of the training data",

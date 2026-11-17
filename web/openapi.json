@@ -10612,6 +10612,108 @@
         }
       }
     },
+    "/api/settings/job-logs": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Read how long job logs are kept",
+        "operationId": "read_job_logs_api_settings_job_logs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobLogSettings"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Change how long job logs are kept",
+        "operationId": "update_job_logs_api_settings_job_logs_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobLogSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobLogSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/job-logs/purge": {
+      "post": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Delete old job logs",
+        "description": "Removes the logs and checkpoints of jobs that finished more than the given days ago. Queued and running jobs keep theirs.",
+        "operationId": "purge_old_job_logs_api_system_job_logs_purge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobLogPurge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobLogPurged"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -16835,39 +16937,6 @@
         "type": "object",
         "title": "DatasetVersionRequest"
       },
-      "DatasetVersionUsage": {
-        "properties": {
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "for_versions": {
-            "type": "integer",
-            "title": "For Versions"
-          },
-          "saved": {
-            "type": "integer",
-            "title": "Saved"
-          },
-          "keep": {
-            "type": "integer",
-            "title": "Keep"
-          }
-        },
-        "type": "object",
-        "required": [
-          "count",
-          "size",
-          "for_versions",
-          "saved",
-          "keep"
-        ],
-        "title": "DatasetVersionUsage"
-      },
       "DecisionInfo": {
         "properties": {
           "passed": {
@@ -19227,6 +19296,58 @@
         ],
         "title": "FolderRoots"
       },
+      "FreeUpItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "base",
+              "dataset",
+              "source",
+              "job_logs"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Dataset versions, or jobs whose logs could go.",
+            "default": 1
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days",
+            "description": "For job logs: finished more than this many days ago."
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "name",
+          "size_bytes"
+        ],
+        "title": "FreeUpItem"
+      },
       "FunctionCallBody": {
         "properties": {
           "name": {
@@ -20066,32 +20187,23 @@
             "type": "array",
             "title": "Stores"
           },
-          "dataset_versions": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DatasetVersionUsage"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "largest": {
+          "usage": {
             "items": {
-              "$ref": "#/components/schemas/StoredItem"
+              "$ref": "#/components/schemas/UsageGroup"
             },
             "type": "array",
-            "title": "Largest"
+            "title": "Usage"
           },
-          "reclaimable": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Reclaimable"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "free_up": {
+            "items": {
+              "$ref": "#/components/schemas/FreeUpItem"
+            },
+            "type": "array",
+            "title": "Free Up"
+          },
+          "job_log_days": {
+            "type": "integer",
+            "title": "Job Log Days"
           }
         },
         "type": "object",
@@ -20101,7 +20213,9 @@
           "home",
           "web",
           "stores",
-          "largest"
+          "usage",
+          "free_up",
+          "job_log_days"
         ],
         "title": "InfrastructureInfo"
       },
@@ -21469,6 +21583,55 @@
           "finished_at"
         ],
         "title": "JobInfo"
+      },
+      "JobLogPurge": {
+        "properties": {
+          "older_than_days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Older Than Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "older_than_days"
+        ],
+        "title": "JobLogPurge"
+      },
+      "JobLogPurged": {
+        "properties": {
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "size_bytes"
+        ],
+        "title": "JobLogPurged"
+      },
+      "JobLogSettings": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 0.0,
+            "title": "Days",
+            "description": "Keep finished jobs' logs and checkpoints this long; 0 keeps them."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "title": "JobLogSettings"
       },
       "JobMetrics": {
         "properties": {
@@ -24795,6 +24958,19 @@
             "title": "Minibrain Bytes",
             "description": "What minibrain keeps in that folder."
           },
+          "cache_bytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Bytes",
+            "description": "Model copies and downloaded files this machine can fetch again."
+          },
           "reported_at": {
             "type": "string",
             "format": "date-time",
@@ -27135,45 +27311,6 @@
           "finished_at"
         ],
         "title": "RecentJob"
-      },
-      "Reclaimable": {
-        "properties": {
-          "dataset_versions": {
-            "type": "integer",
-            "title": "Dataset Versions",
-            "description": "Dataset versions past retention, removed by the next cleanup."
-          },
-          "dataset_versions_bytes": {
-            "type": "integer",
-            "title": "Dataset Versions Bytes"
-          },
-          "unused_models": {
-            "items": {
-              "$ref": "#/components/schemas/UnusedModel"
-            },
-            "type": "array",
-            "title": "Unused Models",
-            "description": "Base models on main that no model is built on or serves."
-          },
-          "orphan_uploads": {
-            "type": "integer",
-            "title": "Orphan Uploads",
-            "description": "Uploaded files no source refers to."
-          },
-          "orphan_uploads_bytes": {
-            "type": "integer",
-            "title": "Orphan Uploads Bytes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "dataset_versions",
-          "dataset_versions_bytes",
-          "unused_models",
-          "orphan_uploads",
-          "orphan_uploads_bytes"
-        ],
-        "title": "Reclaimable"
       },
       "RelabelInfo": {
         "properties": {
@@ -29982,53 +30119,6 @@
         ],
         "title": "StoreInfo"
       },
-      "StoredItem": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "model",
-              "dataset",
-              "adapter",
-              "upload",
-              "log"
-            ],
-            "title": "Kind"
-          },
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "title": "Size Bytes"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version",
-            "description": "Model version that owns an adapter."
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "key",
-          "name",
-          "size_bytes"
-        ],
-        "title": "StoredItem"
-      },
       "SystemInfo": {
         "properties": {
           "device": {
@@ -32228,29 +32318,6 @@
         ],
         "title": "TurnInfo"
       },
-      "UnusedModel": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "size_bytes": {
-            "type": "integer",
-            "title": "Size Bytes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "name",
-          "size_bytes"
-        ],
-        "title": "UnusedModel"
-      },
       "Usage": {
         "properties": {
           "days": {
@@ -32336,6 +32403,130 @@
           "p50_ms"
         ],
         "title": "Usage"
+      },
+      "UsageGroup": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bases",
+              "adapters",
+              "datasets",
+              "uploads",
+              "jobs",
+              "database"
+            ],
+            "title": "Kind"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Items in the group; items lists the largest of them."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UsageItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "size_bytes",
+          "count",
+          "items"
+        ],
+        "title": "UsageGroup"
+      },
+      "UsageItem": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count",
+            "description": "Versions of an adapter or dataset; attempts of a job."
+          },
+          "used_by": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRef"
+            },
+            "type": "array",
+            "title": "Used By",
+            "description": "Models built on a base model."
+          },
+          "checks": {
+            "type": "boolean",
+            "title": "Checks",
+            "description": "A base model that judges or checks safety.",
+            "default": false
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "size_bytes"
+        ],
+        "title": "UsageItem"
+      },
+      "UsageRef": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name"
+        ],
+        "title": "UsageRef"
       },
       "ValidationError": {
         "properties": {

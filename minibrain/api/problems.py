@@ -12,7 +12,7 @@ from minibrain.api.access import viewer
 from minibrain.api.compute import served_models
 from minibrain.api.deps import LocalNodeDep, MetricsDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import StoreInfo
-from minibrain.api.system import dataset_version_usage, main_stores
+from minibrain.api.system import main_stores
 from minibrain.auth.identity import current_role
 from minibrain.auth.roles import Role, allows
 from minibrain.ml.planner import gigabytes
@@ -353,6 +353,6 @@ def list_problems(
     scope: View | None = None,
     model: str | None = None,
 ) -> list[Problem]:
-    stores = main_stores(session, settings, store, dataset_version_usage(session))
+    stores = main_stores(session, settings, store)
     admin = allows(current_role(), Role.ADMIN)
     return narrowed(collect(session, node, metrics, stores, admin), scope, model)

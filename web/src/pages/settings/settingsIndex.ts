@@ -722,6 +722,16 @@ export const STORAGE = {
             ),
         ),
     }),
+    jobLogs: section("Job logs", {
+        days: aka(
+            ["job log retention"],
+            setting(
+                "Keep job logs for",
+                "Logs and checkpoints of finished jobs go after this many days; 0 keeps them.",
+                ["retention", "logs", "checkpoints", "cleanup", "delete", "prune", "disk"],
+            ),
+        ),
+    }),
 };
 
 export const CONNECTIONS = {

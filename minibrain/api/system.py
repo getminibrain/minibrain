@@ -10,30 +10,28 @@ from minibrain import provision
 from minibrain.api.access import admin, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
-    DatasetVersionUsage,
     DeviceInfo,
     InfrastructureInfo,
     InstallSettings,
+    JobLogPurge,
+    JobLogPurged,
+    JobLogSettings,
     LoadedModel,
-    Reclaimable,
     StorageCheck,
     StorageSettings,
     StorageUpdate,
-    StoredItem,
     StoreInfo,
     SystemInfo,
-    UnusedModel,
 )
+from minibrain.api.storage_usage import free_up, usage_groups
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
-from minibrain.data.dataset_versions import doomed_dataset_versions
-from minibrain.data.limits import load_limits
 from minibrain.data.splits import EVAL_MAX, GOLDEN_MAX, MIN_ROWS, SHOTS_MAX
+from minibrain.jobs.retention import log_days, purge_job_logs, save_log_days
 from minibrain.models.bucket import WEIGHTS, writes_bucket
 from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.models.registry import models_dir
-from minibrain.models.safety import install_safety
 from minibrain.object_store import CREDENTIAL_ENV, S3, StorageConfig, StorageError, load_config, read_secret
 from minibrain.object_store import apply as apply_storage
 from minibrain.object_store import check as check_storage
@@ -46,18 +44,12 @@ from minibrain.registry.models import (
     Artifact,
     BaseModel,
     BaseModelStatus,
-    Dataset,
     DatasetVersion,
     Job,
-    JobAttempt,
-    Model,
-    Source,
-    Version,
 )
 from minibrain.serve.backend import ServingBackend
 from minibrain.settings import Settings
 from minibrain.storage import disk_space
-from minibrain.tasks.judges import install_judge
 
 router = APIRouter(prefix="/api")
 
@@ -239,15 +231,20 @@ def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
 
 
-def main_stores(
-    session: Session, settings: Settings, store: ArtifactStore, usage: DatasetVersionUsage
-) -> list[StoreInfo]:
+def dataset_version_bytes(session: Session) -> int:
+    stored = {
+        artifact: size for artifact, size in session.execute(select(DatasetVersion.artifact_id, DatasetVersion.size))
+    }
+    return sum(stored.values())
+
+
+def main_stores(session: Session, settings: Settings, store: ArtifactStore) -> list[StoreInfo]:
     kept = (ArtifactKind.DATASET_VERSION, WEIGHTS)
     artifacts = session.scalar(select(func.sum(Artifact.size)).where(Artifact.kind.not_in(kept)))
     return [
         database_store(settings),
         model_store(session, settings, store),
-        artifact_store("Dataset versions", settings, store, usage.size),
+        artifact_store("Dataset versions", settings, store, dataset_version_bytes(session)),
         artifact_store("Uploads, adapters and results", settings, store, int(artifacts or 0)),
     ]
 
@@ -256,136 +253,39 @@ def main_stores(
 def infrastructure(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, store: StoreDep
 ) -> InfrastructureInfo:
-    usage = dataset_version_usage(session)
-    stores = main_stores(session, settings, store, usage)
+    stores = main_stores(session, settings, store)
     return InfrastructureInfo(
         setup=setup_of(session, node, stores[0]),
         host=node.host,
         home=str(settings.home),
         web=str(settings.web_dist),
         stores=stores,
-        dataset_versions=usage,
-        largest=largest_items(session),
-        reclaimable=reclaimable(session),
+        usage=usage_groups(session, settings, stores[0]),
+        free_up=free_up(session, settings),
+        job_log_days=log_days(session),
     )
 
 
-LARGEST = 8
+@router.get("/settings/job-logs", dependencies=[Depends(viewer)], summary="Read how long job logs are kept")
+def read_job_logs(session: SessionDep) -> JobLogSettings:
+    return JobLogSettings(days=log_days(session))
 
 
-def largest_items(session: Session) -> list[StoredItem]:
-    models = [
-        StoredItem(kind="model", key=base.id, name=base.name, size_bytes=base.size_bytes)
-        for base in session.scalars(select(BaseModel).where(*on_main(), BaseModel.size_bytes > 0))
-    ]
-    stored: dict[int, dict[str, int]] = {}
-    for version in session.scalars(select(DatasetVersion).where(DatasetVersion.dataset_id.is_not(None))):
-        stored.setdefault(version.dataset_id or 0, {})[version.artifact_id] = version.size
-    named = session.scalars(select(Dataset).where(Dataset.id.in_(stored)))
-    datasets = [
-        StoredItem(kind="dataset", key=dataset.slug, name=dataset.name, size_bytes=sum(stored[dataset.id].values()))
-        for dataset in named
-        if sum(stored[dataset.id].values()) > 0
-    ]
-    items = models + datasets + adapter_items(session) + upload_items(session) + log_items(session)
-    return sorted(items, key=lambda item: item.size_bytes, reverse=True)[:LARGEST]
+@router.put("/settings/job-logs", dependencies=[Depends(admin)], summary="Change how long job logs are kept")
+def update_job_logs(body: JobLogSettings, session: SessionDep) -> JobLogSettings:
+    return JobLogSettings(days=save_log_days(session, body.days, current_actor()))
 
 
-def adapter_items(session: Session) -> list[StoredItem]:
-    found = session.execute(
-        select(Model.slug, Model.name, Version.number, Artifact.size)
-        .join(Version, Version.model_id == Model.id)
-        .join(Artifact, Artifact.id == Version.adapter_artifact_id)
-        .where(Artifact.size > 0)
-        .order_by(Artifact.size.desc())
-        .limit(LARGEST)
-    )
-    return [
-        StoredItem(kind="adapter", key=slug, name=f"{name} v{number}", size_bytes=size, version=number)
-        for slug, name, number, size in found
-    ]
-
-
-def upload_items(session: Session) -> list[StoredItem]:
-    found = session.execute(
-        select(Source.id, Source.name, Artifact.size)
-        .join(Artifact, Artifact.id == Source.artifact_id)
-        .where(Artifact.size > 0)
-        .order_by(Artifact.size.desc())
-        .limit(LARGEST)
-    )
-    return [StoredItem(kind="upload", key=str(source), name=name, size_bytes=size) for source, name, size in found]
-
-
-def log_items(session: Session) -> list[StoredItem]:
-    found = session.execute(
-        select(JobAttempt.job_id, func.sum(Artifact.size))
-        .join(Artifact, Artifact.id == JobAttempt.log_artifact_id)
-        .group_by(JobAttempt.job_id)
-        .order_by(func.sum(Artifact.size).desc())
-        .limit(LARGEST)
-    )
-    return [
-        StoredItem(kind="log", key=str(job), name=f"Job {job} log", size_bytes=int(size)) for job, size in found if size
-    ]
-
-
-def checking_bases(session: Session) -> set[str]:
-    found = {install_judge(session), install_safety(session).model}
-    found |= set(session.scalars(select(Model.judge_model)))
-    for safety in session.scalars(select(Model.safety)):
-        if isinstance(safety, dict) and safety.get("model"):
-            found.add(str(safety["model"]))
-    return {key for key in found if key}
-
-
-def reclaimable(session: Session) -> Reclaimable:
-    doomed = doomed_dataset_versions(session)
-    doomed_ids = {item.id for item in doomed}
-    kept = set(session.scalars(select(DatasetVersion.artifact_id).where(DatasetVersion.id.not_in(doomed_ids))))
-    freed = {item.artifact_id: item.size for item in doomed if item.artifact_id not in kept}
-    needed = set(session.scalars(select(Model.base_model))) | set(session.scalars(select(Version.base_model)))
-    needed |= checking_bases(session)
-    unused = [
-        UnusedModel(key=base.id, name=base.name, size_bytes=base.size_bytes)
-        for base in session.scalars(
-            select(BaseModel)
-            .where(*on_main(), BaseModel.size_bytes > 0, BaseModel.deployed.is_(False))
-            .order_by(BaseModel.size_bytes.desc())
-        )
-        if base.id not in needed
-    ]
-    referenced = select(Source.artifact_id).where(Source.artifact_id.is_not(None))
-    orphans = session.execute(
-        select(func.count(Artifact.id), func.sum(Artifact.size)).where(
-            Artifact.kind == ArtifactKind.SOURCE, Artifact.id.not_in(referenced)
-        )
-    ).one()
-    return Reclaimable(
-        dataset_versions=len(doomed),
-        dataset_versions_bytes=sum(freed.values()),
-        unused_models=unused,
-        orphan_uploads=int(orphans[0] or 0),
-        orphan_uploads_bytes=int(orphans[1] or 0),
-    )
-
-
-def dataset_version_usage(session: Session) -> DatasetVersionUsage:
-    dataset_versions = session.scalars(select(DatasetVersion)).all()
-    used = set(session.scalars(select(Version.dataset_version_id)))
-    used |= {
-        dataset_version.base_id
-        for dataset_version in dataset_versions
-        if dataset_version.id in used and dataset_version.base_id is not None
-    }
-    stored = {dataset_version.artifact_id: dataset_version.size for dataset_version in dataset_versions}
-    return DatasetVersionUsage(
-        count=len(dataset_versions),
-        size=sum(stored.values()),
-        for_versions=sum(dataset_version.id in used for dataset_version in dataset_versions),
-        saved=sum(dataset_version.saved and dataset_version.id not in used for dataset_version in dataset_versions),
-        keep=load_limits(session).keep_versions,
-    )
+@router.post(
+    "/system/job-logs/purge",
+    dependencies=[Depends(admin)],
+    summary="Delete old job logs",
+    description="Removes the logs and checkpoints of jobs that finished more than the given days ago. "
+    "Queued and running jobs keep theirs.",
+)
+def purge_old_job_logs(body: JobLogPurge, session: SessionDep, settings: SettingsDep, store: StoreDep) -> JobLogPurged:
+    found = purge_job_logs(session, settings, store, body.older_than_days, current_actor())
+    return JobLogPurged(jobs=len(found.jobs), size_bytes=found.size)
 
 
 @router.get("/settings", dependencies=[Depends(viewer)], summary="Read install settings")

@@ -1368,26 +1368,42 @@ class StoreInfo(BaseModel):
     mount: str | None = Field(default=None, description="Mount point of the disk that holds the store.")
 
 
-class StoredItem(BaseModel):
-    kind: Literal["model", "dataset", "adapter", "upload", "log"]
+UsageKind = Literal["bases", "adapters", "datasets", "uploads", "jobs", "database"]
+
+
+class UsageRef(BaseModel):
+    key: str
+    name: str
+
+
+class UsageItem(BaseModel):
     key: str
     name: str
     size_bytes: int
-    version: int | None = Field(default=None, description="Model version that owns an adapter.")
+    count: int | None = Field(default=None, description="Versions of an adapter or dataset; attempts of a job.")
+    used_by: list[UsageRef] = Field(default_factory=list, description="Models built on a base model.")
+    checks: bool = Field(default=False, description="A base model that judges or checks safety.")
+    deployed: bool = False
+    finished_at: datetime | None = None
 
 
-class UnusedModel(BaseModel):
+class UsageGroup(BaseModel):
+    kind: UsageKind
+    size_bytes: int
+    count: int = Field(description="Items in the group; items lists the largest of them.")
+    items: list[UsageItem]
+
+
+FreeUpKind = Literal["base", "dataset", "source", "job_logs"]
+
+
+class FreeUpItem(BaseModel):
+    kind: FreeUpKind
     key: str
     name: str
     size_bytes: int
-
-
-class Reclaimable(BaseModel):
-    dataset_versions: int = Field(description="Dataset versions past retention, removed by the next cleanup.")
-    dataset_versions_bytes: int
-    unused_models: list[UnusedModel] = Field(description="Base models on main that no model is built on or serves.")
-    orphan_uploads: int = Field(description="Uploaded files no source refers to.")
-    orphan_uploads_bytes: int
+    count: int = Field(default=1, description="Dataset versions, or jobs whose logs could go.")
+    days: int | None = Field(default=None, description="For job logs: finished more than this many days ago.")
 
 
 class InfrastructureInfo(BaseModel):
@@ -1396,9 +1412,22 @@ class InfrastructureInfo(BaseModel):
     home: str
     web: str
     stores: list[StoreInfo]
-    dataset_versions: DatasetVersionUsage | None = None
-    largest: list[StoredItem]
-    reclaimable: Reclaimable | None = None
+    usage: list[UsageGroup]
+    free_up: list[FreeUpItem]
+    job_log_days: int
+
+
+class JobLogSettings(BaseModel):
+    days: int = Field(ge=0, le=3650, description="Keep finished jobs' logs and checkpoints this long; 0 keeps them.")
+
+
+class JobLogPurge(BaseModel):
+    older_than_days: int = Field(ge=1, le=3650)
+
+
+class JobLogPurged(BaseModel):
+    jobs: int
+    size_bytes: int
 
 
 AvailabilityState = Literal["available", "downloading", "importing", "missing", "not_downloaded", "none"]

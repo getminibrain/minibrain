@@ -242,7 +242,8 @@ def test_feedback_copies_are_removed_with_their_versions(harness: Harness) -> No
     assert not store_for(harness.settings).has(copy.hash)
     with harness.sessions() as session:
         assert session.get(Artifact, copy.hash) is None
-    assert harness.client.get("/api/system/infrastructure").json()["dataset_versions"]["for_versions"] == 0
+    usage = {group["kind"]: group for group in harness.client.get("/api/system/infrastructure").json()["usage"]}
+    assert [item["count"] for item in usage["datasets"]["items"]] == [1]
 
 
 def test_two_dataset_versions_diff_by_input_with_label_shift(harness: Harness) -> None:

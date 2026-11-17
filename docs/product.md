@@ -541,8 +541,17 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep base weights in the bucket; machines fetch them by signed links.
   UI: Settings › Storage › Base model files
 - **Storage usage** · shipped · admin
-  See disk use on main and every machine, and what to free.
+  See space by base, adapter, dataset, upload, job and database.
   UI: Infrastructure › Storage · API: GET /api/system/infrastructure, GET /api/compute/pools
+- **Free up space** · shipped · admin
+  Suggest unused items to delete, each on its own page.
+  UI: Infrastructure › Storage › Free up space · API: GET /api/system/infrastructure, POST /api/system/job-logs/purge
+- **Job log retention** · shipped · admin
+  Delete finished jobs' logs and checkpoints after N days.
+  UI: Settings › Storage › Job logs · API: GET /api/settings/job-logs, PUT /api/settings/job-logs
+- **Machine caches** · partial · admin
+  See each machine's cache of model copies and downloads.
+  UI: Infrastructure › Storage › Disks on other machines · API: GET /api/compute/pools · Roadmap: Artifact storage
 - **Highly available main** · shipped · admin
   Run several mains on Postgres, with a leader for background work.
   Config: MINIBRAIN_DATABASE_URL

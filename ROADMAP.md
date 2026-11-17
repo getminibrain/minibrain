@@ -677,6 +677,19 @@ trains are the same rows (the `dataset_versions` table, `/api/datasets/<slug>/ve
   folder store) and `models/` (base weights when Storage is the folder). Caches and scratch, safe to wipe while
   minibrain is stopped: `cache/` (unpacked artifacts), `staging/` (DuckDB databases built from uploads, rebuilt from
   the upload), `work/` (job scratch), `gateway/`, `engines/` and `worker/` (copies on serving and batch machines).
+- Infrastructure → Storage answers two questions and nothing else (no forecasts). What is using the space: one list
+  grouped by minibrain's own things (base models with the models built on them, adapters per model, dataset versions
+  per dataset, uploads, job logs and checkpoints per job, the database), biggest first, with group totals, under the
+  disk gauges. What could go: suggestions only, each with its size and why it is safe (no model uses this base, no
+  model version trained on these dataset versions, no dataset uses this upload, jobs finished over 7 days ago). Each
+  links to the item, deleted one at a time by its own delete action, which refuses anything in use. Never a bulk or
+  automatic delete of models, adapters or datasets; job logs are the one thing deleted from the page (admin, audited).
+- Job log retention: Settings → Storage → Job logs, 30 days by default, 0 keeps them. The leader's hourly purge removes
+  the log files, library output lines and `work/job-N` checkpoints of jobs finished longer ago; queued and running
+  jobs keep theirs, and job results and metrics stay. Each purge is audited (`job_logs.purge`).
+- Each worker and engine machine reports its cache (model copies, downloaded artifacts, `engines/`) with its disk.
+  Later, not built: "Clear cache" for an idle machine (admin, audited; the machine deletes what it does not need on
+  its next heartbeat), and retention of `work/` checkpoints on remote workers.
 
 ### Connections
 

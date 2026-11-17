@@ -3085,6 +3085,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/job-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read how long job logs are kept */
+        get: operations["read_job_logs_api_settings_job_logs_get"];
+        /** Change how long job logs are kept */
+        put: operations["update_job_logs_api_settings_job_logs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/job-logs/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete old job logs
+         * @description Removes the logs and checkpoints of jobs that finished more than the given days ago. Queued and running jobs keep theirs.
+         */
+        post: operations["purge_old_job_logs_api_system_job_logs_purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -5033,19 +5071,6 @@ export interface components {
         DatasetVersionRequest: {
             sample?: components["schemas"]["SampleRequest"] | null;
         };
-        /** DatasetVersionUsage */
-        DatasetVersionUsage: {
-            /** Count */
-            count: number;
-            /** Size */
-            size: number;
-            /** For Versions */
-            for_versions: number;
-            /** Saved */
-            saved: number;
-            /** Keep */
-            keep: number;
-        };
         /** DecisionInfo */
         DecisionInfo: {
             /** Passed */
@@ -5841,6 +5866,31 @@ export interface components {
             /** Locked */
             locked: boolean;
         };
+        /** FreeUpItem */
+        FreeUpItem: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "base" | "dataset" | "source" | "job_logs";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Count
+             * @description Dataset versions, or jobs whose logs could go.
+             * @default 1
+             */
+            count?: number;
+            /**
+             * Days
+             * @description For job logs: finished more than this many days ago.
+             */
+            days?: number | null;
+        };
         /** FunctionCallBody */
         FunctionCallBody: {
             /** Name */
@@ -6112,10 +6162,12 @@ export interface components {
             web: string;
             /** Stores */
             stores: components["schemas"]["StoreInfo"][];
-            dataset_versions?: components["schemas"]["DatasetVersionUsage"] | null;
-            /** Largest */
-            largest: components["schemas"]["StoredItem"][];
-            reclaimable?: components["schemas"]["Reclaimable"] | null;
+            /** Usage */
+            usage: components["schemas"]["UsageGroup"][];
+            /** Free Up */
+            free_up: components["schemas"]["FreeUpItem"][];
+            /** Job Log Days */
+            job_log_days: number;
         };
         /** InspectRequest */
         InspectRequest: {
@@ -6576,6 +6628,26 @@ export interface components {
              * @description Pool the job ran in, or the pool a queued job waits for.
              */
             pool?: string | null;
+        };
+        /** JobLogPurge */
+        JobLogPurge: {
+            /** Older Than Days */
+            older_than_days: number;
+        };
+        /** JobLogPurged */
+        JobLogPurged: {
+            /** Jobs */
+            jobs: number;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** JobLogSettings */
+        JobLogSettings: {
+            /**
+             * Days
+             * @description Keep finished jobs' logs and checkpoints this long; 0 keeps them.
+             */
+            days: number;
         };
         /** JobMetrics */
         JobMetrics: {
@@ -7637,6 +7709,11 @@ export interface components {
              */
             minibrain_bytes?: number | null;
             /**
+             * Cache Bytes
+             * @description Model copies and downloaded files this machine can fetch again.
+             */
+            cache_bytes?: number | null;
+            /**
              * Reported At
              * Format: date-time
              */
@@ -8477,28 +8554,6 @@ export interface components {
              * Format: date-time
              */
             finished_at: string;
-        };
-        /** Reclaimable */
-        Reclaimable: {
-            /**
-             * Dataset Versions
-             * @description Dataset versions past retention, removed by the next cleanup.
-             */
-            dataset_versions: number;
-            /** Dataset Versions Bytes */
-            dataset_versions_bytes: number;
-            /**
-             * Unused Models
-             * @description Base models on main that no model is built on or serves.
-             */
-            unused_models: components["schemas"]["UnusedModel"][];
-            /**
-             * Orphan Uploads
-             * @description Uploaded files no source refers to.
-             */
-            orphan_uploads: number;
-            /** Orphan Uploads Bytes */
-            orphan_uploads_bytes: number;
         };
         /** RelabelInfo */
         RelabelInfo: {
@@ -9467,25 +9522,6 @@ export interface components {
              */
             mount?: string | null;
         };
-        /** StoredItem */
-        StoredItem: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "model" | "dataset" | "adapter" | "upload" | "log";
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
-            /** Size Bytes */
-            size_bytes: number;
-            /**
-             * Version
-             * @description Model version that owns an adapter.
-             */
-            version?: number | null;
-        };
         /** SystemInfo */
         SystemInfo: {
             device: components["schemas"]["DeviceInfo"];
@@ -10189,15 +10225,6 @@ export interface components {
             /** Content */
             content: string;
         };
-        /** UnusedModel */
-        UnusedModel: {
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
-            /** Size Bytes */
-            size_bytes: number;
-        };
         /** Usage */
         Usage: {
             /** Days */
@@ -10237,6 +10264,62 @@ export interface components {
              * @default 0
              */
             tokens?: number;
+        };
+        /** UsageGroup */
+        UsageGroup: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bases" | "adapters" | "datasets" | "uploads" | "jobs" | "database";
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Count
+             * @description Items in the group; items lists the largest of them.
+             */
+            count: number;
+            /** Items */
+            items: components["schemas"]["UsageItem"][];
+        };
+        /** UsageItem */
+        UsageItem: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Count
+             * @description Versions of an adapter or dataset; attempts of a job.
+             */
+            count?: number | null;
+            /**
+             * Used By
+             * @description Models built on a base model.
+             */
+            used_by?: components["schemas"]["UsageRef"][];
+            /**
+             * Checks
+             * @description A base model that judges or checks safety.
+             * @default false
+             */
+            checks?: boolean;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
+            /** Finished At */
+            finished_at?: string | null;
+        };
+        /** UsageRef */
+        UsageRef: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -17246,6 +17329,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InfrastructureInfo"];
+                };
+            };
+        };
+    };
+    read_job_logs_api_settings_job_logs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLogSettings"];
+                };
+            };
+        };
+    };
+    update_job_logs_api_settings_job_logs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobLogSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLogSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_old_job_logs_api_system_job_logs_purge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobLogPurge"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLogPurged"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -6,11 +6,13 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.data.dataset_versions import cleanup
+from minibrain.jobs.retention import log_days, purge_job_logs
 from minibrain.leader import Leader
 from minibrain.policy import load
 from minibrain.registry import playground_sessions
 from minibrain.registry.audit_chain import head_of, prune_cut, seal_all
 from minibrain.registry.compute import forget_stale
+from minibrain.registry.files import store_for
 from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, RequestLog, now
 from minibrain.settings import Settings
 from minibrain.siem import target_of
@@ -60,6 +62,13 @@ def purge_audit_events(session: Session) -> int:
     return deleted
 
 
+def purge_old_job_logs(session: Session, settings: Settings) -> int:
+    days = log_days(session)
+    if days <= 0:
+        return 0
+    return len(purge_job_logs(session, settings, store_for(settings), days, SYSTEM_ACTOR).jobs)
+
+
 def seal_forever(sessions: sessionmaker[Session], stop: threading.Event, leader: Leader) -> None:
     while not stop.wait(SEAL_SECONDS):
         try:
@@ -82,5 +91,6 @@ def purge_forever(sessions: sessionmaker[Session], settings: Settings, stop: thr
                 forget_stale(session)
                 cleanup(session, settings)
                 session.commit()
+                purge_old_job_logs(session, settings)
         except Exception:
             log.exception("request log purge failed")

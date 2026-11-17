@@ -1,4 +1,4 @@
-import { IconDeviceSdCard, IconPackages } from "@tabler/icons-react";
+import { IconDeviceSdCard, IconFileText, IconPackages } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Button,
@@ -13,6 +13,7 @@ import {
 import { type FormEvent, type ReactNode, useEffect, useId, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
+import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
@@ -24,6 +25,8 @@ type StorageSettings = components["schemas"]["StorageSettings"];
 type StorageUpdate = components["schemas"]["StorageUpdate"];
 
 const STORAGE_KEY = ["settings", "storage"] as const;
+const JOB_LOGS_KEY = ["settings", "job-logs"] as const;
+const WHOLE: Intl.NumberFormatOptions = { maximumFractionDigits: 0 };
 const TEXT = STORAGE.location.settings;
 
 type Draft = {
@@ -289,6 +292,49 @@ function ModelFiles({ settings }: { settings: StorageSettings }) {
     );
 }
 
+function JobLogsSection() {
+    const client = useQueryClient();
+    const settings = useQuery({
+        queryKey: JOB_LOGS_KEY,
+        queryFn: () => unwrap(api.GET("/api/settings/job-logs")),
+    });
+    const save = useMutation({
+        mutationFn: (days: number) => unwrap(api.PUT("/api/settings/job-logs", { body: { days } })),
+        onSuccess: async (saved) => {
+            client.setQueryData(JOB_LOGS_KEY, saved);
+            await client.invalidateQueries({ queryKey: ["infrastructure"] });
+        },
+    });
+    const text = STORAGE.jobLogs.settings.days;
+    return (
+        <SettingsSection
+            icon={IconFileText}
+            anchor={STORAGE.jobLogs.anchor}
+            title={STORAGE.jobLogs.title}
+            description="Logs and training checkpoints of finished jobs on main. Queued and running jobs keep theirs, and models, adapters and datasets are never touched."
+        >
+            <ErrorLine error={settings.error} onRetry={settings.refetch} />
+            <SettingsGroup>
+                <NumberSettingRow
+                    id="job-log-days-field"
+                    anchor={text.anchor}
+                    label={text.label}
+                    description={`Default 30. ${text.description}`}
+                    value={settings.data?.days}
+                    format={WHOLE}
+                    unit="days"
+                    min={0}
+                    max={3650}
+                    largeStep={30}
+                    pending={save.isPending}
+                    error={save.error}
+                    onSave={(next, saved) => save.mutate(next, { onSuccess: saved })}
+                />
+            </SettingsGroup>
+        </SettingsSection>
+    );
+}
+
 export function StorageSettingsPage() {
     const settings = useQuery({
         queryKey: STORAGE_KEY,
@@ -297,7 +343,7 @@ export function StorageSettingsPage() {
     return (
         <SettingsLayout
             title="Storage"
-            caption="Where minibrain keeps uploads, dataset versions, adapters, logs and base model files."
+            caption="Where minibrain keeps uploads, dataset versions, adapters, logs and base model files, and how long job logs stay."
         >
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <SettingsSections>
@@ -310,6 +356,7 @@ export function StorageSettingsPage() {
                 >
                     {settings.data && <ModelFiles settings={settings.data} />}
                 </SettingsSection>
+                <JobLogsSection />
             </SettingsSections>
         </SettingsLayout>
     );

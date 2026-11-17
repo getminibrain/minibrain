@@ -33,6 +33,7 @@ NVIDIA_QUERY = [
 ROCM_QUERY = ["rocm-smi", "--showmeminfo", "vram", "--showuse", "--json"]
 UNIFIED = ("mps", "cpu")
 MAX_GPUS = 64
+CACHE_FOLDERS = (("worker", "models"), ("worker", "artifacts"), ("worker", "cache"), ("engines",))
 
 log = logging.getLogger("minibrain.metrics")
 
@@ -53,6 +54,9 @@ class DiskSample(BaseModel):
     total_bytes: int | None = Bytes
     free_bytes: int | None = Bytes
     minibrain_bytes: int | None = Field(default=None, ge=0, description="What minibrain keeps in that folder.")
+    cache_bytes: int | None = Field(
+        default=None, ge=0, description="Model copies and downloaded files this machine can fetch again."
+    )
 
 
 class MachineSample(BaseModel):
@@ -167,6 +171,10 @@ def folder_bytes(folder: Path) -> int:
     return total
 
 
+def cache_bytes(home: Path) -> int:
+    return sum(folder_bytes(home.joinpath(*parts)) for parts in CACHE_FOLDERS)
+
+
 class Sampler:
     def __init__(
         self, home: Path | None = None, run: Run = run_tool, clock: Callable[[], float] = time.monotonic
@@ -179,6 +187,7 @@ class Sampler:
         self.taken = float("-inf")
         self.primed = False
         self.usage: int | None = None
+        self.cache: int | None = None
         self.counted = float("-inf")
 
     def disks(self, moment: float) -> list[DiskSample]:
@@ -189,6 +198,7 @@ class Sampler:
             return []
         if moment - self.counted >= USAGE_SECONDS:
             self.usage = folder_bytes(self.home) if self.home.exists() else 0
+            self.cache = cache_bytes(self.home)
             self.counted = moment
         return [
             DiskSample(
@@ -197,6 +207,7 @@ class Sampler:
                 total_bytes=space.total,
                 free_bytes=space.free,
                 minibrain_bytes=self.usage,
+                cache_bytes=self.cache,
             )
         ]
 

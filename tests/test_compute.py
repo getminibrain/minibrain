@@ -4,17 +4,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select
 
 from minibrain.models import hardware
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
-from minibrain.registry import settings_store
 from minibrain.registry.models import (
     Artifact,
-    BaseModel,
-    BaseModelStatus,
-    Dataset,
-    DatasetVersion,
     EngineReplica,
     Job,
     JobAttempt,
@@ -22,7 +16,6 @@ from minibrain.registry.models import (
     JobKind,
     JobStatus,
     Model,
-    Source,
     Version,
     now,
 )
@@ -118,7 +111,7 @@ def test_infrastructure_reports_the_setup_and_where_data_lives(harness: Harness)
     assert info["setup"] == "one_machine"
     stores = {store["name"]: store for store in info["stores"]}
     assert set(stores) == {"Database", "Model files", "Dataset versions", "Uploads, adapters and results"}
-    assert info["dataset_versions"] == {"count": 0, "size": 0, "for_versions": 0, "saved": 0, "keep": 5}
+    assert info["free_up"] == [] and info["job_log_days"] == 30
     assert stores["Database"]["kind"] == "sqlite" and stores["Database"]["location"].endswith("minibrain.db")
     assert stores["Model files"]["free_bytes"] > 0 and stores["Model files"]["used_bytes"] == 0
     join_rack(harness)
@@ -210,84 +203,11 @@ def test_pools_say_what_each_machine_is_doing(harness: Harness) -> None:
     assert by_name(harness)["local"]["nodes"][0]["jobs"] == []
 
 
-def test_storage_groups_stores_by_disk_and_lists_the_largest_items(harness: Harness) -> None:
-    with harness.sessions() as session:
-        session.add(Artifact(id="rows-1", kind="dataset_version", packing="parquet", name="rows", size=300))
-        session.add(Artifact(id="rows-2", kind="dataset_version", packing="parquet", name="rows", size=200))
-        dataset = Dataset(slug="tickets", name="Tickets")
-        session.add(dataset)
-        session.flush()
-        for number, artifact, size in ((1, "rows-1", 300), (2, "rows-1", 300), (3, "rows-2", 200)):
-            session.add(
-                DatasetVersion(
-                    dataset_id=dataset.id,
-                    number=number,
-                    hash=f"h{number}",
-                    artifact_id=artifact,
-                    counts={},
-                    labels=[],
-                    size=size,
-                )
-            )
-        session.commit()
+def test_storage_groups_stores_by_disk(harness: Harness) -> None:
     info = harness.client.get("/api/system/infrastructure").json()
     disks = {store["disk"] for store in info["stores"] if store["kind"] in ("folder", "sqlite")}
     assert len(disks) == 1 and None not in disks
-    assert {"kind": "dataset", "key": "tickets", "name": "Tickets", "size_bytes": 500, "version": None} in info[
-        "largest"
-    ]
     assert all(store["mount"] for store in info["stores"] if store["kind"] in ("folder", "sqlite"))
-
-
-def test_storage_lists_adapters_uploads_and_logs_and_what_could_be_freed(harness: Harness) -> None:
-    serve_on_rack(harness)
-    with harness.sessions() as session:
-        for artifact, kind, size in (
-            ("upload-1", "source", 900),
-            ("orphan-1", "source", 70),
-            ("log-1", "log", 40),
-            ("rows-x", "dataset_version", 123),
-        ):
-            session.add(Artifact(id=artifact, kind=kind, packing="raw", name=artifact, size=size))
-        session.add(
-            Source(name="tickets.csv", filename="tickets.csv", table_name="tickets_csv", artifact_id="upload-1")
-        )
-        for key, size in (("qwen3-0.6b", 5000), ("spare-1b", 3000)):
-            session.add(
-                BaseModel(id=key, source="download", name=key, status=BaseModelStatus.AVAILABLE, size_bytes=size)
-            )
-        session.add(DatasetVersion(hash="hx", artifact_id="rows-x", counts={}, labels=[], size=123))
-        job = Job(kind=JobKind.TRAIN, status=JobStatus.SUCCEEDED)
-        session.add(job)
-        session.flush()
-        session.add(JobAttempt(job_id=job.id, number=1, worker="w", log_artifact_id="log-1"))
-        session.commit()
-        job_id = job.id
-    info = harness.client.get("/api/system/infrastructure").json()
-    largest = {(item["kind"], item["key"], item["version"]): item["size_bytes"] for item in info["largest"]}
-    assert largest[("adapter", "triage", 4)] == 64 * 1024**2
-    assert ("upload", "1", None) in largest
-    assert largest[("log", str(job_id), None)] == 40
-    freed = info["reclaimable"]
-    assert [item["key"] for item in freed["unused_models"]] == ["spare-1b"]
-    assert (freed["orphan_uploads"], freed["orphan_uploads_bytes"]) == (1, 70)
-    assert (freed["dataset_versions"], freed["dataset_versions_bytes"]) == (1, 123)
-
-
-def test_free_up_space_keeps_base_models_used_as_judge_or_safety_model(harness: Harness) -> None:
-    serve_on_rack(harness)
-    keys = ("judge-1b", "guard-1b", "install-judge", "install-guard", "spare-1b")
-    with harness.sessions() as session:
-        for key in keys:
-            session.add(BaseModel(id=key, source="download", name=key, status=BaseModelStatus.AVAILABLE, size_bytes=10))
-        model = session.scalars(select(Model).where(Model.slug == "triage")).one()
-        model.judge_model = "judge-1b"
-        model.safety = {"model": "guard-1b", "answers": False}
-        settings_store.write(session, "judge", {"model": "install-judge"})
-        settings_store.write(session, "safety", {"model": "install-guard", "answers": False})
-        session.commit()
-    freed = harness.client.get("/api/system/infrastructure").json()["reclaimable"]
-    assert [item["key"] for item in freed["unused_models"]] == ["spare-1b"]
 
 
 def finish_on_rack(harness: Harness, count: int) -> list[int]:

@@ -1,35 +1,23 @@
-import {
-    IconArchive,
-    IconDeviceSdCard,
-    IconEraser,
-    IconFiles,
-    IconServer,
-    IconStack2,
-} from "@tabler/icons-react";
+import { IconDeviceSdCard, IconServer, IconStack2 } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { DataGrid, Link } from "obp-ui";
+import { DataGrid } from "obp-ui";
 import type { ReactNode } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MiddleTruncate } from "~/components/MiddleTruncate";
 import { PoolLink } from "~/components/PoolLink";
-import { PanelSection, PanelSections, Stat } from "~/components/Section";
+import { PanelSection, PanelSections } from "~/components/Section";
 import { type GaugeKind, type GaugeSegment, UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
-import { count } from "~/lib/format";
-import { JOBS_PATH, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
-import { datasetHref } from "~/pages/models/list/cells";
+import { FreeUpSection } from "./FreeUpSection";
+import { UsageSection } from "./UsageSection";
 import {
     type InfrastructureInfo,
     MachineName,
     type NodeInfo,
     type PoolInfo,
     type StoreInfo,
-    plural,
 } from "./parts";
-
-type StoredItem = InfrastructureInfo["largest"][number];
-type Reclaimable = NonNullable<InfrastructureInfo["reclaimable"]>;
 
 const CATEGORY_KIND: Record<string, GaugeKind> = {
     Database: "database",
@@ -43,14 +31,6 @@ const STORE_KIND: Record<StoreInfo["kind"], string> = {
     postgres: "Postgres",
     folder: "Folder",
     s3: "S3 bucket",
-};
-
-const ITEM_KIND: Record<StoredItem["kind"], string> = {
-    model: "Model files",
-    dataset: "Dataset versions",
-    adapter: "Adapter",
-    upload: "Upload",
-    log: "Job log",
 };
 
 type Disk = { key: string; free: number; total: number; stores: StoreInfo[] };
@@ -124,6 +104,7 @@ type DiskView = {
     ours: number;
     share: GaugeSegment[];
     heading?: ReactNode;
+    footer?: ReactNode;
 };
 
 function DiskCard({ view }: { view: DiskView }) {
@@ -165,6 +146,7 @@ function DiskCard({ view }: { view: DiskView }) {
                     />
                 </div>
             )}
+            {view.footer}
         </div>
     );
 }
@@ -203,12 +185,23 @@ function machineDisks(pools: PoolInfo[]): MachineDisk[] {
                                       total: disk.total_bytes,
                                       ours: disk.minibrain_bytes ?? 0,
                                       share: [],
+                                      footer: <CacheLine cache={disk.cache_bytes} />,
                                   },
                               },
                           ]
                         : [],
                 ),
             ),
+    );
+}
+
+function CacheLine({ cache }: { cache: number | null | undefined }) {
+    return (
+        <p className="text-sm text-muted-foreground tabular-nums">
+            {cache === null || cache === undefined
+                ? "Cache not reported; this machine runs an older minibrain."
+                : `Cache · ${bytes(cache)} of model copies and downloads it can fetch again`}
+        </p>
     );
 }
 
@@ -219,7 +212,7 @@ function MachineDisksSection({ pools }: { pools: PoolInfo[] }) {
             flush
             icon={IconServer}
             title="Disks on other machines"
-            description="The disk each worker and engine keeps model copies and job files on, as each last reported."
+            description="The disk each worker and engine keeps model copies, downloads and job files on, as each last reported."
         >
             {disks.length === 0 ? (
                 <p className="px-4 py-3 text-muted-foreground">
@@ -288,40 +281,6 @@ function storeColumns(home: string): ColumnDef<StoreInfo, unknown>[] {
     ];
 }
 
-function itemHref(item: StoredItem): string {
-    if (item.kind === "model") {
-        return modelPageHref(item.key);
-    }
-    if (item.kind === "adapter" && item.version !== null && item.version !== undefined) {
-        return modelVersionHref(item.key, item.version);
-    }
-    if (item.kind === "upload") {
-        return `/data?item=source:${encodeURIComponent(item.key)}`;
-    }
-    if (item.kind === "log") {
-        return `${JOBS_PATH}/${item.key}`;
-    }
-    return datasetHref(item.key);
-}
-
-const ITEM_COLUMNS: ColumnDef<StoredItem, unknown>[] = [
-    {
-        header: "Item",
-        id: "name",
-        cell: ({ row }) => (
-            <Link href={itemHref(row.original)} className="text-primary hover:underline">
-                {row.original.name}
-            </Link>
-        ),
-    },
-    { header: "Kind", id: "kind", cell: ({ row }) => ITEM_KIND[row.original.kind] },
-    {
-        header: "Size",
-        id: "size",
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.size_bytes)}</span>,
-    },
-];
-
 function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
     const stores = info?.stores ?? [];
     const disks = disksOf(stores);
@@ -341,82 +300,6 @@ function StorageSection({ info }: { info: InfrastructureInfo | undefined }) {
                     ))}
                 </div>
             )}
-        </PanelSection>
-    );
-}
-
-type FreeRow = { key: string; what: ReactNode; detail: string; size: number; where: ReactNode };
-
-const FREE_COLUMNS: ColumnDef<FreeRow, unknown>[] = [
-    { header: "What", id: "what", cell: ({ row }) => row.original.what },
-    {
-        header: "Why it is safe",
-        id: "detail",
-        cell: ({ row }) => <span className="text-muted-foreground">{row.original.detail}</span>,
-    },
-    {
-        header: "Size",
-        id: "size",
-        cell: ({ row }) => <span className="tabular-nums">{bytes(row.original.size)}</span>,
-    },
-    { header: "Managed in", id: "where", cell: ({ row }) => row.original.where },
-];
-
-function TextLink({ href, children }: { href: string; children: ReactNode }) {
-    return (
-        <Link href={href} className="text-primary hover:underline">
-            {children}
-        </Link>
-    );
-}
-
-function freeRows(found: Reclaimable): FreeRow[] {
-    const rows: FreeRow[] = [];
-    if (found.dataset_versions > 0) {
-        rows.push({
-            key: "dataset-versions",
-            what: plural(found.dataset_versions, "dataset version"),
-            detail: "Past retention; the next cleanup removes them.",
-            size: found.dataset_versions_bytes,
-            where: <TextLink href="/settings/data">Retention</TextLink>,
-        });
-    }
-    for (const model of found.unused_models) {
-        rows.push({
-            key: `model-${model.key}`,
-            what: `${model.name} files`,
-            detail: "No model is built on it and it is not deployed.",
-            size: model.size_bytes,
-            where: <TextLink href={modelPageHref(model.key)}>Model page</TextLink>,
-        });
-    }
-    if (found.orphan_uploads > 0) {
-        rows.push({
-            key: "uploads",
-            what: plural(found.orphan_uploads, "uploaded file"),
-            detail: "No source refers to them.",
-            size: found.orphan_uploads_bytes,
-            where: <TextLink href="/data">Data</TextLink>,
-        });
-    }
-    return rows;
-}
-
-function FreeUpSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const rows = info?.reclaimable ? freeRows(info.reclaimable) : [];
-    const total = rows.reduce((sum, row) => sum + row.size, 0);
-    return (
-        <PanelSection
-            bare
-            icon={IconEraser}
-            title="Free up space"
-            description={
-                rows.length > 0
-                    ? `${bytes(total)} could be removed without breaking any model, dataset or source.`
-                    : "What could be removed without breaking any model, dataset or source."
-            }
-        >
-            <DataGrid columns={FREE_COLUMNS} rows={rows} empty="Nothing to free up." />
         </PanelSection>
     );
 }
@@ -441,46 +324,6 @@ function StoresSection({ info }: { info: InfrastructureInfo | undefined }) {
     );
 }
 
-function LargestSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const items = info?.largest ?? [];
-    return (
-        <PanelSection
-            bare
-            icon={IconFiles}
-            title="Largest items"
-            description="Base model files on main, dataset versions, adapters, uploads and job logs, biggest first."
-        >
-            <DataGrid columns={ITEM_COLUMNS} rows={items} empty="Nothing stored yet." />
-        </PanelSection>
-    );
-}
-
-function VersionUsageSection({ info }: { info: InfrastructureInfo | undefined }) {
-    const usage = info?.dataset_versions;
-    return (
-        <PanelSection
-            icon={IconArchive}
-            title="Dataset versions"
-            description="Saved copies of dataset rows that models train and score on, and the copies that add accepted feedback. Identical rows are stored once."
-        >
-            <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                    <Stat label="Copies" value={count(usage?.count)} />
-                    <Stat label="Stored" value={bytes(usage?.size)} />
-                    <Stat label="Used by models" value={count(usage?.for_versions)} />
-                    <Stat label="Unused, kept" value={count(usage?.saved)} />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {`Versions a model uses are kept, and so is each dataset's latest; of the rest, the last ${count(usage?.keep)} per dataset stay. `}
-                    <Link href="/settings/data" className="text-primary hover:underline">
-                        Change retention
-                    </Link>
-                </p>
-            </div>
-        </PanelSection>
-    );
-}
-
 export function StorageTab({
     info,
     pools,
@@ -491,11 +334,10 @@ export function StorageTab({
     return (
         <PanelSections>
             <StorageSection info={info} />
-            <MachineDisksSection pools={pools} />
+            <UsageSection info={info} />
             <FreeUpSection info={info} />
-            <LargestSection info={info} />
+            <MachineDisksSection pools={pools} />
             <StoresSection info={info} />
-            <VersionUsageSection info={info} />
         </PanelSections>
     );
 }

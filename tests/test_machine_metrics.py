@@ -79,6 +79,20 @@ def test_the_sampler_asks_nvidia_first_caches_and_reports_its_disk(tmp_path: Pat
     assert sampler.sample() is not sample and sampler.sample().cpu_percent is not None
 
 
+def test_the_sampler_reports_model_copies_and_downloads_as_cache(tmp_path: Path) -> None:
+    for parts, size in (
+        (("worker", "models", "qwen", "weights.bin"), 1000),
+        (("worker", "cache", "a1", "rows.parquet"), 200),
+        (("engines", "qwen", "weights", "w.bin"), 30),
+        (("worker", "work", "job-4", "checkpoint.bin"), 7),
+    ):
+        path = tmp_path.joinpath(*parts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * size)
+    disk = Sampler(tmp_path, run=lambda command: None).sample().disks[0]
+    assert disk.cache_bytes == 1230 and disk.minibrain_bytes == 1237
+
+
 def test_machines_without_a_gpu_tool_report_no_gpus_rather_than_guesses() -> None:
     sample = Sampler(run=lambda command: None).sample()
     assert sample.gpus == [] and sample.disks == []
