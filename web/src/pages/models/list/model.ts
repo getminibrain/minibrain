@@ -27,8 +27,6 @@ export type StatusKind =
     | "health"
     | "unhealthy"
     | "failing"
-    | "candidate"
-    | "ready"
     | "failed"
     | "training"
     | "transfer"
@@ -64,7 +62,6 @@ const ATTENTION: StatusKind[] = [
     "health",
     "unhealthy",
     "failing",
-    "candidate",
     "failed",
     "training",
     "transfer",
@@ -337,16 +334,6 @@ function customLine(model: ListModel): StatusLine {
     if (problem) {
         return problem;
     }
-    const best = candidateOf(model);
-    if (best) {
-        return {
-            kind: "candidate",
-            text: `v${best.number} ${points(deltaOf(model, best) ?? 0)} vs live`,
-            tone: "success",
-            version: best.number,
-            row,
-        };
-    }
     const newest = model.versions[0];
     if (newest?.status === "failed") {
         return {
@@ -386,16 +373,6 @@ function customLine(model: ListModel): StatusLine {
             return { ...deployedLine(row), hint: { text: "Needs data", href: trainHref(row.key) } };
         }
         return { kind: "setup", text: "Needs data", tone: null, row };
-    }
-    const ready = readyOf(model);
-    if (ready) {
-        return {
-            kind: "ready",
-            text: `v${ready.number} ready`,
-            tone: "success",
-            version: ready.number,
-            row,
-        };
     }
     return deployedLine(row);
 }

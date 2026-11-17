@@ -269,35 +269,6 @@ function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
     );
 }
 
-function MakeLiveLink({
-    model,
-    number,
-    on,
-}: {
-    model: ListModel;
-    number: number;
-    on: Handlers;
-}) {
-    const version = model.versions.find((item) => item.number === number);
-    if (!version || !canMakeLive(model, version)) {
-        return null;
-    }
-    return (
-        <>
-            <span aria-hidden="true" className="text-faint">
-                ·
-            </span>
-            <button
-                type="button"
-                onClick={() => on.makeLive(model, version)}
-                className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-                {`Deploy v${number}`}
-            </button>
-        </>
-    );
-}
-
 function StatusHintLink({ hint }: { hint: StatusHint }) {
     return (
         <>
@@ -314,7 +285,7 @@ function StatusHintLink({ hint }: { hint: StatusHint }) {
     );
 }
 
-function ModelStatus({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
+function ModelStatus({ model }: { model: ListModel }) {
     const line = statusLine(model);
     const prefix =
         model.kind === "base" && model.variants.length > 1 && line.kind !== "update"
@@ -327,11 +298,6 @@ function ModelStatus({ model, on, can }: { model: ListModel; on: Handlers; can: 
             )}
             <StatusLineText line={line} replicas={replicasOf(model)} />
             {line.hint && <StatusHintLink hint={line.hint} />}
-            {can.build &&
-                (line.kind === "candidate" || line.kind === "ready") &&
-                line.version !== undefined && (
-                    <MakeLiveLink model={model} number={line.version} on={on} />
-                )}
         </span>
     );
 }
@@ -730,7 +696,7 @@ export function ModelLine({
                 }}
             />
             <div className="min-w-0">
-                <ModelStatus model={model} on={on} can={props.can} />
+                <ModelStatus model={model} />
             </div>
             <ModelActions model={model} on={on} can={props.can} />
         </li>
