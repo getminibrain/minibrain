@@ -214,6 +214,9 @@ def serving(job: Job) -> bool:
 
 def worker_place(session: Session, job: Job) -> dict[str, str | None]:
     attempt = max(job.attempts, key=lambda item: item.number, default=None)
+    if attempt is not None and attempt.node_id:
+        pool, _, host = attempt.node_id.partition("/")
+        return {"host": host, "pool": pool}
     worker = session.get(Worker, attempt.worker) if attempt is not None else None
     if worker is None:
         return {"host": None, "pool": job.pool}

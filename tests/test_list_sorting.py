@@ -343,3 +343,5 @@ def test_pool_is_where_each_job_ran_after_its_worker_joins_another_pool(harness:
         session.commit()
     items = walk(harness, "/api/jobs", {"sort": "pool", "order": "asc", "limit": 2})
     assert [item["pool"] for item in items] == ["alpha", "beta", "zulu"]
+    places = [harness.client.get(f"/api/jobs/{item['id']}").json() for item in items]
+    assert [(place["pool"], place["host"]) for place in places] == [("alpha", "box"), ("beta", "box"), ("zulu", "box")]
