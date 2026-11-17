@@ -420,8 +420,18 @@ def examples_query(sql: str, columns: Sequence[Column], limit: int | None = None
     return pair_examples(sql, limit)
 
 
+WHITESPACE = "".join(character for character in map(chr, range(0x3001)) if character.isspace())
+
+
+def stripped(expression: str) -> str:
+    return f"trim({expression}, {quote_literal(WHITESPACE)})"
+
+
 def usable_examples(examples: str) -> str:
-    return f"SELECT * FROM ({examples}) WHERE coalesce(trim(input), '') <> '' AND coalesce(trim(expected), '') <> ''"
+    return (
+        f"SELECT * REPLACE ({stripped('input')} AS input, {stripped('expected')} AS expected) FROM ({examples}) "
+        f"WHERE coalesce({stripped('input')}, '') <> '' AND coalesce({stripped('expected')}, '') <> ''"
+    )
 
 
 def count_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None) -> int:

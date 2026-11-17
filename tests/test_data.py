@@ -61,7 +61,7 @@ def test_rows_as_text_keep_nested_values_as_json(staging: list[Table]) -> None:
     sql = "SELECT 1 AS id, [{'role': 'user', 'content': 'hi \"there\"'}] AS messages, NULL::INTEGER[] AS empty"
     result = run_query(staging, sql, None, as_text=True)
     assert result.columns == ["id", "messages", "empty"]
-    assert result.types == ["INTEGER", "STRUCT(\"role\" VARCHAR, \"content\" VARCHAR)[]", "INTEGER[]"]
+    assert result.types == ["INTEGER", 'STRUCT("role" VARCHAR, "content" VARCHAR)[]', "INTEGER[]"]
     assert result.rows == [["1", '[{"role":"user","content":"hi \\"there\\""}]', None]]
 
 
@@ -110,6 +110,18 @@ def test_chat_rows_split_off_the_last_answer(tmp_path: Path) -> None:
     assert label_counts(tables, "SELECT messages FROM source", 10) == [("billing", 1), ("bug", 1)]
     with pytest.raises(SourceError, match="messages column"):
         example_rows(tables, "SELECT 1 AS other")
+
+
+def test_quality_and_label_counts_ignore_surrounding_whitespace_like_checks_and_training(
+    staging: list[Table],
+) -> None:
+    sql = (
+        "SELECT * FROM (VALUES ('How do I pay?', 'billing'), (chr(10) || 'How do I pay?', 'billing '), "
+        "('It broke', chr(9) || 'bug'), (chr(10), 'bug'), ('Where is it?', chr(160))) AS t(input, label)"
+    )
+    quality = assess(staging, sql)
+    assert (quality.rows, quality.empty, quality.duplicates, quality.labels) == (5, 2, 1, 2)
+    assert label_counts(staging, sql, 10) == [("billing", 2), ("bug", 1)]
 
 
 TABBED = "text\tlabel\nhello, world, again\tgreet\nbye, see you, soon\tbye\nfoo, bar, baz\tother\n"
