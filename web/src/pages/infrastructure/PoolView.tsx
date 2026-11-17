@@ -1,8 +1,21 @@
-import { Link, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
+import { IconServer, IconStack2 } from "@tabler/icons-react";
+import {
+    Link,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+    cn,
+} from "obp-ui";
 import type { ReactNode } from "react";
 import type { PoolToken } from "~/api/joinTokenQueries";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
-import { BASIS_LABELS, UsageGauge } from "~/components/UsageGauge";
+import { PublisherLogo } from "~/components/PublisherLogo";
+import { BASIS_HINTS, UsageGauge } from "~/components/UsageGauge";
 import { StatusText, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
@@ -144,9 +157,16 @@ function MemoryCell({ row }: { row: MachineRow }) {
                 size="sm"
                 className="w-10 shrink-0"
             />
-            <span className="truncate text-sm text-muted-foreground tabular-nums">
-                {`${shareText(view.used, view.capacity)} ${BASIS_LABELS[view.basis].toLowerCase()}`}
-            </span>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <span className="cursor-default truncate text-sm text-muted-foreground tabular-nums">
+                        {shareText(view.used, view.capacity)}
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs whitespace-normal">
+                    {BASIS_HINTS[view.basis]}
+                </TooltipContent>
+            </Tooltip>
         </span>
     );
 }
@@ -180,7 +200,10 @@ function GroupRow({
             </TableCell>
             <TableCell colSpan={COLUMNS - 1} className="py-1.5 whitespace-normal">
                 <span className="flex flex-wrap items-center gap-x-3 text-sm">
-                    <span className="text-base font-medium text-foreground">{pool.name}</span>
+                    <span className="flex items-center gap-2 text-base font-medium text-foreground">
+                        <IconStack2 aria-hidden="true" className="size-4 text-muted-foreground" />
+                        {pool.name}
+                    </span>
                     {pool.label !== pool.name && (
                         <span className="text-muted-foreground">{pool.label}</span>
                     )}
@@ -244,6 +267,10 @@ function MachineLine({
             </TableCell>
             <TableCell className="py-2">
                 <span className="flex min-w-0 items-center gap-2">
+                    <IconServer
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
                     <span className="max-w-full shrink-0 truncate font-mono text-foreground">
                         {node.host}
                     </span>
@@ -299,8 +326,9 @@ function ActivityRows({ row }: { row: MachineRow }) {
                         <StatusText tone={state.tone} active={state.active}>
                             {state.label}
                         </StatusText>
-                        <span className="truncate">
-                            <Link href={servedHref(served)} className={LINK}>
+                        <span className="flex min-w-0 items-center gap-2">
+                            <PublisherLogo name={served.name} modelKey={served.model} size="sm" />
+                            <Link href={servedHref(served)} className={cn(LINK, "truncate")}>
                                 {versioned(served.name, served.version)}
                             </Link>
                         </span>

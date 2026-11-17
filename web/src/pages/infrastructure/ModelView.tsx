@@ -1,7 +1,9 @@
+import { IconServer } from "@tabler/icons-react";
 import { Link, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
 import { Fragment, type ReactNode } from "react";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
 import { PoolLink } from "~/components/PoolLink";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { modelPageHref, modelVersionHref } from "~/lib/modelLinks";
@@ -53,7 +55,8 @@ function ModelLine({
                 </StatusText>
             </TableCell>
             <TableCell className="py-2">
-                <span className="flex min-w-0 items-baseline gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                    <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
                     <Link href={modelPageHref(model.model)} className={cn(LINK, "truncate")}>
                         {model.name}
                     </Link>
@@ -115,6 +118,10 @@ function MachineSubRow({
             </TableCell>
             <TableCell className="py-1.5 pl-6">
                 <span className="flex min-w-0 items-center gap-2">
+                    <IconServer
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
                     <MachineName node={row.node} busy />
                     <span className="shrink-0 text-sm text-muted-foreground">
                         {engineLabel(engine.engine)}
