@@ -9,6 +9,7 @@ import duckdb
 DIRECTORY_ENV = "MINIBRAIN_DUCKDB_EXTENSIONS"
 REPOSITORY_ENV = "MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY"
 OFFICIAL = "https://extensions.duckdb.org"
+CORE = "core"
 PLATFORMS = ("linux_amd64", "linux_arm64", "osx_arm64", "osx_amd64", "windows_amd64")
 PURPOSES = {
     "httpfs": "S3 and Iceberg sources",
@@ -108,12 +109,17 @@ def with_dependencies(names: Iterable[str]) -> list[str]:
     return ordered
 
 
-def install_from(connection: duckdb.DuckDBPyConnection, name: str, source: str) -> None:
+def install_statement(name: str, source: str) -> str:
     flat = Path(source).expanduser() / f"{name}.duckdb_extension"
     if "://" not in source and flat.is_file():
-        connection.execute(f"INSTALL {quoted(str(flat))}")
-    else:
-        connection.execute(f"INSTALL {name} FROM {quoted(source)}")
+        return f"INSTALL {quoted(str(flat))}"
+    if source.rstrip("/") == OFFICIAL:
+        return f"INSTALL {name} FROM {CORE}"
+    return f"INSTALL {name} FROM {quoted(source)}"
+
+
+def install_from(connection: duckdb.DuckDBPyConnection, name: str, source: str) -> None:
+    connection.execute(install_statement(name, source))
 
 
 def load(connection: duckdb.DuckDBPyConnection, names: Sequence[str]) -> None:
