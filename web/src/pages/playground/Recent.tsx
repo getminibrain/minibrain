@@ -17,17 +17,15 @@ import {
     Input,
     SearchInput,
     Skeleton,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
     cn,
     useToast,
 } from "obp-ui";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { useChats, useDeleteChat, useSaveChat } from "~/api/playgroundQueries";
+import { useChats, useDeleteChat, usePlaygroundModels, useSaveChat } from "~/api/playgroundQueries";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
-import type { ChatSummary } from "~/lib/playground";
-import { timeText } from "~/lib/time";
+import type { ChatSummary, Target } from "~/lib/playground";
+import { DAY_GROUPS, ageText, dayGroup, exactTime } from "~/lib/time";
 
 const PLACEHOLDERS = ["first", "second", "third", "fourth"];
 
@@ -92,19 +90,18 @@ function ChatActions({
     onRename: () => void;
     onDelete: () => void;
 }) {
-    const label = `Actions for ${chat.title}`;
     return (
         <DropdownMenu>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-xs" aria-label={label}>
-                            <IconDots aria-hidden="true" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Actions</TooltipContent>
-            </Tooltip>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Actions for ${chat.title}`}
+                    className="opacity-0 group-focus-within/chat:opacity-100 group-hover/chat:opacity-100 data-popup-open:opacity-100"
+                >
+                    <IconDots aria-hidden="true" />
+                </Button>
+            </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onSelect={onRename}>
                     <IconPencil />
@@ -120,14 +117,29 @@ function ChatActions({
     );
 }
 
+function ChatAvatar({ chat, targets }: { chat: ChatSummary; targets: Target[] }) {
+    const target = targets.find((item) => item.name === chat.model);
+    const key = target?.key ?? chat.model.split("@")[0];
+    return (
+        <PublisherLogo
+            publisher={target?.publisher}
+            name={target?.model_name ?? key}
+            modelKey={key}
+            size="sm"
+        />
+    );
+}
+
 function ChatRow({
     chat,
+    targets,
     current,
     onOpen,
     onRename,
     onDelete,
 }: {
     chat: ChatSummary;
+    targets: Target[];
     current: boolean;
     onOpen: () => void;
     onRename: () => void;
@@ -136,7 +148,7 @@ function ChatRow({
     return (
         <li
             className={cn(
-                "flex items-center gap-1 rounded-md pr-1",
+                "group/chat relative flex h-8 items-center rounded-md",
                 current ? "bg-accent text-accent-foreground" : "hover:bg-secondary",
             )}
         >
@@ -144,16 +156,72 @@ function ChatRow({
                 type="button"
                 onClick={onOpen}
                 aria-current={current ? "true" : undefined}
-                className="flex min-w-0 flex-1 flex-col rounded-md px-2 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                title={`${chat.title}\n${chat.model} · ${exactTime(chat.updated_at)}`}
+                className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-                <span className="truncate">{chat.title}</span>
-                <span className="truncate text-sm text-muted-foreground">
-                    {`${timeText(chat.updated_at)} · `}
-                    <span className="font-mono">{chat.model}</span>
-                </span>
+                <ChatAvatar chat={chat} targets={targets} />
+                <span className="min-w-0 flex-1 truncate">{chat.title}</span>
+                <time
+                    dateTime={chat.updated_at}
+                    className="min-w-6 shrink-0 text-right text-sm text-muted-foreground tabular-nums group-focus-within/chat:opacity-0 group-hover/chat:opacity-0 group-has-data-popup-open/chat:opacity-0"
+                >
+                    {ageText(chat.updated_at)}
+                </time>
             </button>
-            <ChatActions chat={chat} onRename={onRename} onDelete={onDelete} />
+            <span className="absolute right-1">
+                <ChatActions chat={chat} onRename={onRename} onDelete={onDelete} />
+            </span>
         </li>
+    );
+}
+
+function ChatGroups({
+    chats,
+    targets,
+    current,
+    onOpen,
+    onRename,
+    onDelete,
+}: {
+    chats: ChatSummary[];
+    targets: Target[];
+    current: number | null;
+    onOpen: (id: number) => void;
+    onRename: (chat: ChatSummary) => void;
+    onDelete: (chat: ChatSummary) => void;
+}) {
+    const now = Date.now();
+    const sorted = [...chats].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    return (
+        <div className="flex flex-col gap-3">
+            {DAY_GROUPS.map((group) => {
+                const members = sorted.filter((chat) => dayGroup(chat.updated_at, now) === group);
+                if (members.length === 0) {
+                    return null;
+                }
+                const id = `recent-${group.replaceAll(" ", "-").toLowerCase()}`;
+                return (
+                    <section key={group} aria-labelledby={id} className="flex flex-col gap-0.5">
+                        <h3 id={id} className="px-2 pb-1 text-sm text-muted-foreground">
+                            {group}
+                        </h3>
+                        <ul className="flex flex-col gap-0.5">
+                            {members.map((chat) => (
+                                <ChatRow
+                                    key={chat.id}
+                                    chat={chat}
+                                    targets={targets}
+                                    current={chat.id === current}
+                                    onOpen={() => onOpen(chat.id)}
+                                    onRename={() => onRename(chat)}
+                                    onDelete={() => onDelete(chat)}
+                                />
+                            ))}
+                        </ul>
+                    </section>
+                );
+            })}
+        </div>
     );
 }
 
@@ -174,6 +242,7 @@ export function Recent({
 }) {
     const toast = useToast();
     const chats = useChats();
+    const targets = usePlaygroundModels().data?.targets ?? [];
     const remove = useDeleteChat();
     const [filter, setFilter] = useState("");
     const [renaming, setRenaming] = useState<ChatSummary | null>(null);
@@ -199,33 +268,31 @@ export function Recent({
             )}
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
                 {chats.isLoading && (
-                    <div className="flex flex-col gap-2 p-2">
+                    <div className="flex flex-col gap-1 p-2">
                         {PLACEHOLDERS.map((name) => (
-                            <Skeleton key={name} className="h-10 w-full" />
+                            <Skeleton key={name} className="h-8 w-full" />
                         ))}
                     </div>
                 )}
                 {chats.data && items.length === 0 && (
-                    <p className="p-2 text-muted-foreground">
-                        Your past chats appear here. Only you can see them.
-                    </p>
+                    <p className="truncate p-2 text-muted-foreground">No chats yet.</p>
                 )}
                 {items.length > 0 && shown.length === 0 && (
-                    <p className="p-2 text-muted-foreground">No chat matches {filter.trim()}.</p>
+                    <p className="truncate p-2 text-muted-foreground">
+                        No chat matches {filter.trim()}.
+                    </p>
                 )}
                 {shown.length > 0 && (
-                    <ul className="flex flex-col gap-0.5" aria-label="Recent chats">
-                        {shown.map((chat) => (
-                            <ChatRow
-                                key={chat.id}
-                                chat={chat}
-                                current={chat.id === current}
-                                onOpen={() => onOpen(chat.id)}
-                                onRename={() => setRenaming(chat)}
-                                onDelete={() => setDeleting(chat)}
-                            />
-                        ))}
-                    </ul>
+                    <nav aria-label="Recent chats">
+                        <ChatGroups
+                            chats={shown}
+                            targets={targets}
+                            current={current}
+                            onOpen={onOpen}
+                            onRename={setRenaming}
+                            onDelete={setDeleting}
+                        />
+                    </nav>
                 )}
                 <ErrorLine error={chats.error ?? remove.error} />
             </div>

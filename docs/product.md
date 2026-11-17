@@ -445,7 +445,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Save, rename and delete named settings, one loading by default.
   UI: Playground › Presets · API: GET /api/playground/presets, POST /api/playground/presets, PUT /api/playground/presets/{preset_id}, DELETE /api/playground/presets/{preset_id}
 - **Playground history** · shipped · product, engineer
-  Reopen, rename and delete your chats, saved encrypted per person.
+  Reopen, rename and delete chats grouped by day, saved encrypted.
   UI: Playground › Recent · API: GET /api/playground/sessions, POST /api/playground/sessions, GET /api/playground/sessions/{chat_id}, PUT /api/playground/sessions/{chat_id}, DELETE /api/playground/sessions/{chat_id} · Policy: request_bodies, log_retention_days
 - **Staff chat** · planned · product, admin
   A ChatGPT-like app for staff: history, retrieval, sharing, retention.

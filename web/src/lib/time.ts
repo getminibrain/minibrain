@@ -46,6 +46,47 @@ export function exactTime(value: string): string {
     return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }
 
+const SHORT_DATE = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+const SHORT_UNITS: [string, number][] = [
+    ["w", 7 * 24 * 3600],
+    ["d", 24 * 3600],
+    ["h", 3600],
+    ["m", 60],
+];
+const AGE_LIMIT_S = 5 * 7 * 24 * 3600;
+const DAY_MS = 24 * 3600 * 1000;
+
+export function ageText(value: string, now: number = Date.now()): string {
+    const seconds = Math.max(0, (now - new Date(value).getTime()) / 1000);
+    if (seconds >= AGE_LIMIT_S) {
+        return SHORT_DATE.format(new Date(value));
+    }
+    for (const [unit, size] of SHORT_UNITS) {
+        if (seconds >= size) {
+            return `${Math.floor(seconds / size)}${unit}`;
+        }
+    }
+    return "now";
+}
+
+export const DAY_GROUPS = ["Today", "Yesterday", "Previous 7 days", "Older"] as const;
+export type DayGroup = (typeof DAY_GROUPS)[number];
+
+function dayStart(at: Date): number {
+    return new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
+}
+
+export function dayGroup(value: string, now: number = Date.now()): DayGroup {
+    const days = Math.round((dayStart(new Date(now)) - dayStart(new Date(value))) / DAY_MS);
+    if (days <= 0) {
+        return "Today";
+    }
+    if (days === 1) {
+        return "Yesterday";
+    }
+    return days <= 7 ? "Previous 7 days" : "Older";
+}
+
 export function fileSize(value: number | null | undefined): string {
     if (value === null || value === undefined || value >= 1024) {
         return bytes(value);
