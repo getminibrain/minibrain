@@ -3,6 +3,7 @@ import type { components } from "~/api/schema";
 import { failingShare } from "~/components/models/ModelMetrics";
 import type { Tone } from "~/components/models/StatusText";
 import { costText } from "~/lib/cost";
+import { deployReady } from "~/lib/deployReady";
 import { percent, pointsSize } from "~/lib/format";
 import { modelPageHref, trainHref } from "~/lib/modelLinks";
 import { PER_TOKENS, gpu } from "~/lib/traffic";
@@ -210,27 +211,26 @@ export function canMakeLive(model: ListModel, version: ModelVersionRow): boolean
     return !model.row.teardown && !version.live && goesLive(version);
 }
 
+export function readyToDeploy(version: ModelVersionRow): boolean {
+    return deployReady(version, Boolean(version.live));
+}
+
+export function readyOf(model: ListModel): ModelVersionRow | undefined {
+    return model.versions
+        .filter(readyToDeploy)
+        .sort(
+            (left, right) => (right.score ?? -1) - (left.score ?? -1) || right.number - left.number,
+        )[0];
+}
+
 export function beatsLive(model: ListModel, version: ModelVersionRow): boolean {
     const delta = deltaOf(model, version);
-    return (
-        goesLive(version) && version.promotion?.passed === true && delta !== null && delta > SAME
-    );
+    return readyToDeploy(version) && delta !== null && delta > SAME;
 }
 
 export function candidateOf(model: ListModel): ModelVersionRow | undefined {
-    return model.versions
-        .filter((version) => beatsLive(model, version))
-        .sort((left, right) => (right.score ?? 0) - (left.score ?? 0))[0];
-}
-
-function trainedReady(model: ListModel): ModelVersionRow | undefined {
-    const serveOnly = Boolean(model.row.serve_only);
-    return model.versions.find(
-        (version) =>
-            goesLive(version) &&
-            version.promotion?.passed === true &&
-            (version.kind === "lora" || serveOnly),
-    );
+    const best = readyOf(model);
+    return best && beatsLive(model, best) ? best : undefined;
 }
 
 export function busyVersion(model: ListModel): ModelVersionRow | undefined {
@@ -387,7 +387,7 @@ function customLine(model: ListModel): StatusLine {
         }
         return { kind: "setup", text: "Needs data", tone: null, row };
     }
-    const ready = liveOf(model) ? undefined : trainedReady(model);
+    const ready = readyOf(model);
     if (ready) {
         return {
             kind: "ready",

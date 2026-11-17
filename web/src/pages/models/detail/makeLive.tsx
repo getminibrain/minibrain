@@ -17,6 +17,7 @@ import { FormRow, FormRows } from "~/components/FormRows";
 import { type PickOption, PickSelect } from "~/components/PickSelect";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
+import { deployReady } from "~/lib/deployReady";
 import { percent, points } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
 import {
@@ -38,12 +39,7 @@ export function deltaOf(version: VersionInfo, live: VersionInfo | undefined): nu
 }
 
 export function readyToDeploy(version: VersionInfo, live: VersionInfo | undefined): boolean {
-    return (
-        version.status === "ready" &&
-        !version.base_refusal &&
-        version.promotion?.passed === true &&
-        version.number !== live?.number
-    );
+    return deployReady(version, version.number === live?.number);
 }
 
 export function liveOf(versions: VersionInfo[] | undefined): VersionInfo | undefined {
