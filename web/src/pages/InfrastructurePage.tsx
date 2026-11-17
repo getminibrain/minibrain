@@ -96,7 +96,7 @@ function SetupTab({
                 <PanelSection
                     icon={IconCpu}
                     title="This main process"
-                    description="Inference uses the GPU; training avoids the Apple GPU, which hangs."
+                    description="The devices this process uses for inference and training."
                 >
                     <div className="grid grid-cols-3 gap-x-8 gap-y-4">
                         <Stat
