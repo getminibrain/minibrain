@@ -1,6 +1,18 @@
+import { IconPlayerPlay } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge, Button, CheckboxSelect, DataGrid, EmptyState, Link, SearchInput, cn } from "obp-ui";
-import { useMemo } from "react";
+import {
+    Badge,
+    Button,
+    CheckboxSelect,
+    DataGrid,
+    Link,
+    SearchInput,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    cn,
+} from "obp-ui";
+import { type ReactNode, useEffect, useMemo } from "react";
 import {
     type FeedbackInfo,
     useFeedbackFacets,
@@ -15,13 +27,19 @@ import { StatusText } from "~/components/models/StatusText";
 import {
     FEEDBACK_PATH,
     FEEDBACK_STATUSES,
+    FEEDBACK_TABS,
+    type FeedbackTab,
     feedbackStatusLabel,
     feedbackStatusVariant,
+    feedbackTab,
     fromLabel,
     signalLabel,
+    tabLabel,
 } from "~/lib/feedback";
 import { listHref, splitList, useListSearch } from "~/lib/listSearch";
+import { DiffText, answerDiff } from "./feedback/AnswerDiff";
 import { FeedbackReview } from "./feedback/FeedbackReview";
+import { TrainingNudges } from "./feedback/TrainingNudges";
 import { Updated } from "./models/MyModels";
 
 const KEYS = ["model", "status", "assignee", "q", "item"] as const;
@@ -31,12 +49,24 @@ const ASSIGNEES = [
 ];
 
 const STATUS_WIDTH = 264;
+const NEXT = "next";
+
+const EMPTY: Record<FeedbackTab, string> = {
+    pending: "Nothing to review. New feedback lands here.",
+    accepted: "No accepted feedback yet.",
+    rejected: "No rejected feedback.",
+    all: "",
+};
 
 function Muted({ children }: { children: string }) {
     return <span className="text-muted-foreground">{children}</span>;
 }
 
-function TextCell({ text, wide = false }: { text: string; wide?: boolean }) {
+function TextCell({
+    text,
+    wide = false,
+    children,
+}: { text: string; wide?: boolean; children?: ReactNode }) {
     return (
         <span
             className={cn(
@@ -45,23 +75,23 @@ function TextCell({ text, wide = false }: { text: string; wide?: boolean }) {
             )}
         >
             <span className="max-w-[32rem] truncate" title={text}>
-                {text}
+                {children ?? text}
             </span>
         </span>
     );
 }
 
-function ReviewHeader({ id, back }: { id: number; back: string }) {
+function ReviewHeader({ id, back }: { id: number | null; back: string }) {
     const item = useFeedbackItem(id);
     const model = item.data?.model_name;
     return (
         <PageHeader
             title="Review feedback"
-            crumbs={[{ label: "Feedback", href: back }, { label: `#${id}` }]}
+            crumbs={[{ label: "Feedback", href: back }, { label: id === null ? "Next" : `#${id}` }]}
             caption={
                 model
-                    ? `An answer from ${model}. Accept it, fix it or reject it.`
-                    : "Accept the answer, fix it or reject it."
+                    ? `An answer from ${model}. Accept it, edit it or reject it.`
+                    : "Accept the answer, edit it or reject it."
             }
         />
     );
@@ -91,6 +121,30 @@ function StatusCell({ item }: { item: FeedbackInfo }) {
     );
 }
 
+function AnswerCell({ item }: { item: FeedbackInfo }) {
+    if (!item.output) {
+        return <Muted>Not sent</Muted>;
+    }
+    const parts = answerDiff(item);
+    return (
+        <TextCell text={item.output}>
+            {parts ? <DiffText parts={parts} side="before" /> : null}
+        </TextCell>
+    );
+}
+
+function SuggestionCell({ item }: { item: FeedbackInfo }) {
+    if (!item.suggestion) {
+        return <Muted>None given</Muted>;
+    }
+    const parts = answerDiff(item);
+    return (
+        <TextCell text={item.suggestion}>
+            {parts ? <DiffText parts={parts} side="after" /> : null}
+        </TextCell>
+    );
+}
+
 function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<FeedbackInfo, unknown>[] {
     return [
         {
@@ -106,22 +160,12 @@ function feedbackColumns(href: (item: FeedbackInfo) => string): ColumnDef<Feedba
         {
             id: "answer",
             header: "Model's answer",
-            cell: ({ row }) =>
-                row.original.output ? (
-                    <TextCell text={row.original.output} />
-                ) : (
-                    <Muted>Not sent</Muted>
-                ),
+            cell: ({ row }) => <AnswerCell item={row.original} />,
         },
         {
             id: "suggestion",
             header: "Suggested answer",
-            cell: ({ row }) =>
-                row.original.suggestion ? (
-                    <TextCell text={row.original.suggestion} />
-                ) : (
-                    <Muted>None given</Muted>
-                ),
+            cell: ({ row }) => <SuggestionCell item={row.original} />,
         },
         {
             id: "status",
@@ -174,17 +218,62 @@ function itemId(value: string | undefined): number | null {
     return value && Number.isInteger(id) && id > 0 ? id : null;
 }
 
+function StatusTabs({
+    value,
+    counts,
+    onChange,
+}: {
+    value: FeedbackTab;
+    counts: Record<string, number> | undefined;
+    onChange: (tab: FeedbackTab) => void;
+}) {
+    const total = FEEDBACK_STATUSES.reduce((sum, status) => sum + (counts?.[status] ?? 0), 0);
+    return (
+        <Tabs value={value} onValueChange={(next) => onChange(next as FeedbackTab)}>
+            <TabsList aria-label="Feedback status">
+                {FEEDBACK_TABS.map((tab) => (
+                    <TabsTrigger key={tab} value={tab}>
+                        {tabLabel(tab)}
+                        {counts && (
+                            <span className="text-sm tabular-nums text-muted-foreground">
+                                {(tab === "all" ? total : (counts[tab] ?? 0)).toLocaleString()}
+                            </span>
+                        )}
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+        </Tabs>
+    );
+}
+
+function NoFeedback() {
+    return (
+        <p className="text-muted-foreground">
+            No feedback yet. Mark answers in the{" "}
+            <Link href="/playground" className="text-primary hover:underline">
+                Playground
+            </Link>{" "}
+            or send them with <span className="font-mono">POST /v1/feedback</span>.
+        </p>
+    );
+}
+
 export function FeedbackPage() {
     const { search, update, open } = useListSearch(FEEDBACK_PATH, KEYS);
     const owned = useModels();
+    const tab = feedbackTab(search.status);
     const models = splitList(search.model);
-    const statuses = splitList(search.status);
     const assignees = splitList(search.assignee);
-    const filter = { model: models, status: statuses, assignee: assignees, q: search.q };
+    const filter = {
+        model: models,
+        status: tab === "all" ? [] : [tab],
+        assignee: assignees,
+        q: search.q,
+    };
     const list = useFeedbackList(filter);
     const facets = useFeedbackFacets(filter);
     const selected = itemId(search.item);
-    const filtering = models.length + statuses.length + assignees.length > 0 || Boolean(search.q);
+    const filtering = models.length + assignees.length > 0 || Boolean(search.q);
     const columns = useMemo(
         () =>
             feedbackColumns((item) =>
@@ -193,10 +282,19 @@ export function FeedbackPage() {
         [search],
     );
     const ids = list.rows.map((item) => item.id);
-    const firstPending = list.rows.find((item) => item.status === "pending");
-    const clear = () => update({ model: "", status: "", assignee: "", q: "" });
+    const pending = facets.data?.statuses.pending ?? 0;
+    const first = tab === "pending" && !list.isPlaceholder ? list.rows[0] : undefined;
+    const clear = () => update({ model: "", assignee: "", q: "" });
     const show = (id: number | null) =>
         id === null ? update({ item: "" }) : open({ item: String(id) });
+    const reviewNext = () => open({ status: "", item: first ? String(first.id) : NEXT });
+    const waiting = search.item === NEXT;
+    useEffect(() => {
+        if (search.item !== NEXT || tab !== "pending" || list.isPlaceholder || list.isLoading) {
+            return;
+        }
+        update({ item: list.rows[0] ? String(list.rows[0].id) : "" });
+    }, [search.item, tab, list.isPlaceholder, list.isLoading, list.rows, update]);
     const modelOptions = (owned.data ?? []).map((item) =>
         modelOption({
             value: item.key,
@@ -204,11 +302,13 @@ export function FeedbackPage() {
             count: facets.data?.models[item.key] ?? 0,
         }),
     );
-    const statusOptions = FEEDBACK_STATUSES.map((status) => ({
-        value: status,
-        label: feedbackStatusLabel(status),
-        count: facets.data?.statuses[status] ?? 0,
-    }));
+    if (waiting) {
+        return (
+            <Page>
+                <ReviewHeader id={null} back={listHref(FEEDBACK_PATH, { ...search, item: "" })} />
+            </Page>
+        );
+    }
     if (selected !== null) {
         return (
             <Page>
@@ -220,6 +320,7 @@ export function FeedbackPage() {
                     key={selected}
                     id={selected}
                     ids={ids}
+                    total={list.total}
                     hasMore={list.hasMore}
                     loadMore={list.loadMore}
                     onOpen={show}
@@ -233,13 +334,17 @@ export function FeedbackPage() {
                 title="Feedback"
                 caption="Answers people marked right or wrong, from the playground and the API. Accepted answers join the model's next training data."
                 actions={
-                    <Button
-                        onClick={() => firstPending && show(firstPending.id)}
-                        disabled={!firstPending}
-                    >
+                    <Button onClick={reviewNext} disabled={pending === 0}>
+                        <IconPlayerPlay aria-hidden="true" />
                         Review next
                     </Button>
                 }
+            />
+            <TrainingNudges models={models} />
+            <StatusTabs
+                value={tab}
+                counts={facets.data?.statuses}
+                onChange={(next) => update({ status: next === "pending" ? "" : next })}
             />
             <div className="flex flex-wrap items-center gap-2">
                 <SearchInput
@@ -256,14 +361,6 @@ export function FeedbackPage() {
                     options={modelOptions}
                     value={models}
                     onValueChange={(next) => update({ model: next.join(",") })}
-                />
-                <CheckboxSelect
-                    label="Status"
-                    allLabel="All statuses"
-                    noun="statuses"
-                    options={statusOptions}
-                    value={statuses}
-                    onValueChange={(next) => update({ status: next.join(",") })}
                 />
                 <CheckboxSelect
                     label="Assigned to"
@@ -299,23 +396,11 @@ export function FeedbackPage() {
                 }
                 empty={
                     filtering ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-muted-foreground">
-                                No feedback matches these filters.
-                            </p>
-                            <Button variant="outline" onClick={clear}>
-                                Clear filters
-                            </Button>
-                        </div>
+                        <p className="text-muted-foreground">No feedback matches these filters.</p>
+                    ) : tab === "all" ? (
+                        <NoFeedback />
                     ) : (
-                        <EmptyState title="No feedback yet">
-                            Mark answers right or wrong in the{" "}
-                            <Link href="/playground" className="text-primary hover:underline">
-                                Playground
-                            </Link>
-                            , or send them from your app with{" "}
-                            <span className="font-mono">POST /v1/feedback</span>.
-                        </EmptyState>
+                        <p className="text-muted-foreground">{EMPTY[tab]}</p>
                     )
                 }
                 minWidth="min-w-[880px]"

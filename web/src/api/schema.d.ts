@@ -2484,6 +2484,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/feedback/untrained": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count accepted feedback no version has trained on
+         * @description Per model: answers accepted since its newest version, which the next version adds to its data.
+         */
+        get: operations["untrained_feedback_api_feedback_untrained_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/feedback/{feedback_id}": {
         parameters: {
             query?: never;
@@ -5755,6 +5775,11 @@ export interface components {
             correction: string | null;
             /** Comment */
             comment: string | null;
+            /**
+             * Sent By
+             * @description Who sent it from the Playground; API feedback names its key instead.
+             */
+            sent_by: string | null;
             /** Suggestion */
             suggestion: string | null;
             /**
@@ -5797,6 +5822,11 @@ export interface components {
             /** Labels */
             labels: string[];
             request: components["schemas"]["LoggedRequest"] | null;
+            /**
+             * Key Name
+             * @description The API key the feedback was sent with.
+             */
+            key_name: string | null;
         };
         /** FeedbackFacets */
         FeedbackFacets: {
@@ -5836,6 +5866,11 @@ export interface components {
             correction: string | null;
             /** Comment */
             comment: string | null;
+            /**
+             * Sent By
+             * @description Who sent it from the Playground; API feedback names its key instead.
+             */
+            sent_by: string | null;
             /** Suggestion */
             suggestion: string | null;
             /**
@@ -10373,6 +10408,22 @@ export interface components {
             role: string;
             /** Content */
             content: string;
+        };
+        /** UntrainedFeedback */
+        UntrainedFeedback: {
+            /** Model */
+            model: string;
+            /** Model Name */
+            model_name: string;
+            /**
+             * Version
+             * @description The model's newest version; the count is of answers accepted since.
+             */
+            version: number | null;
+            /** Accepted */
+            accepted: number;
+            /** Next Version */
+            next_version: number;
         };
         /** Usage */
         Usage: {
@@ -16331,6 +16382,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    untrained_feedback_api_feedback_untrained_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UntrainedFeedback"][];
                 };
             };
         };

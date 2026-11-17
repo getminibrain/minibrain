@@ -5,6 +5,18 @@ type Variant = "approval" | "success" | "warning";
 export const FEEDBACK_PATH = "/feedback";
 export const FEEDBACK_STATUSES: FeedbackStatus[] = ["pending", "accepted", "rejected"];
 
+export type FeedbackTab = FeedbackStatus | "all";
+export const FEEDBACK_TABS: FeedbackTab[] = [...FEEDBACK_STATUSES, "all"];
+export const DEFAULT_TAB: FeedbackTab = "pending";
+
+export function feedbackTab(value: string | undefined): FeedbackTab {
+    return FEEDBACK_TABS.find((tab) => tab === value) ?? DEFAULT_TAB;
+}
+
+export function tabLabel(tab: FeedbackTab): string {
+    return tab === "all" ? "All" : STATUS[tab].label;
+}
+
 const STATUS: Record<FeedbackStatus, { label: string; variant: Variant }> = {
     pending: { label: "To review", variant: "approval" },
     accepted: { label: "Accepted", variant: "success" },

@@ -554,6 +554,7 @@ class Feedback(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     messages: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, default=None)
     split: Mapped[str | None] = mapped_column(default=None)
+    sent_by: Mapped[str | None] = mapped_column(default=None)
 
     model: Mapped[Model] = relationship()
 

@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from minibrain.api.access import builder, viewer
 from minibrain.api.deps import SessionDep, SettingsDep
@@ -17,7 +17,7 @@ from minibrain.data.splits import HELD_OUT
 from minibrain.registry.models import ApiKey, Feedback, FeedbackStatus, Model
 from minibrain.registry.service import NotFoundError, get_model, latest_dataset_version
 from minibrain.tasks.examples import Turn
-from minibrain.tasks.service import contract_of
+from minibrain.tasks.service import contract_of, upcoming_version_number
 
 router = APIRouter(prefix="/api")
 
@@ -48,6 +48,7 @@ class FeedbackInfo(BaseModel):
     output: str | None
     correction: str | None
     comment: str | None
+    sent_by: str | None = Field(description="Who sent it from the Playground; API feedback names its key instead.")
     suggestion: str | None
     status: Literal["pending", "accepted", "rejected"]
     label: str | None
@@ -86,6 +87,15 @@ class FeedbackDetail(FeedbackInfo):
     related: list[FeedbackInfo]
     labels: list[str]
     request: LoggedRequest | None
+    key_name: str | None = Field(description="The API key the feedback was sent with.")
+
+
+class UntrainedFeedback(BaseModel):
+    model: str
+    model_name: str
+    version: int | None = Field(description="The model's newest version; the count is of answers accepted since.")
+    accepted: int
+    next_version: int
 
 
 class ReviewRequest(BaseModel):
@@ -149,6 +159,7 @@ def feedback_info(item: Feedback) -> FeedbackInfo:
         output=item.output,
         correction=item.correction,
         comment=item.comment,
+        sent_by=item.sent_by,
         suggestion=suggestion(item),
         status=FeedbackStatus(item.status).value,
         label=item.label,
@@ -251,6 +262,32 @@ def feedback_facets(session: SessionDep, filters: FilterDep) -> FeedbackFacets:
     )
 
 
+@router.get(
+    "/feedback/untrained",
+    dependencies=[Depends(builder)],
+    summary="Count accepted feedback no version has trained on",
+    description="Per model: answers accepted since its newest version, which the next version adds to its data.",
+)
+def untrained_feedback(session: SessionDep) -> list[UntrainedFeedback]:
+    counts = store.untrained(session)
+    if not counts:
+        return []
+    models = session.scalars(select(Model).where(Model.id.in_(counts)).options(selectinload(Model.versions)))
+    found = []
+    for model in models:
+        newest = max((version.number for version in model.versions), default=None)
+        found.append(
+            UntrainedFeedback(
+                model=model.slug,
+                model_name=model.name,
+                version=newest,
+                accepted=counts[model.id],
+                next_version=upcoming_version_number(model),
+            )
+        )
+    return sorted(found, key=lambda row: (-row.accepted, row.model_name))
+
+
 def get_feedback(session: Session, feedback_id: int) -> Feedback:
     item = session.get(Feedback, feedback_id)
     if item is None:
@@ -277,11 +314,17 @@ def logged_info(session: Session, item: Feedback) -> LoggedRequest | None:
     return LoggedRequest(at=log.at, status=log.status, latency_ms=log.latency_ms, key_name=key.name if key else None)
 
 
+def key_name(session: Session, item: Feedback) -> str | None:
+    key = session.get(ApiKey, item.key_id) if item.key_id is not None else None
+    return key.name if key is not None else None
+
+
 def feedback_detail(session: Session, item: Feedback) -> FeedbackDetail:
     extra = {
         "related": [feedback_info(other) for other in store.related(session, item)],
         "labels": labels_for(session, item.model),
         "request": logged_info(session, item),
+        "key_name": key_name(session, item),
     }
     return FeedbackDetail.model_validate(feedback_info(item).model_dump() | extra)
 
@@ -325,6 +368,7 @@ def playground_feedback(name: str, body: PlaygroundFeedback, session: SessionDep
         output=body.output,
         correction=body.correction,
         comment=body.comment,
+        sent_by=current_actor(),
     )
     item = store.record(session, submission)
     session.commit()

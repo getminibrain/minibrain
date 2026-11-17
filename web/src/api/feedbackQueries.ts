@@ -5,6 +5,7 @@ import {
     useQuery,
     useQueryClient,
 } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { api, succeed, unwrap } from "./client";
 import { keys } from "./queries";
 import type { components } from "./schema";
@@ -14,6 +15,7 @@ type Schemas = components["schemas"];
 export type FeedbackInfo = Schemas["FeedbackInfo"];
 export type FeedbackDetail = Schemas["FeedbackDetail"];
 export type FeedbackSummary = Schemas["FeedbackSummary"];
+export type UntrainedFeedback = Schemas["UntrainedFeedback"];
 export type FeedbackStatus = FeedbackInfo["status"];
 export type PlaygroundFeedback = Schemas["PlaygroundFeedback"];
 export type SaveExampleBody = Schemas["SaveExampleBody"];
@@ -32,6 +34,7 @@ export const feedbackKeys = {
     root: ROOT,
     list: (filter: FeedbackFilter) => [...ROOT, "list", filter] as const,
     facets: (filter: FeedbackFilter) => [...ROOT, "facets", filter] as const,
+    untrained: [...ROOT, "untrained"] as const,
     item: (id: number) => [...ROOT, "item", id] as const,
     summary: (slug: string) => [...ROOT, "summary", slug] as const,
     trainingRows: (slug: string, datasetVersion: number) =>
@@ -70,6 +73,7 @@ export function useFeedbackList(filter: FeedbackFilter) {
         rows: pages.data?.pages.flatMap((page) => page.items) ?? [],
         total: pages.data?.pages[0]?.total,
         isLoading: pages.isLoading,
+        isPlaceholder: pages.isPlaceholderData,
         error: pages.error,
         hasMore: pages.hasNextPage,
         loadingMore: pages.isFetchingNextPage,
@@ -90,16 +94,34 @@ export function useFeedbackFacets(filter: FeedbackFilter) {
     });
 }
 
-export function useFeedbackItem(id: number | null) {
-    return useQuery({
-        queryKey: feedbackKeys.item(id ?? 0),
+function itemQuery(id: number) {
+    return {
+        queryKey: feedbackKeys.item(id),
         queryFn: () =>
             unwrap(
                 api.GET("/api/feedback/{feedback_id}", {
-                    params: { path: { feedback_id: id ?? 0 } },
+                    params: { path: { feedback_id: id } },
                 }),
             ),
-        enabled: id !== null,
+    };
+}
+
+export function useFeedbackItem(id: number | null) {
+    return useQuery({ ...itemQuery(id ?? 0), enabled: id !== null });
+}
+
+export function usePrefetchFeedback() {
+    const client = useQueryClient();
+    return useCallback(
+        (id: number) => client.prefetchQuery({ ...itemQuery(id), staleTime: 30_000 }),
+        [client],
+    );
+}
+
+export function useUntrainedFeedback() {
+    return useQuery({
+        queryKey: feedbackKeys.untrained,
+        queryFn: () => unwrap(api.GET("/api/feedback/untrained")),
     });
 }
 

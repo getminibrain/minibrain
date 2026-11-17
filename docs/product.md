@@ -491,8 +491,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Rate or correct any playground answer.
   UI: Playground · API: POST /api/models/{name}/feedback
 - **Review queue** · partial · product
-  Accept, fix or reject feedback by keyboard, disagreements first.
+  Status tabs and word diffs; accept, edit, reject or skip each.
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
+- **Train nudge** · shipped · product
+  Feedback shows each model's accepted answers since its newest version.
+  UI: Feedback · API: GET /api/feedback/untrained
 - **Test examples** · shipped · product, ml
   Tests the next version faces, added by hand or from the Playground.
   UI: Playground › Save as test example, Models › model › Evaluation › What it's tested on, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples, DELETE /api/models/{name}/test-examples/{feedback_id}

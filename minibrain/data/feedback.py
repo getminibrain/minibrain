@@ -3,12 +3,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.data.splits import HELD_OUT
 from minibrain.policy import load as load_policy
-from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Model, RequestLog, now
+from minibrain.registry.models import AuditEvent, Feedback, FeedbackStatus, Model, RequestLog, Version, now
 from minibrain.tasks.examples import ASSISTANT, Example, Turn, single, turns_of, well_formed
 
 UP = "up"
@@ -38,6 +38,7 @@ class Submission:
     output: str | None = None
     correction: str | None = None
     comment: str | None = None
+    sent_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +165,7 @@ def record(session: Session, submission: Submission) -> Feedback:
     item.output = cleaned(submission.output) or (cleaned(log.output) if log else None)
     item.correction = correction
     item.comment = cleaned(submission.comment)
+    item.sent_by = submission.sent_by
     item.status = FeedbackStatus.PENDING
     item.updated_at = now()
     refresh_group(session, submission.model_id, item.input_key)
@@ -263,6 +265,26 @@ def summary(session: Session, model: Model) -> Summary:
     )
 
 
+def untrained(session: Session) -> dict[int, int]:
+    newest = (
+        select(func.max(Version.created_at))
+        .where(Version.model_id == Feedback.model_id)
+        .correlate(Feedback)
+        .scalar_subquery()
+    )
+    query = (
+        select(Feedback.model_id, func.count())
+        .where(
+            Feedback.status == FeedbackStatus.ACCEPTED,
+            Feedback.label.is_not(None),
+            or_(Feedback.split.is_(None), Feedback.split != HELD_OUT),
+            or_(newest.is_(None), Feedback.reviewed_at > newest),
+        )
+        .group_by(Feedback.model_id)
+    )
+    return {int(model_id): int(total) for model_id, total in session.execute(query).all()}
+
+
 def example_of(item: Feedback) -> Example | None:
     label = (item.label or "").strip()
     turns = turns_of(item.messages) if item.messages else (Turn("user", item.input.strip()),)
@@ -315,6 +337,7 @@ def save_example(session: Session, model: Model, saved: SavedExample, actor: str
         status=FeedbackStatus.ACCEPTED,
         label=expected,
         priority=REVIEWED_PRIORITY,
+        sent_by=actor,
         reviewed_by=actor,
         reviewed_at=moment,
         created_at=moment,

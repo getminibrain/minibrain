@@ -246,3 +246,23 @@ def test_feedback_is_deleted_with_its_model(harness: Harness) -> None:
     harness.settle()
     with harness.sessions() as session:
         assert session.scalars(select(Feedback)).all() == []
+
+
+def test_accepted_feedback_since_the_newest_version_nudges_training(harness: Harness) -> None:
+    create_with_dataset(harness)
+    path = "/api/feedback/untrained"
+    first = played(harness, "ticket 0 about billing", "down", correction="bug", comment="wrong team")
+    second = played(harness, "my card was declined", "up", output="billing")
+    assert harness.client.get(path).json() == []
+    assert first["sent_by"] == "admin@example.com"
+    for item in (first, second):
+        review(harness, item, "accept")
+    review(harness, played(harness, "ticket 2 about account", "down", correction="feature"), "reject")
+    example = {"messages": [{"role": "user", "content": "hi"}], "expected": "bug"}
+    assert harness.client.post(f"/api/models/{SLUG}/test-examples", json=example).status_code == 201
+    nudge = {"model": SLUG, "model_name": "Support Triage", "version": 0, "accepted": 2, "next_version": 1}
+    assert harness.client.get(path).json() == [nudge]
+    add_version(harness, "prompt")
+    assert harness.client.get(path).json() == []
+    review(harness, played(harness, "ticket 3 about feature", "down", correction="bug"), "accept")
+    assert harness.client.get(path).json() == [nudge | {"version": 1, "accepted": 1, "next_version": 2}]

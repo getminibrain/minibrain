@@ -1236,12 +1236,16 @@ keys, and `/v1` stays key-only.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
     view.
-  - Feedback is the review queue across models: input, the model's answer, the suggested answer, status (To
-    review, Accepted, Rejected) and model, paged on the server and filtered by model, status and assignee
-    (`?model=<slug>&status=pending&assignee=me`), disagreement first. A row opens its review screen
-    (`?item=<id>`): the input, the model's answer, the suggestion, other feedback on the same input and a
-    right-answer box with the known answers; Accept (A), Fix and accept (F, or Enter in the box), Reject (R),
-    Next and Previous (J, K), Esc back to the list, Assign to me. The keys show on the buttons.
+  - Feedback is the review queue across models: status tabs with counts (To review, the default, Accepted,
+    Rejected, All; `?status=accepted`), then input, the model's answer and the suggested answer with the changed
+    words marked, status and model, paged on the server and filtered by model and assignee
+    (`?model=<slug>&assignee=me`), disagreement first. Above the tabs, each model with answers accepted since its
+    newest version gets one line: "Support Triage: 24 accepted answers since v3 · Train v4". Review next (or a
+    row) opens the review screen (`?item=<id>`, `?item=next` for the first to review): input, the model's answer
+    and the suggested answer side by side with a word diff, the comment, who sent it (the person in the
+    Playground, or the API key), other feedback on the same input; Accept (A), Edit answer (E, then ⌘ or Ctrl
+    Enter), Reject (R), Skip (S), Previous (K), Esc back to the list, Assign to me. Each decision moves to the
+    next item in the tab and filters, with "n left".
 - Jobs (`/jobs`, 2026-11-11) lists every job of every kind (training, scoring, judging, downloads, imports, verify,
   repair, catalogue sync, and exports once they exist): job, kind and version, model or base, status, started and
   took. Tabs by kind with their counts (`?kind=`), a status filter and a search (`?status=&q=`), ticks with bulk

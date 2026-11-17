@@ -8448,6 +8448,32 @@
         }
       }
     },
+    "/api/feedback/untrained": {
+      "get": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Count accepted feedback no version has trained on",
+        "description": "Per model: answers accepted since its newest version, which the next version adds to its data.",
+        "operationId": "untrained_feedback_api_feedback_untrained_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UntrainedFeedback"
+                  },
+                  "type": "array",
+                  "title": "Response Untrained Feedback Api Feedback Untrained Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/feedback/{feedback_id}": {
       "get": {
         "tags": [
@@ -19074,6 +19100,18 @@
             ],
             "title": "Comment"
           },
+          "sent_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent By",
+            "description": "Who sent it from the Playground; API feedback names its key instead."
+          },
           "suggestion": {
             "anyOf": [
               {
@@ -19207,6 +19245,18 @@
                 "type": "null"
               }
             ]
+          },
+          "key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Name",
+            "description": "The API key the feedback was sent with."
           }
         },
         "type": "object",
@@ -19221,6 +19271,7 @@
           "output",
           "correction",
           "comment",
+          "sent_by",
           "suggestion",
           "status",
           "label",
@@ -19233,7 +19284,8 @@
           "held_out",
           "related",
           "labels",
-          "request"
+          "request",
+          "key_name"
         ],
         "title": "FeedbackDetail"
       },
@@ -19339,6 +19391,18 @@
               }
             ],
             "title": "Comment"
+          },
+          "sent_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent By",
+            "description": "Who sent it from the Playground; API feedback names its key instead."
           },
           "suggestion": {
             "anyOf": [
@@ -19463,6 +19527,7 @@
           "output",
           "correction",
           "comment",
+          "sent_by",
           "suggestion",
           "status",
           "label",
@@ -32867,6 +32932,47 @@
           "content"
         ],
         "title": "TurnInfo"
+      },
+      "UntrainedFeedback": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The model's newest version; the count is of answers accepted since."
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted"
+          },
+          "next_version": {
+            "type": "integer",
+            "title": "Next Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "model_name",
+          "version",
+          "accepted",
+          "next_version"
+        ],
+        "title": "UntrainedFeedback"
       },
       "Usage": {
         "properties": {

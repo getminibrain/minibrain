@@ -188,6 +188,7 @@ ROUTE_ROLES = {
     ("PUT", "/api/models/{name}/versions/{number}/note"): "builder",
     ("GET", "/api/feedback"): "builder",
     ("GET", "/api/feedback/facets"): "builder",
+    ("GET", "/api/feedback/untrained"): "builder",
     ("GET", "/api/feedback/{feedback_id}"): "builder",
     ("POST", "/api/feedback/{feedback_id}/review"): "builder",
     ("POST", "/api/feedback/{feedback_id}/assign"): "builder",
