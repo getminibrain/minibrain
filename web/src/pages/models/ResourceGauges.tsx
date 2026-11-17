@@ -1,7 +1,8 @@
 import { IconCylinder, IconServer, type TablerIcon } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "obp-ui";
+import { type ReactNode, useState } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
-import { SummaryLine } from "~/components/CreateLayout";
+import { SummaryLine, SummarySection } from "~/components/CreateLayout";
 import { PoolLink } from "~/components/PoolLink";
 import { UsageGauge } from "~/components/UsageGauge";
 import { StatusText } from "~/components/models/StatusText";
@@ -131,22 +132,19 @@ function verdict(fit: FitInfo | null, trainFit: TrainFitInfo | null, servesOnly:
     return { text: "Runs only", tone: "warning" };
 }
 
-function PoolRow({ pool, servesOnly }: { pool: PoolFit; servesOnly: boolean }) {
+function PoolMemory({ pool, servesOnly }: { pool: PoolFit; servesOnly: boolean }) {
     const { fit } = pool;
     const result = verdict(fit, pool.trainFit, servesOnly);
     const available = fit?.available_bytes ?? 0;
     const needed = fit?.needed_bytes ?? 0;
     const short = needed > available;
     return (
-        <li className="flex flex-col gap-1.5">
-            <span className="flex items-center justify-between gap-3">
-                <PoolLink name={pool.name} />
-                {result.tone === "muted" ? (
-                    <span className="text-muted-foreground">{result.text}</span>
-                ) : (
-                    <StatusText tone={result.tone}>{result.text}</StatusText>
-                )}
-            </span>
+        <div className="flex flex-col gap-1.5">
+            {result.tone === "muted" ? (
+                <span className="text-muted-foreground">{result.text}</span>
+            ) : (
+                <StatusText tone={result.tone}>{result.text}</StatusText>
+            )}
             {available > 0 && (
                 <>
                     <UsageGauge
@@ -171,19 +169,83 @@ function PoolRow({ pool, servesOnly }: { pool: PoolFit; servesOnly: boolean }) {
                     </span>
                 </>
             )}
-        </li>
+        </div>
     );
 }
 
-export function PoolFitList({ pools, servesOnly }: { pools: PoolFit[]; servesOnly: boolean }) {
-    if (pools.length === 0) {
-        return <span className="text-muted-foreground">Unknown</span>;
+const RANK: Record<Verdict["tone"], number> = { success: 0, warning: 1, muted: 2, destructive: 3 };
+
+function bestPool(pools: PoolFit[], servesOnly: boolean): string {
+    const ranked = [...pools].sort(
+        (a, b) =>
+            RANK[verdict(a.fit, a.trainFit, servesOnly).tone] -
+            RANK[verdict(b.fit, b.trainFit, servesOnly).tone],
+    );
+    return ranked[0]?.name ?? "";
+}
+
+function PoolPicker({
+    pools,
+    value,
+    servesOnly,
+    onChange,
+}: {
+    pools: PoolFit[];
+    value: string;
+    servesOnly: boolean;
+    onChange: (name: string) => void;
+}) {
+    if (pools.length < 2) {
+        return pools[0] ? (
+            <span className="text-sm text-muted-foreground">
+                {"in "}
+                <PoolLink name={pools[0].name} />
+            </span>
+        ) : null;
     }
     return (
-        <ul className="flex flex-col gap-4">
-            {pools.map((pool) => (
-                <PoolRow key={pool.name} pool={pool} servesOnly={servesOnly} />
-            ))}
-        </ul>
+        <Select value={value} onValueChange={(next) => onChange(String(next))}>
+            <SelectTrigger aria-label="Pool" size="sm" className="w-auto min-w-32">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                {pools.map((pool) => (
+                    <SelectItem
+                        key={pool.name}
+                        value={pool.name}
+                        label={pool.name}
+                        description={verdict(pool.fit, pool.trainFit, servesOnly).text}
+                    >
+                        {pool.name}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+export function MemorySection({ pools, servesOnly }: { pools: PoolFit[]; servesOnly: boolean }) {
+    const [picked, setPicked] = useState<string | null>(null);
+    const chosen =
+        pools.find((pool) => pool.name === picked) ??
+        pools.find((pool) => pool.name === bestPool(pools, servesOnly));
+    return (
+        <SummarySection
+            title="Memory"
+            action={
+                <PoolPicker
+                    pools={pools}
+                    value={chosen?.name ?? ""}
+                    servesOnly={servesOnly}
+                    onChange={setPicked}
+                />
+            }
+        >
+            {chosen ? (
+                <PoolMemory pool={chosen} servesOnly={servesOnly} />
+            ) : (
+                <span className="text-muted-foreground">Unknown</span>
+            )}
+        </SummarySection>
     );
 }

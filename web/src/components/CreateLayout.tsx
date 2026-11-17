@@ -88,18 +88,23 @@ export function SummaryCard({ children }: { children: ReactNode }) {
 export function SummarySection({
     title,
     info,
+    action,
     children,
 }: {
     title: string;
     info?: ReactNode;
+    action?: ReactNode;
     children: ReactNode;
 }) {
     return (
         <section className="flex flex-col gap-2.5 px-panel py-4">
-            <h3 className="flex items-center gap-1.5 font-medium">
-                {title}
-                {info}
-            </h3>
+            <div className="flex min-h-6 items-center justify-between gap-3">
+                <h3 className="flex items-center gap-1.5 font-medium">
+                    {title}
+                    {info}
+                </h3>
+                {action}
+            </div>
             {children}
         </section>
     );

@@ -36,7 +36,7 @@ import { bytes } from "~/lib/time";
 import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
-import { DiskGauge, PoolFitList } from "./ResourceGauges";
+import { DiskGauge, MemorySection } from "./ResourceGauges";
 import { type BaseOption, trainableVariant } from "./baseOptions";
 import { formatUse, scheme, trainable } from "./formats";
 import { usePoolFits } from "./runsHere";
@@ -306,10 +306,8 @@ export function AddModelSummary({
                     storage={storage}
                 />
             </SummarySection>
-            <SummarySection title="Pools">
-                <PoolFitList pools={pools} servesOnly={servesOnly} />
-            </SummarySection>
-            <SummarySection title="Disk">
+            <MemorySection pools={pools} servesOnly={servesOnly} />
+            <SummarySection title="Storage">
                 <DiskGauge
                     need={need}
                     free={free}
