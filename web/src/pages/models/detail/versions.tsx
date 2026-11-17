@@ -202,6 +202,27 @@ export function versionStatus(row: ModelRow, version: VersionInfo): ShownStatus 
     return { tone: "neutral", label: "Ready" };
 }
 
+const STATUS_ORDER = [
+    "Deployed",
+    "Deploying",
+    "Waiting for a machine",
+    "Training",
+    "Scoring",
+    "Queued",
+    "Cancelling…",
+    "Ready",
+    "Was deployed",
+    "Cancelled",
+    "Failed",
+    "Deleting",
+];
+
+export function versionStatusRank(row: ModelRow, version: VersionInfo): number {
+    const label = versionStatus(row, version).label;
+    const index = STATUS_ORDER.findIndex((name) => label.startsWith(name));
+    return index === -1 ? STATUS_ORDER.length : index;
+}
+
 export function VersionStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
     const status = versionStatus(row, version);
     const text = (
@@ -539,7 +560,7 @@ function versionColumns(
         {
             id: "status",
             header: "Status",
-            accessorFn: (version) => versionStatus(row, version).label,
+            accessorFn: (version) => versionStatusRank(row, version),
             cell: ({ row: { original: version } }) => (
                 <span className="inline-flex items-center gap-3">
                     <RunStatus row={row} version={version} />
@@ -597,7 +618,8 @@ function versionColumns(
         {
             id: "started",
             header: "Started",
-            accessorFn: (version) => runJob(version, jobs)?.started_at ?? version.created_at,
+            accessorFn: (version) =>
+                Date.parse(runJob(version, jobs)?.started_at ?? version.created_at),
             cell: ({ row: { original: version } }) => (
                 <span className="text-muted-foreground">
                     <When value={runJob(version, jobs)?.started_at ?? version.created_at} />

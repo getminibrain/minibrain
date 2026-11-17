@@ -30,16 +30,16 @@ def test_pages_run_newest_first_with_cursors(harness: Harness) -> None:
     add_events(harness, 7)
     first = page(harness, limit=3)
     assert [event["target"] for event in first["events"]] == ["mb_0006", "mb_0005", "mb_0004"]
-    assert (first["total"], first["newer"], first["newer_cursor"]) == (7, 0, None)
-    second = page(harness, limit=3, before=first["older_cursor"])
+    assert (first["total"], first["start"], first["prev_cursor"]) == (7, 0, None)
+    second = page(harness, limit=3, next=first["next_cursor"])
     assert [event["target"] for event in second["events"]] == ["mb_0003", "mb_0002", "mb_0001"]
-    assert second["newer"] == 3
-    last = page(harness, limit=3, before=second["older_cursor"])
+    assert second["start"] == 3
+    last = page(harness, limit=3, next=second["next_cursor"])
     assert [event["target"] for event in last["events"]] == ["mb_0000"]
-    assert (last["older_cursor"], last["newer"]) == (None, 6)
-    back = page(harness, limit=3, after=second["newer_cursor"])
+    assert (last["next_cursor"], last["start"]) == (None, 6)
+    back = page(harness, limit=3, prev=second["prev_cursor"])
     assert back["events"] == first["events"]
-    assert page(harness, limit=3, after=last["newer_cursor"])["events"] == second["events"]
+    assert page(harness, limit=3, prev=last["prev_cursor"])["events"] == second["events"]
 
 
 def test_filters_combine_and_facets_count(harness: Harness) -> None:

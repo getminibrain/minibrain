@@ -306,6 +306,7 @@ class Version(Base):
     from_version: Mapped[int | None] = mapped_column(default=None)
     device_time: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     note: Mapped[str | None] = mapped_column(default=None)
+    score: Mapped[float | None] = mapped_column(default=None)
 
     model: Mapped[Model] = relationship(back_populates="versions")
     dataset_version: Mapped[DatasetVersion | None] = relationship(back_populates="model_versions")
@@ -496,6 +497,8 @@ class RequestLog(Base):
         Index("ix_request_logs_at", "at"),
         Index("ix_request_logs_key", "key_id", "id"),
         Index("ix_request_logs_slug", "model_slug", "id"),
+        Index("ix_request_logs_latency", "latency_ms", "id"),
+        Index("ix_request_logs_status", "status", "id"),
         {"sqlite_autoincrement": True},
     )
 
@@ -932,3 +935,11 @@ class JoinRequest(Base):
     collected_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+
+
+@event.listens_for(Version, "before_insert")
+@event.listens_for(Version, "before_update")
+def keep_score(_mapper: Any, _connection: Any, target: Version) -> None:
+    from minibrain.tasks.service import held_out_score
+
+    target.score = held_out_score(target)

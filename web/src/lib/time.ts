@@ -38,6 +38,10 @@ export function timeText(value: string, now: number = Date.now()): string {
     return format.format(at);
 }
 
+export function timeValue(value: string | null | undefined): number | undefined {
+    return value ? new Date(value).getTime() : undefined;
+}
+
 export function exactTime(value: string): string {
     return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
 }

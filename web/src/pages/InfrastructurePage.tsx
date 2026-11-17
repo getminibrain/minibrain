@@ -40,6 +40,7 @@ const LOADED_COLUMNS: ColumnDef<LoadedModel, unknown>[] = [
     {
         header: "Adapters",
         id: "adapters",
+        accessorFn: (model) => model.adapters.length,
         cell: ({ row }) => (
             <span className="font-mono">
                 {row.original.adapters.length ? row.original.adapters.join(", ") : "–"}

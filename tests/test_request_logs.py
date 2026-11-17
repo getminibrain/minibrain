@@ -45,7 +45,7 @@ def test_pages_newest_first_and_follows_new_rows(harness: Harness) -> None:
     servable(harness)
     first = seed(harness, *({"latency_ms": float(index)} for index in range(5)))
     page = listed(harness.client, limit=2)
-    assert ids_of(page) == first[::-1][:2] and page["total"] == 5 and page["next_cursor"] == str(first[3])
+    assert ids_of(page) == first[::-1][:2] and page["total"] == 5 and page["next_cursor"] is not None
     rest = listed(harness.client, limit=2, cursor=page["next_cursor"])
     assert ids_of(rest) == [first[2], first[1]]
     last = listed(harness.client, limit=2, cursor=rest["next_cursor"])

@@ -30,6 +30,7 @@ import {
     VersionState,
     versionState,
     versionStateLabel,
+    versionStateRank,
 } from "~/components/StatusBadge";
 import {
     GraderScores,
@@ -193,8 +194,8 @@ const SORTS: Record<string, (row: GridRow) => Value> = {
     p95: (row) => row.line.version.latency_p95_ms ?? Number.POSITIVE_INFINITY,
     cost: (row) => costSortValue(row.line.version.cost),
     scored: (row) => scoredTime(row.line.version),
-    created: (row) => row.line.version.created_at,
-    status: (row) => versionState(row.line.version),
+    created: (row) => Date.parse(row.line.version.created_at),
+    status: (row) => versionStateRank(row.line.version),
 };
 
 function compareValues(left: Value, right: Value): number {
@@ -432,6 +433,7 @@ const MISTAKE_COLUMNS: ColumnDef<Mistake, unknown>[] = [
     {
         header: "Input",
         accessorKey: "input",
+        enableSorting: false,
         cell: (info) => (
             <span className="line-clamp-2 min-w-56 whitespace-normal">
                 {String(info.getValue())}

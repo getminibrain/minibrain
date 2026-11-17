@@ -1,8 +1,9 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { type ListSort, isDefaultSort } from "~/lib/listSort";
 import { sinceOf } from "~/lib/requests";
 import { api, unwrap } from "./client";
-import type { components } from "./schema";
+import type { components, operations } from "./schema";
 
 type Schemas = components["schemas"];
 
@@ -14,6 +15,12 @@ export type RequestFeedback = Schemas["RequestFeedback"];
 export type RequestOverview = Schemas["RequestOverview"];
 export type OverviewModel = Schemas["OverviewModel"];
 export type OverviewSeries = Schemas["OverviewSeries"];
+
+export type RequestSortKey = NonNullable<
+    NonNullable<operations["list_requests_api_requests_get"]["parameters"]["query"]>["sort"]
+>;
+export type RequestSort = ListSort<RequestSortKey>;
+export const NEWEST_REQUESTS: RequestSort = { sort: "at", order: "desc" };
 
 export type RequestFilter = {
     model: string[];
@@ -52,9 +59,15 @@ function withSince({ range, ...query }: ServerQuery) {
     return { ...query, since: sinceOf(range) };
 }
 
-function fetchPage(query: ServerQuery, bounds: { cursor?: string; after?: string; limit: number }) {
+type Bounds = { cursor?: string; after?: string; limit: number };
+
+function fetchPage(query: ServerQuery, sort: RequestSort, bounds: Bounds) {
     return unwrap(
-        api.GET("/api/requests", { params: { query: { ...withSince(query), ...bounds } } }),
+        api.GET("/api/requests", {
+            params: {
+                query: { ...withSince(query), ...bounds, sort: sort.sort, order: sort.order },
+            },
+        }),
     );
 }
 
@@ -63,11 +76,17 @@ function unique(rows: RequestRow[]): RequestRow[] {
     return rows.filter((row) => !seen.has(row.id) && seen.add(row.id));
 }
 
-export function useRequestList(filter: RequestFilter, paused: boolean) {
+export function useRequestList(
+    filter: RequestFilter,
+    paused: boolean,
+    sort: RequestSort = NEWEST_REQUESTS,
+) {
     const query = serverQuery(filter);
+    const newest = isDefaultSort(sort, NEWEST_REQUESTS);
+    const following = newest && !paused;
     const pages = useInfiniteQuery({
-        queryKey: [...ROOT, "list", query] as const,
-        queryFn: ({ pageParam }) => fetchPage(query, { cursor: pageParam, limit: PAGE }),
+        queryKey: [...ROOT, "list", query, sort] as const,
+        queryFn: ({ pageParam }) => fetchPage(query, sort, { cursor: pageParam, limit: PAGE }),
         initialPageParam: undefined as string | undefined,
         getNextPageParam: (last) => last.next_cursor ?? undefined,
         placeholderData: keepPreviousData,
@@ -79,15 +98,16 @@ export function useRequestList(filter: RequestFilter, paused: boolean) {
     const live = useQuery({
         queryKey: [...ROOT, "list", query, "after", top ?? 0] as const,
         queryFn: () =>
-            fetchPage(query, {
+            fetchPage(query, NEWEST_REQUESTS, {
                 after: top === undefined ? undefined : String(top),
                 limit: LIVE_PAGE,
             }),
-        enabled: settled && !paused,
-        refetchInterval: paused ? false : LIVE_MS,
-        refetchOnWindowFocus: !paused,
+        enabled: settled && following,
+        refetchInterval: following ? LIVE_MS : false,
+        refetchOnWindowFocus: following,
     });
-    const gap = settled && live.data !== undefined && live.data.next_cursor !== null;
+    const tail = newest ? live.data : undefined;
+    const gap = settled && tail !== undefined && tail.next_cursor !== null;
     const { refetch } = pages;
     useEffect(() => {
         if (gap) {
@@ -95,11 +115,11 @@ export function useRequestList(filter: RequestFilter, paused: boolean) {
         }
     }, [gap, refetch]);
     const arrivals =
-        gap || top === undefined ? [] : (live.data?.items ?? []).filter((row) => row.id > top);
-    const fresh = top === undefined && !gap ? (live.data?.items ?? []) : [];
+        gap || top === undefined ? [] : (tail?.items ?? []).filter((row) => row.id > top);
+    const fresh = top === undefined && !gap ? (tail?.items ?? []) : [];
     return {
         rows: unique([...fresh, ...arrivals, ...loaded]),
-        total: live.data?.total ?? pages.data?.pages[0]?.total,
+        total: tail?.total ?? pages.data?.pages[0]?.total,
         isLoading: pages.isLoading,
         error: pages.error ?? live.error,
         hasMore: pages.hasNextPage,

@@ -38,10 +38,17 @@ import { itemHref } from "./data/catalogue";
 type Row = { input: string | null; label: string | null };
 
 const ROW_COLUMNS: ColumnDef<Row, unknown>[] = [
-    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
+    {
+        header: "Input",
+        accessorKey: "input",
+        enableSorting: false,
+        cell: (info) => <Clamp text={info.getValue()} />,
+    },
     {
         header: "Label",
-        accessorKey: "label",
+        id: "label",
+        accessorFn: (row) => row.label ?? undefined,
+        sortUndefined: "last",
         cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
     },
 ];
@@ -314,10 +321,15 @@ export function PreviewSection({
 }
 
 const GOLDEN_COLUMNS: ColumnDef<ExampleInfo, unknown>[] = [
-    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
+    {
+        header: "Input",
+        accessorKey: "input",
+        enableSorting: false,
+        cell: (info) => <Clamp text={info.getValue()} />,
+    },
     {
         header: "Label",
-        accessorKey: "label",
+        accessorKey: "expected",
         cell: (info) => <span className="font-mono">{String(info.getValue())}</span>,
     },
 ];

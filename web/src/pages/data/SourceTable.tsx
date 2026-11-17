@@ -49,7 +49,7 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
     {
         id: "name",
         header: "Name",
-        accessorKey: "name",
+        accessorFn: (source) => source.name.toLowerCase(),
         cell: ({ row }) => (
             <span className="flex min-w-0 items-center gap-2">
                 <SourceIcon source={row.original} className="size-4 shrink-0" />
@@ -96,7 +96,7 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
     {
         id: "added",
         header: "Added",
-        accessorKey: "created_at",
+        accessorFn: (source) => Date.parse(source.created_at),
         cell: ({ row }) => <When value={row.original.created_at} />,
     },
 ];

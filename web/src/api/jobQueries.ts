@@ -1,9 +1,15 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { type ListSort, isDefaultSort } from "~/lib/listSort";
 import { type JobInfo, api, unwrap } from "./client";
 import { isActiveJob } from "./queries";
+import type { operations } from "./schema";
 
-export type JobOrder = "newest" | "oldest";
+export type JobSortKey = NonNullable<
+    NonNullable<operations["list_jobs_api_jobs_get"]["parameters"]["query"]>["sort"]
+>;
+export type JobSort = ListSort<JobSortKey>;
+export const NEWEST_JOBS: JobSort = { sort: "id", order: "desc" };
 
 export type JobFilter = {
     kind?: string[];
@@ -12,7 +18,7 @@ export type JobFilter = {
     status?: string[];
     q?: string;
     since?: string;
-    order?: JobOrder;
+    sort?: JobSort;
 };
 
 const PAGE = 50;
@@ -63,11 +69,18 @@ function serverQuery(filter: JobFilter) {
 
 type ServerQuery = ReturnType<typeof serverQuery>;
 
-function fetchPage(query: ServerQuery, order: JobOrder, cursor: string | undefined) {
+function fetchPage(query: ServerQuery, sort: JobSort, cursor: string | undefined) {
     return unwrap(
         api.GET("/api/jobs", {
             params: {
-                query: { ...query, since: sinceTime(query.since), order, cursor, limit: PAGE },
+                query: {
+                    ...query,
+                    since: sinceTime(query.since),
+                    sort: sort.sort,
+                    order: sort.order,
+                    cursor,
+                    limit: PAGE,
+                },
             },
         }),
     );
@@ -78,8 +91,8 @@ function unique(jobs: JobInfo[]): JobInfo[] {
     return jobs.filter((job) => !seen.has(job.id) && seen.add(job.id));
 }
 
-function arrivals(head: JobInfo[], loaded: JobInfo[], order: JobOrder): JobInfo[] {
-    if (order !== "newest") {
+function arrivals(head: JobInfo[], loaded: JobInfo[], newest: boolean): JobInfo[] {
+    if (!newest) {
         return [];
     }
     const top = loaded[0]?.id ?? Number.NEGATIVE_INFINITY;
@@ -89,10 +102,11 @@ function arrivals(head: JobInfo[], loaded: JobInfo[], order: JobOrder): JobInfo[
 export function useJobList(filter: JobFilter) {
     const q = useDebounced(filter.q ?? "", TYPING_MS);
     const query = serverQuery({ ...filter, q });
-    const order = filter.order ?? "newest";
+    const sort = filter.sort ?? NEWEST_JOBS;
+    const newest = isDefaultSort(sort, NEWEST_JOBS);
     const pages = useInfiniteQuery({
-        queryKey: ["jobs", "list", query, order] as const,
-        queryFn: ({ pageParam }) => fetchPage(query, order, pageParam),
+        queryKey: ["jobs", "list", query, sort] as const,
+        queryFn: ({ pageParam }) => fetchPage(query, sort, pageParam),
         initialPageParam: undefined as string | undefined,
         getNextPageParam: (last) => last.next_cursor ?? undefined,
         placeholderData: keepPreviousData,
@@ -105,11 +119,11 @@ export function useJobList(filter: JobFilter) {
         watched.current = active;
     });
     const live = useQuery({
-        queryKey: ["jobs", "list", query, order, "live"] as const,
+        queryKey: ["jobs", "list", query, sort, "live"] as const,
         queryFn: async () => {
             const ids = watched.current.slice(0, 200);
             const [head, current] = await Promise.all([
-                fetchPage(query, order, undefined),
+                fetchPage(query, sort, undefined),
                 ids.length > 0
                     ? unwrap(api.GET("/api/jobs", { params: { query: { id: ids, limit: 200 } } }))
                     : null,
@@ -127,7 +141,7 @@ export function useJobList(filter: JobFilter) {
     const gap =
         head !== undefined &&
         head.next_cursor !== null &&
-        order === "newest" &&
+        newest &&
         loaded.length > 0 &&
         head.items.every((job) => job.id > (loaded[0]?.id ?? 0));
     const { refetch } = pages;
@@ -143,7 +157,7 @@ export function useJobList(filter: JobFilter) {
     const rows = gap
         ? loaded
         : [
-              ...arrivals(head?.items ?? [], loaded, order),
+              ...arrivals(head?.items ?? [], loaded, newest),
               ...loaded.map((job) => fresh.get(job.id) ?? job),
           ];
     return {

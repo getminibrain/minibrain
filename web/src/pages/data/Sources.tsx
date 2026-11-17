@@ -100,7 +100,6 @@ export function SourcesOverview({
                         columns={KIND_COLUMNS}
                         rows={rows}
                         getRowId={(row) => row.kind}
-                        sortable={false}
                         onOpen={(row) => onSelect({ kind: "group", id: row.kind })}
                         rowLabel={(row) => `${row.label}, ${plural(row.sources, row.noun)}`}
                         maxHeight="100%"

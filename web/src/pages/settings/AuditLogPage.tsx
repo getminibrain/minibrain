@@ -45,7 +45,7 @@ import {
 } from "obp-ui";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
-import type { components } from "~/api/schema";
+import type { components, operations } from "~/api/schema";
 import { Facts } from "~/components/Facts";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
@@ -74,6 +74,7 @@ import {
 } from "~/lib/audit";
 import { count } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
+import { type ListSort, sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
 import { exactTime, relativeTime } from "~/lib/time";
 import { AuditStatus, RETENTION } from "~/pages/settings/AuditSettings";
 
@@ -81,6 +82,13 @@ type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Policies = Map<string, PolicyInfo>;
 type AuditSearchKey = (typeof AUDIT_KEYS)[number];
 
+type AuditSortKey = NonNullable<
+    NonNullable<operations["list_events_api_audit_get"]["parameters"]["query"]>["sort"]
+>;
+type AuditSort = ListSort<AuditSortKey>;
+
+const AUDIT_SORTS: AuditSortKey[] = ["at", "actor", "action"];
+const NEWEST_EVENTS: AuditSort = { sort: "at", order: "desc" };
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 300;
 const ALL_TIME = "all";
@@ -96,17 +104,19 @@ function usePolicies() {
     return useQuery({ queryKey: ["policies"], queryFn: () => unwrap(api.GET("/api/policies")) });
 }
 
-function useAuditPage(query: AuditQuery, before?: string, after?: string) {
+function useAuditPage(query: AuditQuery, sort: AuditSort, prev?: string, next?: string) {
     return useQuery({
-        queryKey: ["audit", "page", query, before ?? "", after ?? ""],
+        queryKey: ["audit", "page", query, sort, prev ?? "", next ?? ""],
         queryFn: () =>
             unwrap(
                 api.GET("/api/audit", {
                     params: {
                         query: {
                             ...query,
-                            before: before ? Number(before) : undefined,
-                            after: after ? Number(after) : undefined,
+                            prev: prev || undefined,
+                            next: next || undefined,
+                            sort: sort.sort,
+                            order: sort.order,
                             limit: PAGE_SIZE,
                         },
                     },
@@ -164,6 +174,7 @@ function auditColumns(policies: Policies): ColumnDef<AuditEvent, unknown>[] {
         {
             id: "at",
             header: "Time",
+            accessorFn: (event) => new Date(event.at).getTime(),
             cell: ({ row }) => (
                 <span title={utcTime(row.original.at)} className="whitespace-nowrap tabular-nums">
                     {relativeTime(row.original.at)}
@@ -173,11 +184,13 @@ function auditColumns(policies: Policies): ColumnDef<AuditEvent, unknown>[] {
         {
             id: "actor",
             header: "Actor",
+            accessorFn: (event) => actorOf(event).toLowerCase(),
             cell: ({ row }) => <ActorCell event={row.original} />,
         },
         {
             id: "action",
             header: "Action",
+            accessorFn: (event) => event.action,
             cell: ({ row }) => (
                 <div className="flex min-w-0 flex-col">
                     <span>{actionLabel(row.original.action)}</span>
@@ -288,15 +301,17 @@ function ExportMenu({ query }: { query: AuditQuery }) {
 
 function Pager({
     page,
-    onNewer,
-    onOlder,
+    byTime,
+    onPrevious,
+    onNext,
 }: {
     page: components["schemas"]["AuditPage"];
-    onNewer: () => void;
-    onOlder: () => void;
+    byTime: boolean;
+    onPrevious: () => void;
+    onNext: () => void;
 }) {
-    const first = page.newer + 1;
-    const last = page.newer + page.events.length;
+    const first = page.start + 1;
+    const last = page.start + page.events.length;
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground tabular-nums">
@@ -305,12 +320,12 @@ function Pager({
                     : `${count(first)}–${count(last)} of ${count(page.total)}`}
             </p>
             <div className="flex items-center gap-2">
-                <Button variant="outline" disabled={page.newer_cursor === null} onClick={onNewer}>
+                <Button variant="outline" disabled={page.prev_cursor === null} onClick={onPrevious}>
                     <IconChevronLeft />
-                    Newer
+                    {byTime ? "Newer" : "Previous"}
                 </Button>
-                <Button variant="outline" disabled={page.older_cursor === null} onClick={onOlder}>
-                    Older
+                <Button variant="outline" disabled={page.next_cursor === null} onClick={onNext}>
+                    {byTime ? "Older" : "Next"}
                     <IconChevronRight />
                 </Button>
             </div>
@@ -499,7 +514,8 @@ function EventSheet({
 export function AuditLogPage() {
     const { search, update } = useListSearch(AUDIT_PATH, AUDIT_KEYS);
     const query = useMemo(() => auditQuery(search), [search]);
-    const page = useAuditPage(query, search.before, search.after);
+    const sort = sortFrom(AUDIT_SORTS, NEWEST_EVENTS, search);
+    const page = useAuditPage(query, sort, search.prev, search.next);
     const policiesQuery = usePolicies();
     const facets = useQuery({
         queryKey: ["audit", "facets"],
@@ -511,7 +527,7 @@ export function AuditLogPage() {
     );
     const columns = useMemo(() => auditColumns(policies), [policies]);
     const filter = (patch: Partial<Record<AuditSearchKey, string>>) =>
-        update({ ...patch, before: "", after: "" });
+        update({ ...patch, prev: "", next: "" });
     const [draft, setDraft] = useDebounced(search.q ?? "", (q) => filter({ q }));
     const categories = splitList(search.category);
     const actors = splitList(search.actor);
@@ -619,7 +635,8 @@ export function AuditLogPage() {
                     rows={page.data?.events ?? []}
                     getRowId={(event) => String(event.id)}
                     loading={page.isLoading}
-                    sortable={false}
+                    sorting={sortingOf(sort)}
+                    onSortingChange={(next) => filter(sortSearch(next, NEWEST_EVENTS))}
                     storageKey="minibrain.audit.columns.v2"
                     onOpen={(event) => update({ event: String(event.id) })}
                     rowLabel={(event) =>
@@ -642,12 +659,9 @@ export function AuditLogPage() {
                 {page.data && page.data.total > 0 && (
                     <Pager
                         page={page.data}
-                        onNewer={() =>
-                            update({ before: "", after: String(page.data?.newer_cursor ?? "") })
-                        }
-                        onOlder={() =>
-                            update({ after: "", before: String(page.data?.older_cursor ?? "") })
-                        }
+                        byTime={sort.sort === "at"}
+                        onPrevious={() => update({ next: "", prev: page.data?.prev_cursor ?? "" })}
+                        onNext={() => update({ prev: "", next: page.data?.next_cursor ?? "" })}
                     />
                 )}
             </div>

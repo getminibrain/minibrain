@@ -16,6 +16,7 @@ from minibrain.api.access import builder, facts_of, sees_rows, still_allowed, vi
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.job_facts import TRAINING_METHODS, job_setup
 from minibrain.api.job_rows import list_extras
+from minibrain.api.job_sorting import JobSort, job_keyset
 from minibrain.api.owners import custom_owned, custom_token, split_token
 from minibrain.api.schemas import (
     JobActionResult,
@@ -27,6 +28,7 @@ from minibrain.api.schemas import (
     JobInfo,
     JobPage,
 )
+from minibrain.api.sorting import CURSOR_PATTERN, Order, keyset_rows
 from minibrain.api.views import job_detail, job_info
 from minibrain.auth.identity import current_actor
 from minibrain.auth.roles import Role
@@ -62,7 +64,6 @@ EVENT_BATCH = 500
 JOB_PAGE = 50
 JOB_PAGE_MAX = 200
 
-JobOrder = Literal["newest", "oldest"]
 Facet = Literal["status", "model", "kind"]
 
 
@@ -161,30 +162,26 @@ def list_jobs(
     session: SessionDep,
     filters: FilterDep,
     limit: int = JOB_PAGE,
-    cursor: Annotated[str | None, Query(pattern=r"^\d{1,18}$")] = None,
-    order: JobOrder = "newest",
+    cursor: Annotated[str | None, Query(pattern=CURSOR_PATTERN)] = None,
+    sort: JobSort = "id",
+    order: Order = "desc",
 ) -> JobPage:
     where = conditions(filters)
     size = max(1, min(limit, JOB_PAGE_MAX))
-    newest = order == "newest"
     loads = (
         joinedload(Job.model),
         joinedload(Job.version).joinedload(Version.dataset_version).joinedload(DatasetVersion.dataset),
         joinedload(Job.version).joinedload(Version.dataset_version).joinedload(DatasetVersion.base),
         joinedload(Job.base_model).joinedload(BaseModel.variant).joinedload(CatalogVariant.model),
     )
-    query = select(Job).options(*loads).where(*where)
-    if cursor is not None:
-        query = query.where(Job.id < int(cursor) if newest else Job.id > int(cursor))
-    query = query.order_by(Job.id.desc() if newest else Job.id.asc()).limit(size + 1)
-    jobs = list(session.scalars(query))
-    shown = jobs[:size]
-    more = len(jobs) > size
+    keyset = job_keyset(sort, order)
+    found = keyset_rows(session, select(Job).options(*loads).where(*where), keyset, cursor, size)
+    shown: list[Job] = [row[0] for row in found.rows]
     infos = [job_info(job) for job in shown]
     extras = list_extras(session, shown, {info.id: info.score for info in infos})
     return JobPage(
         items=[info.model_copy(update=extras[info.id]) for info in infos],
-        next_cursor=str(shown[-1].id) if more else None,
+        next_cursor=keyset.encode(found.last) if found.more and found.last is not None else None,
         total=count_jobs(session, where),
     )
 

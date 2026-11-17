@@ -5747,35 +5747,37 @@
         "operationId": "list_events_api_audit_get",
         "parameters": [
           {
-            "name": "before",
+            "name": "next",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,2048}$"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Before"
+              "title": "Next"
             }
           },
           {
-            "name": "after",
+            "name": "prev",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,2048}$"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "After"
+              "title": "Prev"
             }
           },
           {
@@ -5786,6 +5788,35 @@
               "type": "integer",
               "default": 50,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "at",
+                "actor",
+                "action"
+              ],
+              "type": "string",
+              "default": "at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
             }
           },
           {
@@ -8989,7 +9020,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^\\d{1,18}$"
+                  "pattern": "^[A-Za-z0-9_-]{1,2048}$"
                 },
                 {
                   "type": "null"
@@ -8999,16 +9030,38 @@
             }
           },
           {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "id",
+                "kind",
+                "model",
+                "status",
+                "pool",
+                "started",
+                "duration",
+                "score",
+                "trained_on",
+                "gpu_hours"
+              ],
+              "type": "string",
+              "default": "id",
+              "title": "Sort"
+            }
+          },
+          {
             "name": "order",
             "in": "query",
             "required": false,
             "schema": {
               "enum": [
-                "newest",
-                "oldest"
+                "asc",
+                "desc"
               ],
               "type": "string",
-              "default": "newest",
+              "default": "desc",
               "title": "Order"
             }
           },
@@ -9928,7 +9981,7 @@
               "anyOf": [
                 {
                   "type": "string",
-                  "pattern": "^\\d{1,18}$"
+                  "pattern": "^[A-Za-z0-9_-]{1,2048}$"
                 },
                 {
                   "type": "null"
@@ -9952,6 +10005,39 @@
                 }
               ],
               "title": "After"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "at",
+                "model",
+                "kind",
+                "key",
+                "status",
+                "latency",
+                "tokens"
+              ],
+              "type": "string",
+              "default": "at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
             }
           },
           {
@@ -12066,40 +12152,40 @@
             "type": "integer",
             "title": "Total"
           },
-          "newer": {
+          "start": {
             "type": "integer",
-            "title": "Newer"
+            "title": "Start"
           },
-          "older_cursor": {
+          "next_cursor": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Older Cursor"
+            "title": "Next Cursor"
           },
-          "newer_cursor": {
+          "prev_cursor": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Newer Cursor"
+            "title": "Prev Cursor"
           }
         },
         "type": "object",
         "required": [
           "events",
           "total",
-          "newer",
-          "older_cursor",
-          "newer_cursor"
+          "start",
+          "next_cursor",
+          "prev_cursor"
         ],
         "title": "AuditPage"
       },

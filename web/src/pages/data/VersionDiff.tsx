@@ -51,6 +51,7 @@ const ROW_COLUMNS: ColumnDef<DiffRow, unknown>[] = [
     {
         header: "Input",
         accessorKey: "input",
+        enableSorting: false,
         cell: (info) => <Clamp text={String(info.getValue())} />,
     },
     {
@@ -64,6 +65,7 @@ const RELABEL_COLUMNS: ColumnDef<RelabelInfo, unknown>[] = [
     {
         header: "Input",
         accessorKey: "input",
+        enableSorting: false,
         cell: (info) => <Clamp text={String(info.getValue())} />,
     },
     {

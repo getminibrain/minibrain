@@ -1,10 +1,10 @@
-import type { ColumnDef, SortingState } from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import type { JobInfo } from "~/api/client";
-import type { JobOrder } from "~/api/jobQueries";
 import { ModelName, withDeleted } from "~/components/ModelName";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
+import { jobStatusRank } from "~/components/StatusBadge";
 import { When } from "~/components/When";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { percent, points } from "~/lib/format";
@@ -21,6 +21,10 @@ const STATES: Record<string, { tone: Tone; label: string }> = {
     failed: { tone: "destructive", label: "Failed" },
     cancelled: { tone: "neutral", label: "Cancelled" },
 };
+
+function timestamp(value: string | null | undefined): number {
+    return value ? new Date(value).getTime() : -1;
+}
 
 const METHODS: Record<string, string> = { sft: "SFT" };
 const STRATEGIES: Record<string, string> = { lora: "LoRA", qlora: "QLoRA" };
@@ -133,14 +137,14 @@ export const OWNER_COLUMN: JobColumn = {
 export const STATUS_COLUMN: JobColumn = {
     id: "status",
     header: "Status",
-    accessorFn: (job) => job.status,
+    accessorFn: (job) => jobStatusRank(job.status),
     cell: ({ row }) => <JobState job={row.original} />,
 };
 
 export const STARTED_COLUMN: JobColumn = {
     id: "started",
     header: "Started",
-    accessorFn: (job) => job.started_at ?? job.created_at,
+    accessorFn: (job) => timestamp(job.started_at ?? job.created_at),
     cell: ({ row }) =>
         row.original.started_at ? (
             <When value={row.original.started_at} />
@@ -159,7 +163,7 @@ export const DURATION_COLUMN: JobColumn = {
 export const POOL_COLUMN: JobColumn = {
     id: "pool",
     header: "Pool",
-    accessorFn: (job) => job.pool ?? "",
+    accessorFn: (job) => (job.pool ?? "").toLowerCase(),
     cell: ({ row }) =>
         row.original.pool ? (
             <PoolLink name={row.original.pool} />
@@ -171,6 +175,7 @@ export const POOL_COLUMN: JobColumn = {
 export const ATTEMPT_COLUMN: JobColumn = {
     id: "attempt",
     header: "Attempt",
+    enableSorting: false,
     accessorFn: (job) => job.attempt,
     cell: ({ row }) => (
         <span className="tabular-nums">{`${Math.max(1, row.original.attempt)} of ${row.original.max_attempts}`}</span>
@@ -256,7 +261,10 @@ function TrainedOn({ job }: { job: JobInfo }) {
 export const TRAINED_ON_COLUMN: JobColumn = {
     id: "trained_on",
     header: "Trained on",
-    accessorFn: (job) => job.trained_on?.base_model_name ?? job.trained_on?.base_model ?? "",
+    accessorFn: (job) => {
+        const on = job.trained_on;
+        return on ? `${on.base_model_name ?? on.base_model} ${on.dataset ?? ""}`.toLowerCase() : "";
+    },
     cell: ({ row }) => <TrainedOn job={row.original} />,
 };
 
@@ -286,15 +294,3 @@ export const DEVICE_HOURS_COLUMN: JobColumn = {
     accessorFn: (job) => job.device_time?.hours ?? -1,
     cell: ({ row }) => <DeviceHours job={row.original} />,
 };
-
-export function sortedById(columns: JobColumn[]): JobColumn[] {
-    return columns.map((column) => ({ ...column, enableSorting: column.id === "id" }));
-}
-
-export function sortingFor(order: JobOrder): SortingState {
-    return [{ id: "id", desc: order === "newest" }];
-}
-
-export function orderFrom(sorting: SortingState): JobOrder {
-    return sorting[0]?.desc === false ? "oldest" : "newest";
-}

@@ -6,39 +6,52 @@ import { ModelName } from "~/components/ModelName";
 import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section, Stat } from "~/components/Section";
-import { JobStatus } from "~/components/StatusBadge";
+import { JobStatus, jobStatusRank } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { count, dateTime, percent } from "~/lib/format";
 import { jobTitle } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { Checklist } from "./home/Checklist";
 
+function jobModelName(job: JobInfo): string {
+    return job.model_name ?? job.base_model_name ?? job.base_model ?? "Install";
+}
+
 const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     {
         header: "Model",
         id: "model",
+        accessorFn: (job) => jobModelName(job).toLowerCase(),
         cell: ({ row }) => (
             <Link className="text-primary" href={jobHref(row.original)}>
-                <ModelName
-                    name={
-                        row.original.model_name ??
-                        row.original.base_model_name ??
-                        row.original.base_model ??
-                        "Install"
-                    }
-                    deleted={row.original.deleted}
-                />
+                <ModelName name={jobModelName(row.original)} deleted={row.original.deleted} />
             </Link>
         ),
     },
     {
         header: "Job",
         id: "job",
+        accessorFn: (job) => jobTitle(job).toLowerCase(),
         cell: ({ row }) => jobTitle(row.original),
     },
-    { header: "Status", id: "status", cell: ({ row }) => <JobStatus job={row.original} /> },
-    { header: "Progress", id: "progress", cell: ({ row }) => percent(row.original.progress) },
-    { header: "Created", id: "created", cell: ({ row }) => dateTime(row.original.created_at) },
+    {
+        header: "Status",
+        id: "status",
+        accessorFn: (job) => jobStatusRank(job.status),
+        cell: ({ row }) => <JobStatus job={row.original} />,
+    },
+    {
+        header: "Progress",
+        id: "progress",
+        accessorFn: (job) => job.progress,
+        cell: ({ row }) => percent(row.original.progress),
+    },
+    {
+        header: "Created",
+        id: "created",
+        accessorFn: (job) => Date.parse(job.created_at),
+        cell: ({ row }) => dateTime(row.original.created_at),
+    },
 ];
 
 export function HomePage() {

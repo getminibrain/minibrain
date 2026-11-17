@@ -53,8 +53,8 @@ import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { When } from "~/components/When";
-import { ROLE_LABELS, SOURCE_LABELS } from "~/lib/access";
-import { relativeTime } from "~/lib/time";
+import { ROLE_LABELS, SOURCE_LABELS, roleRank } from "~/lib/access";
+import { relativeTime, timeValue } from "~/lib/time";
 import { ACCOUNTS } from "~/pages/settings/settingsIndex";
 
 type RoleChoice = Role | "none";
@@ -309,17 +309,26 @@ function LinkNotice({ link, onDismiss }: { link: PasswordLink; onDismiss: () => 
     );
 }
 
-function StatusBadge({ person }: { person: AccountInfo }) {
+const ACCOUNT_STATE = {
+    active: { rank: 0, variant: "success", label: "Active" },
+    invited: { rank: 1, variant: "info", label: "Invited" },
+    no_role: { rank: 2, variant: "warning", label: "No role" },
+    off: { rank: 3, variant: "neutral", label: "Off" },
+} as const;
+
+function accountState(person: AccountInfo): keyof typeof ACCOUNT_STATE {
     if (person.disabled) {
-        return <Badge variant="neutral">Off</Badge>;
+        return "off";
     }
     if (person.link_pending && !person.password_set) {
-        return <Badge variant="info">Invited</Badge>;
+        return "invited";
     }
-    if (person.role == null) {
-        return <Badge variant="warning">No role</Badge>;
-    }
-    return <Badge variant="success">Active</Badge>;
+    return person.role == null ? "no_role" : "active";
+}
+
+function StatusBadge({ person }: { person: AccountInfo }) {
+    const state = ACCOUNT_STATE[accountState(person)];
+    return <Badge variant={state.variant}>{state.label}</Badge>;
 }
 
 function PersonMenu({
@@ -418,7 +427,7 @@ function columns(): ColumnDef<AccountInfo, unknown>[] {
         {
             header: "Role",
             id: "role",
-            accessorFn: (row) => row.role ?? "",
+            accessorFn: (row) => roleRank(row.role),
             cell: ({ row }) => <RoleCell person={row.original} />,
         },
         {
@@ -429,13 +438,14 @@ function columns(): ColumnDef<AccountInfo, unknown>[] {
         {
             header: "Last sign-in",
             id: "last",
-            accessorFn: (row) => row.last_sign_in_at ?? "",
+            accessorFn: (row) => timeValue(row.last_sign_in_at),
+            sortUndefined: "last",
             cell: ({ row }) => <When value={row.original.last_sign_in_at} empty="Never" />,
         },
         {
             header: "Status",
             id: "status",
-            accessorFn: (row) => (row.disabled ? "off" : "on"),
+            accessorFn: (row) => ACCOUNT_STATE[accountState(row)].rank,
             cell: ({ row }) => <StatusBadge person={row.original} />,
         },
     ];

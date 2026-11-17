@@ -20,8 +20,10 @@ import {
 } from "obp-ui";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
+    NEWEST_REQUESTS,
     type RequestFilter,
     type RequestRow,
+    type RequestSortKey,
     type RequestSummary,
     useRequestFacets,
     useRequestList,
@@ -33,6 +35,7 @@ import { ErrorLine, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count, milliseconds, percent } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
+import { sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
 import {
     DEFAULT_RANGE,
     RANGES,
@@ -50,6 +53,15 @@ import { exactTime, relativeTime } from "~/lib/time";
 import { RequestDialog } from "./RequestDetail";
 
 const SEARCH_DELAY_MS = 300;
+const REQUEST_SORTS: RequestSortKey[] = [
+    "at",
+    "model",
+    "kind",
+    "key",
+    "status",
+    "latency",
+    "tokens",
+];
 
 type FacetOption = {
     value: string;
@@ -113,11 +125,13 @@ export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
         id: "at",
         header: "Time",
         enableHiding: false,
+        accessorFn: (row) => new Date(row.at).getTime(),
         cell: ({ row }) => <TimeCell at={row.original.at} />,
     },
     {
         id: "model",
         header: "Model",
+        accessorFn: (row) => modelLabel(row).toLowerCase(),
         cell: ({ row }) => (
             <ModelName
                 name={modelLabel(row.original)}
@@ -129,11 +143,13 @@ export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
     {
         id: "kind",
         header: "Endpoint",
+        accessorFn: (row) => row.kind,
         cell: ({ row }) => REQUEST_KINDS[row.original.kind].label,
     },
     {
         id: "key",
         header: "Key",
+        accessorFn: (row) => (row.key_name ?? "").toLowerCase(),
         cell: ({ row }) =>
             row.original.key_name ? (
                 <span className="block max-w-40 truncate">{row.original.key_name}</span>
@@ -144,6 +160,7 @@ export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
     {
         id: "status",
         header: "Status",
+        accessorFn: (row) => row.status,
         cell: ({ row }) => (
             <StatusText tone={STATUS_TONES[row.original.status_class]}>
                 <span className="tabular-nums">{row.original.status}</span>
@@ -153,6 +170,7 @@ export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
     {
         id: "latency",
         header: "Latency",
+        accessorFn: (row) => row.latency_ms,
         cell: ({ row }) => (
             <span className="tabular-nums">{milliseconds(row.original.latency_ms)}</span>
         ),
@@ -160,6 +178,7 @@ export const REQUEST_COLUMNS: ColumnDef<RequestRow, unknown>[] = [
     {
         id: "tokens",
         header: "Tokens in / out",
+        accessorFn: (row) => row.prompt_tokens + row.completion_tokens,
         cell: ({ row }) => (
             <span className="tabular-nums">
                 {`${count(row.original.prompt_tokens)} / ${count(row.original.completion_tokens)}`}
@@ -316,7 +335,8 @@ export function RequestsTab({ paused }: { paused: boolean }) {
         }),
         [search, range],
     );
-    const list = useRequestList(filter, paused);
+    const sort = sortFrom(REQUEST_SORTS, NEWEST_REQUESTS, search);
+    const list = useRequestList(filter, paused, sort);
     const facets = useRequestFacets(filter, paused);
     const summary = useRequestSummary(filter, paused);
     const [draft, setDraft] = useDebounced(search.q ?? "", (q) => update({ q }));
@@ -401,7 +421,8 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                 rows={list.rows}
                 getRowId={(row) => String(row.id)}
                 loading={list.isLoading}
-                sortable={false}
+                sorting={sortingOf(sort)}
+                onSortingChange={(next) => update(sortSearch(next, NEWEST_REQUESTS))}
                 storageKey="minibrain.requests.columns"
                 columnPicker
                 hasMore={list.hasMore}

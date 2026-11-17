@@ -15,6 +15,7 @@ import { usePerson } from "~/api/authQueries";
 import { type KeyCreated, type KeyInfo, type ModelRef, api, succeed } from "~/api/client";
 import { When } from "~/components/When";
 import { useCan } from "~/lib/access";
+import { timeValue } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
 import { KeyDialog, type KeyEditing, useRefreshKeys } from "./KeyDialog";
 import { NewSecret } from "./NewSecret";
@@ -22,11 +23,11 @@ import { type Choice, ScopeCell, useChoiceIndex } from "./scope";
 
 export const KEY_STATUS: Record<
     KeyInfo["status"],
-    { label: string; variant: "success" | "warning" | "destructive" }
+    { label: string; variant: "success" | "warning" | "destructive"; rank: number }
 > = {
-    active: { label: "Active", variant: "success" },
-    no_access: { label: "No access", variant: "warning" },
-    expired: { label: "Expired", variant: "destructive" },
+    active: { label: "Active", variant: "success", rank: 0 },
+    no_access: { label: "No access", variant: "warning", rank: 1 },
+    expired: { label: "Expired", variant: "destructive", rank: 2 },
 };
 
 function revokeConfirmation(key: KeyInfo, run: () => Promise<unknown>): Confirmation {
@@ -84,7 +85,7 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
         {
             header: "Name",
             id: "name",
-            accessorFn: (key) => key.name,
+            accessorFn: (key) => key.name.toLowerCase(),
             size: 220,
             cell: ({ row }) => (
                 <span className="flex min-w-0 items-baseline gap-2">
@@ -105,7 +106,8 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
         {
             header: "Created by",
             id: "created_by",
-            accessorFn: (key) => key.created_by ?? "",
+            accessorFn: (key) => key.created_by?.toLowerCase(),
+            sortUndefined: "last",
             size: 180,
             cell: ({ row }) => {
                 const by = row.original.created_by;
@@ -118,28 +120,29 @@ function columns(index: Map<string, Choice>, me: string | null): ColumnDef<KeyIn
         {
             header: "Created",
             id: "created",
-            accessorFn: (key) => key.created_at,
+            accessorFn: (key) => timeValue(key.created_at),
             size: 120,
             cell: ({ row }) => <When value={row.original.created_at} empty="" />,
         },
         {
             header: "Last used",
             id: "used",
-            accessorFn: (key) => key.last_used_at ?? "",
+            accessorFn: (key) => timeValue(key.last_used_at),
+            sortUndefined: "last",
             size: 120,
             cell: ({ row }) => <When value={row.original.last_used_at} empty="Never" />,
         },
         {
             header: "Expires",
             id: "expires",
-            accessorFn: (key) => key.expires_at ?? "~",
+            accessorFn: (key) => timeValue(key.expires_at) ?? Number.POSITIVE_INFINITY,
             size: 120,
             cell: ({ row }) => <When value={row.original.expires_at} empty="Never" />,
         },
         {
             header: "Status",
             id: "status",
-            accessorFn: (key) => key.status,
+            accessorFn: (key) => KEY_STATUS[key.status].rank,
             size: 136,
             cell: ({ row }) => {
                 const status = KEY_STATUS[row.original.status];

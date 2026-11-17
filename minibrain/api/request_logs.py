@@ -1,18 +1,19 @@
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 import pydantic
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import ColumnElement, and_, case, false, func, or_, select
+from sqlalchemy import ColumnElement, Select, SQLColumnExpression, String, and_, case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from minibrain.api.access import sees_rows, viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.owners import base_token, custom_owned, log_custom_token, log_owned, split_token
+from minibrain.api.sorting import CURSOR_PATTERN, Keyset, Order, keyset_rows
 from minibrain.data.feedback import UP
 from minibrain.models.registry import base_publisher
 from minibrain.policy import bodies_choice
@@ -33,6 +34,7 @@ StatusClass = Literal["ok", "client_error", "server_error"]
 RequestKind = Literal["chat", "completion"]
 BodyState = Literal["kept", "hidden", "missing", "off"]
 Facet = Literal["model", "version", "key", "status"]
+RequestSort = Literal["at", "model", "kind", "key", "status", "latency", "tokens"]
 STATUS_CLASSES: tuple[StatusClass, ...] = ("ok", "client_error", "server_error")
 
 
@@ -246,14 +248,41 @@ def aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
-def rows_for(session: Session, where: Sequence[ColumnElement[bool]], size: int) -> list[Any]:
-    query = (
+def rows_query(where: Sequence[ColumnElement[bool]]) -> Select[*tuple[Any, ...]]:
+    return (
         select(RequestLog, Model.slug, Model.name, ApiKey.name)
         .outerjoin(Model, RequestLog.model_id == Model.id)
         .outerjoin(ApiKey, RequestLog.key_id == ApiKey.id)
         .where(*where)
     )
-    return list(session.execute(query.order_by(RequestLog.id.desc()).limit(size)))
+
+
+def rows_for(session: Session, where: Sequence[ColumnElement[bool]], size: int) -> list[Any]:
+    return list(session.execute(rows_query(where).order_by(RequestLog.id.desc()).limit(size)))
+
+
+def lowered(value: SQLColumnExpression[Any]) -> SQLColumnExpression[str]:
+    return func.lower(func.coalesce(value, ""), type_=String)
+
+
+def model_parts() -> tuple[SQLColumnExpression[Any], ...]:
+    base = select(BaseModel.name).where(BaseModel.id == RequestLog.model).scalar_subquery()
+    return (lowered(func.coalesce(Model.name, RequestLog.model_name, base, RequestLog.model)),)
+
+
+PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
+    "at": tuple,
+    "model": model_parts,
+    "kind": lambda: (RequestLog.kind,),
+    "key": lambda: (lowered(ApiKey.name),),
+    "status": lambda: (RequestLog.status,),
+    "latency": lambda: (RequestLog.latency_ms,),
+    "tokens": lambda: (RequestLog.prompt_tokens + RequestLog.completion_tokens,),
+}
+
+
+def request_keyset(sort: RequestSort, order: Order) -> Keyset:
+    return Keyset(columns=(*PARTS[sort](), RequestLog.id), descending=order == "desc")
 
 
 @dataclass(frozen=True)
@@ -319,21 +348,19 @@ def list_requests(
     session: SessionDep,
     filters: FilterDep,
     limit: int = PAGE,
-    cursor: Annotated[str | None, Query(pattern=r"^\d{1,18}$")] = None,
+    cursor: Annotated[str | None, Query(pattern=CURSOR_PATTERN)] = None,
     after: Annotated[str | None, Query(pattern=r"^\d{1,18}$")] = None,
+    sort: RequestSort = "at",
+    order: Order = "desc",
 ) -> RequestPage:
     where = filters.conditions()
     size = max(1, min(limit, PAGE_MAX))
-    bounds: list[ColumnElement[bool]] = []
-    if cursor is not None:
-        bounds.append(RequestLog.id < int(cursor))
-    if after is not None:
-        bounds.append(RequestLog.id > int(after))
-    found = rows_for(session, [*where, *bounds], size + 1)
-    shown = found[:size]
+    bounds = [RequestLog.id > int(after)] if after is not None else []
+    keyset = request_keyset(sort, order)
+    found = keyset_rows(session, rows_query([*where, *bounds]), keyset, cursor, size)
     return RequestPage(
-        items=request_rows(session, shown),
-        next_cursor=str(shown[-1][0].id) if len(found) > size else None,
+        items=request_rows(session, found.rows),
+        next_cursor=keyset.encode(found.last) if found.more and found.last is not None else None,
         total=count_requests(session, where),
     )
 

@@ -72,6 +72,13 @@ const CHANGE_TONE: Record<Change, string> = {
     worse: "text-destructive",
 };
 
+const CHANGE_RANK: Record<Change, number> = {
+    "newly wrong": 0,
+    worse: 1,
+    better: 2,
+    "newly right": 3,
+};
+
 function columnsFor(
     metric: string | null | undefined,
     mode: Mode,
@@ -82,6 +89,7 @@ function columnsFor(
         id: "input",
         header: "Input",
         enableHiding: false,
+        enableSorting: false,
         accessorFn: (item) => inputOf(item.answer),
         cell: ({ row }) => <Clipped text={inputOf(row.original.answer)} />,
     };
@@ -111,7 +119,8 @@ function columnsFor(
             {
                 id: "change",
                 header: "Change",
-                accessorFn: (item) => item.change ?? "",
+                accessorFn: (item) => (item.change ? CHANGE_RANK[item.change] : undefined),
+                sortUndefined: "last",
                 cell: ({ row }) => {
                     const change = row.original.change;
                     return change ? (

@@ -14,6 +14,10 @@ export const SOURCE_LABELS: Record<string, string> = {
     proxy: "Proxy",
 };
 
+export function roleRank(role: Role | null | undefined): number {
+    return role ? RANK[role] : 0;
+}
+
 export function allows(role: Role | null | undefined, needed: Role): boolean {
     return role != null && RANK[role] >= RANK[needed];
 }

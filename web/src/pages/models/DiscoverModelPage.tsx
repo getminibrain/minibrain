@@ -311,7 +311,7 @@ export function DiscoverModelPage() {
                             description="Memory needed is estimated from the weights' size; real use also depends on context length and batch size."
                             bare
                         >
-                            <DataGrid columns={table} rows={entry.variants} sortable={false} />
+                            <DataGrid columns={table} rows={entry.variants} />
                         </PanelSection>
                         <Licence entry={entry} />
                     </PanelSections>

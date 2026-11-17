@@ -7,6 +7,7 @@ import { type FeedbackInfo, useRemoveTestExample, useTestExamples } from "~/api/
 import { ErrorLine, errorMessage } from "~/components/Section";
 import { When } from "~/components/When";
 import { feedbackHref } from "~/lib/feedback";
+import { timeValue } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "~/pages/models/dialogs";
 
 function lastMessage(item: FeedbackInfo): string {
@@ -18,6 +19,7 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
         id: "conversation",
         header: "Conversation",
         enableHiding: false,
+        accessorFn: (item) => lastMessage(item).toLowerCase(),
         cell: ({ row }) => (
             <Link
                 href={feedbackHref(row.original.id)}
@@ -30,6 +32,8 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
     {
         id: "expected",
         header: "Expected answer",
+        accessorFn: (item) => item.label?.toLowerCase(),
+        sortUndefined: "last",
         cell: ({ row }) => <span className="block max-w-48 truncate">{row.original.label}</span>,
     },
     {
@@ -44,6 +48,8 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
     {
         id: "version",
         header: "Found on",
+        accessorFn: (item) => item.version ?? undefined,
+        sortUndefined: "last",
         cell: ({ row }) => (
             <span className="tabular-nums">
                 {row.original.version === null ? "–" : `v${row.original.version}`}
@@ -53,6 +59,8 @@ const COLUMNS: ColumnDef<FeedbackInfo, unknown>[] = [
     {
         id: "saved",
         header: "Saved",
+        accessorFn: (item) => timeValue(item.reviewed_at ?? item.created_at),
+        sortUndefined: "last",
         cell: ({ row }) => (
             <span className="block max-w-56 truncate">
                 <When value={row.original.reviewed_at ?? row.original.created_at} />

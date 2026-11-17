@@ -1,7 +1,7 @@
 import csv
 import io
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -9,13 +9,14 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import ColumnElement, String, cast, func, or_, select
+from sqlalchemy import ColumnElement, SQLColumnExpression, String, cast, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.api.access import admin
 from minibrain.api.audit_targets import ActorKind, AuditTarget, actor_kind, actor_names, category_of, targets_of
 from minibrain.api.deps import SessionDep
+from minibrain.api.sorting import CURSOR_PATTERN, Keyset, KeysetPage, Order, keyset_rows
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
 from minibrain.registry.audit_chain import ChainReport, head_of, verify
@@ -31,6 +32,7 @@ EXPORT_BATCH = 1000
 EXPORT_COLUMNS = ("id", "seq", "at", "actor", "actor_id", "ip", "action", "target", "detail", "prev_hash", "hash")
 EXPORTED: set[str] = set(EXPORT_COLUMNS)
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+AuditSort = Literal["at", "actor", "action"]
 MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"}
 
 
@@ -67,9 +69,9 @@ class AuditInfo(BaseModel):
 class AuditPage(BaseModel):
     events: list[AuditInfo]
     total: int
-    newer: int
-    older_cursor: int | None
-    newer_cursor: int | None
+    start: int
+    next_cursor: str | None
+    prev_cursor: str | None
 
 
 class AuditFacet(BaseModel):
@@ -203,44 +205,61 @@ def matching(session: Session, conditions: list[ColumnElement[bool]]) -> int:
     return int(session.scalar(select(func.count(AuditEvent.id)).where(*conditions)) or 0)
 
 
-def newest(session: Session, conditions: list[ColumnElement[bool]], size: int) -> list[AuditEvent]:
-    return list(session.scalars(select(AuditEvent).where(*conditions).order_by(AuditEvent.id.desc()).limit(size)))
+def lowered(value: SQLColumnExpression[str]) -> SQLColumnExpression[str]:
+    return func.lower(value, type_=String)
+
+
+PARTS: dict[str, Callable[[], tuple[SQLColumnExpression[Any], ...]]] = {
+    "at": tuple,
+    "actor": lambda: (lowered(AuditEvent.actor),),
+    "action": lambda: (AuditEvent.action,),
+}
+
+
+def audit_keyset(sort: AuditSort, order: Order) -> Keyset:
+    return Keyset(columns=(*PARTS[sort](), AuditEvent.id), descending=order == "desc")
 
 
 def page_rows(
-    session: Session, conditions: list[ColumnElement[bool]], before: int | None, after: int | None, size: int
-) -> list[AuditEvent]:
-    if after is not None:
-        query = select(AuditEvent).where(*conditions, AuditEvent.id > after).order_by(AuditEvent.id.asc())
-        rows = list(session.scalars(query.limit(size)))
-        return rows[::-1] if len(rows) == size else newest(session, conditions, size)
-    if before is not None:
-        return newest(session, [*conditions, AuditEvent.id < before], size)
-    return newest(session, conditions, size)
+    session: Session,
+    conditions: list[ColumnElement[bool]],
+    keyset: Keyset,
+    after: str | None,
+    back: str | None,
+    size: int,
+) -> KeysetPage:
+    query = select(AuditEvent).where(*conditions)
+    if back is not None:
+        found = keyset_rows(session, query, keyset, back, size, reverse=True)
+        if len(found.rows) == size:
+            return found
+    return keyset_rows(session, query, keyset, after if back is None else None, size)
 
 
 @router.get("", dependencies=[Depends(admin)], summary="List audit events")
 def list_events(
     session: SessionDep,
     found: FilterDep,
-    before: int | None = None,
-    after: int | None = None,
+    after: Annotated[str | None, Query(alias="next", pattern=CURSOR_PATTERN)] = None,
+    back: Annotated[str | None, Query(alias="prev", pattern=CURSOR_PATTERN)] = None,
     limit: int = PAGE_SIZE,
+    sort: AuditSort = "at",
+    order: Order = "desc",
 ) -> AuditPage:
     conditions = found.conditions()
-    rows = page_rows(session, conditions, before, after, max(1, min(limit, PAGE_MAX)))
+    keyset = audit_keyset(sort, order)
+    page = page_rows(session, conditions, keyset, after, back, max(1, min(limit, PAGE_MAX)))
     total = matching(session, conditions)
-    if not rows:
-        return AuditPage(events=[], total=total, newer=total, older_cursor=None, newer_cursor=None)
-    top, bottom = rows[0].id, rows[-1].id
-    newer = matching(session, [*conditions, AuditEvent.id > top])
-    older = total - newer - len(rows)
+    if page.first is None or page.last is None:
+        return AuditPage(events=[], total=total, start=0, next_cursor=None, prev_cursor=None)
+    start = matching(session, [*conditions, keyset.beyond(page.first, reverse=True)])
+    rest = total - start - len(page.rows)
     return AuditPage(
-        events=described(session, rows),
+        events=described(session, [row[0] for row in page.rows]),
         total=total,
-        newer=newer,
-        older_cursor=bottom if older > 0 else None,
-        newer_cursor=top if newer > 0 else None,
+        start=start,
+        next_cursor=keyset.encode(page.last) if rest > 0 else None,
+        prev_cursor=keyset.encode(page.first) if start > 0 else None,
     )
 
 

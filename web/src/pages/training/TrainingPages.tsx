@@ -21,7 +21,7 @@ import {
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import type { JobInfo, ModelRow } from "~/api/client";
-import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
+import { type JobSortKey, NEWEST_JOBS, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useModels } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
@@ -33,6 +33,7 @@ import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { TRAIN_KIND, jobPageHref } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
+import { SORT_KEYS, sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
 import {
     TRAINING_PATH,
     jobHref,
@@ -52,13 +53,20 @@ import {
     TRAINED_ON_COLUMN,
     jobRowLabel,
     methodText,
-    orderFrom,
     ownerName,
-    sortedById,
-    sortingFor,
 } from "../jobs/jobCells";
 
-const KEYS = ["model", "status", "method", "q", "job"] as const;
+const KEYS = ["model", "status", "method", "q", "job", ...SORT_KEYS] as const;
+const SORTS: JobSortKey[] = [
+    "id",
+    "model",
+    "status",
+    "score",
+    "trained_on",
+    "gpu_hours",
+    "duration",
+    "started",
+];
 const ANY = "any";
 const SFT = "sft";
 
@@ -110,7 +118,7 @@ function TrainedModel({ job }: { job: JobInfo }) {
     );
 }
 
-const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
+const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     ID_COLUMN,
     {
         id: "model",
@@ -127,11 +135,12 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
     {
         id: "method",
         header: "Method",
+        enableSorting: false,
         accessorFn: methodText,
         cell: ({ row }) => <span className="tabular-nums">{methodText(row.original)}</span>,
     },
     ATTEMPT_COLUMN,
-]);
+];
 
 function versionCount(count: number): string {
     return count === 1 ? "1 version" : `${count} versions`;
@@ -249,7 +258,7 @@ function Runs() {
     const router = useRouter();
     useOldJobLinks(search.job);
     const owned = useModels();
-    const [order, setOrder] = useState<JobOrder>("newest");
+    const sort = sortFrom(SORTS, NEWEST_JOBS, search);
     const models = splitList(search.model);
     const statuses = splitList(search.status);
     const method = search.method === SFT ? SFT : ANY;
@@ -259,7 +268,7 @@ function Runs() {
         status: statuses,
         method: method === ANY ? [] : [method],
         q: search.q,
-        order,
+        sort,
     };
     const jobs = useJobList(filter);
     const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
@@ -334,8 +343,8 @@ function Runs() {
                 storageKey="minibrain.training.runs"
                 columnPicker
                 hiddenColumns={["attempt", "method", "duration"]}
-                sorting={sortingFor(order)}
-                onSortingChange={(next) => setOrder(orderFrom(next))}
+                sorting={sortingOf(sort)}
+                onSortingChange={(next) => update(sortSearch(next, NEWEST_JOBS))}
                 hasMore={jobs.hasMore}
                 loadingMore={jobs.loadingMore}
                 onLoadMore={jobs.loadMore}

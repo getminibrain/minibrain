@@ -32,6 +32,7 @@ import { keys } from "~/api/queries";
 import { ErrorLine, Stat } from "~/components/Section";
 import { When } from "~/components/When";
 import { count } from "~/lib/format";
+import { timeValue } from "~/lib/time";
 import {
     DATASETS_GROUP,
     type FolderIndex,
@@ -59,6 +60,7 @@ type ContentRow = {
     name: string;
     folder: boolean;
     detail: string;
+    amount: number | null;
     models: number;
     updated: string | null;
 };
@@ -444,7 +446,7 @@ const CONTENT_COLUMNS: ColumnDef<ContentRow, unknown>[] = [
     {
         id: "name",
         header: "Name",
-        accessorKey: "name",
+        accessorFn: (row) => row.name.toLowerCase(),
         cell: ({ row }) => (
             <span className="flex min-w-0 items-center gap-2">
                 <span aria-hidden="true" className="shrink-0 text-muted-foreground [&>svg]:size-4">
@@ -459,7 +461,8 @@ const CONTENT_COLUMNS: ColumnDef<ContentRow, unknown>[] = [
     {
         id: "contents",
         header: "Contents",
-        accessorKey: "detail",
+        accessorFn: (row) => row.amount ?? undefined,
+        sortUndefined: "last",
         cell: ({ row }) => <span className="tabular-nums">{row.original.detail}</span>,
     },
     {
@@ -471,7 +474,8 @@ const CONTENT_COLUMNS: ColumnDef<ContentRow, unknown>[] = [
     {
         id: "updated",
         header: "Updated",
-        accessorKey: "updated",
+        accessorFn: (row) => timeValue(row.updated),
+        sortUndefined: "last",
         cell: ({ row }) => <When value={row.original.updated} />,
     },
 ];
@@ -485,6 +489,7 @@ function contentRows(index: FolderIndex, folderId: number | null): ContentRow[] 
             name: folder.name,
             folder: true,
             detail: plural(inside.length, "dataset"),
+            amount: inside.length,
             models: new Set(inside.flatMap((dataset) => dataset.models)).size,
             updated: null,
         };
@@ -495,6 +500,7 @@ function contentRows(index: FolderIndex, folderId: number | null): ContentRow[] 
         name: dataset.name,
         folder: false,
         detail: dataset.rows === null ? "–" : plural(dataset.rows, "row"),
+        amount: dataset.rows,
         models: dataset.models.length,
         updated: dataset.updated_at,
     }));
@@ -658,7 +664,6 @@ export function FolderContents({
                 columns={CONTENT_COLUMNS}
                 rows={rows}
                 getRowId={(row) => row.key}
-                sortable={false}
                 onOpen={(row) => onSelect(row.item)}
                 rowLabel={(row) => `${row.folder ? "Folder" : "Dataset"} ${row.name}`}
                 selectedIds={selected}

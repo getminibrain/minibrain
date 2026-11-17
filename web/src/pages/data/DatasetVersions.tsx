@@ -247,17 +247,24 @@ function UsedBy({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
     );
 }
 
-function ChecksSummary({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
+function openWarnings(datasetVersion: DatasetVersionInfo): number | undefined {
     const checks = datasetVersion.checks ?? [];
     if (checks.length === 0) {
+        return undefined;
+    }
+    return checks.filter((check) => check.status === "warning" && !check.dismissed).length;
+}
+
+function ChecksSummary({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
+    const open = openWarnings(datasetVersion);
+    if (open === undefined) {
         return <span className="text-muted-foreground">Not run</span>;
     }
-    const open = checks.filter((check) => check.status === "warning" && !check.dismissed);
-    return open.length === 0 ? (
+    return open === 0 ? (
         <StatusText tone="success">Passed</StatusText>
     ) : (
         <StatusText tone="warning">
-            {open.length === 1 ? "1 warning" : `${count(open.length)} warnings`}
+            {open === 1 ? "1 warning" : `${count(open)} warnings`}
         </StatusText>
     );
 }
@@ -274,7 +281,7 @@ const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
     {
         id: "taken",
         header: "Saved",
-        accessorFn: (datasetVersion) => takenAt(datasetVersion),
+        accessorFn: (datasetVersion) => Date.parse(takenAt(datasetVersion)),
         cell: ({ row }) => <When value={takenAt(row.original)} />,
     },
     {
@@ -294,13 +301,14 @@ const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
     {
         id: "checks",
         header: "Checks",
-        enableSorting: false,
+        accessorFn: (datasetVersion) => openWarnings(datasetVersion),
+        sortUndefined: "last",
         cell: ({ row }) => <ChecksSummary datasetVersion={row.original} />,
     },
     {
         id: "used",
         header: "Used by",
-        enableSorting: false,
+        accessorFn: (datasetVersion) => datasetVersion.versions.length,
         cell: ({ row }) => <UsedBy datasetVersion={row.original} />,
     },
     {
@@ -313,6 +321,7 @@ const VERSION_COLUMNS: ColumnDef<DatasetVersionInfo, unknown>[] = [
         id: "id",
         header: "SHA-256",
         accessorFn: (datasetVersion) => datasetVersion.hash,
+        enableSorting: false,
         cell: ({ row }) => (
             <span className="font-mono text-muted-foreground">{shortId(row.original)}</span>
         ),

@@ -25,10 +25,16 @@ function inHome(location: string, home: string): string {
 function storeColumns(home: string): ColumnDef<StoreInfo, unknown>[] {
     return [
         { header: "Holds", accessorKey: "name" },
-        { header: "Kind", id: "kind", cell: ({ row }) => STORE_KIND[row.original.kind] },
+        {
+            header: "Kind",
+            id: "kind",
+            accessorFn: (store) => STORE_KIND[store.kind],
+            cell: ({ row }) => STORE_KIND[row.original.kind],
+        },
         {
             header: "Where",
             id: "location",
+            accessorFn: (store) => inHome(store.location, home).toLowerCase(),
             cell: ({ row }) => (
                 <span className="flex min-w-0 items-center gap-1">
                     <MiddleTruncate
@@ -45,6 +51,8 @@ function storeColumns(home: string): ColumnDef<StoreInfo, unknown>[] {
         {
             header: "Used",
             id: "used",
+            accessorFn: (store) => store.used_bytes ?? undefined,
+            sortUndefined: "last",
             cell: ({ row }) => (
                 <span className="tabular-nums">{bytes(row.original.used_bytes)}</span>
             ),

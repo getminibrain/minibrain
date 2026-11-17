@@ -461,7 +461,6 @@ function RecentRequests({ row }: { row: ModelRow }) {
                 rows={items}
                 getRowId={(item) => String(item.id)}
                 loading={latest.isLoading}
-                sortable={false}
                 storageKey="minibrain.model-requests.columns"
                 columnPicker
                 hiddenColumns={["kind", "finish", "response"]}

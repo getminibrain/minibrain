@@ -23,6 +23,19 @@ export const JOB_STATUSES = ["running", "queued", "succeeded", "failed", "cancel
 
 export const VERSION_STATES = ["live", "ready", "evaluating", "training", "failed"];
 
+function rankIn(order: string[], value: string): number {
+    const index = order.indexOf(value);
+    return index === -1 ? order.length : index;
+}
+
+export function jobStatusRank(status: string): number {
+    return rankIn(JOB_STATUSES, status);
+}
+
+export function versionStateRank(version: { status: string; live: boolean }): number {
+    return rankIn(VERSION_STATES, versionState(version));
+}
+
 export function jobStatusLabel(status: string): string {
     return JOB_BADGE[status]?.label ?? status;
 }

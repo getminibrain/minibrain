@@ -41,7 +41,7 @@ import { StatusText, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import type { ModelsSearch } from "~/lib/modelsSearch";
-import { bytes } from "~/lib/time";
+import { bytes, timeValue } from "~/lib/time";
 import {
     CLEARED,
     FilterPanel,
@@ -488,7 +488,10 @@ function columns(names: Map<string, string>, pool: string): ColumnDef<CatalogEnt
             id: "newer",
             header: "Newer version",
             accessorFn: (entry) =>
-                entry.superseded_by ? (names.get(entry.superseded_by) ?? entry.superseded_by) : "",
+                entry.superseded_by
+                    ? (names.get(entry.superseded_by) ?? entry.superseded_by).toLowerCase()
+                    : undefined,
+            sortUndefined: "last",
             cell: ({ row }) =>
                 row.original.superseded_by
                     ? (names.get(row.original.superseded_by) ?? row.original.superseded_by)
@@ -505,7 +508,8 @@ function columns(names: Map<string, string>, pool: string): ColumnDef<CatalogEnt
             id: "context",
             header: "Context",
             meta: { info: CONTEXT_INFO },
-            accessorFn: (entry) => entry.context_tokens ?? 0,
+            accessorFn: (entry) => entry.context_tokens ?? undefined,
+            sortUndefined: "last",
             cell: ({ row }) => contextText(row.original) ?? muted("—"),
         },
         {
@@ -542,7 +546,8 @@ function columns(names: Map<string, string>, pool: string): ColumnDef<CatalogEnt
         {
             id: "released",
             header: "Released",
-            accessorFn: (entry) => entry.released ?? "",
+            accessorFn: (entry) => timeValue(entry.released),
+            sortUndefined: "last",
             cell: ({ row }) => releasedText(row.original) ?? muted("—"),
         },
         {

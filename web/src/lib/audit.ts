@@ -20,9 +20,11 @@ export const AUDIT_KEYS = [
     "range",
     "from",
     "to",
-    "before",
-    "after",
+    "prev",
+    "next",
     "event",
+    "sort",
+    "order",
 ] as const;
 export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 

@@ -362,6 +362,7 @@ const SOURCE_COLUMNS: ColumnDef<Source, unknown>[] = [
     {
         header: "Fingerprint",
         accessorKey: "fingerprint",
+        enableSorting: false,
         cell: (info) => <HashText>{String(info.getValue())}</HashText>,
     },
 ];
@@ -1004,7 +1005,8 @@ export function LimitsSection({ card, onEdit }: { card: ModelCard; onEdit?: () =
 const EVENT_COLUMNS: ColumnDef<CardEvent, unknown>[] = [
     {
         header: "When",
-        accessorKey: "at",
+        id: "at",
+        accessorFn: (event) => Date.parse(event.at),
         cell: (info) => <span className="tabular-nums">{when(info.row.original.at)}</span>,
     },
     { header: "Who", accessorKey: "actor" },

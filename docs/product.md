@@ -656,6 +656,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Request log** · shipped · engineer, admin
   Browse every /v1 call live, filtered, with its kept input.
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
+- **Sortable tables** · shipped · product, ml, engineer, admin
+  Sort any table by its columns; long lists sort on the server.
+  UI: Jobs, Training, Monitoring › Requests, Settings › Audit log · API: GET /api/jobs, GET /api/requests, GET /api/audit
 - **Jobs** · shipped · ml, admin
   Every job by status and pool; cancel, retry or delete.
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}

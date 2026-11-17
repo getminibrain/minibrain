@@ -25,7 +25,7 @@ import {
     clockTime,
     rangeOf,
 } from "~/lib/requests";
-import { exactTime, relativeTime } from "~/lib/time";
+import { exactTime, relativeTime, timeValue } from "~/lib/time";
 import { NothingYet, SummaryStrip } from "./RequestsTab";
 
 const SLOT_COLORS = [
@@ -85,7 +85,7 @@ const COLUMNS: ColumnDef<OverviewModel, unknown>[] = [
         id: "model",
         header: "Model",
         enableHiding: false,
-        accessorFn: (row) => row.label,
+        accessorFn: (row) => row.label.toLowerCase(),
         cell: ({ row }) => (
             <span className="block max-w-72 truncate" title={row.original.key}>
                 <ModelName name={row.original.label} deleted={row.original.deleted} />
@@ -101,13 +101,15 @@ const COLUMNS: ColumnDef<OverviewModel, unknown>[] = [
     {
         id: "errors",
         header: "Error rate",
-        accessorFn: (row) => row.error_rate ?? 0,
+        accessorFn: (row) => row.error_rate ?? undefined,
+        sortUndefined: "last",
         cell: ({ row }) => <span className="tabular-nums">{percent(row.original.error_rate)}</span>,
     },
     {
         id: "p50",
         header: "Latency p50",
-        accessorFn: (row) => row.p50_ms ?? 0,
+        accessorFn: (row) => row.p50_ms ?? undefined,
+        sortUndefined: "last",
         cell: ({ row }) => (
             <span className="tabular-nums">{milliseconds(row.original.p50_ms)}</span>
         ),
@@ -115,7 +117,8 @@ const COLUMNS: ColumnDef<OverviewModel, unknown>[] = [
     {
         id: "p95",
         header: "Latency p95",
-        accessorFn: (row) => row.p95_ms ?? 0,
+        accessorFn: (row) => row.p95_ms ?? undefined,
+        sortUndefined: "last",
         cell: ({ row }) => (
             <span className="tabular-nums">{milliseconds(row.original.p95_ms)}</span>
         ),
@@ -133,7 +136,8 @@ const COLUMNS: ColumnDef<OverviewModel, unknown>[] = [
     {
         id: "last",
         header: "Last request",
-        accessorFn: (row) => row.last_at ?? "",
+        accessorFn: (row) => timeValue(row.last_at),
+        sortUndefined: "last",
         cell: ({ row }) =>
             row.original.last_at ? (
                 <time

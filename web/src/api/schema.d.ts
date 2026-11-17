@@ -3521,12 +3521,12 @@ export interface components {
             events: components["schemas"]["AuditInfo"][];
             /** Total */
             total: number;
-            /** Newer */
-            newer: number;
-            /** Older Cursor */
-            older_cursor: number | null;
-            /** Newer Cursor */
-            newer_cursor: number | null;
+            /** Start */
+            start: number;
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Prev Cursor */
+            prev_cursor: string | null;
         };
         /** AuditTarget */
         AuditTarget: {
@@ -14896,9 +14896,11 @@ export interface operations {
     list_events_api_audit_get: {
         parameters: {
             query?: {
-                before?: number | null;
-                after?: number | null;
+                next?: string | null;
+                prev?: string | null;
                 limit?: number;
+                sort?: "at" | "actor" | "action";
+                order?: "asc" | "desc";
                 category?: string[] | null;
                 action?: string[] | null;
                 actor?: string[] | null;
@@ -16681,7 +16683,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string | null;
-                order?: "newest" | "oldest";
+                sort?: "id" | "kind" | "model" | "status" | "pool" | "started" | "duration" | "score" | "trained_on" | "gpu_hours";
+                order?: "asc" | "desc";
                 model?: string[] | null;
                 kind?: string[] | null;
                 method?: string[] | null;
@@ -17121,6 +17124,8 @@ export interface operations {
                 limit?: number;
                 cursor?: string | null;
                 after?: string | null;
+                sort?: "at" | "model" | "kind" | "key" | "status" | "latency" | "tokens";
+                order?: "asc" | "desc";
                 model?: string[] | null;
                 version?: string[] | null;
                 key?: string[] | null;

@@ -68,9 +68,9 @@ def test_pages_are_newest_first_without_duplicates_or_gaps_while_jobs_arrive(har
     assert fresh["total"] == 31
 
 
-def test_oldest_order_pages_forwards(harness: Harness) -> None:
+def test_ascending_order_pages_forwards(harness: Harness) -> None:
     original = add_jobs(harness, 7)
-    assert walk(harness, "limit=3&order=oldest") == original
+    assert walk(harness, "limit=3&order=asc") == original
 
 
 def test_limit_defaults_to_50_and_caps_at_200(harness: Harness) -> None:

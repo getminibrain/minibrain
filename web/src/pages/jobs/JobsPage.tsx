@@ -1,9 +1,8 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button, CheckboxSelect, DataGrid, SearchInput, Tabs, TabsList, TabsTrigger } from "obp-ui";
-import { useState } from "react";
 import type { JobInfo } from "~/api/client";
-import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
+import { type JobSortKey, NEWEST_JOBS, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { PageHeader } from "~/components/PageHeader";
@@ -11,6 +10,7 @@ import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { JOB_KINDS, kindGroup } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
+import { SORT_KEYS, sortFrom, sortSearch, sortingOf } from "~/lib/listSort";
 import { JOBS_PATH, jobHref } from "~/lib/modelLinks";
 import {
     ATTEMPT_COLUMN,
@@ -22,15 +22,13 @@ import {
     STATUS_COLUMN,
     jobName,
     jobRowLabel,
-    orderFrom,
-    sortedById,
-    sortingFor,
 } from "./jobCells";
 
-const KEYS = ["kind", "status", "q"] as const;
+const KEYS = ["kind", "status", "q", ...SORT_KEYS] as const;
+const SORTS: JobSortKey[] = ["id", "kind", "model", "status", "pool", "started", "duration"];
 const ALL = "all";
 
-const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
+const COLUMNS: ColumnDef<JobInfo, unknown>[] = [
     ID_COLUMN,
     {
         id: "kind",
@@ -44,7 +42,7 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
     STARTED_COLUMN,
     DURATION_COLUMN,
     ATTEMPT_COLUMN,
-]);
+];
 
 function KindTabs({
     value,
@@ -80,14 +78,14 @@ function KindTabs({
 function Queue() {
     const { search, update } = useListSearch(JOBS_PATH, KEYS);
     const router = useRouter();
-    const [order, setOrder] = useState<JobOrder>("newest");
+    const sort = sortFrom(SORTS, NEWEST_JOBS, search);
     const kind = search.kind && JOB_KINDS.includes(search.kind) ? search.kind : ALL;
     const statuses = splitList(search.status);
     const filter = {
         kind: kind === ALL ? [] : [kind],
         status: statuses,
         q: search.q,
-        order,
+        sort,
     };
     const jobs = useJobList(filter);
     const facets = useJobFacets(filter, jobs.rows.some(isActiveJob));
@@ -137,8 +135,8 @@ function Queue() {
                 storageKey="minibrain.jobs.queue"
                 columnPicker
                 hiddenColumns={["attempt"]}
-                sorting={sortingFor(order)}
-                onSortingChange={(next) => setOrder(orderFrom(next))}
+                sorting={sortingOf(sort)}
+                onSortingChange={(next) => update(sortSearch(next, NEWEST_JOBS))}
                 hasMore={jobs.hasMore}
                 loadingMore={jobs.loadingMore}
                 onLoadMore={jobs.loadMore}
