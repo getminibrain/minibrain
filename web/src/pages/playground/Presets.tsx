@@ -1,3 +1,4 @@
+import { IconCopyPlus, IconDeviceFloppy, IconPencil, IconTrash } from "@tabler/icons-react";
 import {
     Button,
     ConfirmDialog,
@@ -193,6 +194,7 @@ export function Presets({
                         )
                     }
                 >
+                    <IconDeviceFloppy />
                     Save
                 </Button>
                 <Button
@@ -200,6 +202,7 @@ export function Presets({
                     variant="outline"
                     onClick={() => setNaming({ mode: "create", name: "", isDefault: false })}
                 >
+                    <IconCopyPlus />
                     Save as
                 </Button>
                 <Button
@@ -215,11 +218,13 @@ export function Presets({
                         })
                     }
                 >
+                    <IconPencil />
                     Rename
                 </Button>
                 <ConfirmDialog
                     trigger={
                         <Button size="sm" variant="outline" disabled={!current}>
+                            <IconTrash />
                             Delete
                         </Button>
                     }

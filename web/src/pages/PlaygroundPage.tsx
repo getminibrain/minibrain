@@ -506,6 +506,7 @@ export function PlaygroundPage() {
                             }
                             composer={
                                 <ChatComposer
+                                    autoFocus
                                     variant="dock"
                                     sendOn="mod-enter"
                                     placeholder="Type a message"
