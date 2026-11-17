@@ -795,8 +795,8 @@ export function FolderDetail({
                     onSelect={onSelect}
                     empty={
                         <p className="text-muted-foreground">
-                            Empty. Use Add for a new dataset or folder here, drag datasets or
-                            folders onto it in the list, or use Move to… on one.
+                            Empty. Use New dataset above, drag datasets or folders onto it in the
+                            list, or use Move to… on one.
                         </p>
                     }
                 />
