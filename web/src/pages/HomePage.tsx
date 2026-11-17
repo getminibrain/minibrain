@@ -2,6 +2,7 @@ import { IconListCheck } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
+import { useJobFacets } from "~/api/jobQueries";
 import { useModels, useRecentJobs } from "~/api/queries";
 import { ModelName } from "~/components/ModelName";
 import { NeedsAttention } from "~/components/NeedsAttention";
@@ -67,7 +68,7 @@ function Overview({
     models,
     serving,
     running,
-}: { models: number | undefined; serving: number; running: number }) {
+}: { models: number | undefined; serving: number; running: number | undefined }) {
     return (
         <div className="flex gap-6">
             <Stat label="Models" value={count(models)} />
@@ -82,7 +83,9 @@ export function HomePage() {
     const { data: models } = useModels();
     const { data: jobs } = useRecentJobs(10);
     const serving = (models ?? []).filter(isLiveRow).length;
-    const running = (models ?? []).reduce((total, item) => total + item.active_jobs, 0);
+    const active = (models ?? []).some((item) => item.active_jobs > 0);
+    const statuses = useJobFacets({}, active).data?.statuses;
+    const running = statuses ? (statuses.running ?? 0) : undefined;
     return (
         <Page wide>
             <PageHeader
