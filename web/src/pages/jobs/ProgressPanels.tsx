@@ -180,15 +180,30 @@ function Result({ slug, number }: { slug: string; number: number }) {
         );
     }
     return (
-        <div className="flex flex-col gap-4">
-            <VerdictLine
-                row={row}
-                version={info}
-                phase={phaseOf(info)}
-                peers={peersOf(row, list, info)}
-                eta={undefined}
-            />
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
+        <div className="grid gap-x-panel gap-y-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="flex flex-col items-start gap-4">
+                <VerdictLine
+                    row={row}
+                    version={info}
+                    phase={phaseOf(info)}
+                    peers={peersOf(row, list, info)}
+                    eta={undefined}
+                />
+                <ErrorLine error={promote.error} />
+                <div className="flex flex-wrap items-center gap-2">
+                    {can.build && line && (
+                        <DeployButton
+                            version={line}
+                            pending={promote.isPending}
+                            onDeploy={() => promote.mutate({ slug, number })}
+                        />
+                    )}
+                    <Button variant="outline" asChild>
+                        <Link href={reviewHref(slug, number)}>Scores and mistakes</Link>
+                    </Button>
+                </div>
+            </div>
+            <div className="grid grid-cols-3 gap-x-8 gap-y-4 xl:border-l xl:pl-panel">
                 <Stat
                     label={`${shortMetricName(info.main_metric)} (held-out)`}
                     value={percent(info.score)}
@@ -200,19 +215,6 @@ function Result({ slug, number }: { slug: string; number: number }) {
                 <Stat label="vs live" value={<Versus version={info} live={live} />} />
                 <Stat label="Test set" value={percent(metricOf(info.golden, info.main_metric))} />
                 <Stat label="Invalid answers" value={percent(info.held_out?.invalid_rate)} />
-            </div>
-            <ErrorLine error={promote.error} />
-            <div className="flex flex-wrap items-center gap-2">
-                {can.build && line && (
-                    <DeployButton
-                        version={line}
-                        pending={promote.isPending}
-                        onDeploy={() => promote.mutate({ slug, number })}
-                    />
-                )}
-                <Button variant="outline" asChild>
-                    <Link href={reviewHref(slug, number)}>Scores and mistakes</Link>
-                </Button>
             </div>
         </div>
     );

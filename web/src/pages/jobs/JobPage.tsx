@@ -23,7 +23,14 @@ import { ModelName } from "~/components/ModelName";
 import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
-import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
+import {
+    ErrorLine,
+    Page,
+    PanelColumns,
+    PanelSection,
+    PanelSections,
+    Stat,
+} from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
@@ -537,10 +544,10 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
             <Serving job={job} />
             <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
             <PanelSections>
-                <div className="grid items-start gap-x-6 gap-y-10 xl:grid-cols-2">
+                <PanelColumns stretch>
                     <ProgressSection job={job} metrics={metrics.data} />
                     <InputsSection job={job} />
-                </div>
+                </PanelColumns>
                 {training && <LossSection job={job} metrics={metrics.data} />}
                 {(training || job.kind === "eval") && <ResultSection job={job} />}
                 <JobLogsSection key={job.id} job={job} anchor={JOB_LOGS_ID} />
