@@ -10,6 +10,7 @@ import {
     DialogTitle,
     Field,
     FieldGroup,
+    InfoTip,
     Input,
     Textarea,
     Tooltip,
@@ -60,36 +61,89 @@ export function ItemHeader({
     icon,
     detail,
     actions,
-    about,
 }: {
     title: ReactNode;
     icon?: ReactNode;
     detail?: ReactNode;
     actions?: ReactNode;
-    about?: ReactNode;
 }) {
     return (
-        <header className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <h2 className="flex min-w-0 items-center gap-2 text-2xl font-semibold">
-                        {icon && (
-                            <span aria-hidden="true" className="shrink-0 [&>svg]:size-5">
-                                {icon}
-                            </span>
-                        )}
-                        <span className="truncate">{title}</span>
-                    </h2>
-                    {detail && <p className="text-muted-foreground">{detail}</p>}
-                </div>
-                {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        <header className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-0.5">
+                <h2 className="flex min-w-0 items-center gap-2 text-2xl font-semibold">
+                    {icon && (
+                        <span aria-hidden="true" className="shrink-0 [&>svg]:size-5">
+                            {icon}
+                        </span>
+                    )}
+                    <span className="truncate">{title}</span>
+                </h2>
+                {detail && <p className="text-muted-foreground">{detail}</p>}
             </div>
-            {about}
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
     );
 }
 
-export function About({ item, onEdit }: { item: Described; onEdit: () => void }) {
+export function SplitDetail({
+    header,
+    about,
+    preview,
+}: {
+    header: ReactNode;
+    about: ReactNode;
+    preview: ReactNode;
+}) {
+    return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="shrink-0 border-b px-6 py-5">{header}</div>
+            <div className="flex min-h-0 flex-1 flex-col @3xl:flex-row">
+                <section
+                    aria-label="About"
+                    className="flex shrink-0 flex-col gap-6 border-b p-6 @3xl:w-90 @3xl:overflow-y-auto @6xl:w-100 @3xl:border-r @3xl:border-b-0"
+                >
+                    {about}
+                </section>
+                {preview}
+            </div>
+        </div>
+    );
+}
+
+export function AboutPart({
+    title,
+    tip,
+    action,
+    children,
+}: {
+    title: string;
+    tip?: ReactNode;
+    action?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <section className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-h-8 items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 font-semibold">
+                    {title}
+                    {tip && (
+                        <InfoTip label={`About ${title.toLowerCase()}`} side="right">
+                            {tip}
+                        </InfoTip>
+                    )}
+                </h3>
+                {action}
+            </div>
+            {children}
+        </section>
+    );
+}
+
+export function Stats({ children }: { children: ReactNode }) {
+    return <div className="grid grid-cols-3 gap-x-4 gap-y-3">{children}</div>;
+}
+
+export function Description({ item, onEdit }: { item: Described; onEdit: () => void }) {
     if (!item.description && item.tags.length === 0) {
         return (
             <div>
@@ -100,9 +154,9 @@ export function About({ item, onEdit }: { item: Described; onEdit: () => void })
         );
     }
     return (
-        <div className="flex max-w-3xl flex-col gap-2">
+        <div className="flex flex-col gap-2">
             {item.description && (
-                <p className="text-base whitespace-pre-line">{item.description}</p>
+                <p className="text-base break-words whitespace-pre-line">{item.description}</p>
             )}
             <Tags tags={item.tags} />
         </div>
@@ -237,19 +291,19 @@ export function DeleteAction({
     );
 }
 
-const SHOWN_LABELS = 12;
+const SHOWN_LABELS = 10;
 
 export function LabelBalance({ counts }: { counts: LabelCount[] }) {
+    const [all, setAll] = useState(false);
     const total = counts.reduce((sum, item) => sum + item.rows, 0);
     const largest = counts[0]?.rows ?? 0;
-    const shown = counts.slice(0, SHOWN_LABELS);
-    const rest = counts.slice(SHOWN_LABELS);
-    const restRows = rest.reduce((sum, item) => sum + item.rows, 0);
+    const shown = all ? counts : counts.slice(0, SHOWN_LABELS);
+    const hidden = counts.length - shown.length;
     if (total === 0) {
         return <p className="text-muted-foreground">No labelled rows yet.</p>;
     }
     return (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
             <table className="w-full table-fixed border-collapse">
                 <caption className="sr-only">Rows per label</caption>
                 <thead className="sr-only">
@@ -264,17 +318,17 @@ export function LabelBalance({ counts }: { counts: LabelCount[] }) {
                         const share = item.rows / total;
                         return (
                             <tr key={item.label} className="group/bar h-7 hover:bg-secondary">
-                                <th scope="row" className="w-[32%] pr-3 text-left font-normal">
+                                <th scope="row" className="w-[40%] pr-2 text-left font-normal">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <span className="block truncate">{item.label}</span>
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-96 break-all">
-                                            {item.label}
+                                            {`${item.label}: ${item.rows.toLocaleString()} rows, ${(share * 100).toFixed(1)}%`}
                                         </TooltipContent>
                                     </Tooltip>
                                 </th>
-                                <td className="pr-3">
+                                <td className="pr-2">
                                     <div
                                         aria-hidden="true"
                                         className="h-3 rounded-r-sm bg-primary"
@@ -282,18 +336,22 @@ export function LabelBalance({ counts }: { counts: LabelCount[] }) {
                                     />
                                     <span className="sr-only">{`${(share * 100).toFixed(1)}%`}</span>
                                 </td>
-                                <td className="w-28 text-right text-muted-foreground tabular-nums group-hover/bar:text-foreground">
-                                    {`${item.rows.toLocaleString()} · ${(share * 100).toFixed(0)}%`}
+                                <td className="w-16 text-right text-sm text-muted-foreground tabular-nums group-hover/bar:text-foreground">
+                                    {item.rows.toLocaleString()}
                                 </td>
                             </tr>
                         );
                     })}
                 </tbody>
             </table>
-            {rest.length > 0 && (
-                <p className="text-sm text-muted-foreground tabular-nums">
-                    {`${rest.length.toLocaleString()} more labels, ${restRows.toLocaleString()} rows`}
-                </p>
+            {(hidden > 0 || all) && counts.length > SHOWN_LABELS && (
+                <div>
+                    <Button variant="link" className="h-auto px-0" onClick={() => setAll(!all)}>
+                        {all
+                            ? "Show the top 10"
+                            : `Show all ${counts.length.toLocaleString()} labels`}
+                    </Button>
+                </div>
             )}
         </div>
     );

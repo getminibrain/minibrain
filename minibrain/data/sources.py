@@ -330,13 +330,30 @@ def clip(value: Any, limit: int = 80) -> str | None:
     return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
 
+NESTED_TYPES = ("STRUCT", "MAP", "UNION")
+
+
+def is_nested(type_name: str) -> bool:
+    return type_name.endswith("]") or type_name.startswith(NESTED_TYPES)
+
+
+def as_text_query(connection: duckdb.DuckDBPyConnection, query: str) -> str:
+    found = connection.execute(f"DESCRIBE {query}").fetchall()
+    parts = []
+    for name, type_name, *_ in found:
+        column = quote_identifier(name)
+        value = f"to_json({column})" if is_nested(type_name) else column
+        parts.append(f"{value}::VARCHAR AS {column}")
+    return f"SELECT {', '.join(parts)} FROM ({query})" if parts else query
+
+
 def run_query(
     tables: Sequence[Table], sql: str, limit: int | None, aliases: dict[str, str] | None = None, as_text: bool = False
 ) -> QueryResult:
     query = wrapped(sql, limit)
-    if as_text:
-        query = f"SELECT COLUMNS(*)::VARCHAR FROM ({query})"
     with sandbox(tables, aliases) as connection:
+        if as_text:
+            query = as_text_query(connection, query)
         cursor = connection.execute(query)
         columns = [description[0] for description in cursor.description or []]
         rows = [list(row) for row in cursor.fetchall()]

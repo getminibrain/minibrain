@@ -1,9 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Link } from "obp-ui";
+import {
+    Button,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { api, succeed } from "~/api/client";
 import type { DatasetVersionInfo } from "~/api/dataQueries";
 import type { components } from "~/api/schema";
-import { ErrorLine, Section } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { relativeTime } from "~/lib/time";
 import { itemHref } from "./catalogue";
@@ -156,24 +165,119 @@ export function ChecksReport({
     );
 }
 
-export function ChecksSection({
+function CompactFinding({
+    check,
+    actions,
+}: {
+    check: CheckInfo;
+    actions: ReturnType<typeof useDismiss>;
+}) {
+    return (
+        <li className="flex flex-col py-1">
+            <Collapsible>
+                <div className="flex min-h-8 items-center gap-2">
+                    <CollapsibleTrigger className="min-w-0 flex-1 font-normal">
+                        <StatusText tone={TONES[check.status]} className="min-w-0">
+                            <span className="truncate">{check.title}</span>
+                        </StatusText>
+                    </CollapsibleTrigger>
+                    {check.status === "warning" && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={actions.dismiss.isPending}
+                            onClick={() => actions.dismiss.mutate(check)}
+                        >
+                            Dismiss
+                        </Button>
+                    )}
+                </div>
+                <CollapsibleContent className="flex flex-col gap-1 pb-1 pl-5">
+                    <p className="text-sm text-muted-foreground">{check.detail}</p>
+                    {check.examples.length > 0 && (
+                        <ul className="flex flex-col gap-0.5">
+                            {check.examples.map((example) => (
+                                <li key={example} className="truncate">
+                                    {example}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </CollapsibleContent>
+            </Collapsible>
+        </li>
+    );
+}
+
+export function ChecksList({
     datasetVersion,
     dataset,
 }: {
     datasetVersion: DatasetVersionInfo | null | undefined;
     dataset: string;
 }) {
+    const actions = useDismiss(dataset);
     if (!datasetVersion) {
-        return null;
+        return <p className="text-muted-foreground">Checks run when a version is saved.</p>;
     }
-    return (
-        <Section
-            title="Checks"
-            caption={`On version ${datasetVersion.number ?? "–"}, saved ${relativeTime(datasetVersion.taken_at ?? datasetVersion.created_at)}. Warnings do not block training; an empty dataset or a single label stops a version from being saved. Turn checks on or off under Settings, Data.`}
-        >
-            <ChecksReport datasetVersion={datasetVersion} dataset={dataset} />
-        </Section>
+    const checks = [...(datasetVersion.checks ?? [])].sort(
+        (left, right) => ORDER.indexOf(left.status) - ORDER.indexOf(right.status),
     );
+    if (checks.length === 0) {
+        return (
+            <p className="text-muted-foreground">
+                This version was saved before checks ran. The next one carries a report.
+            </p>
+        );
+    }
+    const open = checks.filter((check) => check.status !== "ok" && !check.dismissed);
+    const dismissed = checks.filter((check) => check.dismissed);
+    const passed = checks.filter((check) => check.status === "ok");
+    return (
+        <div className="flex flex-col gap-1">
+            {open.length > 0 && (
+                <ul className="flex flex-col">
+                    {open.map((check) => (
+                        <CompactFinding key={check.check} check={check} actions={actions} />
+                    ))}
+                </ul>
+            )}
+            {passed.length > 0 && (
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="flex min-h-8 items-center">
+                            <StatusText tone="success">{`${passed.length} passed`}</StatusText>
+                        </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-80">
+                        {passed.map((check) => check.title).join(" · ")}
+                    </TooltipContent>
+                </Tooltip>
+            )}
+            {dismissed.map((check) => (
+                <p key={check.check} className="flex min-h-8 items-center gap-2">
+                    <span className="min-w-0 truncate text-muted-foreground">
+                        {`Dismissed: ${check.title}`}
+                    </span>
+                    <Button
+                        variant="link"
+                        className="h-auto shrink-0 px-0"
+                        disabled={actions.restore.isPending}
+                        onClick={() => actions.restore.mutate(check)}
+                    >
+                        Show again
+                    </Button>
+                </p>
+            ))}
+            <ErrorLine error={actions.dismiss.error ?? actions.restore.error} />
+        </div>
+    );
+}
+
+export function checksCaption(datasetVersion: DatasetVersionInfo | null | undefined): string {
+    return datasetVersion
+        ? `On version ${datasetVersion.number ?? "–"}, saved ${relativeTime(datasetVersion.taken_at ?? datasetVersion.created_at)}. Warnings do not block training. Turn checks on or off under Settings, Data.`
+        : "";
 }
 
 export function ModelChecks({

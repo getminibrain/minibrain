@@ -57,6 +57,13 @@ def test_mapping_quotes_identifiers(staging: list[Table]) -> None:
         run_query(staging, template_sql(pair_template('text" FROM source; --', "category"), "source"), 1)
 
 
+def test_rows_as_text_keep_nested_values_as_json(staging: list[Table]) -> None:
+    sql = "SELECT 1 AS id, [{'role': 'user', 'content': 'hi \"there\"'}] AS messages, NULL::INTEGER[] AS empty"
+    result = run_query(staging, sql, None, as_text=True)
+    assert result.columns == ["id", "messages", "empty"]
+    assert result.rows == [["1", '[{"role":"user","content":"hi \\"there\\""}]', None]]
+
+
 def test_templates_compile_to_chat_messages(staging: list[Table]) -> None:
     template = {"user": "Ticket: {text}\nWhy: {category}", "assistant": "{category}"}
     sql = template_sql(template, "source")

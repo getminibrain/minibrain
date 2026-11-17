@@ -13,19 +13,12 @@ import {
     SqlEditor,
     type SqlEditorHandle,
 } from "obp-ui";
-import { ChatBubble } from "obp-ui/chat";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type {
-    DatasetSummary,
-    MappingInfo,
-    PreviewResponse,
-    QueryResponse,
-    SourceSummary,
-} from "~/api/client";
-import { ErrorLine, Section, Stat } from "~/components/Section";
-import { asCode, count } from "~/lib/format";
+import type { DatasetSummary, MappingInfo, QueryResponse, SourceSummary } from "~/api/client";
+import { ErrorLine } from "~/components/Section";
 import { sqlProblem } from "~/lib/sqlError";
 import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
+import { typeWord } from "./columnTypes";
 
 export type MappingBody = {
     source_id?: number;
@@ -38,13 +31,11 @@ export type MappingBody = {
 type Mode = "columns" | "sql";
 
 const MODES = [
-    { key: "columns", label: "Columns" },
-    { key: "sql", label: "SQL" },
+    { key: "columns", label: "Pick columns" },
+    { key: "sql", label: "Write SQL" },
 ];
 
-type Row = { input: string | null; label: string | null };
-
-function Clamp({ text }: { text: unknown }) {
+export function Clamp({ text }: { text: unknown }) {
     return (
         <span className="line-clamp-2 max-w-xl whitespace-normal">
             {text === null || text === undefined || text === "" ? "–" : String(text)}
@@ -52,16 +43,7 @@ function Clamp({ text }: { text: unknown }) {
     );
 }
 
-const PREVIEW_COLUMNS: ColumnDef<Row, unknown>[] = [
-    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
-    {
-        header: "Label",
-        accessorKey: "label",
-        cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
-    },
-];
-
-export function QueryResult({ result }: { result: QueryResponse }) {
+function QueryResult({ result }: { result: QueryResponse }) {
     const columns: ColumnDef<(string | null)[], unknown>[] = result.columns.map((name, index) => ({
         id: `${index}:${name}`,
         header: () => <span className="font-mono">{name}</span>,
@@ -178,8 +160,6 @@ export function QueryEditor({
     sources,
     onSave,
     onRun,
-    title = "Query",
-    caption = "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.",
     saveLabel,
     saveBlocked = false,
     before,
@@ -191,8 +171,6 @@ export function QueryEditor({
     sources: SourceSummary[];
     onSave: (body: MappingBody) => Promise<unknown>;
     onRun: (sql: string) => Promise<QueryResponse>;
-    title?: string;
-    caption?: string;
     saveLabel?: string;
     saveBlocked?: boolean;
     before?: ReactNode;
@@ -231,7 +209,7 @@ export function QueryEditor({
     const columns = (chosen?.columns ?? []).map((column) => ({
         value: column.name,
         label: column.name,
-        description: column.type.toLowerCase(),
+        description: typeWord(column.type),
     }));
     const schema = Object.fromEntries(
         sources.map((item) => [item.table, item.columns.map((column) => column.name)]),
@@ -255,17 +233,12 @@ export function QueryEditor({
         setMode(next as Mode);
     };
     return (
-        <Section
-            title={title}
-            caption={caption}
-            actions={
-                <>
-                    <SegmentedTabs tabs={MODES} active={mode} onSelect={switchMode} />
-                    {extraActions}
-                </>
-            }
-        >
+        <div className="flex min-w-0 flex-col gap-4">
             {before}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <SegmentedTabs tabs={MODES} active={mode} onSelect={switchMode} />
+                {extraActions && <div className="flex items-center gap-2">{extraActions}</div>}
+            </div>
             {mode === "sql" ? (
                 <div className="@container flex flex-col gap-3">
                     <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_16rem]">
@@ -364,67 +337,6 @@ export function QueryEditor({
                     {offer || <ErrorLine error={save.error} />}
                 </div>
             )}
-        </Section>
-    );
-}
-
-export function PreviewSection({
-    data,
-    error,
-    loading,
-}: {
-    data: PreviewResponse | undefined;
-    error: unknown;
-    loading: boolean;
-}) {
-    const quality = data?.quality;
-    return (
-        <Section
-            title="Preview"
-            caption="The first 20 rows as a model sees them, from a live run of the query, and checks over every row."
-            flush
-        >
-            <ErrorLine error={error} />
-            {quality && (
-                <div className="flex flex-wrap gap-x-8 gap-y-3 border-b px-panel py-4">
-                    <Stat label="Rows" value={count(quality.rows)} />
-                    <Stat label="Empty" value={count(quality.empty)} />
-                    <Stat label="Duplicate inputs" value={count(quality.duplicates)} />
-                    <Stat label="Labels" value={count(quality.labels)} />
-                    <Stat
-                        label="Rows per label"
-                        value={`${count(quality.smallest_label)}–${count(quality.largest_label)}`}
-                    />
-                    <Stat
-                        label="Average input"
-                        value={`${count(quality.mean_input_chars)} chars`}
-                    />
-                </div>
-            )}
-            <DataGrid
-                columns={PREVIEW_COLUMNS}
-                rows={data?.rows ?? []}
-                loading={loading}
-                loadingRows={6}
-                maxHeight="420px"
-                empty="The query returned no rows."
-            />
-            {data && data.example.length > 0 && (
-                <div className="flex max-w-2xl flex-col gap-2 border-t px-panel py-4">
-                    <h3 className="font-semibold">One training example</h3>
-                    {data.example.map((message) => (
-                        <ChatBubble
-                            key={message.role}
-                            role={message.role === "user" ? "user" : "system"}
-                            text={message.content}
-                        />
-                    ))}
-                    <ChatBubble
-                        role="assistant"
-                        text={asCode(data.rows.find((row) => row.label)?.label ?? "")}
-                    />
-                </div>
-            )}
-        </Section>
+        </div>
     );
 }

@@ -38,14 +38,17 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Install the S3, database and lakehouse readers without internet.
   UI: Settings › Connections › DuckDB extensions · API: GET /api/extensions · CLI: minibrain extensions status, minibrain extensions install, minibrain extensions download · Config: MINIBRAIN_DUCKDB_EXTENSIONS, MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY
 - **Source catalogue** · shipped · product, ml
-  Find sources by name, column or tag, with stats and rows.
-  UI: Data › Sources · API: GET /api/sources, GET /api/sources/{source_id}, PATCH /api/sources/{source_id}, DELETE /api/sources/{source_id}, GET /api/sources/{source_id}/rows, GET /api/sources/{source_id}/stats
+  Find sources by name, column or tag; read stats and schema.
+  UI: Data › Sources, Data › source › Schema · API: GET /api/sources, GET /api/sources/{source_id}, PATCH /api/sources/{source_id}, DELETE /api/sources/{source_id}, GET /api/sources/{source_id}/rows, GET /api/sources/{source_id}/stats
+- **Record preview** · shipped · product, ml
+  Read rows as foldable JSON records, a table or one example.
+  UI: Data › source › Preview, Data › dataset › Preview · API: GET /api/sources/{source_id}/rows, GET /api/datasets/{slug}/preview
 - **Datasets** · shipped · product, ml
   Turn sources into chat examples that models share.
-  UI: Data › Add › New dataset, Data › Add › From sources, Data › Datasets · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
+  UI: Data › Add › New dataset, Data › Add › From sources, Data › source › Create dataset, Data › Datasets · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
 - **Dataset SQL** · shipped · ml
   Join, filter and clean several sources in locked-down DuckDB SQL.
-  UI: Data › dataset › SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
+  UI: Data › dataset › Edit query › Write SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
@@ -57,10 +60,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
 - **Sampled versions** · shipped · product, ml
   Save a seeded random sample when a query exceeds the row limit.
-  UI: Data › dataset, Data › dataset › Query, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
+  UI: Data › dataset, Data › dataset › Edit query, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
-  UI: Data › dataset › Versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
+  UI: Data › dataset › Versions › All versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
 - **Change detection** · shipped · product, ml
   Know when sources or the query changed since the last version.
   UI: Data › dataset, Models › model › Train › Data
@@ -75,7 +78,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add › Upload file · API: POST /api/sources, PUT /api/models/{name}/dataset
 - **Mapping templates** · shipped · product, ml
   Turn columns or chat JSONL into chat examples, compiled to SQL.
-  UI: Data › dataset › Columns · API: PUT /api/datasets/{slug}/mapping
+  UI: Data › dataset › Edit query › Pick columns · API: PUT /api/datasets/{slug}/mapping
 - **Mapping editor** · planned · product, ml
   Edit message templates in the UI, proposed by a model.
   Roadmap: Transforms

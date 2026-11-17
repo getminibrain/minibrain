@@ -1,7 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import {
+    Button,
+    DataGrid,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { useState } from "react";
 import { type DatasetSummary, api, unwrap } from "~/api/client";
 import {
@@ -11,7 +24,7 @@ import {
     useDatasetVersions,
 } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
-import { ErrorLine, Section } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -317,56 +330,142 @@ function ordered(pair: string[], datasetVersions: DatasetVersionInfo[]): [number
     return [older.id, newer.id];
 }
 
-export function VersionsSection({ dataset }: { dataset: DatasetSummary }) {
-    const datasetVersions = useDatasetVersions(dataset.slug);
+function useCompareParam() {
     const router = useRouter();
     const requested = useRouterState({
         select: (state) => parseCompare((state.location.search as { compare?: unknown }).compare),
     });
-    const [selected, setSelected] = useState<string[]>([]);
-    const rows = datasetVersions.data ?? [];
-    const pair = ordered(selected, rows);
-    const close = () => {
+    const set = (pair: [number, number] | null) => {
         const params = new URLSearchParams(window.location.search);
-        params.delete("compare");
+        if (pair) {
+            params.set("compare", compareParam(pair[0], pair[1]));
+        } else {
+            params.delete("compare");
+        }
         router.history.replace(`/data?${params.toString()}`);
     };
+    return { requested, set };
+}
+
+function AllVersionsDialog({
+    rows,
+    loading,
+    open,
+    onOpenChange,
+    onCompare,
+}: {
+    rows: DatasetVersionInfo[];
+    loading: boolean;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onCompare: (pair: [number, number]) => void;
+}) {
+    const [selected, setSelected] = useState<string[]>([]);
+    const pair = ordered(selected, rows);
     return (
-        <Section
-            title="Versions"
-            caption="Saved copies of the query's rows, newest first. Models train and score on a version: saving the query or Update makes the next one, and identical rows are stored once. Tick two to compare them."
-            actions={
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pair === null}
-                    onClick={() => {
-                        if (pair) {
-                            const params = new URLSearchParams(window.location.search);
-                            params.set("compare", compareParam(pair[0], pair[1]));
-                            router.history.replace(`/data?${params.toString()}`);
-                        }
-                    }}
-                >
-                    Compare
-                </Button>
-            }
-            flush
-        >
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-5xl">
+                <DialogHeader>
+                    <DialogTitle>Versions</DialogTitle>
+                    <DialogDescription>
+                        Saved copies of the query's rows, newest first. Models train and score on a
+                        version: saving the query or Update makes the next one, and identical rows
+                        are stored once. Tick two to compare them.
+                    </DialogDescription>
+                </DialogHeader>
+                <DataGrid
+                    columns={VERSION_COLUMNS}
+                    rows={rows}
+                    getRowId={(datasetVersion) => String(datasetVersion.id)}
+                    selectedIds={selected}
+                    onSelectedIdsChange={(ids) => setSelected(ids.slice(-2))}
+                    loading={loading}
+                    loadingRows={2}
+                    maxHeight="420px"
+                    storageKey="minibrain.data.versions"
+                    empty="No version yet."
+                />
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        Close
+                    </Button>
+                    <Button disabled={pair === null} onClick={() => pair && onCompare(pair)}>
+                        Compare
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+const RECENT_VERSIONS = 3;
+
+function RecentVersion({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
+    return (
+        <li className="flex flex-col gap-0.5 py-2">
+            <div className="flex items-baseline gap-2">
+                <span className="font-semibold tabular-nums">{`Version ${datasetVersion.number}`}</span>
+                <span className="min-w-0 truncate text-sm text-muted-foreground">
+                    <When value={takenAt(datasetVersion)} />
+                </span>
+                <span className="ml-auto shrink-0">
+                    <VersionRows datasetVersion={datasetVersion} />
+                    <span className="text-muted-foreground"> rows</span>
+                </span>
+            </div>
+            <div className="flex min-w-0 items-center gap-3 text-sm">
+                <ChecksSummary datasetVersion={datasetVersion} />
+                {datasetVersion.versions.length > 0 && (
+                    <span className="min-w-0 truncate">
+                        <UsedBy datasetVersion={datasetVersion} />
+                    </span>
+                )}
+            </div>
+        </li>
+    );
+}
+
+export function VersionsPart({ dataset }: { dataset: DatasetSummary }) {
+    const datasetVersions = useDatasetVersions(dataset.slug);
+    const compare = useCompareParam();
+    const [all, setAll] = useState(false);
+    const rows = datasetVersions.data ?? [];
+    return (
+        <>
             <ErrorLine error={datasetVersions.error} onRetry={datasetVersions.refetch} />
-            <DataGrid
-                columns={VERSION_COLUMNS}
+            {rows.length === 0 ? (
+                <p className="text-muted-foreground">
+                    {datasetVersions.isLoading
+                        ? "Loading…"
+                        : "No version yet. Save the query to make version 1."}
+                </p>
+            ) : (
+                <ul className="flex flex-col divide-y">
+                    {rows.slice(0, RECENT_VERSIONS).map((datasetVersion) => (
+                        <RecentVersion key={datasetVersion.id} datasetVersion={datasetVersion} />
+                    ))}
+                </ul>
+            )}
+            {rows.length > 0 && (
+                <div>
+                    <Button variant="link" className="h-auto px-0" onClick={() => setAll(true)}>
+                        {rows.length > 1
+                            ? `All ${count(rows.length)} versions and compare`
+                            : "Version details"}
+                    </Button>
+                </div>
+            )}
+            <AllVersionsDialog
                 rows={rows}
-                getRowId={(datasetVersion) => String(datasetVersion.id)}
-                selectedIds={selected}
-                onSelectedIdsChange={(ids) => setSelected(ids.slice(-2))}
                 loading={datasetVersions.isLoading}
-                loadingRows={2}
-                maxHeight="320px"
-                storageKey="minibrain.data.versions"
-                empty="No version yet. Pick the input and label columns and save them to make version 1."
+                open={all}
+                onOpenChange={setAll}
+                onCompare={(pair) => {
+                    setAll(false);
+                    compare.set(pair);
+                }}
             />
-            <VersionDiffDialog pair={requested} onClose={close} />
-        </Section>
+            <VersionDiffDialog pair={compare.requested} onClose={() => compare.set(null)} />
+        </>
     );
 }

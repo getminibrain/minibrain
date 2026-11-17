@@ -1,6 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
+    CodeBlock,
+    DataGrid,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
     Field,
     Input,
     Link,
@@ -10,10 +18,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "obp-ui";
-import { useState } from "react";
+import { ChatBubble, type ChatRole } from "obp-ui/chat";
+import { type ReactNode, useState } from "react";
 import {
     type DatasetSummary,
     type ModelRow,
+    type PreviewResponse,
     type SourceSummary,
     api,
     succeed,
@@ -22,19 +32,20 @@ import {
 import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
-import { count } from "~/lib/format";
+import { asCode, count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
-import { ChecksSection } from "./Checks";
+import { ChecksList, checksCaption } from "./Checks";
 import { MoveDialog, type MoveTarget, PathLinks, folderRef } from "./DatasetFolders";
 import {
     ChangeNotice,
     FirstVersionNotice,
     RowLimitNotice,
-    VersionsSection,
+    VersionsPart,
     needsSample,
     useVersionRefresh,
 } from "./DatasetVersions";
-import { type MappingBody, PreviewSection, QueryEditor } from "./QueryEditor";
+import { Clamp, type MappingBody, QueryEditor } from "./QueryEditor";
+import { RowsPreview } from "./RowsPreview";
 import { SampleNote } from "./SampleOffer";
 import {
     type FolderIndex,
@@ -42,14 +53,18 @@ import {
     datasetNameProblem,
     datasetsIn,
     freeDatasetName,
+    itemHref,
     stem,
 } from "./catalogue";
 import {
-    About,
+    AboutPart,
     DeleteAction,
+    Description,
     EditDialog,
     ItemHeader,
     LabelBalance,
+    SplitDetail,
+    Stats,
     modelHref,
     useDataRefresh,
     useModelNames,
@@ -61,6 +76,9 @@ const SPLITS: [string, string][] = [
     ["golden", "Test set"],
     ["shots", "Few-shot"],
 ];
+
+const QUERY_HELP =
+    "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.";
 
 function useDatasetRefresh(slug: string) {
     const client = useQueryClient();
@@ -76,46 +94,124 @@ function useDatasetRefresh(slug: string) {
     };
 }
 
-export function DatasetQuery({
+function QueryDialog({
+    dataset,
+    sources,
+    open,
+    onOpenChange,
+}: {
+    dataset: DatasetSummary;
+    sources: SourceSummary[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const refresh = useDatasetRefresh(dataset.slug);
+    const path = { params: { path: { slug: dataset.slug } } };
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-5xl">
+                <DialogHeader>
+                    <DialogTitle>Edit query</DialogTitle>
+                    <DialogDescription>
+                        {`${QUERY_HELP} Saving makes the next version of the dataset.`}
+                    </DialogDescription>
+                </DialogHeader>
+                <QueryEditor
+                    mapping={dataset.mapping}
+                    mode={dataset.mode}
+                    sourceId={dataset.source_id}
+                    sources={sources}
+                    onSave={async (body: MappingBody) => {
+                        await unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body }));
+                        await refresh();
+                        onOpenChange(false);
+                    }}
+                    onRun={(sql) =>
+                        unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
+                    }
+                />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function QueryPart({
     dataset,
     sources,
 }: {
     dataset: DatasetSummary;
     sources: SourceSummary[];
 }) {
-    const refresh = useDatasetRefresh(dataset.slug);
-    const path = { params: { path: { slug: dataset.slug } } };
+    const [editing, setEditing] = useState(false);
+    const { mapping } = dataset;
+    const source = sources.find((item) => item.id === dataset.source_id);
+    let body: ReactNode;
+    if (!mapping.sql) {
+        body = <p className="text-muted-foreground">No query yet. Edit it to pick the columns.</p>;
+    } else if (dataset.mode === "columns" && source) {
+        body = (
+            <dl className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="truncate">
+                    <Link
+                        href={itemHref({ kind: "source", id: source.id })}
+                        className="text-primary hover:underline"
+                    >
+                        {source.name}
+                    </Link>
+                </dd>
+                <dt className="text-muted-foreground">Input</dt>
+                <dd className="truncate font-mono">{mapping.input_column ?? "–"}</dd>
+                <dt className="text-muted-foreground">Label</dt>
+                <dd className="truncate font-mono">{mapping.label_column ?? "–"}</dd>
+            </dl>
+        );
+    } else {
+        body = (
+            <CodeBlock
+                code={mapping.sql}
+                language="sql"
+                copyLabel="Copy the query"
+                wrap
+                className="max-h-56"
+            />
+        );
+    }
     return (
-        <QueryEditor
-            caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources. Saving makes the next version of the dataset."
-            mapping={dataset.mapping}
-            mode={dataset.mode}
-            sourceId={dataset.source_id}
-            sources={sources}
-            onSave={(body: MappingBody) =>
-                unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body })).then(refresh)
+        <AboutPart
+            title="Query"
+            tip={QUERY_HELP}
+            action={
+                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                    Edit query
+                </Button>
             }
-            onRun={(sql) =>
-                unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
-            }
-        />
+        >
+            {body}
+            <QueryDialog
+                dataset={dataset}
+                sources={sources}
+                open={editing}
+                onOpenChange={setEditing}
+            />
+        </AboutPart>
     );
 }
 
 const EMPTY_MAPPING = { input_column: null, label_column: null, sql: null };
 
-export function CreateDataset({
+function NewDatasetEditor({
     source,
     sources,
-    folderId = null,
+    folderId,
     onCreated,
-    onCancel,
+    extraActions,
 }: {
     source?: SourceSummary;
     sources: SourceSummary[];
-    folderId?: number | null;
+    folderId: number | null;
     onCreated: (dataset: DatasetSummary) => Promise<void>;
-    onCancel: () => void;
+    extraActions?: ReactNode;
 }) {
     const datasets = useDatasets();
     const siblings = datasetsIn(datasets.data ?? [], folderId);
@@ -124,21 +220,15 @@ export function CreateDataset({
     const problem = datasetNameProblem(siblings, name);
     return (
         <QueryEditor
-            title="New dataset"
-            caption="Pick a source and the columns a model reads and answers with, or write SQL over one or more sources. Creating the dataset saves version 1 of its rows."
             saveLabel="Create dataset"
             saveBlocked={problem !== null}
             mapping={EMPTY_MAPPING}
             mode="columns"
             sourceId={source?.id}
             sources={sources}
-            extraActions={
-                <Button variant="ghost" size="sm" onClick={onCancel}>
-                    Cancel
-                </Button>
-            }
+            extraActions={extraActions}
             before={
-                <Field id="new-dataset-name" label="Name" className="mb-4 max-w-sm" error={problem}>
+                <Field id="new-dataset-name" label="Name" className="max-w-sm" error={problem}>
                     <Input
                         id="new-dataset-name"
                         value={name}
@@ -169,13 +259,73 @@ export function CreateDataset({
     );
 }
 
+const NEW_DATASET_HELP = `${QUERY_HELP} Creating the dataset saves version 1 of its rows.`;
+
+export function CreateDataset({
+    sources,
+    folderId = null,
+    onCreated,
+    onCancel,
+}: {
+    sources: SourceSummary[];
+    folderId?: number | null;
+    onCreated: (dataset: DatasetSummary) => Promise<void>;
+    onCancel: () => void;
+}) {
+    return (
+        <Section title="New dataset" caption={NEW_DATASET_HELP}>
+            <NewDatasetEditor
+                sources={sources}
+                folderId={folderId}
+                onCreated={onCreated}
+                extraActions={
+                    <Button variant="ghost" size="sm" onClick={onCancel}>
+                        Cancel
+                    </Button>
+                }
+            />
+        </Section>
+    );
+}
+
+export function CreateDatasetDialog({
+    open,
+    source,
+    sources,
+    onOpenChange,
+    onCreated,
+}: {
+    open: boolean;
+    source: SourceSummary;
+    sources: SourceSummary[];
+    onOpenChange: (open: boolean) => void;
+    onCreated: (dataset: DatasetSummary) => Promise<void>;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-5xl">
+                <DialogHeader>
+                    <DialogTitle>New dataset</DialogTitle>
+                    <DialogDescription>{NEW_DATASET_HELP}</DialogDescription>
+                </DialogHeader>
+                <NewDatasetEditor
+                    source={source}
+                    sources={sources}
+                    folderId={null}
+                    onCreated={onCreated}
+                />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function TestExampleNote({ count: total }: { count: number }) {
     if (total === 0) {
         return null;
     }
     return (
         <span className="text-sm text-muted-foreground tabular-nums">
-            {`adds ${count(total)} test ${total === 1 ? "example" : "examples"} from the Playground to the held-out rows of its next version`}
+            {`Adds ${count(total)} test ${total === 1 ? "example" : "examples"} from the Playground to the held-out rows of its next version`}
         </span>
     );
 }
@@ -208,54 +358,176 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     });
     const nameOf = useModelNames();
     return (
-        <Section
+        <AboutPart
             title="Used by"
-            caption="Models that train on this dataset. Several models can share one to compare fairly."
+            tip="Models that train on this dataset. Several models can share one to compare fairly."
         >
-            <div className="flex flex-col gap-3">
-                {dataset.models.length === 0 ? (
-                    <p className="text-muted-foreground">No model trains on it yet.</p>
-                ) : (
-                    <ul className="flex flex-col divide-y rounded-lg border">
-                        {dataset.models.map((slug) => (
-                            <li key={slug} className="flex min-h-9 items-center gap-3 px-3 py-1.5">
-                                <Link href={modelHref(slug)} className="truncate text-primary">
-                                    {nameOf(slug)}
-                                </Link>
-                                <TestExampleNote count={dataset.test_examples?.[slug] ?? 0} />
-                            </li>
-                        ))}
-                    </ul>
+            {dataset.models.length === 0 ? (
+                <p className="text-muted-foreground">No model trains on it yet.</p>
+            ) : (
+                <ul className="flex flex-col divide-y rounded-lg border">
+                    {dataset.models.map((slug) => (
+                        <li key={slug} className="flex min-h-8 flex-col justify-center px-3 py-1">
+                            <Link href={modelHref(slug)} className="truncate text-primary">
+                                {nameOf(slug)}
+                            </Link>
+                            <TestExampleNote count={dataset.test_examples?.[slug] ?? 0} />
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {candidates.length > 0 && (
+                <Select
+                    value=""
+                    onValueChange={(slug) => slug && assign.mutate(String(slug))}
+                    disabled={assign.isPending}
+                >
+                    <SelectTrigger aria-label="Use for a model" className="w-full">
+                        <SelectValue placeholder="Use it for another model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {candidates.map((row) => {
+                            const busy = busyOnData(row);
+                            return (
+                                <SelectItem
+                                    key={row.key}
+                                    value={row.key}
+                                    disabled={Boolean(busy)}
+                                    description={busy ?? undefined}
+                                >
+                                    {row.name}
+                                </SelectItem>
+                            );
+                        })}
+                    </SelectContent>
+                </Select>
+            )}
+            <ErrorLine error={assign.error} />
+        </AboutPart>
+    );
+}
+
+function DatasetStats({
+    dataset,
+    preview,
+}: {
+    dataset: DatasetSummary;
+    preview: PreviewResponse | undefined;
+}) {
+    const quality = preview?.quality;
+    const splits = dataset.splits;
+    return (
+        <div className="flex flex-col gap-3">
+            <Stats>
+                <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
+                <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
+                <Stat label="Sources" value={count(dataset.sources.length)} />
+                {splits &&
+                    SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
+                        <Stat key={key} label={label} value={count(splits[key])} />
+                    ))}
+                {quality && (
+                    <>
+                        <Stat label="Empty" value={count(quality.empty)} />
+                        <Stat label="Duplicate inputs" value={count(quality.duplicates)} />
+                        <Stat
+                            label="Rows per label"
+                            value={`${count(quality.smallest_label)}–${count(quality.largest_label)}`}
+                        />
+                        <Stat
+                            label="Average input"
+                            value={`${count(quality.mean_input_chars)} chars`}
+                        />
+                    </>
                 )}
-                {candidates.length > 0 && (
-                    <Select
-                        value=""
-                        onValueChange={(slug) => slug && assign.mutate(String(slug))}
-                        disabled={assign.isPending}
-                    >
-                        <SelectTrigger aria-label="Use for a model" className="w-72 max-w-full">
-                            <SelectValue placeholder="Use it for another model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {candidates.map((row) => {
-                                const busy = busyOnData(row);
-                                return (
-                                    <SelectItem
-                                        key={row.key}
-                                        value={row.key}
-                                        disabled={Boolean(busy)}
-                                        description={busy ?? undefined}
-                                    >
-                                        {row.name}
-                                    </SelectItem>
-                                );
-                            })}
-                        </SelectContent>
-                    </Select>
-                )}
-                <ErrorLine error={assign.error} />
-            </div>
-        </Section>
+            </Stats>
+            {!splits && (
+                <p className="text-sm text-muted-foreground">
+                    {dataset.dataset_version
+                        ? "Splits are unknown since the change."
+                        : "The first version sets the splits."}
+                </p>
+            )}
+        </div>
+    );
+}
+
+type PreviewRow = PreviewResponse["rows"][number];
+
+const PREVIEW_COLUMNS: ColumnDef<PreviewRow, unknown>[] = [
+    { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
+    {
+        header: "Label",
+        accessorKey: "label",
+        cell: (info) => <span className="font-mono">{String(info.getValue() ?? "–")}</span>,
+    },
+];
+
+function rowSummary(record: unknown): ReactNode {
+    const row = record as PreviewRow;
+    return (
+        <>
+            <span className="min-w-0 flex-1 truncate">{row.input ?? "–"}</span>
+            <span className="max-w-[40%] shrink-0 truncate font-mono text-sm text-syntax-string">
+                {row.label ?? "–"}
+            </span>
+        </>
+    );
+}
+
+const CHAT_ROLES = new Set(["user", "assistant"]);
+
+function TrainingExample({ data }: { data: PreviewResponse | undefined }) {
+    if (!data || data.example.length === 0) {
+        return <p className="px-3 py-2 text-muted-foreground">No example yet.</p>;
+    }
+    return (
+        <div className="flex max-w-2xl flex-col gap-5 p-panel">
+            <h3 className="font-semibold">One training example</h3>
+            {data.example.map((message, index) => {
+                const role = CHAT_ROLES.has(message.role) ? message.role : "system";
+                return (
+                    <ChatBubble
+                        key={`${index}:${message.role}`}
+                        variant="plain"
+                        role={role as ChatRole}
+                        text={role === "assistant" ? asCode(message.content) : message.content}
+                    />
+                );
+            })}
+        </div>
+    );
+}
+
+function DatasetPreview({ dataset }: { dataset: DatasetSummary }) {
+    const mapped = Boolean(dataset.mapping.sql);
+    const preview = useDatasetPreview(dataset.slug, mapped);
+    const empty = mapped
+        ? "The query returned no rows."
+        : "No query yet. Use Edit query to pick the columns.";
+    return (
+        <RowsPreview
+            records={preview.data?.rows ?? []}
+            total={preview.data?.quality.rows}
+            loading={preview.isLoading}
+            error={preview.error}
+            onRetry={preview.refetch}
+            marked={["label"]}
+            summary={rowSummary}
+            empty={empty}
+            note="as a model sees them"
+            table={
+                <DataGrid
+                    columns={PREVIEW_COLUMNS}
+                    rows={preview.data?.rows ?? []}
+                    loading={preview.isLoading}
+                    loadingRows={6}
+                    maxHeight="100%"
+                    empty={empty}
+                />
+            }
+            example={<TrainingExample data={preview.data} />}
+        />
     );
 }
 
@@ -284,56 +556,55 @@ export function DatasetDetail({
             await refresh();
         },
     });
-    const quality = preview.data?.quality;
-    const splits = dataset.splits;
-    return (
-        <div className="flex flex-col gap-6">
-            <ItemHeader
-                title={dataset.name}
-                detail={
-                    <>
-                        Dataset <span className="font-mono">{dataset.slug}</span>
-                        {` · ${dataset.mode === "sql" ? "SQL" : "columns"} · updated ${relativeTime(dataset.updated_at)}`}
-                        {folderId !== null && (
-                            <>
-                                {" · in "}
-                                <PathLinks index={index} folderId={folderId} />
-                            </>
-                        )}
-                    </>
-                }
-                actions={
-                    <>
-                        <Button asChild>
-                            <Link href={`/models/new?dataset=${encodeURIComponent(dataset.slug)}`}>
-                                Train a model
-                            </Link>
-                        </Button>
-                        <Button variant="outline" onClick={() => setEditing(true)}>
-                            Edit
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                setMoving({
-                                    item: { kind: "dataset", id: dataset.slug },
-                                    name: dataset.name,
-                                    from: folderId,
-                                })
-                            }
-                        >
-                            Move to…
-                        </Button>
-                        <DeleteAction
-                            blocked={dataset.delete_lock ?? null}
-                            title={`Delete ${dataset.name}?`}
-                            description={datasetDeleteNote(dataset.model_names ?? [])}
-                            onConfirm={() => remove.mutateAsync().catch(() => undefined)}
-                        />
-                    </>
-                }
-                about={<About item={dataset} onEdit={() => setEditing(true)} />}
-            />
+    const header = (
+        <ItemHeader
+            title={dataset.name}
+            detail={
+                <>
+                    {`Updated ${relativeTime(dataset.updated_at)}`}
+                    {folderId !== null && (
+                        <>
+                            {" · in "}
+                            <PathLinks index={index} folderId={folderId} />
+                        </>
+                    )}
+                </>
+            }
+            actions={
+                <>
+                    <Button asChild>
+                        <Link href={`/models/new?dataset=${encodeURIComponent(dataset.slug)}`}>
+                            Train a model
+                        </Link>
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditing(true)}>
+                        Edit
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() =>
+                            setMoving({
+                                item: { kind: "dataset", id: dataset.slug },
+                                name: dataset.name,
+                                from: folderId,
+                            })
+                        }
+                    >
+                        Move to…
+                    </Button>
+                    <DeleteAction
+                        blocked={dataset.delete_lock ?? null}
+                        title={`Delete ${dataset.name}?`}
+                        description={datasetDeleteNote(dataset.model_names ?? [])}
+                        onConfirm={() => remove.mutateAsync().catch(() => undefined)}
+                    />
+                </>
+            }
+        />
+    );
+    const about = (
+        <>
+            <Description item={dataset} onEdit={() => setEditing(true)} />
             <ErrorLine error={remove.error} />
             {dataset.error && (
                 <p className="text-destructive">{`The query fails: ${dataset.error}`}</p>
@@ -351,46 +622,38 @@ export function DatasetDetail({
                 }
             />
             <SampleNote sample={dataset.dataset_version?.sample} />
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-                <Stat label="Rows" value={count(quality?.rows ?? dataset.rows)} />
-                <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
-                <Stat label="Sources" value={count(dataset.sources.length)} />
-                {splits ? (
-                    SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
-                        <Stat key={key} label={label} value={count(splits[key])} />
-                    ))
-                ) : (
-                    <Stat
-                        label="Splits"
-                        value={
-                            <span className="font-normal text-muted-foreground">
-                                {dataset.dataset_version
-                                    ? "Unknown since the change"
-                                    : "Set by the first version"}
-                            </span>
-                        }
-                    />
-                )}
-            </div>
-            <VersionsSection dataset={dataset} />
-            <ChecksSection datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
-            {mapped && preview.data && (
-                <Section
-                    title="Label balance"
-                    caption="Rows per label across the whole dataset. Rare labels are the ones a model gets wrong."
-                >
-                    <LabelBalance counts={preview.data.label_counts} />
-                </Section>
-            )}
-            <DatasetQuery dataset={dataset} sources={sources} />
+            <DatasetStats dataset={dataset} preview={preview.data} />
+            <QueryPart dataset={dataset} sources={sources} />
+            <AboutPart title="Checks" tip={checksCaption(dataset.dataset_version) || undefined}>
+                <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
+            </AboutPart>
             {mapped && (
-                <PreviewSection
-                    data={preview.data}
-                    error={preview.error}
-                    loading={preview.isLoading}
-                />
+                <AboutPart
+                    title="Label balance"
+                    tip="Rows per label across the whole dataset. Rare labels are the ones a model gets wrong."
+                >
+                    {preview.data ? (
+                        <LabelBalance counts={preview.data.label_counts} />
+                    ) : (
+                        <p className="text-muted-foreground">
+                            {preview.isLoading ? "Loading…" : "–"}
+                        </p>
+                    )}
+                </AboutPart>
             )}
+            <AboutPart title="Versions">
+                <VersionsPart dataset={dataset} />
+            </AboutPart>
             <UsedBy dataset={dataset} />
+        </>
+    );
+    return (
+        <>
+            <SplitDetail
+                header={header}
+                about={about}
+                preview={<DatasetPreview dataset={dataset} />}
+            />
             <MoveDialog
                 targets={moving ? [moving] : null}
                 index={index}
@@ -408,6 +671,6 @@ export function DatasetDetail({
                     unwrap(api.PATCH("/api/datasets/{slug}", { ...path, body })).then(refresh)
                 }
             />
-        </div>
+        </>
     );
 }

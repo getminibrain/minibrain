@@ -691,6 +691,7 @@ export function DataExplorer() {
     const retryLists = () =>
         Promise.all([sources.refetch(), datasets.refetch(), folders.refetch()]);
     let detail: ReactNode = null;
+    let split = false;
     if (listError) {
         detail = <QueryError heading="h2" error={listError} retry={retryLists} />;
     } else if (!loading) {
@@ -731,6 +732,7 @@ export function DataExplorer() {
             );
         } else if (selected.kind === "source") {
             const source = sourceList.find((item) => item.id === selected.id);
+            split = Boolean(source);
             detail = source ? (
                 <FileDetail
                     key={selectedKey}
@@ -769,6 +771,7 @@ export function DataExplorer() {
             );
         } else {
             const dataset = datasetList.find((item) => item.slug === selected.id);
+            split = Boolean(dataset);
             detail = dataset ? (
                 <DatasetDetail
                     key={selectedKey}
@@ -885,7 +888,11 @@ export function DataExplorer() {
                 </aside>
                 <section
                     aria-label="Details"
-                    className="min-w-0 flex-1 px-6 py-6 @3xl:overflow-y-auto"
+                    className={
+                        split
+                            ? "flex min-w-0 flex-1 flex-col @3xl:min-h-0"
+                            : "min-w-0 flex-1 px-6 py-6 @3xl:overflow-y-auto"
+                    }
                 >
                     {detail}
                 </section>

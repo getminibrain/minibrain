@@ -260,7 +260,7 @@ export function LakehouseFacts({ source }: { source: SourceSummary }) {
         return null;
     }
     return (
-        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
             <dt className="text-muted-foreground">Format</dt>
             <dd className="flex items-center gap-2">
                 <FileTypeIcon type={format} className="size-4" />

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Badge, Button, DataGrid, FileName, Link } from "obp-ui";
-import { useState } from "react";
+import { Button, DataGrid, FileName, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { useMemo, useState } from "react";
 import {
     type ColumnStats,
     type DatasetSummary,
@@ -12,13 +12,14 @@ import {
     unwrap,
 } from "~/api/client";
 import { useSourceRows, useSourceStats } from "~/api/queries";
-import { ErrorLine, Section, Stat } from "~/components/Section";
+import { ErrorLine, Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { fileSize, relativeTime } from "~/lib/time";
 import { ConnectedFacts } from "./Connected";
-import { CreateDataset } from "./DatasetDetail";
+import { CreateDatasetDialog } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
 import { LakehouseFacts } from "./Lakehouse";
+import { RowsPreview } from "./RowsPreview";
 import {
     type ItemRef,
     groupOf,
@@ -27,10 +28,19 @@ import {
     sourceNameProblem,
     tableFormat,
 } from "./catalogue";
+import { isTextType, rowRecord, typeWord } from "./columnTypes";
 import { SourceIcon } from "./icons";
-import { About, DeleteAction, EditDialog, ItemHeader, useDataRefresh } from "./parts";
+import {
+    AboutPart,
+    DeleteAction,
+    Description,
+    EditDialog,
+    ItemHeader,
+    SplitDetail,
+    Stats,
+    useDataRefresh,
+} from "./parts";
 
-const TEXT_TYPES = new Set(["VARCHAR", "BLOB", "JSON"]);
 const ENCODING_LABELS: Record<string, string> = {
     "utf-8": "UTF-8",
     "windows-1252": "Windows-1252",
@@ -46,60 +56,100 @@ function share(part: number, whole: number): string {
     return part > 0 && value < 1 ? "<1%" : `${Math.round(value)}%`;
 }
 
-function statColumns(sampled: number, withRange: boolean): ColumnDef<ColumnStats, unknown>[] {
-    const columns: ColumnDef<ColumnStats, unknown>[] = [
-        {
-            id: "name",
-            header: "Column",
-            accessorFn: (column) => column.name.toLowerCase(),
-            cell: ({ row }) => <span className="font-mono">{row.original.name}</span>,
-        },
-        {
-            id: "type",
-            header: "Type",
-            accessorFn: (column) => column.type.toLowerCase(),
-            cell: ({ row }) => (
-                <span className="text-muted-foreground">{row.original.type.toLowerCase()}</span>
-            ),
-        },
-        {
-            id: "empty",
-            header: "Empty",
-            accessorFn: (column) => column.nulls,
-            cell: ({ row }) => (
-                <span className="tabular-nums">{share(row.original.nulls, sampled)}</span>
-            ),
-        },
-        {
-            id: "distinct",
-            header: "Distinct",
-            accessorFn: (column) => column.distinct,
-            cell: ({ row }) => (
-                <span className="tabular-nums">{`≈ ${count(row.original.distinct)}`}</span>
-            ),
-        },
-    ];
-    if (!withRange) {
-        return columns;
+function rangeText(stats: ColumnStats | undefined): string | null {
+    if (!stats || stats.min === null || isTextType(stats.type)) {
+        return null;
     }
-    return [
-        ...columns,
-        {
-            id: "range",
-            header: "Range",
-            enableSorting: false,
-            cell: ({ row }) =>
-                row.original.min === null || TEXT_TYPES.has(row.original.type) ? (
-                    <span className="text-muted-foreground">–</span>
-                ) : (
-                    <span className="block truncate text-muted-foreground">
-                        {row.original.min === row.original.max
-                            ? row.original.min
-                            : `${row.original.min} … ${row.original.max}`}
-                    </span>
-                ),
-        },
-    ];
+    return stats.min === stats.max ? stats.min : `${stats.min} … ${stats.max}`;
+}
+
+function SchemaRow({
+    name,
+    type,
+    stats,
+    sampled,
+}: {
+    name: string;
+    type: string;
+    stats: ColumnStats | undefined;
+    sampled: number;
+}) {
+    const range = rangeText(stats);
+    return (
+        <tr className="h-8 border-t first:border-t-0">
+            <th scope="row" className="pr-3 text-left font-normal">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="block truncate font-mono">{name}</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-96 break-all">{name}</TooltipContent>
+                </Tooltip>
+            </th>
+            <td className="pr-3">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="block truncate text-muted-foreground">
+                            {typeWord(type)}
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-96 break-all">
+                        <span className="font-mono">{type}</span>
+                        {range && ` · ${range}`}
+                    </TooltipContent>
+                </Tooltip>
+            </td>
+            <td className="pr-3 text-right tabular-nums">
+                {stats ? share(stats.nulls, sampled) : "–"}
+            </td>
+            <td className="text-right tabular-nums">{stats ? count(stats.distinct) : "–"}</td>
+        </tr>
+    );
+}
+
+function Schema({ source }: { source: SourceSummary }) {
+    const stats = useSourceStats(source.id);
+    const byName = new Map((stats.data?.columns ?? []).map((column) => [column.name, column]));
+    const sampled = stats.data?.sampled ?? 0;
+    const caption =
+        stats.data && stats.data.sampled < stats.data.rows
+            ? `Empty and distinct from the first ${count(sampled)} rows; distinct is an estimate.`
+            : "Empty and distinct over every row; distinct is an estimate.";
+    return (
+        <AboutPart title="Schema">
+            <ErrorLine error={stats.error} onRetry={stats.refetch} />
+            <table className="w-full table-fixed border-collapse">
+                <caption className="sr-only">Columns of the source</caption>
+                <thead>
+                    <tr className="h-8 border-b text-sm text-muted-foreground">
+                        <th scope="col" className="pr-3 text-left font-normal">
+                            Column
+                        </th>
+                        <th scope="col" className="w-28 pr-3 text-left font-normal">
+                            Type
+                        </th>
+                        <th scope="col" className="w-14 pr-3 text-right font-normal">
+                            Empty
+                        </th>
+                        <th scope="col" className="w-16 text-right font-normal">
+                            Distinct
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {source.columns.map((column) => (
+                        <SchemaRow
+                            key={column.name}
+                            name={column.name}
+                            type={column.type}
+                            stats={byName.get(column.name)}
+                            sampled={sampled}
+                        />
+                    ))}
+                </tbody>
+            </table>
+            <p className="text-sm text-muted-foreground">{caption}</p>
+        </AboutPart>
+    );
 }
 
 function rowColumns(result: QueryResponse): ColumnDef<(string | null)[], unknown>[] {
@@ -118,74 +168,56 @@ function rowColumns(result: QueryResponse): ColumnDef<(string | null)[], unknown
     }));
 }
 
-function Columns({ source }: { source: SourceSummary }) {
-    const stats = useSourceStats(source.id);
-    const sampled = stats.data?.sampled ?? 0;
-    const origin =
-        source.kind === "upload" ? "Types from the staged table" : "Types read from the source";
-    const caption =
-        stats.data && stats.data.sampled < stats.data.rows
-            ? `${origin}; empty and distinct counts from the first ${count(sampled)} rows.`
-            : `${origin}; empty and distinct counts over every row.`;
-    return (
-        <Section title="Columns" caption={caption} flush>
-            <ErrorLine error={stats.error} onRetry={stats.refetch} />
-            <DataGrid
-                columns={statColumns(
-                    sampled,
-                    (stats.data?.columns ?? []).some((column) => !TEXT_TYPES.has(column.type)),
-                )}
-                rows={stats.data?.columns ?? []}
-                loading={stats.isLoading}
-                loadingRows={Math.min(source.columns.length, 6)}
-                storageKey="minibrain.data.columns"
-                maxHeight="360px"
-            />
-        </Section>
-    );
-}
-
-function Preview({ source }: { source: SourceSummary }) {
+function SourcePreview({ source }: { source: SourceSummary }) {
     const rows = useSourceRows(source.id);
+    const records = useMemo(() => {
+        if (!rows.data) {
+            return [];
+        }
+        const types = new Map(source.columns.map((column) => [column.name, column.type]));
+        const { columns } = rows.data;
+        return rows.data.rows.map((row) => rowRecord(columns, row, types));
+    }, [rows.data, source.columns]);
     return (
-        <Section
-            title="Preview"
-            caption={`The first ${count(rows.data?.rows.length ?? 50)} rows as stored.`}
-            flush
-        >
-            <ErrorLine error={rows.error} onRetry={rows.refetch} />
-            <DataGrid
-                columns={rows.data ? rowColumns(rows.data) : []}
-                rows={rows.data?.rows ?? []}
-                loading={rows.isLoading}
-                maxHeight="420px"
-                minWidth={rows.data && rows.data.columns.length > 4 ? "min-w-[960px]" : undefined}
-            />
-        </Section>
+        <RowsPreview
+            records={records}
+            total={source.rows}
+            loading={rows.isLoading}
+            error={rows.error}
+            onRetry={rows.refetch}
+            empty="The source has no rows."
+            note="as stored"
+            table={
+                <DataGrid
+                    columns={rows.data ? rowColumns(rows.data) : []}
+                    rows={rows.data?.rows ?? []}
+                    loading={rows.isLoading}
+                    maxHeight="100%"
+                    minWidth={
+                        rows.data && rows.data.columns.length > 4 ? "min-w-[960px]" : undefined
+                    }
+                    empty="The source has no rows."
+                />
+            }
+        />
     );
 }
 
 function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
     return (
-        <Section
-            title="Used by datasets"
-            caption="Datasets whose query reads this source. A source in use cannot be deleted."
-        >
+        <AboutPart title="Used by datasets">
             {datasets.length === 0 ? (
                 <p className="text-muted-foreground">No dataset reads it yet.</p>
             ) : (
                 <ul className="flex flex-col divide-y rounded-lg border">
                     {datasets.map((dataset) => (
-                        <li key={dataset.slug} className="flex h-9 items-center gap-3 px-3">
+                        <li key={dataset.slug} className="flex h-8 items-center gap-3 px-3">
                             <Link
                                 href={itemHref({ kind: "dataset", id: dataset.slug })}
                                 className="min-w-0 truncate text-primary"
                             >
                                 {dataset.name}
                             </Link>
-                            <Badge variant="neutral">
-                                {dataset.mode === "sql" ? "SQL" : "Columns"}
-                            </Badge>
                             <span className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">
                                 {dataset.rows === null ? "–" : plural(dataset.rows, "row")}
                             </span>
@@ -193,7 +225,36 @@ function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
                     ))}
                 </ul>
             )}
-        </Section>
+        </AboutPart>
+    );
+}
+
+function SourceStats({ source, datasets }: { source: SourceSummary; datasets: number }) {
+    const lastChange = source.modified_at ? relativeTime(source.modified_at) : "–";
+    return (
+        <Stats>
+            <Stat label="Rows" value={count(source.rows)} />
+            <Stat label="Columns" value={count(source.columns.length)} />
+            {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
+                <Stat label="Size" value={fileSize(source.size)} />
+            )}
+            <Stat label="Datasets" value={count(datasets)} />
+            {(source.kind === "folder" || source.kind === "s3") && (
+                <Stat
+                    label={source.kind === "s3" ? "Objects" : "Files"}
+                    value={`${count(source.files)} ${FORMAT_LABELS[source.format ?? ""] ?? ""}`}
+                />
+            )}
+            {(source.kind === "folder" || source.kind === "s3" || tableFormat(source.kind)) && (
+                <Stat label="Last change" value={lastChange} />
+            )}
+            {source.encoding && (
+                <Stat
+                    label="Encoding"
+                    value={ENCODING_LABELS[source.encoding] ?? source.encoding}
+                />
+            )}
+        </Stats>
     );
 }
 
@@ -223,91 +284,67 @@ export function FileDetail({
         },
     });
     const format = tableFormat(source.kind);
-    return (
-        <div className="flex flex-col gap-6">
-            <ItemHeader
-                title={source.kind === "upload" ? <FileName name={source.name} /> : source.name}
-                icon={
-                    source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined
-                }
-                detail={`Added ${relativeTime(source.created_at)}`}
-                actions={
-                    <>
-                        <Button onClick={() => onCreating(true)} disabled={creating}>
-                            Create dataset
-                        </Button>
-                        <Button variant="outline" onClick={() => setEditing(true)}>
-                            Edit
-                        </Button>
-                        <DeleteAction
-                            blocked={
-                                datasets.length
-                                    ? `Used by ${plural(datasets.length, "dataset")}: delete those first`
-                                    : null
-                            }
-                            title={`Delete ${source.name}?`}
-                            description={
-                                source.kind === "upload"
-                                    ? "The stored copy and its staged table go. This cannot be undone."
-                                    : "minibrain stops reading it; the data stays where it is."
-                            }
-                            onConfirm={() => remove.mutateAsync().catch(() => undefined)}
-                        />
-                    </>
-                }
-                about={<About item={source} onEdit={() => setEditing(true)} />}
-            />
+    const header = (
+        <ItemHeader
+            title={source.kind === "upload" ? <FileName name={source.name} /> : source.name}
+            icon={source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined}
+            detail={`Added ${relativeTime(source.created_at)}`}
+            actions={
+                <>
+                    <Button onClick={() => onCreating(true)} disabled={creating}>
+                        Create dataset
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditing(true)}>
+                        Edit
+                    </Button>
+                    <DeleteAction
+                        blocked={
+                            datasets.length
+                                ? `Used by ${plural(datasets.length, "dataset")}: delete those first`
+                                : null
+                        }
+                        title={`Delete ${source.name}?`}
+                        description={
+                            source.kind === "upload"
+                                ? "The stored copy and its staged table go. This cannot be undone."
+                                : "minibrain stops reading it; the data stays where it is."
+                        }
+                        onConfirm={() => remove.mutateAsync().catch(() => undefined)}
+                    />
+                </>
+            }
+        />
+    );
+    const about = (
+        <>
+            <Description item={source} onEdit={() => setEditing(true)} />
             <ErrorLine error={remove.error} />
             {source.error && <p className="text-destructive">{source.error}</p>}
+            <SourceStats source={source} datasets={datasets.length} />
             <ConnectedFacts source={source} />
             <LakehouseFacts source={source} />
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-                <Stat label="Rows" value={count(source.rows)} />
-                <Stat label="Columns" value={count(source.columns.length)} />
-                {(source.kind === "folder" || source.kind === "s3") && (
-                    <>
-                        <Stat
-                            label={source.kind === "s3" ? "Objects" : "Files"}
-                            value={`${count(source.files)} ${FORMAT_LABELS[source.format ?? ""] ?? ""}`}
-                        />
-                        <Stat
-                            label="Last change"
-                            value={source.modified_at ? relativeTime(source.modified_at) : "–"}
-                        />
-                    </>
-                )}
-                {format && (
-                    <Stat
-                        label="Last change"
-                        value={source.modified_at ? relativeTime(source.modified_at) : "–"}
-                    />
-                )}
-                {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
-                    <Stat label="Size" value={fileSize(source.size)} />
-                )}
-                {source.encoding && (
-                    <Stat
-                        label="Encoding"
-                        value={ENCODING_LABELS[source.encoding] ?? source.encoding}
-                    />
-                )}
-                <Stat label="Datasets" value={count(datasets.length)} />
-            </div>
-            {creating && (
-                <CreateDataset
-                    source={source}
-                    sources={sources}
-                    onCancel={() => onCreating(false)}
-                    onCreated={async (dataset) => {
-                        await refresh();
-                        onCreating(false);
-                        onSelect({ kind: "dataset", id: dataset.slug });
-                    }}
-                />
-            )}
-            <Columns source={source} />
-            <Preview source={source} />
+            <Schema source={source} />
             <Datasets datasets={datasets} />
+        </>
+    );
+    return (
+        <>
+            <SplitDetail
+                header={header}
+                about={about}
+                preview={<SourcePreview source={source} />}
+            />
+            <CreateDatasetDialog
+                open={creating}
+                source={source}
+                sources={sources}
+                onOpenChange={onCreating}
+                onCreated={async (dataset) => {
+                    await refresh();
+                    onCreating(false);
+                    onSelect({ kind: "dataset", id: dataset.slug });
+                }}
+            />
             <EditDialog
                 item={source}
                 noun={source.kind === "upload" ? "file" : "source"}
@@ -318,6 +355,6 @@ export function FileDetail({
                     unwrap(api.PATCH("/api/sources/{source_id}", { ...path, body })).then(refresh)
                 }
             />
-        </div>
+        </>
     );
 }
