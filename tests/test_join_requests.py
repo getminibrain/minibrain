@@ -10,7 +10,8 @@ from sqlalchemy import select
 from minibrain.auth.join_requests import PER_ADDRESS
 from minibrain.auth.roles import Role
 from minibrain.joining import Approval, Asked, JoinRefused, approval_path, ask, save, saved, wait
-from minibrain.registry.models import AuditEvent, JoinRequest, now
+from minibrain.registry.compute import FORGET_NODES, forget_stale
+from minibrain.registry.models import AuditEvent, JoinRequest, Node, now
 from tests.conftest import Harness
 from tests.test_accounts import csrf
 from tests.test_join_tokens import TOKENS, announce, bearer, engine_token_for, register
@@ -132,6 +133,25 @@ def test_removing_an_approved_machine_revokes_it(harness: Harness) -> None:
     assert refused.status_code == 401 and "removed this machine" in refused.json()["detail"]
     gone = announce(harness, engine, "gpu")
     assert gone.status_code == 401 and "approval behind this engine token was revoked" in gone.text
+
+
+def test_an_approved_machine_stays_listed_while_offline_so_removing_it_can_revoke_it(harness: Harness) -> None:
+    found = approved(harness)
+    assert register(harness, found.credential, "gpu", HOST).status_code == 204
+    token = harness.client.post(TOKENS, json={"pool": "gpu"}).json()["secret"]
+    assert register(harness, token, "gpu", "gpu-a10-9").status_code == 204
+    with harness.sessions() as session:
+        for node in session.scalars(select(Node)):
+            node.seen_at = now() - FORGET_NODES - timedelta(minutes=1)
+        session.commit()
+        forget_stale(session)
+        session.commit()
+        kept = {(node.pool, node.host) for node in session.scalars(select(Node))}
+    assert ("gpu", HOST) in kept and ("gpu", "gpu-a10-9") not in kept
+    machine = f"/api/compute/pools/gpu/machines/{HOST}"
+    assert harness.client.delete(machine).status_code == 204
+    refused = register(harness, found.credential, "gpu", HOST)
+    assert refused.status_code == 401 and "removed this machine" in refused.json()["detail"]
 
 
 def test_requests_are_rate_limited_by_address_and_superseded_by_host(harness: Harness) -> None:

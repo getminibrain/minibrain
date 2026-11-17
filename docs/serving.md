@@ -389,7 +389,8 @@ announces itself.
 - The Compute page lists pools, their machines (online if seen in the last 2 minutes) and the engines serving.
 - Discover judges hardware fit against the selected pool: the best machine in the pool decides. Multi-GPU (XL)
   models need a machine with two or more GPUs.
-- Machines unseen for 7 days and engines unseen for an hour are forgotten.
+- Machines unseen for 7 days and engines unseen for an hour are forgotten. An approved machine stays listed, offline,
+  until it is removed, which revokes its approval.
 
 ## Flows
 

@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from minibrain.auth.join_requests import approved_machines
 from minibrain.models.hardware import LOCAL_LABEL, LOCAL_POOL, Hardware, NodeReport
 from minibrain.registry.models import EngineReplica, Gateway, Node, now
 
@@ -167,7 +168,10 @@ def forget_stale(session: Session) -> None:
     moment = now()
     session.execute(delete(EngineReplica).where(EngineReplica.seen_at < moment - FORGET_ENGINES))
     session.execute(delete(Gateway).where(Gateway.seen_at < moment - FORGET_GATEWAYS))
-    session.execute(delete(Node).where(Node.seen_at < moment - FORGET_NODES))
+    approved = approved_machines(session)
+    stale = session.execute(select(Node.id, Node.pool, Node.host).where(Node.seen_at < moment - FORGET_NODES))
+    forgotten = [key for key, pool, host in stale if (pool, host) not in approved]
+    session.execute(delete(Node).where(Node.id.in_(forgotten)))
 
 
 def pools(session: Session, local: NodeReport) -> list[Pool]:
