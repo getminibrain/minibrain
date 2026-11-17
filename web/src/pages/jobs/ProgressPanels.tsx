@@ -161,6 +161,46 @@ function reviewHref(slug: string, number: number): string {
     return `/evaluations?version=${encodeURIComponent(`${slug}@${number}`)}`;
 }
 
+function ResultLayout({
+    verdict,
+    actions,
+    stats,
+}: {
+    verdict: ReactNode;
+    actions: ReactNode;
+    stats: ReactNode;
+}) {
+    return (
+        <div className="grid gap-x-panel gap-y-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="flex flex-col items-start gap-4">
+                {verdict}
+                <div className="flex min-h-8 flex-wrap items-center gap-2">{actions}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-x-8 gap-y-4 xl:border-l xl:pl-panel">{stats}</div>
+        </div>
+    );
+}
+
+const PENDING_STATS = ["Held-out", "Live version", "vs live", "Test set", "Invalid answers"];
+
+function PendingResult({ error, onRetry }: { error: unknown; onRetry: () => unknown }) {
+    return (
+        <ResultLayout
+            verdict={
+                error ? (
+                    <ErrorLine error={error} onRetry={onRetry} />
+                ) : (
+                    <p className="flex h-6 items-center text-muted-foreground">
+                        Loading the result…
+                    </p>
+                )
+            }
+            actions={null}
+            stats={PENDING_STATS.map((label) => <Stat key={label} label={label} value="–" />)}
+        />
+    );
+}
+
 function Result({ slug, number }: { slug: string; number: number }) {
     const versions = useVersions(slug);
     const models = useAllModels();
@@ -173,24 +213,28 @@ function Result({ slug, number }: { slug: string; number: number }) {
     const live = row?.versions?.find((item) => item.live);
     if (!info || !row) {
         return (
-            <ErrorLine
+            <PendingResult
                 error={versions.error ?? models.error}
                 onRetry={versions.error ? versions.refetch : models.refetch}
             />
         );
     }
     return (
-        <div className="grid gap-x-panel gap-y-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <div className="flex flex-col items-start gap-4">
-                <VerdictLine
-                    row={row}
-                    version={info}
-                    phase={phaseOf(info)}
-                    peers={peersOf(row, list, info)}
-                    eta={undefined}
-                />
-                <ErrorLine error={promote.error} />
-                <div className="flex flex-wrap items-center gap-2">
+        <ResultLayout
+            verdict={
+                <>
+                    <VerdictLine
+                        row={row}
+                        version={info}
+                        phase={phaseOf(info)}
+                        peers={peersOf(row, list, info)}
+                        eta={undefined}
+                    />
+                    <ErrorLine error={promote.error} />
+                </>
+            }
+            actions={
+                <>
                     {can.build && line && (
                         <DeployButton
                             version={line}
@@ -201,22 +245,29 @@ function Result({ slug, number }: { slug: string; number: number }) {
                     <Button variant="outline" asChild>
                         <Link href={reviewHref(slug, number)}>Scores and mistakes</Link>
                     </Button>
-                </div>
-            </div>
-            <div className="grid grid-cols-3 gap-x-8 gap-y-4 xl:border-l xl:pl-panel">
-                <Stat
-                    label={`${shortMetricName(info.main_metric)} (held-out)`}
-                    value={percent(info.score)}
-                />
-                <Stat
-                    label={live && live.number !== number ? `Live v${live.number}` : "Live version"}
-                    value={live && live.number !== number ? percent(live.score) : "–"}
-                />
-                <Stat label="vs live" value={<Versus version={info} live={live} />} />
-                <Stat label="Test set" value={percent(metricOf(info.golden, info.main_metric))} />
-                <Stat label="Invalid answers" value={percent(info.held_out?.invalid_rate)} />
-            </div>
-        </div>
+                </>
+            }
+            stats={
+                <>
+                    <Stat
+                        label={`${shortMetricName(info.main_metric)} (held-out)`}
+                        value={percent(info.score)}
+                    />
+                    <Stat
+                        label={
+                            live && live.number !== number ? `Live v${live.number}` : "Live version"
+                        }
+                        value={live && live.number !== number ? percent(live.score) : "–"}
+                    />
+                    <Stat label="vs live" value={<Versus version={info} live={live} />} />
+                    <Stat
+                        label="Test set"
+                        value={percent(metricOf(info.golden, info.main_metric))}
+                    />
+                    <Stat label="Invalid answers" value={percent(info.held_out?.invalid_rate)} />
+                </>
+            }
+        />
     );
 }
 
