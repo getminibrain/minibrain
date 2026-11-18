@@ -400,7 +400,7 @@ export function LabelBalance({
                     {shown.map((item) => {
                         const share = item.rows / total;
                         return (
-                            <tr key={item.label} className="group/bar h-7 hover:bg-secondary">
+                            <tr key={item.label} className="group/bar h-8 hover:bg-secondary">
                                 <th scope="row" className="w-[40%] pr-2 text-left font-normal">
                                     <Tooltip>
                                         <TooltipTrigger asChild>

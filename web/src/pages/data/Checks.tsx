@@ -165,7 +165,7 @@ function CompactFinding({
     actions: ReturnType<typeof useDismiss> | null;
 }) {
     return (
-        <li className="flex flex-col py-1">
+        <li className="flex flex-col">
             <Collapsible>
                 <div className="flex min-h-8 items-center gap-2">
                     <CollapsibleTrigger className="min-w-0 flex-1 font-normal">

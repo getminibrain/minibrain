@@ -1,4 +1,4 @@
-import { IconPencil, IconTags } from "@tabler/icons-react";
+import { IconPencil, IconTable, IconTags } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import {
     Button,
@@ -215,12 +215,16 @@ function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
             {datasets.length === 0 ? (
                 <p className="text-muted-foreground">No dataset reads it yet.</p>
             ) : (
-                <ul className="flex flex-col divide-y rounded-lg border">
+                <ul className="flex flex-col">
                     {datasets.map((dataset) => (
-                        <li key={dataset.slug} className="flex h-8 items-center gap-3 px-3">
+                        <li key={dataset.slug} className="flex h-8 items-center gap-2">
+                            <IconTable
+                                aria-hidden="true"
+                                className="size-4 shrink-0 text-muted-foreground"
+                            />
                             <Link
                                 href={itemHref({ kind: "dataset", id: dataset.slug })}
-                                className="min-w-0 truncate text-primary"
+                                className="min-w-0 truncate text-primary hover:underline"
                             >
                                 {dataset.name}
                             </Link>

@@ -359,9 +359,9 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
             {dataset.models.length === 0 ? (
                 <p className="text-muted-foreground">No model trains on it yet.</p>
             ) : (
-                <ul className="flex flex-col divide-y rounded-lg border">
+                <ul className="flex flex-col">
                     {dataset.models.map((slug) => (
-                        <li key={slug} className="flex min-h-10 items-center gap-2 px-3 py-1.5">
+                        <li key={slug} className="flex h-8 items-center gap-2">
                             <PublisherLogo
                                 name={nameOf(slug)}
                                 custom
