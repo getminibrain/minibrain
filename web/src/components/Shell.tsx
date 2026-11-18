@@ -142,7 +142,7 @@ function Account() {
     ];
     return (
         <AccountMenu
-            trigger={<AccountButton initial={initialOf(name)} name={name} sub={sub} />}
+            trigger={<AccountButton tone="muted" initial={initialOf(name)} name={name} sub={sub} />}
             items={items}
             spacing="comfortable"
         />
