@@ -211,9 +211,7 @@ export function AddMenu({
                     <DropdownMenuTrigger asChild>
                         <Button
                             variant="outline"
-                            size="icon"
                             disabled={!idle}
-                            aria-label={label}
                             aria-keyshortcuts="n"
                             className="shrink-0"
                         >
@@ -222,11 +220,12 @@ export function AddMenu({
                             ) : (
                                 <IconLoader2 className="animate-spin motion-reduce:animate-none" />
                             )}
+                            {label}
                         </Button>
                     </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent className="flex items-center gap-2">
-                    {label}
+                    {idle ? "Shortcut" : label}
                     {idle && (
                         <Kbd
                             aria-hidden="true"

@@ -886,7 +886,7 @@ export function DataExplorer() {
                         <div className="flex items-center gap-1">
                             <SearchInput
                                 aria-label="Search data"
-                                placeholder="Search names, columns"
+                                placeholder="Search…"
                                 value={query}
                                 onValueChange={setQuery}
                                 onKeyDown={focusTree}
