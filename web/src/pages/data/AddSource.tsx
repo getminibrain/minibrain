@@ -34,7 +34,7 @@ export type AddKind = Exclude<SourceGroupId, "upload">;
 export const SOURCE_CHOICES: { group: SourceGroupId; label: string; detail: string }[] = [
     { group: "upload", label: "Upload file", detail: "CSV, TSV, JSON, Parquet" },
     { group: "folder", label: "Folder on the server", detail: "Files read in place" },
-    { group: "s3", label: "S3", detail: "Objects in a bucket" },
+    { group: "s3", label: "Object storage", detail: "S3, MinIO, Ceph" },
     { group: "database", label: "Database", detail: "PostgreSQL or MySQL table or query" },
     { group: "lakehouse", label: "Lakehouse table", detail: "Iceberg, Delta Lake" },
 ];
@@ -234,7 +234,7 @@ export function useSourceAdder(onAdded: (source: SourceAdded) => void): SourceAd
 const ALREADY: Record<SourceSummary["kind"], string> = {
     upload: "This file is already uploaded",
     folder: "This folder is already added",
-    s3: "This S3 path is already added",
+    s3: "This bucket path is already added",
     database: "This table is already added",
     iceberg: "This Iceberg table is already added",
     delta: "This Delta table is already added",

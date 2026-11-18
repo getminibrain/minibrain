@@ -64,8 +64,8 @@ export function useSourceBlocks(): SourceBlocks {
     }
     if (noS3) {
         blocks.s3 = {
-            short: "No S3 connection yet",
-            why: "S3 paths are read through a connection, and there is none yet. An admin adds one under Settings, Connections.",
+            short: "No object storage connection yet",
+            why: "Bucket paths are read through a connection, and there is none yet. An admin adds one under Settings, Connections.",
             fixes: ["connections"],
         };
     }

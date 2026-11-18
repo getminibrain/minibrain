@@ -24,7 +24,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add › Folder on the server · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders
 - **S3 sources** · shipped · ml
   Read Parquet, CSV or JSON objects in a bucket in place.
-  UI: Data › Add › S3 · API: POST /api/sources/s3
+  UI: Data › Add › Object storage · API: POST /api/sources/s3
 - **Database sources** · shipped · ml
   Read a PostgreSQL or MySQL table or query, read-only.
   UI: Data › Add › Database · API: POST /api/sources/database

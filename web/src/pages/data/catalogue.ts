@@ -26,7 +26,7 @@ export type SourceGroup = {
 export const SOURCE_GROUPS: SourceGroup[] = [
     { id: "upload", path: "uploads", label: "Uploads", noun: "file", kinds: ["upload"] },
     { id: "folder", path: "folders", label: "Folders", noun: "folder", kinds: ["folder"] },
-    { id: "s3", path: "s3", label: "S3", noun: "bucket", kinds: ["s3"] },
+    { id: "s3", path: "s3", label: "Object storage", noun: "bucket", kinds: ["s3"] },
     {
         id: "database",
         path: "databases",

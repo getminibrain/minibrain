@@ -59,9 +59,9 @@ type GroupText = { title: string; body: string; choice: string; noun: string };
 
 const GROUPS: Record<ConnectedKind, GroupText> = {
     s3: {
-        title: "S3",
+        title: "Object storage",
         body: "Objects in a bucket, read in place as one table: every Parquet, CSV or JSON file a path or pattern matches. Changes are tracked by each object's ETag and size.",
-        choice: "S3",
+        choice: "Object storage",
         noun: "path",
     },
     database: {
@@ -285,11 +285,11 @@ export function AddS3Dialog({
     return (
         <AddDialog
             open={open}
-            title="Add an S3 path"
+            title="Add a bucket path"
             description="minibrain lists the matching objects and reads them in place as one table each time a query runs. Nothing is copied until a dataset saves a version."
             pending={add.isPending}
             ready={chosen !== null && path.trim().startsWith("s3://") && !nameProblem}
-            submitLabel="Add S3 path"
+            submitLabel="Add path"
             error={add.error}
             onOpenChange={onOpenChange}
             onSubmit={() => add.mutate()}
@@ -524,7 +524,7 @@ export function ConnectedGroup({
                     title={
                         kind === "database"
                             ? "No database connections yet"
-                            : "No S3 connections yet"
+                            : "No object storage connections yet"
                     }
                     className="mx-0 mt-0"
                     action={

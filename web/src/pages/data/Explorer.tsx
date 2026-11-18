@@ -213,7 +213,7 @@ function allBranches(nodes: TreeNode[]): string[] {
 const GROUP_ADD: Record<SourceGroupId, string> = {
     upload: "Upload file",
     folder: "Add folder",
-    s3: "Add S3 path",
+    s3: "Add bucket path",
     database: "Add database table",
     lakehouse: "Add lakehouse table",
 };

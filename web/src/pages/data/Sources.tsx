@@ -92,8 +92,8 @@ export function SourcesOverview({
             </header>
             {sources.length === 0 ? (
                 <EmptyState variant="panel" title="No sources yet" className="mx-0 mt-0">
-                    Use Add to upload a CSV, TSV, JSON or Parquet file, read a folder, an S3 bucket
-                    or a database, or start from demo data.
+                    Use Add to upload a CSV, TSV, JSON or Parquet file, read a folder, a bucket or a
+                    database, or start from demo data.
                 </EmptyState>
             ) : (
                 <>
