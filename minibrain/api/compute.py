@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,17 @@ from minibrain.registry.models import (
     Worker,
 )
 from minibrain.registry.models import BaseModel as BaseModel_
-from minibrain.registry.pool_settings import ANY, Workload, all_workloads, listed, save_workloads, workloads_of
+from minibrain.registry.pool_settings import (
+    ANY,
+    DESCRIPTION_LIMIT,
+    PoolSettings,
+    Workload,
+    all_workloads,
+    clean_description,
+    listed,
+    save_settings,
+    settings_of,
+)
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
 from minibrain.tasks.service import live_version, serving_base
 
@@ -168,9 +178,14 @@ class PoolRoom(BaseModel):
     basis: str
 
 
+POOL_DESCRIPTION = "What the pool is for, in a line; null when none."
+PoolDescription = Annotated[str, AfterValidator(clean_description)]
+
+
 class PoolInfo(BaseModel):
     name: str
     label: str
+    description: str | None = Field(default=None, description=POOL_DESCRIPTION)
     nodes: list[NodeInfo]
     engines: list[ReplicaInfo]
     room: PoolRoom | None = Field(default=None, description="What still fits on the online machines that take work.")
@@ -184,11 +199,20 @@ class PoolInfo(BaseModel):
 
 class PoolSettingsInfo(BaseModel):
     pool: str
+    description: str | None = Field(default=None, description=POOL_DESCRIPTION)
     workloads: list[Workload] = Field(description="What the pool is used for; both means any work.")
 
 
 class PoolSettingsUpdate(BaseModel):
-    workloads: list[Workload] = Field(min_length=1, description="Serving, training (with scoring), or both.")
+    description: PoolDescription | None = Field(
+        default=None,
+        description=(
+            f"Plain text up to {DESCRIPTION_LIMIT} characters, trimmed; empty or null clears it, left out keeps it."
+        ),
+    )
+    workloads: Annotated[list[Workload], Field(min_length=1)] | None = Field(
+        default=None, description="Serving, training (with scoring), or both; left out keeps them."
+    )
 
 
 def planned_peak(session: Session, job: Job) -> int | None:
@@ -426,6 +450,7 @@ def pool_info(
     return PoolInfo(
         name=pool.name,
         label=pool.label,
+        description=pool.description,
         nodes=nodes,
         engines=engines,
         room=PoolRoom.model_validate(room.__dict__) if room is not None else None,
@@ -450,21 +475,38 @@ def list_pools(session: SessionDep, node: LocalNodeDep, metrics: MetricsDep) -> 
 SETTINGS = "/pools/{pool}/settings"
 
 
+def settings_info(pool: str, found: PoolSettings) -> PoolSettingsInfo:
+    return PoolSettingsInfo(pool=pool, description=found.description, workloads=listed(found.workloads))
+
+
+def wanted_settings(body: PoolSettingsUpdate, before: PoolSettings) -> PoolSettings:
+    workloads = frozenset(body.workloads) if body.workloads is not None else before.workloads
+    described = "description" in body.model_fields_set
+    return PoolSettings(workloads, (body.description or None) if described else before.description)
+
+
+def audit_settings(session: Session, actor: str, pool: str, before: PoolSettings, after: PoolSettings) -> None:
+    if after.workloads != before.workloads:
+        detail = {"pool": pool, "from": listed(before.workloads), "to": listed(after.workloads)}
+        session.add(AuditEvent(actor=actor, action="pool.workloads", target=pool, detail=detail))
+    if after.description != before.description:
+        detail = {"pool": pool, "from": before.description, "to": after.description}
+        session.add(AuditEvent(actor=actor, action="pool.description", target=pool, detail=detail))
+
+
 @router.get(SETTINGS, dependencies=[Depends(admin)], summary="Read a pool's settings")
 def read_pool_settings(pool: PoolName, session: SessionDep) -> PoolSettingsInfo:
-    return PoolSettingsInfo(pool=pool, workloads=listed(workloads_of(session, pool)))
+    return settings_info(pool, settings_of(session, pool))
 
 
-@router.put(SETTINGS, dependencies=[Depends(admin)], summary="Change what a pool is used for")
+@router.put(SETTINGS, dependencies=[Depends(admin)], summary="Change a pool's description and what it is used for")
 def update_pool_settings(pool: PoolName, body: PoolSettingsUpdate, session: SessionDep) -> PoolSettingsInfo:
     actor = current_actor()
-    before = workloads_of(session, pool)
-    after = save_workloads(session, pool, body.workloads, actor)
-    if after != before:
-        detail = {"pool": pool, "from": listed(before), "to": listed(after)}
-        session.add(AuditEvent(actor=actor, action="pool.workloads", target=pool, detail=detail))
+    before = settings_of(session, pool)
+    after = save_settings(session, pool, wanted_settings(body, before), actor)
+    audit_settings(session, actor, pool, before, after)
     session.commit()
-    return PoolSettingsInfo(pool=pool, workloads=listed(after))
+    return settings_info(pool, after)
 
 
 def machine_of(session: Session, local: str, pool: str, host: str) -> Node:

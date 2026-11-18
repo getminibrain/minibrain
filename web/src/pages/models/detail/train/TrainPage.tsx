@@ -296,6 +296,7 @@ function ComputeRow({ run, error }: { run: TrainRun; error: string | undefined }
                             meta: item.best
                                 ? `${fitText(item.best.chosen)} · ≈ ${duration(item.best.minutes)}`
                                 : item.reason,
+                            description: item.description ?? undefined,
                             disabled: !item.best && item.name !== run.compute,
                             separated: index === 0,
                         })),
@@ -303,6 +304,7 @@ function ComputeRow({ run, error }: { run: TrainRun; error: string | undefined }
                             value: item.name,
                             label: item.name,
                             meta: "Not used for training",
+                            description: item.description ?? undefined,
                             disabled: true,
                             separated: run.pools.length === 0 && index === 0,
                         })),

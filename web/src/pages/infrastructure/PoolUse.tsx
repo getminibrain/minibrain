@@ -1,18 +1,27 @@
-import { IconDots } from "@tabler/icons-react";
+import { IconDots, IconSettings } from "@tabler/icons-react";
 import {
     Badge,
     Button,
-    ConfirmDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
+    DropdownMenuItem,
     DropdownMenuTrigger,
+    Input,
 } from "obp-ui";
 import { useState } from "react";
-import { type Workload, usePoolWorkloads } from "~/api/machineQueries";
+import { type Workload, usePoolSettings } from "~/api/machineQueries";
+import { FormControl, FormRow, FormRows } from "~/components/FormRows";
+import { PickSelect } from "~/components/PickSelect";
+import { usePool } from "~/components/PoolLink";
 import { ErrorLine } from "~/components/Section";
+
+const DESCRIPTION_LIMIT = 120;
 
 type UseKey = "any" | Workload;
 
@@ -61,6 +70,104 @@ function effectText(pool: string, from: UseKey, to: UseKey): string {
     return `Only training and scoring jobs run on pool ${pool}: new deployments no longer go there.${engines}`;
 }
 
+function oneLine(text: string): string {
+    return text.trim().replace(/\s+/g, " ");
+}
+
+const USE_OPTIONS = USES.map((item) => ({ value: item.key, label: item.label, meta: item.hint }));
+
+function SettingsDialog({
+    pool,
+    workloads,
+    description,
+    onClose,
+}: {
+    pool: string;
+    workloads: readonly string[] | undefined;
+    description: string;
+    onClose: () => void;
+}) {
+    const save = usePoolSettings(pool);
+    const current = useOf(workloads);
+    const [text, setText] = useState(description);
+    const [picked, setPicked] = useState<UseKey>(current);
+    const target = USES.find((item) => item.key === picked);
+    const cleaned = oneLine(text);
+    const changed = picked !== current || cleaned !== description;
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-xl">
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (target && changed && !save.isPending) {
+                            save.mutateAsync({ description: cleaned, workloads: target.workloads })
+                                .then(onClose)
+                                .catch(() => undefined);
+                        }
+                    }}
+                    noValidate
+                    className="contents"
+                >
+                    <DialogHeader>
+                        <DialogTitle>{`Pool settings · ${pool}`}</DialogTitle>
+                        <DialogDescription>
+                            Say what the pool is for and which work runs on it. The pool keeps its
+                            name.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <FormRows labels="narrow">
+                        <FormRow id="pool-description" label="Description" align="start">
+                            <FormControl width="full">
+                                <Input
+                                    id="pool-description"
+                                    autoFocus
+                                    value={text}
+                                    maxLength={DESCRIPTION_LIMIT}
+                                    placeholder="Production serving · H100, rack 4"
+                                    onChange={(event) => setText(event.target.value)}
+                                />
+                                <span className="text-sm text-muted-foreground">
+                                    Optional. Shown under the pool's name in pool cards and pool
+                                    pickers.
+                                </span>
+                            </FormControl>
+                        </FormRow>
+                        <FormRow id="pool-use" label="Used for" align="start">
+                            <FormControl width="full">
+                                <PickSelect
+                                    id="pool-use"
+                                    value={picked}
+                                    options={USE_OPTIONS}
+                                    onChange={(value) =>
+                                        setPicked(
+                                            USES.find((item) => item.key === value)?.key ?? current,
+                                        )
+                                    }
+                                />
+                                {picked !== current && (
+                                    <span className="text-sm text-muted-foreground">
+                                        {effectText(pool, current, picked)}
+                                    </span>
+                                )}
+                            </FormControl>
+                        </FormRow>
+                    </FormRows>
+                    <ErrorLine error={save.error} />
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={!changed || save.isPending}>
+                            {save.isPending ? "Saving…" : "Save"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function PoolMenu({
     pool,
     workloads,
@@ -68,10 +175,8 @@ export function PoolMenu({
     pool: string;
     workloads: readonly string[] | undefined;
 }) {
-    const save = usePoolWorkloads(pool);
-    const current = useOf(workloads);
-    const [asked, setAsked] = useState<UseKey | null>(null);
-    const target = USES.find((item) => item.key === asked);
+    const found = usePool(pool);
+    const [open, setOpen] = useState(false);
     return (
         <>
             <DropdownMenu>
@@ -80,47 +185,21 @@ export function PoolMenu({
                         <IconDots />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuLabel>Used for</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup
-                        value={current}
-                        onValueChange={(value) => {
-                            if (value !== current) {
-                                setAsked(value as UseKey);
-                            }
-                        }}
-                    >
-                        {USES.map((item) => (
-                            <DropdownMenuRadioItem key={item.key} value={item.key}>
-                                <span>{item.label}</span>
-                                <span className="ml-auto text-sm text-muted-foreground">
-                                    {item.hint}
-                                </span>
-                            </DropdownMenuRadioItem>
-                        ))}
-                    </DropdownMenuRadioGroup>
+                <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onSelect={() => setOpen(true)}>
+                        <IconSettings />
+                        Pool settings
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-            {target && (
-                <ConfirmDialog
-                    open
-                    onOpenChange={(open) => !open && setAsked(null)}
-                    title={`Use pool ${pool} for ${target.key === "any" ? "anything" : target.label.toLowerCase()}?`}
-                    description={effectText(pool, current, target.key)}
-                    confirmLabel={
-                        target.key === "any"
-                            ? "Use for anything"
-                            : `Use for ${target.label.toLowerCase()}`
-                    }
-                    onConfirm={() =>
-                        save
-                            .mutateAsync(target.workloads)
-                            .then(() => setAsked(null))
-                            .catch(() => undefined)
-                    }
+            {open && (
+                <SettingsDialog
+                    pool={pool}
+                    workloads={workloads}
+                    description={found?.description ?? ""}
+                    onClose={() => setOpen(false)}
                 />
             )}
-            {save.error && <ErrorLine error={save.error} />}
         </>
     );
 }

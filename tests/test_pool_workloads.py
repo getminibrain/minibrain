@@ -31,6 +31,7 @@ def test_a_pool_is_used_for_anything_until_an_admin_narrows_it(harness: Harness)
     assert pool_of(harness, "rack")["workloads"] == ["serving", "training"]
     assert harness.client.get("/api/compute/pools/rack/settings").json() == {
         "pool": "rack",
+        "description": None,
         "workloads": ["serving", "training"],
     }
     saved = use(harness, "rack", "training")

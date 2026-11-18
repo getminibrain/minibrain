@@ -1751,7 +1751,7 @@ export interface paths {
         };
         /** Read a pool's settings */
         get: operations["read_pool_settings_api_compute_pools__pool__settings_get"];
-        /** Change what a pool is used for */
+        /** Change a pool's description and what it is used for */
         put: operations["update_pool_settings_api_compute_pools__pool__settings_put"];
         post?: never;
         delete?: never;
@@ -4735,6 +4735,8 @@ export interface components {
             name: string;
             /** Label */
             label: string;
+            /** Description */
+            description?: string | null;
             /** Reason */
             reason: string;
         };
@@ -7361,6 +7363,11 @@ export interface components {
             pool: string;
             /** Pool Label */
             pool_label: string;
+            /**
+             * Pool Description
+             * @description The pool's description; null when none.
+             */
+            pool_description?: string | null;
             /** Kind */
             kind: string;
             /** Memory Label */
@@ -8517,6 +8524,11 @@ export interface components {
             name: string;
             /** Label */
             label: string;
+            /**
+             * Description
+             * @description The pool's description; null when none.
+             */
+            description?: string | null;
         };
         /** PoolInfo */
         PoolInfo: {
@@ -8524,6 +8536,11 @@ export interface components {
             name: string;
             /** Label */
             label: string;
+            /**
+             * Description
+             * @description What the pool is for, in a line; null when none.
+             */
+            description?: string | null;
             /** Nodes */
             nodes: components["schemas"]["NodeInfo"][];
             /** Engines */
@@ -8552,6 +8569,11 @@ export interface components {
             name: string;
             /** Label */
             label: string;
+            /**
+             * Description
+             * @description The pool's description; null when none.
+             */
+            description?: string | null;
             fit: components["schemas"]["FitInfo"];
             /** Machines */
             machines: number;
@@ -8606,6 +8628,11 @@ export interface components {
             /** Pool */
             pool: string;
             /**
+             * Description
+             * @description What the pool is for, in a line; null when none.
+             */
+            description?: string | null;
+            /**
              * Workloads
              * @description What the pool is used for; both means any work.
              */
@@ -8614,10 +8641,15 @@ export interface components {
         /** PoolSettingsUpdate */
         PoolSettingsUpdate: {
             /**
-             * Workloads
-             * @description Serving, training (with scoring), or both.
+             * Description
+             * @description Plain text up to 120 characters, trimmed; empty or null clears it, left out keeps it.
              */
-            workloads: ("serving" | "training")[];
+            description?: string | null;
+            /**
+             * Workloads
+             * @description Serving, training (with scoring), or both; left out keeps them.
+             */
+            workloads?: ("serving" | "training")[] | null;
         };
         /** PoolToken */
         PoolToken: {

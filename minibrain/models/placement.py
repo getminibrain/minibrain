@@ -32,6 +32,7 @@ class PoolOption:
     machines: int
     room: int = 1
     refused: str | None = None
+    description: str | None = None
 
     @property
     def runs(self) -> bool:
@@ -74,7 +75,8 @@ def option_of(pool: Pool, weights: int, requires: dict[str, Any], placed: int) -
     machines = pool.machines()
     memory = [machine.memory_bytes for machine in machines if machine.memory_bytes is not None]
     free = max(memory) - placed if memory else None
-    return PoolOption(pool.name, pool.label, pool_fit(weights, requires, machines), free, len(machines))
+    fit = pool_fit(weights, requires, machines)
+    return PoolOption(pool.name, pool.label, fit, free, len(machines), description=pool.description)
 
 
 def pool_options(session: Session, local: NodeReport, key: str, owner: str) -> list[PoolOption]:

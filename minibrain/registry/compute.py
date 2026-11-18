@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from minibrain.auth.join_requests import approved_machines
 from minibrain.models.hardware import LOCAL_LABEL, LOCAL_POOL, Hardware, NodeReport
 from minibrain.registry.models import EngineReplica, Gateway, Node, now
+from minibrain.registry.pool_settings import all_descriptions
 
 NODE_FRESH = timedelta(minutes=2)
 ENGINE_FRESH = timedelta(seconds=30)
@@ -66,6 +67,7 @@ class Pool:
     label: str
     nodes: list[PoolNode]
     engines: list[EngineReplica]
+    description: str | None = None
 
     def machines(self) -> list[Hardware]:
         return [node.report.hardware(self.name) for node in self.nodes if node.online]
@@ -195,7 +197,10 @@ def pools(session: Session, local: NodeReport) -> list[Pool]:
     for replica in live_engines(session):
         engines.setdefault(replica.pool, []).append(replica)
     names = sorted(nodes.keys() | engines.keys(), key=lambda name: (name != LOCAL_POOL, name))
-    return [Pool(name, pool_label(name), nodes.get(name, []), engines.get(name, [])) for name in names]
+    described = all_descriptions(session)
+    return [
+        Pool(name, pool_label(name), nodes.get(name, []), engines.get(name, []), described.get(name)) for name in names
+    ]
 
 
 def held_hosts(session: Session, pool: str) -> set[str]:

@@ -105,6 +105,9 @@ export function PoolCard({
                 {pool && pool.label !== name && (
                     <span className="text-sm text-muted-foreground">{pool.label}</span>
                 )}
+                {pool?.description && (
+                    <span className="text-sm text-muted-foreground">{pool.description}</span>
+                )}
             </div>
             {pool ? (
                 <>

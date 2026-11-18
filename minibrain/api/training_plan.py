@@ -47,7 +47,7 @@ from minibrain.registry.models import (
     JobStatus,
     Model,
 )
-from minibrain.registry.pool_settings import ANY, TRAINING, all_workloads, refusal, require
+from minibrain.registry.pool_settings import ANY, TRAINING, all_descriptions, all_workloads, refusal, require
 from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 from minibrain.tasks.rebase import serve_only
@@ -127,7 +127,12 @@ def closed_pools(session: Session, node: NodeReport) -> list[ClosedPoolInfo]:
     found = pools(session, node)
     trainers = {machine.pool for machine in trainer_machines(found)}
     return [
-        ClosedPoolInfo(name=pool.name, label=pool.label, reason=refusal(pool.name, TRAINING, uses[pool.name]))
+        ClosedPoolInfo(
+            name=pool.name,
+            label=pool.label,
+            description=pool.description,
+            reason=refusal(pool.name, TRAINING, uses[pool.name]),
+        )
         for pool in found
         if pool.name in trainers and TRAINING not in uses.get(pool.name, ANY)
     ]
@@ -190,7 +195,9 @@ def unreported(machine: Machine) -> str:
     return f"{machine.place} has not reported its {machine.memory_label} yet."
 
 
-def machine_info(found: Plan, picked: Machine | None, held_out: int) -> MachinePlanInfo | None:
+def machine_info(
+    found: Plan, picked: Machine | None, held_out: int, described: dict[str, str]
+) -> MachinePlanInfo | None:
     machine = found.machine
     if machine is None:
         return None
@@ -199,6 +206,7 @@ def machine_info(found: Plan, picked: Machine | None, held_out: int) -> MachineP
         name=machine.name,
         pool=machine.pool,
         pool_label=pool_label(machine.pool),
+        pool_description=described.get(machine.pool),
         kind=machine.kind,
         memory_label=machine.memory_label,
         available_bytes=machine.available_bytes,
@@ -246,8 +254,9 @@ def plan_info(
     held_out: int,
     queue: TrainingQueueInfo,
     closed: list[ClosedPoolInfo],
+    described: dict[str, str],
 ) -> TrainingPlanInfo:
-    machines = [machine_info(item, found.machine, held_out) for item in found.machines]
+    machines = [machine_info(item, found.machine, held_out, described) for item in found.machines]
     return TrainingPlanInfo(
         level=plan_level(found),
         basis=found.basis,
@@ -290,7 +299,8 @@ def get_training_plan(
         plain = TrainingSettings(machine=query.machine, pool=query.pool)
         default, _ = training_plan(session, settings, node, model, dataset_version, plain)
     held_out = held_out_rows(dataset_version)
-    return plan_info(found, default, longest, held_out, queue_info(session), closed_pools(session, node))
+    closed = closed_pools(session, node)
+    return plan_info(found, default, longest, held_out, queue_info(session), closed, all_descriptions(session))
 
 
 def train_fit(entry: CatalogModel, variant: CatalogVariant, machines: list[Machine]) -> TrainFitInfo:

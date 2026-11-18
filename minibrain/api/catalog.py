@@ -159,6 +159,10 @@ def latest_sync(session: Session) -> Job | None:
     return session.scalar(query)
 
 
+def pool_choice(pool: Pool) -> PoolChoice:
+    return PoolChoice(name=pool.name, label=pool.label, description=pool.description)
+
+
 @router.get("", dependencies=[Depends(viewer)], summary="List the model catalogue")
 def catalogue(
     session: SessionDep, settings: SettingsDep, node: LocalNodeDep, pool: str | None = None
@@ -175,7 +179,7 @@ def catalogue(
     return CatalogResponse(
         entries=[entry_info(session, settings, entry, machines, trainers) for entry in entries],
         hardware=HardwareInfo(**pool_hardware(chosen).as_dict()),
-        pools=[PoolChoice(name=item.name, label=item.label) for item in found if item.machines() or item is chosen],
+        pools=[pool_choice(item) for item in found if item.machines() or item is chosen],
         pool=chosen.name,
         online=hub.CONNECTIVITY.check() if policy.outbound_allowed(hub.endpoint()) else False,
         offline_forced=hub.offline() or not policy.outbound_allowed(hub.endpoint()),

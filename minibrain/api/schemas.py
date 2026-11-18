@@ -1189,6 +1189,7 @@ class MachinePlanInfo(BaseModel):
     name: str
     pool: str
     pool_label: str
+    pool_description: str | None = Field(default=None, description="The pool's description; null when none.")
     kind: str
     memory_label: str
     available_bytes: int | None
@@ -1219,6 +1220,7 @@ class TrainingQueueInfo(BaseModel):
 class ClosedPoolInfo(BaseModel):
     name: str
     label: str
+    description: str | None = None
     reason: str
 
 
@@ -1861,6 +1863,7 @@ class FitInfo(BaseModel):
 class PoolPlacement(BaseModel):
     name: str
     label: str
+    description: str | None = Field(default=None, description="The pool's description; null when none.")
     fit: FitInfo
     machines: int
     free_bytes: int | None
@@ -1953,6 +1956,7 @@ class HardwareInfo(BaseModel):
 class PoolChoice(BaseModel):
     name: str
     label: str
+    description: str | None = Field(default=None, description="The pool's description; null when none.")
 
 
 class CatalogResponse(BaseModel):

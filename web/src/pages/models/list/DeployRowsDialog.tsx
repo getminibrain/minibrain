@@ -45,6 +45,7 @@ function fitOf(placement: Placement | undefined, value: string): Fit {
 function poolOptions(placements: (Placement | undefined)[]): PickOption[] {
     const known = placements.filter((item): item is Placement => Boolean(item));
     const names = known[0]?.pools.map((pool) => pool.name) ?? [];
+    const described = new Map(known[0]?.pools.map((pool) => [pool.name, pool.description]));
     const closed = new Set(known[0]?.pools.filter((pool) => pool.refused).map((pool) => pool.name));
     const fitting = (name: string) => known.filter((item) => fitOf(item, name).runs).length;
     return [
@@ -57,6 +58,7 @@ function poolOptions(placements: (Placement | undefined)[]): PickOption[] {
             value: name,
             label: name,
             meta: closed.has(name) ? NOT_SERVING : `${fitting(name)} of ${known.length} fit`,
+            description: described.get(name) ?? undefined,
             disabled: fitting(name) === 0,
             separated: index === 0,
         })),

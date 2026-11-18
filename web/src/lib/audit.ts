@@ -57,6 +57,7 @@ const ACTIONS: Record<string, string> = {
     "machine.undrain": "Machine undrained",
     "machine.remove": "Machine removed from its pool",
     "pool.workloads": "Pool use changed",
+    "pool.description": "Pool description changed",
     "account.create": "Account created",
     "account.password": "Password set",
     "account.password_change": "Password changed",
@@ -475,6 +476,10 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "account.reset": (detail) =>
         `Link expires ${plainValue(detail.link_expires_at, undefined, "link_expires_at")}`,
     "pool.workloads": (detail) => `Pool ${plainValue(detail.pool)} used for ${usedFor(detail.to)}`,
+    "pool.description": (detail) =>
+        typeof detail.to === "string"
+            ? `Pool ${plainValue(detail.pool)}: ${detail.to}`
+            : `Pool ${plainValue(detail.pool)} description cleared`,
     "auth.setup_link": () => "For the first admin; earlier links stop working",
     "auth.sign_in": (detail) => `With ${plainValue(detail.sign_in, undefined, "sign_in")}`,
     "auth.sign_in_failed": (detail) => plainValue(detail.reason),

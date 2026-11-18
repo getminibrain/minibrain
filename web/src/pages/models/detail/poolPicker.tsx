@@ -74,6 +74,7 @@ function options(placement: Placement): PickOption[] {
             value: pool.name,
             label: pool.name,
             meta: fitText(pool),
+            description: pool.description ?? undefined,
             disabled: pool.fit.level === "insufficient" || !servesHere(pool, placement.pool),
             separated: index === 0,
         })),

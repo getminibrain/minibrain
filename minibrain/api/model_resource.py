@@ -191,6 +191,7 @@ def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
             PoolPlacement(
                 name=option.name,
                 label=option.label,
+                description=option.description,
                 fit=FitInfo(**option.fit),
                 machines=option.machines,
                 free_bytes=option.free_bytes,

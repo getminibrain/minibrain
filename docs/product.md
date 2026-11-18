@@ -551,7 +551,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Infrastructure › Machines · API: POST /api/compute/pools/{pool}/machines/{host}/drain, POST /api/compute/pools/{pool}/machines/{host}/undrain, DELETE /api/compute/pools/{pool}/machines/{host}
 - **Pool use** · shipped · admin
   Use each pool for any work, serving only or training only.
-  UI: Infrastructure › Machines › pool menu › Used for · API: GET /api/compute/pools/{pool}/settings, PUT /api/compute/pools/{pool}/settings, GET /api/compute/pools
+  UI: Infrastructure › Machines › pool menu › Pool settings · API: GET /api/compute/pools/{pool}/settings, PUT /api/compute/pools/{pool}/settings, GET /api/compute/pools
+- **Pool description** · shipped · admin
+  Say what a pool is for, shown wherever it is picked.
+  UI: Infrastructure › Machines › pool menu › Pool settings, Models › model › Deploy, Models › model › Train · API: PUT /api/compute/pools/{pool}/settings, GET /api/compute/pools
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools

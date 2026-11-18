@@ -854,6 +854,7 @@ class PoolSetting(Base):
     workloads: Mapped[list[str]] = mapped_column(JSON, default=list)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_by: Mapped[str]
+    description: Mapped[str | None] = mapped_column(default=None)
 
 
 class EngineReplica(Base):

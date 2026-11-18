@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Final, Literal
 
 from sqlalchemy import select
@@ -13,10 +14,24 @@ WORKLOADS: tuple[Workload, ...] = (SERVING, TRAINING)
 ANY = frozenset(WORKLOADS)
 TRAINING_KINDS = frozenset({JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE})
 NOUNS = {SERVING: "serving", TRAINING: "training and scoring"}
+DESCRIPTION_LIMIT: Final = 120
 
 
 class WorkloadError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class PoolSettings:
+    workloads: frozenset[str] = ANY
+    description: str | None = None
+
+
+def clean_description(text: str) -> str:
+    cleaned = " ".join(text.split())
+    if len(cleaned) > DESCRIPTION_LIMIT:
+        raise ValueError(f"Keep the description to {DESCRIPTION_LIMIT} characters; it has {len(cleaned)}")
+    return cleaned
 
 
 def known(workloads: Iterable[str]) -> frozenset[str]:
@@ -26,6 +41,16 @@ def known(workloads: Iterable[str]) -> frozenset[str]:
 def workloads_of(session: Session, pool: str) -> frozenset[str]:
     found = session.get(PoolSetting, pool)
     return known(found.workloads) if found is not None else ANY
+
+
+def settings_of(session: Session, pool: str) -> PoolSettings:
+    found = session.get(PoolSetting, pool)
+    return PoolSettings(known(found.workloads), found.description) if found is not None else PoolSettings()
+
+
+def all_descriptions(session: Session) -> dict[str, str]:
+    found = session.scalars(select(PoolSetting).where(PoolSetting.description.is_not(None)))
+    return {row.pool: row.description for row in found if row.description}
 
 
 def all_workloads(session: Session) -> dict[str, frozenset[str]]:
@@ -64,21 +89,23 @@ def workload_of_job(kind: str) -> str | None:
     return TRAINING if kind in TRAINING_KINDS else None
 
 
-def save_workloads(session: Session, pool: str, workloads: Iterable[str], actor: str) -> frozenset[str]:
-    wanted = known(workloads)
-    if not wanted:
+def save_settings(session: Session, pool: str, wanted: PoolSettings, actor: str) -> PoolSettings:
+    workloads = known(wanted.workloads)
+    if not workloads:
         raise WorkloadError(f"Pool {pool} needs at least one use: {', '.join(WORKLOADS)}")
+    description = wanted.description or None
     found = session.get(PoolSetting, pool)
-    if wanted == ANY:
+    if workloads == ANY and description is None:
         if found is not None:
             session.delete(found)
-        return wanted
+        return PoolSettings()
     row = found or PoolSetting(pool=pool, updated_by=actor)
-    row.workloads = [item for item in WORKLOADS if item in wanted]
+    row.workloads = [item for item in WORKLOADS if item in workloads]
+    row.description = description
     row.updated_at = now()
     row.updated_by = actor
     session.add(row)
-    return wanted
+    return PoolSettings(workloads, description)
 
 
 def listed(workloads: Iterable[str]) -> list[Workload]:

@@ -5341,7 +5341,7 @@
         "tags": [
           "Infrastructure"
         ],
-        "summary": "Change what a pool is used for",
+        "summary": "Change a pool's description and what it is used for",
         "operationId": "update_pool_settings_api_compute_pools__pool__settings_put",
         "parameters": [
           {
@@ -16120,6 +16120,17 @@
             "type": "string",
             "title": "Label"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "reason": {
             "type": "string",
             "title": "Reason"
@@ -23801,6 +23812,18 @@
             "type": "string",
             "title": "Pool Label"
           },
+          "pool_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool Description",
+            "description": "The pool's description; null when none."
+          },
           "kind": {
             "type": "string",
             "title": "Kind"
@@ -27317,6 +27340,18 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "The pool's description; null when none."
           }
         },
         "type": "object",
@@ -27335,6 +27370,18 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the pool is for, in a line; null when none."
           },
           "nodes": {
             "items": {
@@ -27405,6 +27452,18 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "The pool's description; null when none."
           },
           "fit": {
             "$ref": "#/components/schemas/FitInfo"
@@ -27584,6 +27643,18 @@
             "type": "string",
             "title": "Pool"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the pool is for, in a line; null when none."
+          },
           "workloads": {
             "items": {
               "type": "string",
@@ -27606,24 +27677,40 @@
       },
       "PoolSettingsUpdate": {
         "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Plain text up to 120 characters, trimmed; empty or null clears it, left out keeps it."
+          },
           "workloads": {
-            "items": {
-              "type": "string",
-              "enum": [
-                "serving",
-                "training"
-              ]
-            },
-            "type": "array",
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "serving",
+                    "training"
+                  ]
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Workloads",
-            "description": "Serving, training (with scoring), or both."
+            "description": "Serving, training (with scoring), or both; left out keeps them."
           }
         },
         "type": "object",
-        "required": [
-          "workloads"
-        ],
         "title": "PoolSettingsUpdate"
       },
       "PoolToken": {

@@ -100,6 +100,7 @@ ACTION_LABELS = {
     "model.update": "Model changed",
     "model.verify": "Model files checked",
     "policy.update": "Policy changed",
+    "pool.description": "Pool description changed",
     "pool.workloads": "Pool use changed",
     "safety.block": "Blocked by the safety model",
     "settings.judge": "Default judge changed",

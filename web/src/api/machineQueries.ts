@@ -45,19 +45,29 @@ export function useMachineMetrics(pool: string, host: string, enabled: boolean) 
 
 export type Workload = "serving" | "training";
 
-export function usePoolWorkloads(pool: string) {
+export type PoolSettings = { description?: string; workloads?: Workload[] };
+
+function putSettings(pool: string, body: PoolSettings) {
+    return unwrap(
+        api.PUT("/api/compute/pools/{pool}/settings", { params: { path: { pool } }, body }),
+    );
+}
+
+function useSavePoolSettings<T>(pool: string, bodyOf: (value: T) => PoolSettings) {
     const client = useQueryClient();
     return useMutation({
-        mutationFn: (workloads: Workload[]) =>
-            unwrap(
-                api.PUT("/api/compute/pools/{pool}/settings", {
-                    params: { path: { pool } },
-                    body: { workloads },
-                }),
-            ),
+        mutationFn: (value: T) => putSettings(pool, bodyOf(value)),
         onSettled: async () => {
             await client.invalidateQueries({ queryKey: ["compute", "pools"] });
             await client.invalidateQueries({ queryKey: ["audit"] });
         },
     });
+}
+
+export function usePoolSettings(pool: string) {
+    return useSavePoolSettings(pool, (body: PoolSettings) => body);
+}
+
+export function usePoolWorkloads(pool: string) {
+    return useSavePoolSettings(pool, (workloads: Workload[]) => ({ workloads }));
 }

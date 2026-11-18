@@ -3,6 +3,7 @@ import { type MachinePlan, type PlanInfo, gigabytes } from "./recipe";
 export type PoolPlan = {
     name: string;
     label: string;
+    description: string | null;
     machines: MachinePlan[];
     best: MachinePlan | null;
     reason: string;
@@ -52,6 +53,7 @@ export function poolsOf(plan: PlanInfo | undefined): PoolPlan[] {
     return [...groups.entries()].map(([name, machines]) => ({
         name,
         label: machines[0]?.pool_label ?? name,
+        description: machines[0]?.pool_description ?? null,
         machines,
         best: quickest(machines),
         reason: refusal(machines),
