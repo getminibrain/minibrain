@@ -12332,6 +12332,9 @@
           },
           "siem": {
             "$ref": "#/components/schemas/SiemInfo"
+          },
+          "automatic": {
+            "$ref": "#/components/schemas/AutomaticCheck"
           }
         },
         "type": "object",
@@ -12344,7 +12347,8 @@
           "pending",
           "broken",
           "checked_at",
-          "siem"
+          "siem",
+          "automatic"
         ],
         "title": "AuditChainInfo"
       },
@@ -12614,6 +12618,89 @@
           "live"
         ],
         "title": "AuditTarget"
+      },
+      "AutomaticCheck": {
+        "properties": {
+          "verified_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Seq"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          },
+          "full_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Checked At"
+          },
+          "broken_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broken Seq"
+          },
+          "broken_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broken Reason"
+          },
+          "broken_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broken At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verified_seq",
+          "verified_at",
+          "full_checked_at",
+          "broken_seq",
+          "broken_reason",
+          "broken_at"
+        ],
+        "title": "AutomaticCheck"
       },
       "Availability": {
         "properties": {
@@ -27950,8 +28037,10 @@
           "kind": {
             "type": "string",
             "enum": [
+              "audit_chain_broken",
               "model_down",
               "engine_failed",
+              "siem_behind",
               "disk_low",
               "version_mismatch",
               "training_failed",
@@ -27976,7 +28065,8 @@
               "engine",
               "storage",
               "model",
-              "job"
+              "job",
+              "system"
             ],
             "title": "Scope"
           },

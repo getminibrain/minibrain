@@ -3604,6 +3604,7 @@ export interface components {
              */
             checked_at: string;
             siem: components["schemas"]["SiemInfo"];
+            automatic: components["schemas"]["AutomaticCheck"];
         };
         /** AuditFacet */
         AuditFacet: {
@@ -3683,6 +3684,21 @@ export interface components {
             key: string;
             /** Live */
             live: boolean;
+        };
+        /** AutomaticCheck */
+        AutomaticCheck: {
+            /** Verified Seq */
+            verified_seq: number | null;
+            /** Verified At */
+            verified_at: string | null;
+            /** Full Checked At */
+            full_checked_at: string | null;
+            /** Broken Seq */
+            broken_seq: number | null;
+            /** Broken Reason */
+            broken_reason: string | null;
+            /** Broken At */
+            broken_at: string | null;
         };
         /** Availability */
         Availability: {
@@ -8764,7 +8780,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "model_down" | "engine_failed" | "disk_low" | "version_mismatch" | "training_failed" | "machine_offline";
+            kind: "audit_chain_broken" | "model_down" | "engine_failed" | "siem_behind" | "disk_low" | "version_mismatch" | "training_failed" | "machine_offline";
             /**
              * Severity
              * @enum {string}
@@ -8774,7 +8790,7 @@ export interface components {
              * Scope
              * @enum {string}
              */
-            scope: "machine" | "pool" | "engine" | "storage" | "model" | "job";
+            scope: "machine" | "pool" | "engine" | "storage" | "model" | "job" | "system";
             /**
              * Subject
              * @description The machine, disk, model or job it is about, as a short name.

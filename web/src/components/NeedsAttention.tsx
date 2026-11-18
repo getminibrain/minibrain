@@ -31,6 +31,11 @@ const SEVERITY_WORDS: Record<ProblemSeverity, string> = {
 };
 
 const GROUPS: Record<ProblemKind, { many: (n: number) => string; href: string }> = {
+    audit_chain_broken: { many: () => "Audit log integrity broken", href: "/settings/audit" },
+    siem_behind: {
+        many: () => "Audit events are not reaching the SIEM",
+        href: "/settings/security#audit-integrity",
+    },
     model_down: {
         many: (n) => `${count(n)} live models have no running replica`,
         href: "/models",

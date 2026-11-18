@@ -45,6 +45,7 @@ class ChainReport:
     anchor_seq: int
     pending: int
     broken: ChainBreak | None
+    last_hash: str = GENESIS
 
     @property
     def verified(self) -> bool:
@@ -219,7 +220,7 @@ def ending(progress: Progress, head: Head, latest: Callable[[], Head], anchors: 
             return None
         cuts = anchors()
         if cuts.get(head_seq) == head_hash:
-            progress.anchor = head_seq
+            progress.anchor, progress.previous = head_seq, head_hash
             return None
         first = max((seq for seq in cuts if seq < head_seq), default=0) + 1
         return ChainBreak(first, None, missing(first, head_seq))
@@ -236,8 +237,15 @@ def ending(progress: Progress, head: Head, latest: Callable[[], Head], anchors: 
     return None
 
 
-def walk(rows: Iterable[Sealed], head: Head, latest: Callable[[], Head], anchors: Anchors, pending: int) -> ChainReport:
-    progress = Progress()
+def walk(
+    rows: Iterable[Sealed],
+    head: Head,
+    latest: Callable[[], Head],
+    anchors: Anchors,
+    pending: int,
+    resumed: Progress | None = None,
+) -> ChainReport:
+    progress = resumed or Progress()
     broken: ChainBreak | None = None
     for row in rows:
         broken = start(progress, row, anchors) if progress.first is None else None
@@ -246,10 +254,12 @@ def walk(rows: Iterable[Sealed], head: Head, latest: Callable[[], Head], anchors
             break
     else:
         broken = ending(progress, head, latest, anchors)
-    return ChainReport(progress.count, progress.first, progress.last, progress.anchor, pending, broken)
+    return ChainReport(
+        progress.count, progress.first, progress.last, progress.anchor, pending, broken, progress.previous
+    )
 
 
-def stored(session: Session) -> Iterator[Sealed]:
+def stored(session: Session, after: int = 0) -> Iterator[Sealed]:
     columns = (
         AuditEvent.id,
         AuditEvent.seq,
@@ -263,7 +273,7 @@ def stored(session: Session) -> Iterator[Sealed]:
         AuditEvent.target,
         AuditEvent.detail,
     )
-    query = select(*columns).where(AuditEvent.seq.is_not(None)).order_by(AuditEvent.seq)
+    query = select(*columns).where(AuditEvent.seq.is_not(None), AuditEvent.seq > after).order_by(AuditEvent.seq)
     for row in session.execute(query.execution_options(yield_per=VERIFY_BATCH)):
         fields = chain_fields(
             row.seq, row.prev_hash or "", row.at, (row.actor, row.actor_id), row.ip, row.action, row.target, row.detail
@@ -276,10 +286,38 @@ def current_head(session: Session) -> Head:
     return head.seq, head.hash
 
 
-def verify(session: Session) -> ChainReport:
+def verify(session: Session, rows: Callable[[Iterator[Sealed]], Iterable[Sealed]] = iter) -> ChainReport:
     head = current_head(session)
     pending = unsealed(session)
-    return walk(stored(session), head, lambda: current_head(session), lambda: prune_anchors(session), pending)
+    found = rows(stored(session))
+    return walk(found, head, lambda: current_head(session), lambda: prune_anchors(session), pending)
+
+
+def resume(session: Session, seq: int, verified: str) -> Progress | ChainBreak:
+    progress = Progress(first=seq, anchor=seq, previous=verified)
+    cuts = prune_anchors(session)
+    row = session.execute(select(AuditEvent.id, AuditEvent.hash).where(AuditEvent.seq == seq)).first()
+    if row is None and not any(cut >= seq for cut in cuts):
+        return ChainBreak(seq, None, missing(seq, seq))
+    if row is not None and row.hash != verified:
+        return ChainBreak(seq, row.id, "its hash changed after it was verified")
+    following = session.scalar(select(func.min(AuditEvent.seq)).where(AuditEvent.seq > seq))
+    resumed_at = (following if following is not None else head_of(session).seq + 1) - 1
+    if resumed_at > seq and resumed_at in cuts:
+        progress.anchor, progress.previous = resumed_at, cuts[resumed_at]
+    return progress
+
+
+def verify_after(session: Session, seq: int, verified: str) -> ChainReport:
+    if seq == 0:
+        return verify(session)
+    head = current_head(session)
+    pending = unsealed(session)
+    start = resume(session, seq, verified)
+    if isinstance(start, ChainBreak):
+        return ChainReport(0, None, seq - 1, 0, pending, start, verified)
+    rows = stored(session, after=start.anchor)
+    return walk(rows, head, lambda: current_head(session), lambda: prune_anchors(session), pending, start)
 
 
 def actor_id_of(value: Any) -> int | None:

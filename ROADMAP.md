@@ -1464,7 +1464,11 @@ keys, and `/v1` stays key-only.
   Change in Settings. Settings › Security holds the rest. Audit retention is the `audit_retention_days` policy: keep
   forever by default; the hourly purge deletes older sealed events up to a chain anchor and records an `audit.prune`
   event with the `seq` and hash it cuts at. Audit integrity shows whether the hash chain verifies, or its first
-  break, and whether SIEM export (set in the section above it) is keeping up, with Verify again.
+  break, and whether SIEM export (set in the section above it) is keeping up, with Verify again. The leader checks the
+  chain on its own: hourly from the last verified `seq` and hash kept on the chain head, and in full nightly (paced,
+  in the maintenance loop). A break records `audit.chain_broken` and stays a critical problem until a full check
+  passes; a SIEM error or sealed events waiting over 15 minutes is a warning. Exports record `audit.export` with the
+  format and filters; reading the log records `audit.view` at most once an hour per person.
 - Settings → This install, read only: minibrain version and build commit, Python, DuckDB, PyTorch, Transformers, OS
   and architecture; home, database (location and size), artifact storage (folder, or bucket and endpoint; never
   credentials) and the web build; catalogue version and when catalogue and model files were last checked; pools,

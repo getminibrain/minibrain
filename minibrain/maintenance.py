@@ -11,6 +11,7 @@ from minibrain.leader import Leader
 from minibrain.policy import load
 from minibrain.registry import playground_sessions
 from minibrain.registry.audit_chain import head_of, prune_cut, seal_all
+from minibrain.registry.audit_checks import check_on_schedule
 from minibrain.registry.compute import forget_stale
 from minibrain.registry.files import store_for
 from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, RequestLog, now
@@ -94,3 +95,13 @@ def purge_forever(sessions: sessionmaker[Session], settings: Settings, stop: thr
                 purge_old_job_logs(session, settings)
         except Exception:
             log.exception("request log purge failed")
+        check_audit_chain(sessions, leader)
+
+
+def check_audit_chain(sessions: sessionmaker[Session], leader: Leader) -> None:
+    try:
+        if leader.held():
+            with sessions() as session:
+                check_on_schedule(session)
+    except Exception:
+        log.exception("audit chain check failed")

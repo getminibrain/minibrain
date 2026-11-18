@@ -181,6 +181,8 @@ export function poolProblems(problems: Problem[] | undefined, pool: string): Pro
 }
 
 const PROBLEM_LABELS: Record<Problem["kind"], string> = {
+    audit_chain_broken: "Audit chain broken",
+    siem_behind: "SIEM behind",
     model_down: "Model down",
     engine_failed: "Engine failed",
     disk_low: "Disk low",

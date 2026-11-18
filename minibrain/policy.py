@@ -146,6 +146,7 @@ FIELDS: tuple[Field, ...] = (
         "Older audit events are deleted for good. 0 keeps all.",
         "int",
         0,
+        detail="Most standards (PCI DSS, SOC 2, ISO 27001) expect at least 365 days.",
     ),
     Field(
         "session_idle_minutes",

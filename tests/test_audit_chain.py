@@ -47,7 +47,7 @@ def run_sql(harness: Harness, statement: str, **params: Any) -> None:
 
 def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
     add_events(harness, 3, detail={"name": "Support", "token": "sk-live-0123456789"})
-    assert report(harness) | {"checked_at": None, "siem": None} == {
+    assert report(harness) | {"checked_at": None, "siem": None, "automatic": None} == {
         "verified": True,
         "events": 0,
         "first_seq": None,
@@ -57,6 +57,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
         "broken": None,
         "checked_at": None,
         "siem": None,
+        "automatic": None,
     }
     events = sealed(harness)
     assert [event.seq for event in events] == [1, 2, 3]
@@ -209,7 +210,8 @@ def test_a_prune_of_every_sealed_event_still_verifies(harness: Harness) -> None:
 def test_exports_carry_the_chain_and_verify_offline(harness: Harness, tmp_path: Path) -> None:
     add_events(harness, 3, detail={"name": "Ünïcode", "api_key": "sk-live-abcdef0123456789"})
     sealed(harness)
-    lines = harness.client.get("/api/audit/export", params={"format": "jsonl"}).text.splitlines()
+    params = {"format": "jsonl", "action": "key.create"}
+    lines = harness.client.get("/api/audit/export", params=params).text.splitlines()
     records = [json.loads(line) for line in lines]
     assert [record["seq"] for record in records] == [3, 2, 1]
     assert all(len(record["hash"]) == 64 for record in records)

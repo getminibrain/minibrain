@@ -65,7 +65,10 @@ const ACTIONS: Record<string, string> = {
     "account.sessions_end": "Other sessions ended",
     "account.reset": "Password link created",
     "account.update": "Account changed",
+    "audit.chain_broken": "Audit chain broken",
+    "audit.export": "Audit log exported",
     "audit.prune": "Audit events deleted",
+    "audit.view": "Audit log viewed",
     "auth.setup_link": "Setup link created",
     "auth.sign_in": "Signed in",
     "auth.sign_in_failed": "Sign-in refused",
@@ -268,6 +271,9 @@ export function resultOf(event: AuditEvent): Result {
     if (event.action === "safety.block") {
         return { label: "Blocked", failed: true };
     }
+    if (event.action === "audit.chain_broken") {
+        return { label: "Broken", failed: true };
+    }
     if (event.action.endsWith("_failed") || event.action.endsWith(".refused")) {
         return { label: "Refused", failed: true };
     }
@@ -370,7 +376,7 @@ export function targetLabel(event: AuditEvent, policies: Map<string, PolicyInfo>
     if (event.action === "storage.update") {
         return "Artifact storage";
     }
-    if (event.action === "audit.prune") {
+    if (event.action.startsWith("audit.")) {
         return "Audit log";
     }
     if (event.action.startsWith("job_logs.")) {
@@ -473,6 +479,15 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "auth.sign_in": (detail) => `With ${plainValue(detail.sign_in, undefined, "sign_in")}`,
     "auth.sign_in_failed": (detail) => plainValue(detail.reason),
     "auth.sign_out": () => "Session ended",
+    "audit.chain_broken": (detail) =>
+        `At seq ${plainValue(detail.seq)}: ${plainValue(detail.reason)}`,
+    "audit.export": (detail) =>
+        `${String(detail.format ?? "").toUpperCase()}, ${
+            isRecord(detail.filters) && Object.keys(detail.filters).length > 0
+                ? "filtered"
+                : "every event"
+        }`,
+    "audit.view": () => "Opened the audit log",
     "audit.prune": (detail) =>
         `${plainValue(detail.deleted)} events older than ${plainValue(detail.days, undefined, "days")}${
             typeof detail.cut_seq === "number" ? `, up to seq ${plainValue(detail.cut_seq)}` : ""

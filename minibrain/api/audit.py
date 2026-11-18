@@ -3,7 +3,7 @@ import io
 import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -18,10 +18,11 @@ from minibrain.api.audit_targets import ActorKind, AuditTarget, actor_kind, acto
 from minibrain.api.deps import SessionDep
 from minibrain.api.sort_labels import ACTION_LABELS, label_rank
 from minibrain.api.sorting import CURSOR_PATTERN, Keyset, KeysetPage, Order, keyset_rows
+from minibrain.auth.identity import current_actor
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
 from minibrain.registry.audit_chain import ChainReport, head_of, verify
-from minibrain.registry.models import PEER_ADDRESS, AuditEvent, now
+from minibrain.registry.models import PEER_ADDRESS, AuditChain, AuditEvent, now
 from minibrain.registry.service import NotFoundError
 from minibrain.siem import target_of, waiting
 
@@ -35,6 +36,9 @@ EXPORTED: set[str] = set(EXPORT_COLUMNS)
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 AuditSort = Literal["at", "actor", "action"]
 MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"}
+VIEW_ACTION = "audit.view"
+EXPORT_ACTION = "audit.export"
+VIEW_EVERY = timedelta(hours=1)
 
 
 class PeerAddress:
@@ -100,6 +104,15 @@ class SiemInfo(BaseModel):
     waiting: int
 
 
+class AutomaticCheck(BaseModel):
+    verified_seq: int | None
+    verified_at: datetime | None
+    full_checked_at: datetime | None
+    broken_seq: int | None
+    broken_reason: str | None
+    broken_at: datetime | None
+
+
 class AuditChainInfo(BaseModel):
     verified: bool
     events: int
@@ -110,6 +123,7 @@ class AuditChainInfo(BaseModel):
     broken: ChainBreakInfo | None
     checked_at: datetime
     siem: SiemInfo
+    automatic: AutomaticCheck
 
 
 @dataclass(frozen=True)
@@ -170,6 +184,34 @@ def audit_filter(
         until=until,
         search=q,
     )
+
+
+def filters_of(found: AuditFilter) -> dict[str, Any]:
+    values = {
+        "category": found.categories,
+        "action": found.actions,
+        "actor": found.actors,
+        "target": found.targets,
+        "since": found.since.isoformat() if found.since else None,
+        "until": found.until.isoformat() if found.until else None,
+        "q": found.search.strip(),
+    }
+    return {name: value for name, value in values.items() if value}
+
+
+def viewed_lately(session: Session, actor: str) -> bool:
+    query = select(AuditEvent.id).where(
+        AuditEvent.action == VIEW_ACTION, AuditEvent.actor == actor, AuditEvent.at >= now() - VIEW_EVERY
+    )
+    return session.scalar(query.limit(1)) is not None
+
+
+def record_view(session: Session) -> None:
+    actor = current_actor()
+    if viewed_lately(session, actor):
+        return
+    session.add(AuditEvent(actor=actor, action=VIEW_ACTION, target="audit_events", detail={}))
+    session.commit()
 
 
 FilterDep = Annotated[AuditFilter, Depends(audit_filter)]
@@ -252,16 +294,19 @@ def list_events(
     page = page_rows(session, conditions, keyset, after, back, max(1, min(limit, PAGE_MAX)))
     total = matching(session, conditions)
     if page.first is None or page.last is None:
+        record_view(session)
         return AuditPage(events=[], total=total, start=0, next_cursor=None, prev_cursor=None)
     start = matching(session, [*conditions, keyset.beyond(page.first, reverse=True)])
     rest = total - start - len(page.rows)
-    return AuditPage(
+    listed = AuditPage(
         events=described(session, [row[0] for row in page.rows]),
         total=total,
         start=start,
         next_cursor=keyset.encode(page.last) if rest > 0 else None,
         prev_cursor=keyset.encode(page.first) if start > 0 else None,
     )
+    record_view(session)
+    return listed
 
 
 @router.get("/facets", dependencies=[Depends(admin)], summary="Count audit events by filter")
@@ -326,7 +371,12 @@ def export_stream(
     dependencies=[Depends(admin)],
     summary="Export the audit log",
 )
-def export(request: Request, found: FilterDep, format: Literal["csv", "jsonl"] = "csv") -> StreamingResponse:
+def export(
+    request: Request, session: SessionDep, found: FilterDep, format: Literal["csv", "jsonl"] = "csv"
+) -> StreamingResponse:
+    detail = {"format": format, "filters": filters_of(found)}
+    session.add(AuditEvent(actor=current_actor(), action=EXPORT_ACTION, target="audit_events", detail=detail))
+    session.commit()
     name = f"minibrain-audit-{now().strftime('%Y%m%d-%H%M%S')}.{format}"
     return StreamingResponse(
         export_stream(request.app.state.sessions, found.conditions(), format),
@@ -335,7 +385,18 @@ def export(request: Request, found: FilterDep, format: Literal["csv", "jsonl"] =
     )
 
 
-def chain_info(report: ChainReport, siem: SiemInfo) -> AuditChainInfo:
+def automatic_of(head: AuditChain) -> AutomaticCheck:
+    return AutomaticCheck(
+        verified_seq=head.verified_seq,
+        verified_at=head.verified_at,
+        full_checked_at=head.full_checked_at,
+        broken_seq=head.broken_seq,
+        broken_reason=head.broken_reason,
+        broken_at=head.broken_at,
+    )
+
+
+def chain_info(report: ChainReport, siem: SiemInfo, automatic: AutomaticCheck) -> AuditChainInfo:
     broken = report.broken
     return AuditChainInfo(
         verified=report.verified,
@@ -347,6 +408,7 @@ def chain_info(report: ChainReport, siem: SiemInfo) -> AuditChainInfo:
         broken=ChainBreakInfo(seq=broken.seq, event_id=broken.event_id, reason=broken.reason) if broken else None,
         checked_at=now(),
         siem=siem,
+        automatic=automatic,
     )
 
 
@@ -364,7 +426,7 @@ def siem_info(session: Session) -> SiemInfo:
 
 @router.get("/chain", dependencies=[Depends(admin)], summary="Check the audit hash chain")
 def chain(session: SessionDep) -> AuditChainInfo:
-    return chain_info(verify(session), siem_info(session))
+    return chain_info(verify(session), siem_info(session), automatic_of(head_of(session)))
 
 
 @router.get("/{event_id}", dependencies=[Depends(admin)], summary="Read an audit event")
@@ -372,4 +434,6 @@ def event(event_id: int, session: SessionDep) -> AuditInfo:
     found = session.get(AuditEvent, event_id)
     if found is None:
         raise NotFoundError(f"No audit event {event_id}")
-    return described(session, [found])[0]
+    info = described(session, [found])[0]
+    record_view(session)
+    return info

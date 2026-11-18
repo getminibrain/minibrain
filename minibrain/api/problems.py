@@ -19,26 +19,40 @@ from minibrain.ml.planner import gigabytes
 from minibrain.models.handover import serving_pool
 from minibrain.models.hardware import GIB, NodeReport
 from minibrain.models.machine_metrics import DiskSample, MetricsHistory
+from minibrain.policy import load as load_policy
+from minibrain.registry.audit_chain import head_of
 from minibrain.registry.compute import DRAINING, Pool, PoolNode, live_engines, pools, replica_host
+from minibrain.registry.models import AuditEvent, BaseModelStatus, EngineReplica, Job, JobKind, JobStatus, Model, now
 from minibrain.registry.models import BaseModel as BaseRow
-from minibrain.registry.models import BaseModelStatus, EngineReplica, Job, JobKind, JobStatus, Model, now
+from minibrain.siem import target_of, waiting
 from minibrain.tasks.service import serving_base
 
 router = APIRouter(prefix="/api")
 
 Severity = Literal["critical", "warning", "info"]
-Scope = Literal["machine", "pool", "engine", "storage", "model", "job"]
-Kind = Literal["model_down", "engine_failed", "disk_low", "version_mismatch", "training_failed", "machine_offline"]
+Scope = Literal["machine", "pool", "engine", "storage", "model", "job", "system"]
+Kind = Literal[
+    "audit_chain_broken",
+    "model_down",
+    "engine_failed",
+    "siem_behind",
+    "disk_low",
+    "version_mismatch",
+    "training_failed",
+    "machine_offline",
+]
 View = Literal["infrastructure", "model"]
 
 SEVERITY_ORDER: dict[Severity, int] = {"critical": 0, "warning": 1, "info": 2}
 KIND_ORDER: dict[Kind, int] = {
-    "model_down": 0,
-    "engine_failed": 1,
-    "disk_low": 2,
-    "version_mismatch": 3,
-    "training_failed": 4,
-    "machine_offline": 5,
+    "audit_chain_broken": 0,
+    "model_down": 1,
+    "engine_failed": 2,
+    "siem_behind": 3,
+    "disk_low": 4,
+    "version_mismatch": 5,
+    "training_failed": 6,
+    "machine_offline": 7,
 }
 VIEWS: dict[View, frozenset[Scope]] = {
     "infrastructure": frozenset({"machine", "pool", "engine", "storage", "model"}),
@@ -50,6 +64,9 @@ LOW_FREE_BYTES = 10 * GIB
 STALE_AFTER = timedelta(hours=24)
 FAILED_WITHIN = timedelta(hours=24)
 FAILED = "failed"
+AUDIT_HREF = "/settings/audit"
+SIEM_HREF = "/settings/security#audit-integrity"
+SIEM_LAG = timedelta(minutes=15)
 
 
 class ProblemAction(BaseModel):
@@ -313,6 +330,62 @@ def failed_training(session: Session, moment: datetime) -> list[Problem]:
     return problems
 
 
+def broken_chain(session: Session) -> list[Problem]:
+    head = head_of(session)
+    if head.broken_seq is None:
+        return []
+    return [
+        Problem(
+            id=f"audit_chain_broken:{head.broken_seq}",
+            kind="audit_chain_broken",
+            severity="critical",
+            scope="system",
+            subject="Audit log",
+            text=f"Audit log integrity broken at #{head.broken_seq}",
+            href=AUDIT_HREF,
+            since=head.broken_at,
+        )
+    ]
+
+
+def oldest_unforwarded(session: Session, forwarded: int) -> datetime | None:
+    query = select(AuditEvent.at).where(AuditEvent.seq > forwarded).order_by(AuditEvent.seq).limit(1)
+    return session.scalar(query)
+
+
+def siem_text(error: str | None, backlog: int) -> str:
+    if error:
+        return f"Audit events are not reaching the SIEM: {error}"
+    return f"{backlog:,} audit {'event has' if backlog == 1 else 'events have'} waited over 15 minutes for the SIEM"
+
+
+def siem_behind(session: Session, moment: datetime) -> list[Problem]:
+    target = target_of(load_policy(session))
+    if target is None:
+        return []
+    head = head_of(session)
+    oldest = oldest_unforwarded(session, head.forwarded_seq)
+    lagging = oldest is not None and oldest < moment - SIEM_LAG
+    if not head.forward_error and not lagging:
+        return []
+    return [
+        Problem(
+            id="siem_behind",
+            kind="siem_behind",
+            severity="warning",
+            scope="system",
+            subject=target.describe(),
+            text=siem_text(head.forward_error, waiting(session, head.forwarded_seq)),
+            href=SIEM_HREF,
+            since=oldest if lagging else head.forwarded_at,
+        )
+    ]
+
+
+def audit_problems(session: Session, moment: datetime) -> list[Problem]:
+    return broken_chain(session) + siem_behind(session, moment)
+
+
 def order_key(problem: Problem) -> tuple[int, int, str]:
     return SEVERITY_ORDER[problem.severity], KIND_ORDER[problem.kind], problem.subject
 
@@ -330,6 +403,7 @@ def collect(
         + mismatched(found, local.versions)
         + failed_training(session, moment)
         + offline(found, admin, moment)
+        + (audit_problems(session, moment) if admin else [])
     )
     return sorted(problems, key=order_key)
 

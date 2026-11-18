@@ -734,6 +734,13 @@ class AuditChain(Base):
     forwarded_seq: Mapped[int] = mapped_column(BigInteger, default=0)
     forwarded_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     forward_error: Mapped[str | None] = mapped_column(default=None)
+    verified_seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    verified_hash: Mapped[str | None] = mapped_column(default=None)
+    verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    full_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    broken_seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
+    broken_reason: Mapped[str | None] = mapped_column(default=None)
+    broken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
 
 class User(Base):

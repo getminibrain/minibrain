@@ -16,6 +16,9 @@ import {
     Badge,
     Button,
     CheckboxSelect,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     DataGrid,
     DataGridDetail,
     DropdownMenu,
@@ -43,11 +46,11 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components, operations } from "~/api/schema";
 import { SectionError } from "~/components/ErrorState";
-import { Facts } from "~/components/Facts";
+import { type Fact, Facts } from "~/components/Facts";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import {
@@ -380,9 +383,44 @@ function Hash({ value }: { value: string | null | undefined }) {
     );
 }
 
+const TIPS = {
+    targetId: "The internal key of the target.",
+    sequence: "Position in the log. Numbers never skip, so a gap means an entry was removed.",
+    hash: "SHA-256 of this entry and the previous hash. Any change to the entry changes it.",
+    previous: "Hash of the entry before. It links the log into a chain an edit would break.",
+};
+
+function Integrity({ event }: { event: AuditEvent }) {
+    const facts: Fact[] = [
+        [
+            "Sequence",
+            event.seq === null ? (
+                <span key="seq" className="text-muted-foreground">
+                    Not sealed yet
+                </span>
+            ) : (
+                <span key="seq" className="tabular-nums">
+                    {count(event.seq)}
+                </span>
+            ),
+            TIPS.sequence,
+        ],
+        ["Hash", <Hash key="hash" value={event.hash} />, TIPS.hash],
+        ["Previous hash", <Hash key="prev" value={event.prev_hash} />, TIPS.previous],
+    ];
+    return (
+        <Collapsible className="flex flex-col gap-2">
+            <CollapsibleTrigger className="self-start">Integrity</CollapsibleTrigger>
+            <CollapsibleContent>
+                <Facts items={facts} />
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
 function EventBody({ event, policies }: { event: AuditEvent; policies: Policies }) {
     const target = targetLabel(event, policies);
-    const facts: [string, ReactNode][] = [
+    const facts: Fact[] = [
         [
             "Time",
             <span key="at" className="tabular-nums">
@@ -410,24 +448,9 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
             <span key="target" className="font-mono break-all">
                 {event.target}
             </span>,
+            TIPS.targetId,
         ]);
     }
-    facts.push(
-        [
-            "Sequence",
-            event.seq === null ? (
-                <span key="seq" className="text-muted-foreground">
-                    Not sealed yet
-                </span>
-            ) : (
-                <span key="seq" className="tabular-nums">
-                    {count(event.seq)}
-                </span>
-            ),
-        ],
-        ["Hash", <Hash key="hash" value={event.hash} />],
-        ["Previous hash", <Hash key="prev" value={event.prev_hash} />],
-    );
     const fields = otherFields(event).filter(
         ([name]) => name !== "name" || target !== event.detail.name,
     );
@@ -448,6 +471,7 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
                     />
                 </section>
             )}
+            <Integrity event={event} />
         </div>
     );
 }

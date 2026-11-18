@@ -28,18 +28,19 @@ def page(harness: Harness, **params: Any) -> dict[str, Any]:
 
 def test_pages_run_newest_first_with_cursors(harness: Harness) -> None:
     add_events(harness, 7)
-    first = page(harness, limit=3)
+    page(harness, limit=1)
+    first = page(harness, limit=3, action="key.create")
     assert [event["target"] for event in first["events"]] == ["mb_0006", "mb_0005", "mb_0004"]
     assert (first["total"], first["start"], first["prev_cursor"]) == (7, 0, None)
-    second = page(harness, limit=3, next=first["next_cursor"])
+    second = page(harness, limit=3, action="key.create", next=first["next_cursor"])
     assert [event["target"] for event in second["events"]] == ["mb_0003", "mb_0002", "mb_0001"]
     assert second["start"] == 3
-    last = page(harness, limit=3, next=second["next_cursor"])
+    last = page(harness, limit=3, action="key.create", next=second["next_cursor"])
     assert [event["target"] for event in last["events"]] == ["mb_0000"]
     assert (last["next_cursor"], last["start"]) == (None, 6)
-    back = page(harness, limit=3, prev=second["prev_cursor"])
+    back = page(harness, limit=3, action="key.create", prev=second["prev_cursor"])
     assert back["events"] == first["events"]
-    assert page(harness, limit=3, prev=last["prev_cursor"])["events"] == second["events"]
+    assert page(harness, limit=3, action="key.create", prev=last["prev_cursor"])["events"] == second["events"]
 
 
 def test_filters_combine_and_facets_count(harness: Harness) -> None:
@@ -62,6 +63,7 @@ def test_filters_combine_and_facets_count(harness: Harness) -> None:
     facets = harness.client.get("/api/audit/facets").json()
     assert {item["value"]: item["count"] for item in facets["actions"]} == {
         "audit.prune": 1,
+        "audit.view": 1,
         "key.create": 2,
         "policy.update": 1,
     }
@@ -104,7 +106,8 @@ def test_exports_follow_the_filter_and_defuse_formulas(harness: Harness) -> None
     assert (rows[0]["seq"], rows[0]["hash"]) == ("", "")
     risky = list(csv.DictReader(io.StringIO(harness.client.get("/api/audit/export?action=model.delete").text)))
     assert risky[0]["target"] == "'=HYPERLINK(1)"
-    lines = harness.client.get("/api/audit/export", params={"format": "jsonl"}).text.splitlines()
+    params = {"format": "jsonl", "category": ["model", "key"]}
+    lines = harness.client.get("/api/audit/export", params=params).text.splitlines()
     assert [json.loads(line)["action"] for line in lines] == ["model.delete", "key.create", "key.create", "key.create"]
     assert json.loads(lines[0])["detail"] == {"name": "+danger"}
 
@@ -166,6 +169,7 @@ def test_categories_and_targets_filter_and_count(harness: Harness) -> None:
     assert page(harness, target="support-bot", category="version")["total"] == 1
     facets = harness.client.get("/api/audit/facets").json()
     assert {item["value"]: item["count"] for item in facets["categories"]} == {
+        "audit": 1,
         "feedback": 1,
         "key": 2,
         "model": 2,

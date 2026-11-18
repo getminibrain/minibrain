@@ -30,6 +30,7 @@ export const RETENTION = "audit_retention_days";
 const EXPORT_HREF = `/settings/security#${SECURITY.auditExport.anchor}`;
 const SETTINGS_HREF = `/settings/security#${SECURITY.auditIntegrity.anchor}`;
 const DAY_MS = 24 * 3600 * 1000;
+const STANDARD_DAYS = 365;
 const RETENTION_CHOICES: [number, string][] = [
     [0, "Keep forever"],
     [2555, "7 years"],
@@ -275,6 +276,9 @@ export function AuditRetention({ policy }: { policy: PolicyInfo }) {
                     disabled={policy.locked}
                     control={control}
                 >
+                    {days > 0 && days < STANDARD_DAYS && policy.detail && (
+                        <p className="pb-2.5 text-warning">{policy.detail}</p>
+                    )}
                     {days > 0 && (
                         <p className="pb-2.5 text-warning">
                             {older > 0

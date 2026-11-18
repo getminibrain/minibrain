@@ -638,6 +638,15 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Tamper-evident audit** · shipped · admin
   Prove no audit event was changed or removed.
   UI: Settings › Security › Audit integrity, Settings › Audit log · API: GET /api/audit/chain · CLI: minibrain audit verify
+- **Automatic audit checks** · shipped · admin
+  Verify the chain hourly and in full nightly; raise a break.
+  UI: Home › Needs attention, Settings › Audit log · API: GET /api/problems, GET /api/audit/chain
+- **Audit access record** · shipped · admin
+  Record every audit export and who viewed the log, hourly.
+  UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/{event_id}, GET /api/audit/export
+- **Logging failure alert** · shipped · admin
+  Warn when the SIEM fails or falls 15 minutes behind.
+  UI: Home › Needs attention, Settings › Security › Audit integrity · API: GET /api/problems · Policy: siem_host
 - **SIEM export** · shipped · admin
   Stream audit events to your SIEM as RFC 5424 syslog.
   UI: Settings › Security › Audit log export · Policy: siem_protocol, siem_host, siem_port, siem_ca_bundle
