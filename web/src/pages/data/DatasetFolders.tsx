@@ -830,22 +830,32 @@ export function DatasetsRoot({
     index,
     creating,
     onSelect,
+    onNewDataset,
 }: {
     datasets: DatasetSummary[];
     index: FolderIndex;
     creating: boolean;
     onSelect: (item: ItemRef) => void;
+    onNewDataset?: () => void;
 }) {
     const models = new Set(datasets.flatMap((dataset) => dataset.models));
     const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
     return (
         <div className={`${FILL} gap-6`}>
-            <header className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-2xl font-semibold">Datasets</h2>
-                <p className="text-muted-foreground">
-                    Saved queries that turn one or more sources into input and label rows. Models
-                    train on a saved version of one.
-                </p>
+            <header className="flex items-start justify-between gap-6">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">Datasets</h2>
+                    <p className="text-muted-foreground">
+                        Saved queries that turn one or more sources into input and label rows.
+                        Models train on a saved version of one.
+                    </p>
+                </div>
+                {onNewDataset && (
+                    <Button className="shrink-0" onClick={onNewDataset}>
+                        <IconPlus />
+                        New dataset
+                    </Button>
+                )}
             </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Datasets" value={count(datasets.length)} />
@@ -860,8 +870,7 @@ export function DatasetsRoot({
                     onSelect={onSelect}
                     empty={
                         <p className="text-muted-foreground">
-                            No datasets yet. Use Add for a new dataset from your sources, or demo
-                            data that comes with one.
+                            No datasets yet. Use New dataset above to make one from your sources.
                         </p>
                     }
                 />

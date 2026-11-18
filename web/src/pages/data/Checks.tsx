@@ -1,14 +1,6 @@
+import { IconCheck } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-    Button,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-    Link,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "obp-ui";
+import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Link } from "obp-ui";
 import { api, succeed } from "~/api/client";
 import type { DatasetVersionInfo } from "~/api/dataQueries";
 import type { components } from "~/api/schema";
@@ -243,30 +235,31 @@ export function ChecksList({
                 </ul>
             )}
             {passed.length > 0 && (
-                <p className="flex min-h-8 items-center">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                className="cursor-help rounded-sm underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                                <StatusText tone="success">{`${passed.length} passed`}</StatusText>
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-96 whitespace-normal">
-                            <ul className="flex flex-col gap-1.5">
-                                {passed.map((check) => (
-                                    <li key={check.check} className="flex flex-col">
-                                        <span className="font-medium">{check.title}</span>
+                <Collapsible>
+                    <CollapsibleTrigger className="flex min-h-8 items-center gap-1.5 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <StatusText tone="success">{`${passed.length} passed`}</StatusText>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <ul className="flex flex-col gap-2 pt-1 pb-2">
+                            {passed.map((check) => (
+                                <li key={check.check} className="flex gap-2">
+                                    <IconCheck
+                                        aria-hidden="true"
+                                        className="mt-0.5 size-4 shrink-0 text-success"
+                                    />
+                                    <span className="flex min-w-0 flex-col">
+                                        <span>{check.title}</span>
                                         {check.detail && (
-                                            <span className="opacity-80">{check.detail}</span>
+                                            <span className="text-sm text-muted-foreground">
+                                                {check.detail}
+                                            </span>
                                         )}
-                                    </li>
-                                ))}
-                            </ul>
-                        </TooltipContent>
-                    </Tooltip>
-                </p>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CollapsibleContent>
+                </Collapsible>
             )}
             {dismissed.map((check) => (
                 <p key={check.check} className="flex min-h-8 items-center gap-2">
