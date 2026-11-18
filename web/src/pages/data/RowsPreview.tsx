@@ -24,6 +24,8 @@ export function RowsPreview({
     empty,
     onMore,
     loadingMore = false,
+    counting = false,
+    strip,
 }: {
     records: unknown[];
     total: number | null | undefined;
@@ -37,27 +39,37 @@ export function RowsPreview({
     empty: string;
     onMore?: () => void;
     loadingMore?: boolean;
+    counting?: boolean;
+    strip?: ReactNode;
 }) {
     const [view, setView] = useState<View>("records");
     const [open, setOpen] = useState<number[]>([0]);
     const views = VIEWS.filter((item) => item.key !== "example" || example !== undefined);
-    const shown = view === "example" && !example ? "records" : view;
+    const active = view === "example" && !example ? "records" : view;
     const whole = total === null || total === undefined || total <= records.length;
+    const shown = `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`;
     const status = loading
         ? "Loading…"
-        : whole
-          ? `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`
-          : `First ${count(records.length)} of ${count(total)} rows`;
+        : counting
+          ? `${shown} shown · counting…`
+          : whole
+            ? shown
+            : `First ${count(records.length)} of ${count(total)} rows`;
     return (
         <section aria-label="Preview" className="flex min-h-96 min-w-0 flex-1 flex-col">
+            {strip && (
+                <div className="flex h-10 shrink-0 items-center gap-x-4 overflow-hidden border-b px-3 text-sm whitespace-nowrap">
+                    {strip}
+                </div>
+            )}
             <div className="flex h-12 shrink-0 items-center gap-3 border-b px-3">
                 <SegmentedTabs
                     size="sm"
                     tabs={views}
-                    active={shown}
+                    active={active}
                     onSelect={(key) => setView(key as View)}
                 />
-                {shown === "records" && (
+                {active === "records" && (
                     <span className="ml-auto">
                         <RecordListToggle
                             total={records.length}
@@ -72,11 +84,11 @@ export function RowsPreview({
                     <ErrorLine error={error} onRetry={onRetry} />
                 </div>
             )}
-            {shown === "table" ? (
+            {active === "table" ? (
                 <div className={`flex min-h-0 flex-1 flex-col ${FLUSH_GRID}`}>{table}</div>
             ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    {shown === "example" ? (
+                    {active === "example" ? (
                         example
                     ) : loading ? (
                         <p className="px-3 py-2 text-muted-foreground">Loading rows…</p>

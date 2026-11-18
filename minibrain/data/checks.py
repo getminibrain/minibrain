@@ -9,6 +9,7 @@ from minibrain.data.splits import MIN_ROWS, STEADY_ROWS
 from minibrain.tasks.examples import Example
 
 CHECKS = ("duplicates", "conflicts", "balance", "leakage", "length", "personal_data")
+QUICK_CHECKS = ("duplicates", "conflicts", "balance", "length")
 HARD_STOPS = ("empty", "single_label")
 LONG_TOKENS = 2048
 CHARS_PER_TOKEN = 4
@@ -341,11 +342,14 @@ def run_checks(
     limits: CheckLimits,
     labelled: bool = True,
     examples: int | None = None,
+    only: Sequence[str] = CHECKS,
 ) -> list[Finding]:
     rows = usable(raw)
     kept = examples if examples is not None else len({text for text, _ in rows})
     findings = hard_stops(rows, labelled, kept)
     for name in CHECKS:
+        if name not in only:
+            continue
         if name in limits.off:
             findings.append(Finding(name, "off", TITLES[name], "Turned off under Settings, Data."))
         elif name == "length":

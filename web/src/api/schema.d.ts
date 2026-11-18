@@ -880,9 +880,52 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run SQL over any sources */
+        /**
+         * Run SQL over any sources
+         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
+         */
         post: operations["any_query_api_query_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/query/shape": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Count a query's rows and run the quick checks
+         * @description The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks run up to 50,000 rows. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
+         */
+        post: operations["any_query_shape_api_query_shape_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/query/runs/{run}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop a named query run
+         * @description Stops your run with this name if it is still going; nothing happens if it has finished.
+         */
+        delete: operations["cancel_query_run_api_query_runs__run__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -988,8 +1031,31 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run SQL over a dataset's sources */
+        /**
+         * Run SQL over a dataset's sources
+         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
+         */
         post: operations["dataset_query_api_datasets__slug__query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/datasets/{slug}/query/shape": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Count a dataset query's rows and run the quick checks
+         * @description As POST /api/query/shape, reading the dataset's sources by their old names too and marking the checks dismissed on the dataset. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
+         */
+        post: operations["dataset_query_shape_api_datasets__slug__query_shape_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8794,6 +8860,17 @@ export interface components {
         QueryRequest: {
             /** Sql */
             sql: string;
+            /**
+             * Run
+             * @description Names this run: a newer run with the same name, or DELETE /api/query/runs/{run}, stops it.
+             */
+            run?: string | null;
+            /**
+             * Rows
+             * @description The most rows to return.
+             * @default 50
+             */
+            rows?: number;
         };
         /** QueryResponse */
         QueryResponse: {
@@ -8803,6 +8880,30 @@ export interface components {
             types: string[];
             /** Rows */
             rows: (string | null)[][];
+        };
+        /** QueryShapeInfo */
+        QueryShapeInfo: {
+            /** Rows */
+            rows: number;
+            /** Missing */
+            missing: ("input" | "label")[];
+            quality: components["schemas"]["QualityInfo"] | null;
+            /** Largest Share */
+            largest_share: number | null;
+            /** Checks */
+            checks: components["schemas"]["CheckInfo"][] | null;
+            /** Example */
+            example: components["schemas"]["ChatMessage"][];
+        };
+        /** QueryShapeRequest */
+        QueryShapeRequest: {
+            /** Sql */
+            sql: string;
+            /**
+             * Run
+             * @description Names this run: a newer run with the same name, or DELETE /api/query/runs/{run}, stops it.
+             */
+            run?: string | null;
         };
         /** QueuedJobInfo */
         QueuedJobInfo: {
@@ -12817,6 +12918,68 @@ export interface operations {
             };
         };
     };
+    any_query_shape_api_query_shape_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryShapeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryShapeInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_query_run_api_query_runs__run__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_datasets_api_datasets_get: {
         parameters: {
             query?: never;
@@ -13104,6 +13267,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dataset_query_shape_api_datasets__slug__query_shape_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueryShapeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueryShapeInfo"];
                 };
             };
             /** @description Validation Error */

@@ -1,8 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
 import {
-    Button,
-    DataGrid,
-    Field,
     SegmentedTabs,
     Select,
     SelectContent,
@@ -12,13 +8,13 @@ import {
     SqlEditor,
     type SqlEditorHandle,
 } from "obp-ui";
-import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { DatasetSummary, MappingInfo, QueryResponse, SourceSummary } from "~/api/client";
-import { ErrorLine } from "~/components/Section";
-import { sqlProblem } from "~/lib/sqlError";
-import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
+import { useRef } from "react";
+import type { DatasetSummary, MappingInfo, SourceSummary } from "~/api/client";
+import { FORM_ROW_GAP, FormControl, FormRow, FormRows } from "~/components/FormRows";
+import type { SqlProblem } from "~/lib/sqlError";
+import type { SampleRequest } from "./SampleOffer";
 import { typeWord } from "./columnTypes";
-import { resultColumns } from "./resultColumns";
+import { columnsSql, guessPair } from "./sql";
 
 export type MappingBody = {
     source_id?: number;
@@ -28,12 +24,17 @@ export type MappingBody = {
     sample?: SampleRequest;
 };
 
-type Mode = "columns" | "sql";
+type Mode = DatasetSummary["mode"];
+
+export type Draft = { mode: Mode; source: string; input: string; label: string; sql: string };
 
 const MODES = [
     { key: "columns", label: "Pick columns" },
     { key: "sql", label: "Write SQL" },
 ];
+
+export const QUERY_HELP =
+    "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.";
 
 export function Clamp({ text }: { text: unknown }) {
     return (
@@ -43,16 +44,67 @@ export function Clamp({ text }: { text: unknown }) {
     );
 }
 
-function QueryResult({ result }: { result: QueryResponse }) {
-    return (
-        <DataGrid
-            columns={resultColumns(result)}
-            rows={result.rows}
-            maxHeight="360px"
-            minWidth={result.columns.length > 4 ? "min-w-[960px]" : undefined}
-            empty="The query returned no rows."
-        />
-    );
+function sourceOf(draft: Draft, sources: SourceSummary[]): SourceSummary | undefined {
+    return sources.find((item) => String(item.id) === draft.source);
+}
+
+export function draftSql(draft: Draft, sources: SourceSummary[]): string | null {
+    if (draft.mode === "sql") {
+        return draft.sql.trim() || null;
+    }
+    const chosen = sourceOf(draft, sources);
+    return chosen && draft.input && draft.label
+        ? columnsSql(chosen.table, draft.input, draft.label)
+        : null;
+}
+
+export function draftBody(draft: Draft, sources: SourceSummary[]): MappingBody | null {
+    if (draft.mode === "sql") {
+        return draft.sql.trim() ? { sql: draft.sql } : null;
+    }
+    const chosen = sourceOf(draft, sources);
+    return chosen && draft.input && draft.label
+        ? { source_id: chosen.id, input_column: draft.input, label_column: draft.label }
+        : null;
+}
+
+export function sameDraft(left: Draft, right: Draft): boolean {
+    if (left.mode !== right.mode) {
+        return false;
+    }
+    return left.mode === "sql"
+        ? left.sql === right.sql
+        : left.source === right.source && left.input === right.input && left.label === right.label;
+}
+
+export function savedDraft(
+    mapping: MappingInfo,
+    mode: Mode,
+    sourceId: number | null | undefined,
+    sources: SourceSummary[],
+): Draft {
+    const source =
+        sourceId !== null && sourceId !== undefined
+            ? String(sourceId)
+            : mapping.sql
+              ? ""
+              : String(sources[0]?.id ?? "");
+    return {
+        mode,
+        source,
+        input: mapping.input_column ?? "",
+        label: mapping.label_column ?? "",
+        sql: mapping.sql ?? "",
+    };
+}
+
+function sourceColumns(source: SourceSummary | undefined): string[] {
+    return (source?.columns ?? []).map((column) => column.name);
+}
+
+export function pickedDraft(source: SourceSummary | undefined): Draft {
+    const [input, label] = guessPair(sourceColumns(source));
+    return { mode: "columns", source: source ? String(source.id) : "", input, label, sql: "" };
 }
 
 function ColumnSelect({
@@ -73,28 +125,30 @@ function ColumnSelect({
     disabled?: boolean;
 }) {
     return (
-        <Field id={id} label={label}>
-            <Select
-                value={value}
-                onValueChange={(next) => onChange(String(next ?? ""))}
-                disabled={disabled}
-            >
-                <SelectTrigger id={id} className="w-56 max-w-full">
-                    <SelectValue placeholder={placeholder} />
-                </SelectTrigger>
-                <SelectContent>
-                    {options.map((option) => (
-                        <SelectItem
-                            key={option.value}
-                            value={option.value}
-                            description={option.description}
-                        >
-                            {option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </Field>
+        <FormRow id={id} label={label}>
+            <FormControl>
+                <Select
+                    value={value}
+                    onValueChange={(next) => onChange(String(next ?? ""))}
+                    disabled={disabled}
+                >
+                    <SelectTrigger id={id} className="w-full">
+                        <SelectValue placeholder={placeholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {options.map((option) => (
+                            <SelectItem
+                                key={option.value}
+                                value={option.value}
+                                description={option.description}
+                            >
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </FormControl>
+        </FormRow>
     );
 }
 
@@ -136,200 +190,137 @@ function TableList({
     );
 }
 
-function primarySource(
-    mapping: MappingInfo,
-    sourceId: number | null | undefined,
-    sources: SourceSummary[],
-): string {
-    if (sourceId !== null && sourceId !== undefined) {
-        return String(sourceId);
-    }
-    return mapping.sql ? "" : String(sources[0]?.id ?? "");
+function SqlMode({
+    draft,
+    sources,
+    problem,
+    onChange,
+    onRun,
+}: {
+    draft: Draft;
+    sources: SourceSummary[];
+    problem: SqlProblem | null;
+    onChange: (draft: Draft) => void;
+    onRun: (sql: string) => void;
+}) {
+    const editor = useRef<SqlEditorHandle>(null);
+    const schema = Object.fromEntries(
+        sources.map((item) => [item.table, item.columns.map((column) => column.name)]),
+    );
+    return (
+        <div className="@container flex flex-col gap-3">
+            <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_14rem]">
+                <SqlEditor
+                    ref={editor}
+                    value={draft.sql}
+                    onValueChange={(sql) => onChange({ ...draft, sql })}
+                    onRun={onRun}
+                    schema={schema}
+                    diagnostics={problem?.diagnostics}
+                    minLines={12}
+                    maxLines={32}
+                    aria-label="SQL"
+                    placeholder="SELECT text AS input, category AS label FROM tickets WHERE category IS NOT NULL"
+                />
+                <TableList sources={sources} onInsert={(name) => editor.current?.insert(name)} />
+            </div>
+            <p className="text-sm text-muted-foreground">
+                Return columns named <span className="font-mono">input</span> and{" "}
+                <span className="font-mono">label</span>; other columns are kept in each version.
+                Join, union, filter and clean up with DuckDB SQL. The preview runs when you stop
+                typing; Cmd/Ctrl+Enter runs it at once. Queries are read-only and cannot reach other
+                files or the network.
+            </p>
+        </div>
+    );
 }
 
-export function QueryEditor({
-    mapping,
-    mode: savedMode,
-    sourceId,
+function ColumnsMode({
+    draft,
     sources,
-    onSave,
-    onRun,
-    saveLabel,
-    saveBlocked = false,
-    before,
-    extraActions,
+    onChange,
 }: {
-    mapping: MappingInfo;
-    mode: DatasetSummary["mode"];
-    sourceId: number | null | undefined;
+    draft: Draft;
     sources: SourceSummary[];
-    onSave: (body: MappingBody) => Promise<unknown>;
-    onRun: (sql: string) => Promise<QueryResponse>;
-    saveLabel?: string;
-    saveBlocked?: boolean;
-    before?: ReactNode;
-    extraActions?: ReactNode;
+    onChange: (draft: Draft) => void;
 }) {
-    const [mode, setMode] = useState<Mode>(savedMode);
-    const [source, setSource] = useState(primarySource(mapping, sourceId, sources));
-    const [input, setInput] = useState(mapping.input_column ?? "");
-    const [label, setLabel] = useState(mapping.label_column ?? "");
-    const [sql, setSql] = useState(mapping.sql ?? "");
-    const editor = useRef<SqlEditorHandle>(null);
-    useEffect(() => {
-        setMode(savedMode);
-        setInput(mapping.input_column ?? "");
-        setLabel(mapping.label_column ?? "");
-        setSql(mapping.sql ?? "");
-    }, [mapping, savedMode]);
-    useEffect(() => {
-        if (sourceId !== null && sourceId !== undefined) {
-            setSource(String(sourceId));
-        }
-    }, [sourceId]);
-    const save = useMutation({ mutationFn: onSave });
-    const run = useMutation({ mutationFn: onRun });
-    const over = useOverLimit(save.error, save.isPending && Boolean(save.variables?.sample));
-    const offer = over && save.variables && (
-        <SampleOffer
-            total={over.total_rows}
-            limit={over.row_limit}
-            seed={save.variables.sample?.seed}
-            pending={save.isPending}
-            onTake={(sample) => save.variables && save.mutate({ ...save.variables, sample })}
-        />
-    );
-    const chosen = sources.find((item) => String(item.id) === source);
+    const chosen = sourceOf(draft, sources);
     const columns = (chosen?.columns ?? []).map((column) => ({
         value: column.name,
         label: column.name,
         description: typeWord(column.type),
     }));
-    const schema = Object.fromEntries(
-        sources.map((item) => [item.table, item.columns.map((column) => column.name)]),
+    return (
+        <FormRows labels="compact">
+            <ColumnSelect
+                id="dataset-source"
+                label="Source"
+                value={draft.source}
+                placeholder="Pick a source"
+                options={sources.map((item) => ({
+                    value: String(item.id),
+                    label: item.name,
+                    description: item.table,
+                }))}
+                onChange={(next) =>
+                    onChange({
+                        ...pickedDraft(sources.find((item) => String(item.id) === next)),
+                        sql: draft.sql,
+                    })
+                }
+            />
+            <ColumnSelect
+                id="dataset-input"
+                label="Input"
+                value={draft.input}
+                placeholder="Pick a column"
+                options={columns}
+                onChange={(input) => onChange({ ...draft, input })}
+                disabled={!chosen}
+            />
+            <ColumnSelect
+                id="dataset-label"
+                label="Label"
+                value={draft.label}
+                placeholder="Pick a column"
+                options={columns}
+                onChange={(label) => onChange({ ...draft, label })}
+                disabled={!chosen}
+            />
+        </FormRows>
     );
-    const problem = run.error
-        ? sqlProblem(run.error, run.variables, sql)
-        : over
-          ? null
-          : sqlProblem(save.error, save.variables?.sql, sql);
-    const runSql = (text: string) => {
-        if (text.trim() && !run.isPending) {
-            run.mutate(text);
-        }
-    };
+}
+
+export function QueryEditor({
+    draft,
+    sources,
+    problem,
+    onChange,
+    onRun,
+}: {
+    draft: Draft;
+    sources: SourceSummary[];
+    problem: SqlProblem | null;
+    onChange: (draft: Draft) => void;
+    onRun: (sql: string) => void;
+}) {
     const switchMode = (next: string) => {
-        if (next === "sql" && !sql && chosen && input && label) {
-            setSql(
-                `SELECT CAST("${input}" AS VARCHAR) AS input, CAST("${label}" AS VARCHAR) AS label FROM ${chosen.table}`,
-            );
-        }
-        setMode(next as Mode);
+        const seeded = next === "sql" && !draft.sql.trim() ? draftSql(draft, sources) : null;
+        onChange({ ...draft, mode: next as Mode, sql: seeded ?? draft.sql });
     };
     return (
-        <div className="flex min-w-0 flex-col gap-4">
-            {before}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <SegmentedTabs tabs={MODES} active={mode} onSelect={switchMode} />
-                {extraActions && <div className="flex items-center gap-2">{extraActions}</div>}
-            </div>
-            {mode === "sql" ? (
-                <div className="@container flex flex-col gap-3">
-                    <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_16rem]">
-                        <SqlEditor
-                            ref={editor}
-                            value={sql}
-                            onValueChange={setSql}
-                            onRun={runSql}
-                            schema={schema}
-                            diagnostics={problem?.diagnostics}
-                            minLines={9}
-                            maxLines={24}
-                            aria-label="SQL"
-                            placeholder="SELECT text AS input, category AS label FROM tickets WHERE category IS NOT NULL"
-                        />
-                        <TableList
-                            sources={sources}
-                            onInsert={(name) => editor.current?.insert(name)}
-                        />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        Return columns named <span className="font-mono">input</span> and{" "}
-                        <span className="font-mono">label</span>; other columns are kept in each
-                        version. Join, union, filter and clean up with DuckDB SQL; Cmd/Ctrl+Enter
-                        runs it. Queries are read-only and cannot reach other files or the network.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => runSql(sql)}
-                            disabled={!sql.trim() || run.isPending}
-                        >
-                            {run.isPending ? "Running…" : "Run"}
-                        </Button>
-                        <Button
-                            onClick={() => save.mutate({ sql })}
-                            disabled={!sql.trim() || saveBlocked || save.isPending}
-                        >
-                            {saveLabel ?? "Save query"}
-                        </Button>
-                    </div>
-                    <ErrorLine error={problem?.message} />
-                    {offer}
-                    {run.data && !run.error && <QueryResult result={run.data} />}
-                </div>
+        <div className={`flex min-w-0 flex-col ${FORM_ROW_GAP}`}>
+            <SegmentedTabs tabs={MODES} active={draft.mode} onSelect={switchMode} />
+            {draft.mode === "sql" ? (
+                <SqlMode
+                    draft={draft}
+                    sources={sources}
+                    problem={problem}
+                    onChange={onChange}
+                    onRun={onRun}
+                />
             ) : (
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <ColumnSelect
-                            id="dataset-source"
-                            label="Source"
-                            value={source}
-                            placeholder="Pick a source"
-                            options={sources.map((item) => ({
-                                value: String(item.id),
-                                label: item.name,
-                                description: item.table,
-                            }))}
-                            onChange={(next) => {
-                                setSource(next);
-                                setInput("");
-                                setLabel("");
-                            }}
-                        />
-                        <ColumnSelect
-                            id="dataset-input"
-                            label="Input"
-                            value={input}
-                            placeholder="Pick a column"
-                            options={columns}
-                            onChange={setInput}
-                            disabled={!chosen}
-                        />
-                        <ColumnSelect
-                            id="dataset-label"
-                            label="Label"
-                            value={label}
-                            placeholder="Pick a column"
-                            options={columns}
-                            onChange={setLabel}
-                            disabled={!chosen}
-                        />
-                        <Button
-                            disabled={!chosen || !input || !label || saveBlocked || save.isPending}
-                            onClick={() =>
-                                save.mutate({
-                                    source_id: chosen?.id,
-                                    input_column: input,
-                                    label_column: label,
-                                })
-                            }
-                        >
-                            {saveLabel ?? "Save columns"}
-                        </Button>
-                    </div>
-                    {offer || <ErrorLine error={save.error} />}
-                </div>
+                <ColumnsMode draft={draft} sources={sources} onChange={onChange} />
             )}
         </div>
     );

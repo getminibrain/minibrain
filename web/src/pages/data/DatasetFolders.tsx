@@ -711,15 +711,13 @@ export function removalText(index: FolderIndex, folder: DatasetFolder): string {
 export function FolderDetail({
     folder,
     index,
-    creating,
     onSelect,
     onNewDataset,
 }: {
     folder: DatasetFolder;
     index: FolderIndex;
-    creating: boolean;
     onSelect: (item: ItemRef) => void;
-    onNewDataset?: () => void;
+    onNewDataset: () => void;
 }) {
     const refresh = useDataRefresh();
     const [renaming, setRenaming] = useState(false);
@@ -753,12 +751,10 @@ export function FolderDetail({
                 }
                 actions={
                     <>
-                        {onNewDataset && (
-                            <Button onClick={onNewDataset}>
-                                <IconPlus />
-                                New dataset
-                            </Button>
-                        )}
+                        <Button onClick={onNewDataset}>
+                            <IconPlus />
+                            New dataset
+                        </Button>
                         <ItemMenu name={folder.name}>
                             <DropdownMenuItem onSelect={() => setRenaming(true)}>
                                 <IconPencil />
@@ -788,19 +784,17 @@ export function FolderDetail({
                 <Stat label="Datasets at all levels" value={count(inside.length)} />
                 <Stat label="Models using them" value={count(models.size)} />
             </div>
-            {!creating && (
-                <FolderContents
-                    index={index}
-                    folderId={folder.id}
-                    onSelect={onSelect}
-                    empty={
-                        <p className="text-muted-foreground">
-                            Empty. Use New dataset above, drag datasets or folders onto it in the
-                            list, or use Move to… on one.
-                        </p>
-                    }
-                />
-            )}
+            <FolderContents
+                index={index}
+                folderId={folder.id}
+                onSelect={onSelect}
+                empty={
+                    <p className="text-muted-foreground">
+                        Empty. Use New dataset above, drag datasets or folders onto it in the list,
+                        or use Move to… on one.
+                    </p>
+                }
+            />
             <RenameFolderDialog
                 open={renaming}
                 folder={folder}
@@ -828,15 +822,13 @@ export function FolderDetail({
 export function DatasetsRoot({
     datasets,
     index,
-    creating,
     onSelect,
     onNewDataset,
 }: {
     datasets: DatasetSummary[];
     index: FolderIndex;
-    creating: boolean;
     onSelect: (item: ItemRef) => void;
-    onNewDataset?: () => void;
+    onNewDataset: () => void;
 }) {
     const models = new Set(datasets.flatMap((dataset) => dataset.models));
     const sql = datasets.filter((dataset) => dataset.mode === "sql").length;
@@ -850,12 +842,10 @@ export function DatasetsRoot({
                         Models train on a saved version of one.
                     </p>
                 </div>
-                {onNewDataset && (
-                    <Button className="shrink-0" onClick={onNewDataset}>
-                        <IconPlus />
-                        New dataset
-                    </Button>
-                )}
+                <Button className="shrink-0" onClick={onNewDataset}>
+                    <IconPlus />
+                    New dataset
+                </Button>
             </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Datasets" value={count(datasets.length)} />
@@ -863,18 +853,16 @@ export function DatasetsRoot({
                 <Stat label="Written in SQL" value={count(sql)} />
                 <Stat label="Models using them" value={count(models.size)} />
             </div>
-            {!creating && (
-                <FolderContents
-                    index={index}
-                    folderId={null}
-                    onSelect={onSelect}
-                    empty={
-                        <p className="text-muted-foreground">
-                            No datasets yet. Use New dataset above to make one from your sources.
-                        </p>
-                    }
-                />
-            )}
+            <FolderContents
+                index={index}
+                folderId={null}
+                onSelect={onSelect}
+                empty={
+                    <p className="text-muted-foreground">
+                        No datasets yet. Use New dataset above to make one from your sources.
+                    </p>
+                }
+            />
         </div>
     );
 }

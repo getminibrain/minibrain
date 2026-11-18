@@ -1,4 +1,4 @@
-import { IconPencil, IconTable, IconTags } from "@tabler/icons-react";
+import { IconLayoutGridAdd, IconPencil, IconTable, IconTags } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import {
     Button,
@@ -25,7 +25,6 @@ import { ErrorLine } from "~/components/Section";
 import { count } from "~/lib/format";
 import { fileSize, relativeTime } from "~/lib/time";
 import { ConnectedFacts } from "./Connected";
-import { CreateDatasetDialog } from "./DatasetDetail";
 import { FORMAT_LABELS } from "./Folders";
 import { LakehouseFacts } from "./Lakehouse";
 import { RowsPreview } from "./RowsPreview";
@@ -33,6 +32,7 @@ import {
     type ItemRef,
     groupOf,
     itemHref,
+    newDatasetHref,
     plural,
     sourceNameProblem,
     tableFormat,
@@ -272,15 +272,11 @@ export function FileDetail({
     source,
     sources,
     datasets,
-    creating,
-    onCreating,
     onSelect,
 }: {
     source: SourceSummary;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
-    creating: boolean;
-    onCreating: (creating: boolean) => void;
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
@@ -303,8 +299,11 @@ export function FileDetail({
             detail={`Added ${relativeTime(source.created_at)}`}
             actions={
                 <>
-                    <Button onClick={() => onCreating(true)} disabled={creating}>
-                        Create dataset
+                    <Button asChild>
+                        <Link href={newDatasetHref({ sources: [source.id] })}>
+                            <IconLayoutGridAdd />
+                            Create dataset
+                        </Link>
                     </Button>
                     <ItemMenu name={source.name}>
                         <DropdownMenuItem onSelect={() => setEditing("name")}>
@@ -345,17 +344,6 @@ export function FileDetail({
                 header={header}
                 about={about}
                 preview={<SourcePreview source={source} />}
-            />
-            <CreateDatasetDialog
-                open={creating}
-                source={source}
-                sources={sources}
-                onOpenChange={onCreating}
-                onCreated={async (dataset) => {
-                    await refresh();
-                    onCreating(false);
-                    onSelect({ kind: "dataset", id: dataset.slug });
-                }}
             />
             <EditDialog
                 item={source}

@@ -491,9 +491,12 @@ def same_remote(
     return first_source(session, *conditions)
 
 
+RESERVED_SLUGS = frozenset({"new"})
+
+
 def free_slug(session: Session, name: str) -> str:
     base = slugify(name) or "dataset"
-    taken = set(session.scalars(select(Dataset.slug)))
+    taken = set(session.scalars(select(Dataset.slug))) | RESERVED_SLUGS
     candidates = (base if number == 1 else f"{base}-{number}" for number in range(1, 10_000))
     return next(candidate for candidate in candidates if candidate not in taken)
 

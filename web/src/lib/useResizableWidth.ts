@@ -2,13 +2,13 @@ import { type KeyboardEvent, type PointerEvent, useState } from "react";
 
 const STEP = 16;
 
-type Options = { key: string; initial: number | null; min: number; max: number };
+export type WidthOptions = { key: string; initial: number | null; min: number; max: number };
 
-function clamp(width: number, { min, max }: Options): number {
+function clamp(width: number, { min, max }: WidthOptions): number {
     return Math.min(max, Math.max(min, Math.round(width)));
 }
 
-function read(options: Options): number | null {
+function read(options: WidthOptions): number | null {
     try {
         const stored = Number(window.localStorage.getItem(options.key));
         return stored ? clamp(stored, options) : options.initial;
@@ -29,7 +29,7 @@ function write(key: string, width: number | null): void {
     }
 }
 
-export function useResizableWidth(options: Options) {
+export function useResizableWidth(options: WidthOptions) {
     const [width, setWidth] = useState(() => read(options));
     const commit = (next: number | null) => {
         const value = next === null ? null : clamp(next, options);

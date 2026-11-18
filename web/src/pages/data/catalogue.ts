@@ -78,6 +78,32 @@ export function datasetHref(slug: string): string {
     return `${DATA_PATH}/datasets/${encodeURIComponent(slug)}`;
 }
 
+export const NEW_DATASET = "new";
+
+export function newDatasetHref({
+    sources = [],
+    folder = null,
+}: {
+    sources?: number[];
+    folder?: number | null;
+} = {}): string {
+    const params = new URLSearchParams();
+    if (sources.length > 0) {
+        params.set("source", sources.join(","));
+    }
+    if (folder !== null) {
+        params.set("folder", String(folder));
+    }
+    const search = params.toString();
+    return `${DATA_PATH}/datasets/${NEW_DATASET}${search ? `?${search}` : ""}`;
+}
+
+export function datasetQueryHref(slug: string): string {
+    return `${datasetHref(slug)}/query`;
+}
+
+export type QueryPage = { kind: "new" } | { kind: "edit"; slug: string };
+
 export function datasetVersionHref(slug: string, number: number): string {
     return `${datasetHref(slug)}/versions/${number}`;
 }
@@ -142,6 +168,30 @@ export function datasetVersionOf(path: string): number | null {
     return segments && segments[0] === "datasets" ? versionIn(segments.slice(1)) : null;
 }
 
+export function queryPageOf(path: string): QueryPage | null {
+    const segments = segmentsOf(path);
+    if (!segments || segments[0] !== "datasets") {
+        return null;
+    }
+    if (segments.length === 2 && segments[1] === NEW_DATASET) {
+        return { kind: "new" };
+    }
+    return segments.length === 3 && segments[2] === "query"
+        ? { kind: "edit", slug: segments[1] }
+        : null;
+}
+
+function wholeNumbers(values: string[]): number[] {
+    return values.filter((value) => WHOLE_NUMBER.test(value)).map(Number);
+}
+
+export function newDatasetPrefill(search: string): { sources: number[]; folder: number | null } {
+    const params = new URLSearchParams(search);
+    const [folder] = wholeNumbers(params.getAll("folder"));
+    const sources = params.getAll("source").flatMap((value) => value.split(","));
+    return { sources: [...new Set(wholeNumbers(sources))], folder: folder ?? null };
+}
+
 export function parseItem(path: string | null | undefined): ItemRef | null {
     const segments = path ? segmentsOf(path) : null;
     if (!segments || segments.length === 0) {
@@ -149,10 +199,10 @@ export function parseItem(path: string | null | undefined): ItemRef | null {
     }
     const [head, ...rest] = segments;
     if (head === "datasets") {
-        if (rest.length === 0) {
+        if (rest.length === 0 || (rest.length === 1 && rest[0] === NEW_DATASET)) {
             return DATASETS_GROUP;
         }
-        return rest.length === 1 || versionIn(rest) !== null
+        return rest.length === 1 || versionIn(rest) !== null || queryPageOf(path ?? "") !== null
             ? { kind: "dataset", id: rest[0] }
             : null;
     }

@@ -2542,6 +2542,7 @@
           "Data"
         ],
         "summary": "Run SQL over any sources",
+        "description": "Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
         "operationId": "any_query_api_query_post",
         "requestBody": {
           "content": {
@@ -2563,6 +2564,86 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/query/shape": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Count a query's rows and run the quick checks",
+        "description": "The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks run up to 50,000 rows. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
+        "operationId": "any_query_shape_api_query_shape_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryShapeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryShapeInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/query/runs/{run}": {
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Stop a named query run",
+        "description": "Stops your run with this name if it is still going; nothing happens if it has finished.",
+        "operationId": "cancel_query_run_api_query_runs__run__delete",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_.:-]+$",
+              "title": "Run"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -2941,6 +3022,7 @@
           "Data"
         ],
         "summary": "Run SQL over a dataset's sources",
+        "description": "Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
         "operationId": "dataset_query_api_datasets__slug__query_post",
         "parameters": [
           {
@@ -2970,6 +3052,59 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/{slug}/query/shape": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Count a dataset query's rows and run the quick checks",
+        "description": "As POST /api/query/shape, reading the dataset's sources by their old names too and marking the checks dismissed on the dataset. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
+        "operationId": "dataset_query_shape_api_datasets__slug__query_shape_post",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryShapeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryShapeInfo"
                 }
               }
             }
@@ -28073,6 +28208,28 @@
             "type": "string",
             "minLength": 1,
             "title": "Sql"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run",
+            "description": "Names this run: a newer run with the same name, or DELETE /api/query/runs/{run}, stops it."
+          },
+          "rows": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Rows",
+            "description": "The most rows to return.",
+            "default": 50
           }
         },
         "type": "object",
@@ -28122,6 +28279,105 @@
           "rows"
         ],
         "title": "QueryResponse"
+      },
+      "QueryShapeInfo": {
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "missing": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "input",
+                "label"
+              ]
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QualityInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "largest_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Share"
+          },
+          "checks": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CheckInfo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks"
+          },
+          "example": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Example"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows",
+          "missing",
+          "quality",
+          "largest_share",
+          "checks",
+          "example"
+        ],
+        "title": "QueryShapeInfo"
+      },
+      "QueryShapeRequest": {
+        "properties": {
+          "sql": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sql"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run",
+            "description": "Names this run: a newer run with the same name, or DELETE /api/query/runs/{run}, stops it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sql"
+        ],
+        "title": "QueryShapeRequest"
       },
       "QueuedJobInfo": {
         "properties": {

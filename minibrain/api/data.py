@@ -3,7 +3,7 @@ from dataclasses import asdict
 from functools import lru_cache
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, Path, Query, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
@@ -11,9 +11,11 @@ from minibrain import provision
 from minibrain.api.access import admin, builder
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.api.schemas import (
+    RUN_NAME,
     CatalogueUpdate,
     ChangeInfo,
     ChatMessage,
+    CheckInfo,
     CheckName,
     ColumnInfo,
     ColumnStats,
@@ -43,6 +45,8 @@ from minibrain.api.schemas import (
     QualityInfo,
     QueryRequest,
     QueryResponse,
+    QueryShapeInfo,
+    QueryShapeRequest,
     RelabelInfo,
     SourceAdded,
     SourceKind,
@@ -61,6 +65,7 @@ from minibrain.api.views import (
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
+from minibrain.data.checks import QUICK_CHECKS, run_checks
 from minibrain.data.dataset_folders import folder_or_root, require_free_dataset_name
 from minibrain.data.dataset_versions import (
     changes_since,
@@ -77,6 +82,7 @@ from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.remote import REMOTE_KINDS
+from minibrain.data.runs import cancel, running
 from minibrain.data.shared import (
     FOLDER,
     Added,
@@ -101,6 +107,7 @@ from minibrain.data.shared import (
     tables_of,
 )
 from minibrain.data.sources import (
+    ExampleRow,
     SourceError,
     Table,
     assess,
@@ -109,6 +116,7 @@ from minibrain.data.sources import (
     example_rows,
     label_counts,
     output_columns,
+    query_shape,
     require_mapping,
     run_query,
     safe_filename,
@@ -117,6 +125,7 @@ from minibrain.data.sources import (
     summarize,
     to_text,
 )
+from minibrain.data.splits import answer_labels, clean, pairs
 from minibrain.data.templates import Template, pair_template, template_sql
 from minibrain.data.transcoded import drop_fallbacks
 from minibrain.policy import PolicyError, locked_sources
@@ -137,6 +146,7 @@ QUERY_ROWS = 50
 MORE_ROWS = 500
 STATS_SAMPLE = 10_000
 LABEL_COUNTS = 200
+QUICK_CHECK_ROWS = 50_000
 NO_ANSWER_COLUMN = "no answer column is picked in the dataset yet"
 
 
@@ -376,6 +386,51 @@ def query_rows(
     return QueryResponse(columns=result.columns, types=result.types, rows=rows)
 
 
+def first_example(rows: Sequence[ExampleRow]) -> list[ChatMessage]:
+    found = next(((messages, expected) for messages, text, expected in rows if text and expected), (None, None))
+    return chat_example(*found)
+
+
+def quick_checks(rows: Sequence[ExampleRow], session: Session, dismissed: dict[str, str]) -> list[CheckInfo]:
+    examples = clean(rows)
+    findings = run_checks(
+        pairs(rows),
+        None,
+        load_limits(session).checks(),
+        labelled=bool(answer_labels(examples)),
+        examples=len(examples),
+        only=QUICK_CHECKS,
+    )
+    return [
+        CheckInfo.model_validate(item | {"dismissed": dismissed.get(str(item["check"])) == item["signature"]})
+        for item in (finding.as_dict() for finding in findings)
+    ]
+
+
+def shape_of_query(
+    session: Session,
+    tables: Sequence[Table],
+    sql: str,
+    aliases: dict[str, str] | None = None,
+    dismissed: dict[str, str] | None = None,
+) -> QueryShapeInfo:
+    found = query_shape(tables, sql, aliases, QUICK_CHECK_ROWS)
+    quality, rows = found.quality, found.examples
+    if quality is None:
+        return QueryShapeInfo(
+            rows=found.rows, missing=found.missing, quality=None, largest_share=None, checks=None, example=[]
+        )
+    usable = quality.rows - quality.empty
+    return QueryShapeInfo(
+        rows=found.rows,
+        missing=[],
+        quality=QualityInfo.model_validate(quality, from_attributes=True),
+        largest_share=quality.largest_label / usable if usable else None,
+        checks=quick_checks(rows, session, dismissed or {}) if rows is not None else None,
+        example=first_example(rows if rows is not None else example_rows(tables, sql, aliases, PREVIEW_ROWS)),
+    )
+
+
 def chat_example(messages: str | None, expected: str | None) -> list[ChatMessage]:
     turns = turns_of(messages) or ()
     found = [ChatMessage(role=turn.role, content=turn.content) for turn in turns]
@@ -388,13 +443,12 @@ def preview_of(
     quality = assess(tables, sql, aliases)
     rows = example_rows(tables, sql, aliases, limit)
     counts = label_counts(tables, sql, LABEL_COUNTS, aliases)
-    first = next(((messages, expected) for messages, text, expected in rows if text and expected), (None, None))
     return PreviewResponse(
         rows=[PreviewRow(input=text, label=expected) for _, text, expected in rows],
         quality=QualityInfo.model_validate(quality, from_attributes=True),
         labels=sorted(label for label, _ in counts),
         label_counts=[LabelCount(label=label, rows=size) for label, size in counts],
-        example=chat_example(*first),
+        example=first_example(rows),
     )
 
 
@@ -557,13 +611,47 @@ def source_query(
 ) -> QueryResponse:
     source = get_source(session, source_id)
     sources = sources_in(session, body.sql, [source])
-    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for([source]))
+    with running(current_actor(), body.run):
+        return query_rows(tables_of(settings, store, sources), body.sql, aliases_for([source]), body.rows)
 
 
-@router.post("/query", dependencies=[Depends(builder)], summary="Run SQL over any sources")
+RUN_DESCRIPTION = (
+    "Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues "
+    "work. A stopped run answers 409."
+)
+
+
+@router.post("/query", dependencies=[Depends(builder)], summary="Run SQL over any sources", description=RUN_DESCRIPTION)
 def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     sources = sources_in(session, body.sql)
-    return query_rows(tables_of(settings, store, sources), body.sql)
+    with running(current_actor(), body.run):
+        return query_rows(tables_of(settings, store, sources), body.sql, limit=body.rows)
+
+
+@router.post(
+    "/query/shape",
+    dependencies=[Depends(builder)],
+    summary="Count a query's rows and run the quick checks",
+    description="The row count, labels, empty and repeated inputs and the quick data checks of what the query would "
+    f"save, without saving it. Checks run up to {QUICK_CHECK_ROWS:,} rows. {RUN_DESCRIPTION}",
+)
+def any_query_shape(
+    body: QueryShapeRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> QueryShapeInfo:
+    sources = sources_in(session, body.sql)
+    with running(current_actor(), body.run):
+        return shape_of_query(session, tables_of(settings, store, sources), body.sql)
+
+
+@router.delete(
+    "/query/runs/{run}",
+    status_code=204,
+    dependencies=[Depends(builder)],
+    summary="Stop a named query run",
+    description="Stops your run with this name if it is still going; nothing happens if it has finished.",
+)
+def cancel_query_run(run: str = Path(max_length=64, pattern=RUN_NAME)) -> None:
+    cancel(current_actor(), run)
 
 
 @router.delete("/sources/{source_id}", status_code=204, dependencies=[Depends(builder)], summary="Delete a source")
@@ -683,13 +771,41 @@ def dataset_output(slug: str, session: SessionDep, settings: SettingsDep, store:
     return OutputSuggestion(contract=contract_info(found.contract), basis=found.basis)
 
 
-@router.post("/datasets/{slug}/query", dependencies=[Depends(builder)], summary="Run SQL over a dataset's sources")
+@router.post(
+    "/datasets/{slug}/query",
+    dependencies=[Depends(builder)],
+    summary="Run SQL over a dataset's sources",
+    description=RUN_DESCRIPTION,
+)
 def dataset_query(
     slug: str, body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryResponse:
     dataset = get_dataset(session, slug)
     sources = sources_in(session, body.sql, dataset.sources)
-    return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources))
+    with running(current_actor(), body.run):
+        return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources), body.rows)
+
+
+@router.post(
+    "/datasets/{slug}/query/shape",
+    dependencies=[Depends(builder)],
+    summary="Count a dataset query's rows and run the quick checks",
+    description="As POST /api/query/shape, reading the dataset's sources by their old names too and marking the "
+    f"checks dismissed on the dataset. {RUN_DESCRIPTION}",
+)
+def dataset_query_shape(
+    slug: str, body: QueryShapeRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
+) -> QueryShapeInfo:
+    dataset = get_dataset(session, slug)
+    sources = sources_in(session, body.sql, dataset.sources)
+    with running(current_actor(), body.run):
+        return shape_of_query(
+            session,
+            tables_of(settings, store, sources),
+            body.sql,
+            aliases_for(dataset.sources),
+            dataset.dismissed or {},
+        )
 
 
 @router.delete(

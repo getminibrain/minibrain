@@ -1,19 +1,13 @@
 import { IconFolderDown, IconPencil, IconSchool, IconSql, IconTags } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     CodeBlock,
     ConfirmDialog,
     DataGrid,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
     DropdownMenuItem,
-    Field,
-    Input,
     Link,
     Tooltip,
     TooltipContent,
@@ -35,10 +29,10 @@ import {
     useDatasetVersionStats,
     useDatasetVersions,
 } from "~/api/dataQueries";
-import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
+import { keys, useAllModels, useDatasetPreview } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Section } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { asCode, count } from "~/lib/format";
 import { modelVersionHref } from "~/lib/modelLinks";
@@ -56,17 +50,15 @@ import {
     useSaveVersion,
     useVersionRefresh,
 } from "./DatasetVersions";
-import { Clamp, type MappingBody, QueryEditor } from "./QueryEditor";
+import { Clamp, QUERY_HELP } from "./QueryEditor";
 import { RowsPreview } from "./RowsPreview";
 import {
     type FolderIndex,
     type ItemRef,
     datasetNameProblem,
-    datasetsIn,
-    freeDatasetName,
+    datasetQueryHref,
     itemHref,
     sourceRef,
-    stem,
 } from "./catalogue";
 import {
     AboutPart,
@@ -96,10 +88,7 @@ const SPLITS: [string, string][] = [
 export const LABEL_BALANCE_TIP =
     "Rows per label in the saved version, the rows a model trains on. Rare labels are the ones a model gets wrong.";
 
-const QUERY_HELP =
-    "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.";
-
-function useDatasetRefresh(slug: string) {
+export function useDatasetRefresh(slug: string) {
     const client = useQueryClient();
     const refresh = useDataRefresh();
     const versions = useVersionRefresh(slug);
@@ -111,47 +100,6 @@ function useDatasetRefresh(slug: string) {
             refresh(),
         ]);
     };
-}
-
-function QueryDialog({
-    dataset,
-    sources,
-    open,
-    onOpenChange,
-}: {
-    dataset: DatasetSummary;
-    sources: SourceSummary[];
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-}) {
-    const refresh = useDatasetRefresh(dataset.slug);
-    const path = { params: { path: { slug: dataset.slug } } };
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-5xl">
-                <DialogHeader>
-                    <DialogTitle>Edit query</DialogTitle>
-                    <DialogDescription>
-                        {`${QUERY_HELP} Saving makes the next version of the dataset.`}
-                    </DialogDescription>
-                </DialogHeader>
-                <QueryEditor
-                    mapping={dataset.mapping}
-                    mode={dataset.mode}
-                    sourceId={dataset.source_id}
-                    sources={sources}
-                    onSave={async (body: MappingBody) => {
-                        await unwrap(api.PUT("/api/datasets/{slug}/mapping", { ...path, body }));
-                        await refresh();
-                        onOpenChange(false);
-                    }}
-                    onRun={(sql) =>
-                        unwrap(api.POST("/api/datasets/{slug}/query", { ...path, body: { sql } }))
-                    }
-                />
-            </DialogContent>
-        </Dialog>
-    );
 }
 
 function QueryPart({
@@ -167,7 +115,18 @@ function QueryPart({
     const source = sources.find((item) => item.id === dataset.source_id);
     let body: ReactNode;
     if (!mapping.sql) {
-        body = <p className="text-muted-foreground">No query yet. Edit it to pick the columns.</p>;
+        body = (
+            <p className="text-muted-foreground">
+                No query yet.{" "}
+                <Link
+                    href={datasetQueryHref(dataset.slug)}
+                    className="text-primary hover:underline"
+                >
+                    Edit the query
+                </Link>{" "}
+                to pick the columns.
+            </p>
+        );
     } else if (dataset.mode === "columns" && source) {
         body = (
             <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
@@ -209,127 +168,6 @@ function QueryPart({
         >
             {body}
         </AboutPart>
-    );
-}
-
-const EMPTY_MAPPING = { input_column: null, label_column: null, sql: null };
-
-function NewDatasetEditor({
-    source,
-    sources,
-    folderId,
-    onCreated,
-    extraActions,
-}: {
-    source?: SourceSummary;
-    sources: SourceSummary[];
-    folderId: number | null;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
-    extraActions?: ReactNode;
-}) {
-    const datasets = useDatasets();
-    const siblings = datasetsIn(datasets.data ?? [], folderId);
-    const [typed, setTyped] = useState<string | null>(null);
-    const name = typed ?? (source ? freeDatasetName(siblings, stem(source.name)) : "");
-    const problem = datasetNameProblem(siblings, name);
-    return (
-        <QueryEditor
-            saveLabel="Create dataset"
-            saveBlocked={problem !== null}
-            mapping={EMPTY_MAPPING}
-            mode="columns"
-            sourceId={source?.id}
-            sources={sources}
-            extraActions={extraActions}
-            before={
-                <Field id="new-dataset-name" label="Name" className="max-w-sm" error={problem}>
-                    <Input
-                        id="new-dataset-name"
-                        value={name}
-                        maxLength={80}
-                        placeholder="Support tickets by team"
-                        aria-invalid={problem ? true : undefined}
-                        onChange={(event) => setTyped(event.target.value)}
-                    />
-                </Field>
-            }
-            onSave={async (body) => {
-                const fallback = sources.find((item) => item.id === body.source_id)?.name;
-                const created = await unwrap(
-                    api.POST("/api/datasets", {
-                        body: {
-                            name:
-                                name.trim() ||
-                                freeDatasetName(siblings, stem(fallback ?? "") || "New dataset"),
-                            folder_id: folderId,
-                            ...body,
-                        },
-                    }),
-                );
-                await onCreated(created);
-            }}
-            onRun={(sql) => unwrap(api.POST("/api/query", { body: { sql } }))}
-        />
-    );
-}
-
-const NEW_DATASET_HELP = `${QUERY_HELP} Creating the dataset saves version 1 of its rows.`;
-
-export function CreateDataset({
-    sources,
-    folderId = null,
-    onCreated,
-    onCancel,
-}: {
-    sources: SourceSummary[];
-    folderId?: number | null;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
-    onCancel: () => void;
-}) {
-    return (
-        <Section title="New dataset" caption={NEW_DATASET_HELP}>
-            <NewDatasetEditor
-                sources={sources}
-                folderId={folderId}
-                onCreated={onCreated}
-                extraActions={
-                    <Button variant="ghost" size="sm" onClick={onCancel}>
-                        Cancel
-                    </Button>
-                }
-            />
-        </Section>
-    );
-}
-
-export function CreateDatasetDialog({
-    open,
-    source,
-    sources,
-    onOpenChange,
-    onCreated,
-}: {
-    open: boolean;
-    source: SourceSummary;
-    sources: SourceSummary[];
-    onOpenChange: (open: boolean) => void;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
-}) {
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-5xl">
-                <DialogHeader>
-                    <DialogTitle>New dataset</DialogTitle>
-                    <DialogDescription>{NEW_DATASET_HELP}</DialogDescription>
-                </DialogHeader>
-                <NewDatasetEditor
-                    source={source}
-                    sources={sources}
-                    folderId={null}
-                    onCreated={onCreated}
-                />
-            </DialogContent>
-        </Dialog>
     );
 }
 
@@ -588,7 +426,8 @@ export function DatasetDetail({
 }) {
     const refresh = useDataRefresh();
     const [editing, setEditing] = useState<EditFocus | null>(null);
-    const [editingQuery, setEditingQuery] = useState(false);
+    const router = useRouter();
+    const editQuery = () => router.history.push(datasetQueryHref(dataset.slug));
     const [deleting, setDeleting] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const folderId = dataset.folder_id ?? null;
@@ -649,7 +488,7 @@ export function DatasetDetail({
                             <IconTags />
                             Edit description and tags
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setEditingQuery(true)}>
+                        <DropdownMenuItem onSelect={editQuery}>
                             <IconSql />
                             Edit query
                         </DropdownMenuItem>
@@ -701,7 +540,7 @@ export function DatasetDetail({
             >
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             </AboutPart>
-            <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
+            <QueryPart dataset={dataset} sources={sources} onEdit={editQuery} />
             {mapped && (
                 <AboutPart title="Label balance" tip={LABEL_BALANCE_TIP}>
                     <SavedLabelBalance saved={Boolean(dataset.dataset_version)} stats={stats} />
@@ -733,12 +572,6 @@ export function DatasetDetail({
                 onSave={(body) =>
                     unwrap(api.PATCH("/api/datasets/{slug}", { ...path, body })).then(refresh)
                 }
-            />
-            <QueryDialog
-                dataset={dataset}
-                sources={sources}
-                open={editingQuery}
-                onOpenChange={setEditingQuery}
             />
             <ConfirmDialog
                 open={deleting}

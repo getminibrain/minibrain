@@ -6,11 +6,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import duckdb
 
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
+from minibrain.data.runs import QueryCancelled, cancelled, watched
 from minibrain.encryption.duck import register
 
 MAX_ROW_BYTES = 64 * 1024 * 1024
@@ -223,8 +224,13 @@ def sandbox(
     timer = threading.Timer(QUERY_TIMEOUT_SECONDS, connection.interrupt)
     timer.start()
     try:
-        yield connection
+        with watched(connection):
+            yield connection
+        if cancelled():
+            raise QueryCancelled
     except duckdb.InterruptException as error:
+        if cancelled():
+            raise QueryCancelled from error
         raise SourceError(f"the query ran for more than {QUERY_TIMEOUT_SECONDS} seconds and was stopped") from error
     except duckdb.Error as error:
         raise SourceError(readable_error(error)) from error
@@ -515,6 +521,42 @@ def example_rows(
     with sandbox(tables, aliases) as connection:
         found = connection.execute(f"SELECT messages, input, expected FROM ({examples})").fetchall()
     return [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found]
+
+
+PairColumn = Literal["input", "label"]
+PAIR_COLUMNS: tuple[PairColumn, ...] = ("input", "label")
+
+
+@dataclass(frozen=True)
+class QueryShape:
+    rows: int
+    missing: list[PairColumn]
+    quality: Quality | None
+    examples: list[ExampleRow] | None
+
+
+def missing_example_columns(columns: Sequence[Column]) -> list[PairColumn]:
+    names = {column.name for column in columns}
+    if MESSAGES_COLUMN in names:
+        return []
+    return [name for name in PAIR_COLUMNS if name not in names]
+
+
+def query_shape(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None, cap: int = 0) -> QueryShape:
+    with sandbox(tables, aliases) as connection:
+        found = connection.execute(f"DESCRIBE {wrapped(sql, 0)}").fetchall()
+        columns = [Column(name=row[0], type=row[1]) for row in found]
+        missing = missing_example_columns(columns)
+        if missing:
+            counted = connection.execute(f"SELECT count(*) FROM ({wrapped(sql)})").fetchone()
+            return QueryShape(rows=int(counted[0]) if counted else 0, missing=missing, quality=None, examples=None)
+        examples = examples_query(sql, columns)
+        quality = quality_of(connection, examples)
+        rows: list[ExampleRow] | None = None
+        if quality.rows <= cap:
+            fetched = connection.execute(f"SELECT messages, input, expected FROM ({examples})").fetchall()
+            rows = [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in fetched]
+    return QueryShape(rows=quality.rows, missing=[], quality=quality, examples=rows)
 
 
 @dataclass(frozen=True)

@@ -11,40 +11,20 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Field,
-    Input,
     Label,
     Link,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
 } from "obp-ui";
 import { useEffect, useState } from "react";
-import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
+import { type SourceSummary, api, succeed } from "~/api/client";
 import { useDatasets } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { fileSize } from "~/lib/time";
-import { SampleOffer, type SampleRequest, useOverLimit } from "./SampleOffer";
-import {
-    type ItemRef,
-    datasetNameProblem,
-    datasetsIn,
-    freeDatasetName,
-    itemHref,
-    plural,
-    sourceRef,
-    stem,
-} from "./catalogue";
+import { type ItemRef, itemHref, plural, sourceRef } from "./catalogue";
 import { SourceIcon } from "./icons";
 import { FILL, FILL_GRID, useDataRefresh } from "./parts";
-
-const INPUT_NAMES = /text|message|input|question|prompt|content|body|utterance|query/i;
-const LABEL_NAMES = /label|intent|category|class|target|tag|topic|answer/i;
 
 const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
     {
@@ -101,224 +81,6 @@ const COLUMNS: ColumnDef<SourceSummary, unknown>[] = [
         cell: ({ row }) => <When value={row.original.created_at} />,
     },
 ];
-
-function quoted(name: string): string {
-    return `"${name.replaceAll('"', '""')}"`;
-}
-
-export function stackedSql(sources: SourceSummary[], input: string, label: string): string {
-    return sources
-        .map(
-            (source) =>
-                `SELECT ${quoted(input)} AS input, ${quoted(label)} AS label FROM ${quoted(source.table)}`,
-        )
-        .join("\nUNION ALL\n");
-}
-
-export function sharedColumns(sources: SourceSummary[]): string[] {
-    const [first, ...rest] = sources;
-    if (!first) {
-        return [];
-    }
-    return first.columns
-        .map((column) => column.name)
-        .filter((name) =>
-            rest.every((source) => source.columns.some((column) => column.name === name)),
-        );
-}
-
-function guess(columns: string[], pattern: RegExp, skip?: string): string {
-    return (
-        columns.find((name) => pattern.test(name) && name !== skip) ??
-        columns.find((name) => name !== skip) ??
-        ""
-    );
-}
-
-function defaultName(sources: SourceSummary[]): string {
-    const first = sources[0];
-    if (!first) {
-        return "";
-    }
-    const base = stem(first.name);
-    return sources.length === 1 ? base : `${base} and ${plural(sources.length - 1, "more")}`;
-}
-
-function ColumnSelect({
-    id,
-    label,
-    value,
-    columns,
-    onChange,
-}: {
-    id: string;
-    label: string;
-    value: string;
-    columns: string[];
-    onChange: (value: string) => void;
-}) {
-    return (
-        <Field id={id} label={label}>
-            <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
-                <SelectTrigger id={id} className="w-full">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {columns.map((name) => (
-                        <SelectItem key={name} value={name}>
-                            <span className="font-mono">{name}</span>
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </Field>
-    );
-}
-
-export function MakeDatasetDialog({
-    sources,
-    onOpenChange,
-    onCreated,
-}: {
-    sources: SourceSummary[] | null;
-    onOpenChange: (open: boolean) => void;
-    onCreated: (dataset: DatasetSummary) => Promise<void>;
-}) {
-    const chosen = sources ?? [];
-    const columns = sharedColumns(chosen);
-    const opened = sources ? sources.map((source) => source.id).join(",") : null;
-    const datasets = useDatasets();
-    const siblings = datasetsIn(datasets.data ?? [], null);
-    const [typed, setTyped] = useState<string | null>(null);
-    const name = typed ?? freeDatasetName(siblings, defaultName(chosen) || "New dataset");
-    const problem = datasetNameProblem(siblings, name);
-    const [input, setInput] = useState("");
-    const [label, setLabel] = useState("");
-    const create = useMutation({
-        mutationFn: (sample?: SampleRequest) =>
-            unwrap(
-                api.POST("/api/datasets", {
-                    body: {
-                        name:
-                            name.trim() ||
-                            freeDatasetName(siblings, defaultName(chosen) || "New dataset"),
-                        sql: stackedSql(chosen, input, label),
-                        sample: sample ?? null,
-                    },
-                }),
-            ),
-        onSuccess: async (dataset) => {
-            await onCreated(dataset);
-            onOpenChange(false);
-        },
-    });
-    const over = useOverLimit(create.error, create.isPending && Boolean(create.variables));
-    const reset = create.reset;
-    useEffect(() => {
-        if (opened === null) {
-            return;
-        }
-        const picked = sources ?? [];
-        const shared = sharedColumns(picked);
-        const guessedInput = guess(shared, INPUT_NAMES);
-        setTyped(null);
-        setInput(guessedInput);
-        setLabel(guess(shared, LABEL_NAMES, guessedInput));
-        reset();
-    }, [opened, sources, reset]);
-    const total = chosen.reduce((sum, source) => sum + (source.rows ?? 0), 0);
-    const ready = Boolean(input && label && input !== label);
-    return (
-        <Dialog open={sources !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{`Make a dataset from ${plural(chosen.length, "source")}`}</DialogTitle>
-                    <DialogDescription>
-                        Their rows are stacked into one dataset, saved as its version 1. Pick the
-                        column that holds the input and the one that holds the label; every source
-                        needs both.
-                    </DialogDescription>
-                </DialogHeader>
-                <ul className="flex max-h-48 flex-col divide-y overflow-y-auto rounded-lg border">
-                    {chosen.map((source) => (
-                        <li key={source.id} className="flex items-center gap-3 px-3 py-2">
-                            <SourceIcon source={source} className="size-4 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">{source.name}</span>
-                            <span className="text-sm text-muted-foreground tabular-nums">
-                                {source.rows === null ? "–" : plural(source.rows, "row")}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-                {columns.length < 2 ? (
-                    <StatusText tone="warning" className="whitespace-normal">
-                        {chosen.length > 1
-                            ? "These sources share fewer than two column names, so there is no input and label pair in all of them. Pick sources with the same columns, or write SQL on the Datasets page."
-                            : "This source has fewer than two columns."}
-                    </StatusText>
-                ) : (
-                    <div className="flex flex-col gap-field">
-                        <Field id="stack-name" label="Name" error={problem}>
-                            <Input
-                                id="stack-name"
-                                value={name}
-                                maxLength={80}
-                                aria-invalid={problem ? true : undefined}
-                                onChange={(event) => setTyped(event.target.value)}
-                            />
-                        </Field>
-                        <div className="grid gap-field sm:grid-cols-2">
-                            <ColumnSelect
-                                id="stack-input"
-                                label="Input column"
-                                value={input}
-                                columns={columns}
-                                onChange={setInput}
-                            />
-                            <ColumnSelect
-                                id="stack-label"
-                                label="Label column"
-                                value={label}
-                                columns={columns}
-                                onChange={setLabel}
-                            />
-                        </div>
-                        <span className="text-sm text-muted-foreground tabular-nums">
-                            {`About ${plural(total, "row")} before empty and repeated inputs are dropped.`}
-                        </span>
-                    </div>
-                )}
-                {input && input === label && (
-                    <StatusText tone="warning">Pick different input and label columns.</StatusText>
-                )}
-                {over ? (
-                    <SampleOffer
-                        subject={chosen.length > 1 ? "sources" : "source"}
-                        total={over.total_rows}
-                        limit={over.row_limit}
-                        pending={create.isPending}
-                        onTake={(sample) => create.mutate(sample)}
-                    />
-                ) : (
-                    <ErrorLine error={create.error} />
-                )}
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <Button
-                        disabled={
-                            !ready || columns.length < 2 || problem !== null || create.isPending
-                        }
-                        onClick={() => create.mutate(undefined)}
-                    >
-                        {create.isPending ? "Making…" : "Make dataset"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function DeleteSourcesDialog({
     sources,

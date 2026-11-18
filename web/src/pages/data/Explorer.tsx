@@ -66,13 +66,14 @@ import {
     useSourceAdder,
 } from "./AddSource";
 import { AddDatabaseDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
-import { CreateDataset, DatasetDetail } from "./DatasetDetail";
-import { DatasetsRoot, FolderDetail, folderOf, folderRef, useMoveItem } from "./DatasetFolders";
+import { DatasetDetail } from "./DatasetDetail";
+import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFolders";
+import { EditQueryPage, NewDatasetPage } from "./DatasetQueryPage";
 import { DatasetVersionDetail } from "./DatasetVersionDetail";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
 import { AddLakehouseDialog, LakehouseGroup } from "./Lakehouse";
-import { MakeDatasetDialog, SourceTable } from "./SourceTable";
+import { SourceTable } from "./SourceTable";
 import { SourcesOverview } from "./Sources";
 import { type TreeAction, TreeActionDialogs, useRemoveItem } from "./TreeActions";
 import {
@@ -92,7 +93,10 @@ import {
     groupOf,
     inGroup,
     itemHref,
+    newDatasetHref,
+    newDatasetPrefill,
     parseItem,
+    queryPageOf,
     siblingNamed,
     sourceRef,
     sourceText,
@@ -100,7 +104,7 @@ import {
     usesSource,
 } from "./catalogue";
 import { GroupIcon, SourceIcon } from "./icons";
-import { FILL, useDataRefresh } from "./parts";
+import { FILL } from "./parts";
 
 const TREE_WIDTH = { key: "minibrain.data.treeWidth", initial: 288, min: 200, max: 520 };
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
@@ -399,6 +403,20 @@ function Missing({ item }: { item: ItemRef | null }) {
     );
 }
 
+function newDatasetSpot(
+    prefill: { sources: number[]; folder: number | null },
+    sources: SourceSummary[],
+): ItemRef {
+    if (prefill.folder !== null) {
+        return { kind: "folder", id: prefill.folder };
+    }
+    const only =
+        prefill.sources.length === 1
+            ? sources.find((row) => row.id === prefill.sources[0])
+            : undefined;
+    return only ? sourceRef(only) : DATASETS_GROUP;
+}
+
 function sourceAt(sources: SourceSummary[], item: ItemRef): SourceSummary | undefined {
     const found =
         item.kind === "source" ? sources.find((source) => source.id === item.id) : undefined;
@@ -410,6 +428,8 @@ function sourceAt(sources: SourceSummary[], item: ItemRef): SourceSummary | unde
 export function DataExplorer() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+    const queryPage = queryPageOf(pathname);
     const requested = parseItem(pathname);
     const version = datasetVersionOf(pathname);
     const unknownPath = requested === null && pathname.replace(/\/+$/, "") !== DATA_PATH;
@@ -417,26 +437,27 @@ export function DataExplorer() {
     const sources = useSources();
     const datasets = useDatasets();
     const folders = useDatasetFolders();
-    const refresh = useDataRefresh();
     const move = useMoveItem();
     const width = useResizableWidth(TREE_WIDTH);
     const [query, setQuery] = useState("");
     const [collapsed, setCollapsed] = useStoredList("minibrain.data.collapsed");
-    const [creatingFor, setCreatingFor] = useState<number | string | null>(null);
     const [adding, setAdding] = useState<AddKind | null>(null);
     const [already, setAlready] = useState<SourceSummary | null>(null);
     const [picked, setPicked] = useState<{ scope: string; ids: string[] }>({
         scope: "",
         ids: [],
     });
-    const [making, setMaking] = useState<SourceSummary[] | null>(null);
     const roots = useFolderRoots();
     const treeBox = useRef<HTMLDivElement>(null);
     const loading = sources.isLoading || datasets.isLoading || folders.isLoading;
     const sourceList = useMemo(() => sources.data ?? [], [sources.data]);
     const datasetList = useMemo(() => datasets.data ?? [], [datasets.data]);
     const folderList = useMemo(() => folders.data ?? [], [folders.data]);
-    const selected = requested ?? DEFAULT_ITEM;
+    const prefill = useMemo(() => newDatasetPrefill(searchStr), [searchStr]);
+    const selected =
+        queryPage?.kind === "new"
+            ? newDatasetSpot(prefill, sourceList)
+            : (requested ?? DEFAULT_ITEM);
     const selectedKey = itemHref(selected);
     const index = useMemo(() => folderIndex(folderList, datasetList), [folderList, datasetList]);
     const nodes = useMemo(
@@ -474,13 +495,12 @@ export function DataExplorer() {
 
     const select = (item: ItemRef) => {
         const href = itemHref(item);
-        if (href !== selectedKey) {
-            setCreatingFor(null);
-        }
         if (href !== pathname) {
             router.history.push(href);
         }
     };
+
+    const go = (href: string) => router.history.push(href);
 
     const onSelectKey = (key: string) => {
         const item = parseItem(key);
@@ -519,8 +539,11 @@ export function DataExplorer() {
             return;
         }
         setQuery("");
-        router.history.push(itemHref(sourceRef(source)));
-        setCreatingFor(source.outcome === "created" ? source.id : null);
+        router.history.push(
+            source.outcome === "created"
+                ? newDatasetHref({ sources: [source.id] })
+                : itemHref(sourceRef(source)),
+        );
     };
 
     const adder = useSourceAdder(onUploaded);
@@ -538,11 +561,6 @@ export function DataExplorer() {
         );
     };
 
-    const createIn = (item: ItemRef, key: number | string) => {
-        select(item);
-        setCreatingFor(key);
-    };
-
     const currentFolder = (): number | null => {
         const id =
             selected.kind === "folder"
@@ -555,18 +573,21 @@ export function DataExplorer() {
 
     const newDataset = () => {
         const source = sourceAt(sourceList, selected);
-        if (source) {
-            setCreatingFor(source.id);
-            return;
-        }
-        const folder = currentFolder();
-        const into = folderRef(folder);
-        createIn(into, folder === null ? "new" : itemHref(into));
+        go(
+            source
+                ? newDatasetHref({ sources: [source.id] })
+                : newDatasetHref({ folder: currentFolder() }),
+        );
+    };
+
+    const makeFrom = (picked: SourceSummary[]) => {
+        setPicked({ scope: "", ids: [] });
+        go(newDatasetHref({ sources: picked.map((source) => source.id) }));
     };
 
     const fromSources = () => {
         if (pickedSources.length > 0) {
-            setMaking(pickedSources);
+            makeFrom(pickedSources);
             return;
         }
         select({ kind: "group", id: "upload" });
@@ -588,7 +609,7 @@ export function DataExplorer() {
         if (item.kind === "group" && item.id === "datasets") {
             return (
                 <TreeRowMenu label={label}>
-                    <DropdownMenuItem onSelect={() => createIn(DATASETS_GROUP, "new")}>
+                    <DropdownMenuItem onSelect={() => go(newDatasetHref())}>
                         <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
@@ -619,7 +640,7 @@ export function DataExplorer() {
             }
             return (
                 <TreeRowMenu label={label}>
-                    <DropdownMenuItem onSelect={() => createIn(item, itemHref(item))}>
+                    <DropdownMenuItem onSelect={() => go(newDatasetHref({ folder: folder.id }))}>
                         <IconLayoutGridAdd />
                         New dataset
                     </DropdownMenuItem>
@@ -700,7 +721,7 @@ export function DataExplorer() {
         return (
             <TreeRowMenu label={label}>
                 {open}
-                <DropdownMenuItem onSelect={() => createIn(item, source.id)}>
+                <DropdownMenuItem onSelect={() => go(newDatasetHref({ sources: [source.id] }))}>
                     <IconLayoutGridAdd />
                     New dataset
                 </DropdownMenuItem>
@@ -729,40 +750,48 @@ export function DataExplorer() {
         }
     };
 
-    const created = async (dataset: DatasetSummary) => {
-        await refresh();
-        setCreatingFor(null);
-        select({ kind: "dataset", id: dataset.slug });
-    };
-
     const listError = sources.error ?? datasets.error ?? folders.error;
     const retryLists = () =>
         Promise.all([sources.refetch(), datasets.refetch(), folders.refetch()]);
     let detail: ReactNode = null;
     let split = false;
+    const editing =
+        queryPage?.kind === "edit"
+            ? datasetList.find((item) => item.slug === queryPage.slug)
+            : undefined;
     if (unknownPath) {
         detail = <Missing item={null} />;
     } else if (listError) {
         detail = <QueryError heading="h2" error={listError} retry={retryLists} />;
-    } else if (!loading) {
+    } else if (loading) {
+        detail = null;
+    } else if (queryPage?.kind === "new") {
+        split = true;
+        detail = (
+            <NewDatasetPage
+                key={searchStr}
+                sources={sourceList}
+                datasets={datasetList}
+                index={index}
+                prefill={prefill}
+            />
+        );
+    } else if (queryPage?.kind === "edit") {
+        split = Boolean(editing);
+        detail = editing ? (
+            <EditQueryPage key={editing.slug} dataset={editing} sources={sourceList} />
+        ) : (
+            <Missing item={selected} />
+        );
+    } else {
         if (selected.kind === "group" && selected.id === "datasets") {
             detail = (
-                <div className={creatingFor === "new" ? "flex flex-col gap-6" : `${FILL} gap-6`}>
-                    <DatasetsRoot
-                        datasets={datasetList}
-                        index={index}
-                        creating={creatingFor === "new"}
-                        onSelect={select}
-                        onNewDataset={creatingFor === "new" ? undefined : newDataset}
-                    />
-                    {creatingFor === "new" && (
-                        <CreateDataset
-                            sources={sourceList}
-                            onCancel={() => setCreatingFor(null)}
-                            onCreated={created}
-                        />
-                    )}
-                </div>
+                <DatasetsRoot
+                    datasets={datasetList}
+                    index={index}
+                    onSelect={select}
+                    onNewDataset={newDataset}
+                />
             );
         } else if (selected.kind === "group" && selected.id === "sources") {
             detail = (
@@ -790,7 +819,7 @@ export function DataExplorer() {
                     adder={adder}
                     picked={pickedIds}
                     onPick={(ids) => setPicked({ scope: selectedKey, ids })}
-                    onMake={setMaking}
+                    onMake={makeFrom}
                     onSelect={select}
                     action={
                         can.build && (
@@ -813,8 +842,6 @@ export function DataExplorer() {
                     source={source}
                     sources={sourceList}
                     datasets={datasetList.filter((dataset) => usesSource(dataset, source.id))}
-                    creating={creatingFor === source.id}
-                    onCreating={(on) => setCreatingFor(on ? source.id : null)}
                     onSelect={select}
                 />
             ) : (
@@ -823,28 +850,13 @@ export function DataExplorer() {
         } else if (selected.kind === "folder") {
             const folder = index.byId.get(selected.id);
             detail = folder ? (
-                <div
-                    className={
-                        creatingFor === selectedKey ? "flex flex-col gap-6" : `${FILL} gap-6`
-                    }
-                >
-                    <FolderDetail
-                        key={selectedKey}
-                        folder={folder}
-                        index={index}
-                        creating={creatingFor === selectedKey}
-                        onSelect={select}
-                        onNewDataset={creatingFor === selectedKey ? undefined : newDataset}
-                    />
-                    {creatingFor === selectedKey && (
-                        <CreateDataset
-                            sources={sourceList}
-                            folderId={folder.id}
-                            onCancel={() => setCreatingFor(null)}
-                            onCreated={created}
-                        />
-                    )}
-                </div>
+                <FolderDetail
+                    key={selectedKey}
+                    folder={folder}
+                    index={index}
+                    onSelect={select}
+                    onNewDataset={newDataset}
+                />
             ) : (
                 <Missing item={selected} />
             );
@@ -994,14 +1006,6 @@ export function DataExplorer() {
                 onOpen={(source) => {
                     setQuery("");
                     select(sourceRef(source));
-                }}
-            />
-            <MakeDatasetDialog
-                sources={making}
-                onOpenChange={(open) => !open && setMaking(null)}
-                onCreated={async (dataset) => {
-                    setPicked({ scope: "", ids: [] });
-                    await created(dataset);
                 }}
             />
             <TreeActionDialogs

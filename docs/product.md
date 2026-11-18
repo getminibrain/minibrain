@@ -49,6 +49,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Dataset SQL** · shipped · ml
   Join, filter and clean several sources in locked-down DuckDB SQL.
   UI: Data › dataset › Edit query › Write SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
+- **Live query preview** · shipped · product, ml
+  See rows, labels and quick checks while writing a dataset query.
+  UI: Data › Add › New dataset, Data › dataset › Edit query · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder, Data › folder › New dataset, Data › folder › … › Rename, Data › dataset › … › Move to · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder

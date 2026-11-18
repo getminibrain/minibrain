@@ -996,8 +996,21 @@ class DemoModelDetail(ModelDetail):
     download_bytes: int | None
 
 
-class QueryRequest(BaseModel):
+RUN_NAME = r"^[A-Za-z0-9_.:-]+$"
+
+
+class QueryShapeRequest(BaseModel):
     sql: str = Field(min_length=1)
+    run: str | None = Field(
+        default=None,
+        max_length=64,
+        pattern=RUN_NAME,
+        description="Names this run: a newer run with the same name, or DELETE /api/query/runs/{run}, stops it.",
+    )
+
+
+class QueryRequest(QueryShapeRequest):
+    rows: int = Field(default=50, ge=1, le=500, description="The most rows to return.")
 
 
 class QueryResponse(BaseModel):
@@ -1036,6 +1049,15 @@ class PreviewResponse(BaseModel):
     quality: QualityInfo
     labels: list[str]
     label_counts: list[LabelCount]
+    example: list[ChatMessage]
+
+
+class QueryShapeInfo(BaseModel):
+    rows: int
+    missing: list[Literal["input", "label"]]
+    quality: QualityInfo | None
+    largest_share: float | None
+    checks: list[CheckInfo] | None
     example: list[ChatMessage]
 
 

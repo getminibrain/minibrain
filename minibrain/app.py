@@ -73,6 +73,7 @@ from minibrain.connections.store import sync_declared
 from minibrain.data.dataset_versions import OverLimitError
 from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.feedback import FeedbackError, database_feedback
+from minibrain.data.runs import QueryCancelled
 from minibrain.data.sources import SourceError
 from minibrain.data.splits import DatasetVersionError
 from minibrain.encryption.envelope import EnvelopeError
@@ -132,6 +133,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     DeleteRefused: 409,
     MissingArtifactError: 409,
     SourceError: 422,
+    QueryCancelled: 409,
     TagError: 422,
     ModelNameError: 422,
     DatasetVersionError: 422,
