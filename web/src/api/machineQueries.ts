@@ -47,27 +47,19 @@ export type Workload = "serving" | "training";
 
 export type PoolSettings = { description?: string; workloads?: Workload[] };
 
-function putSettings(pool: string, body: PoolSettings) {
-    return unwrap(
-        api.PUT("/api/compute/pools/{pool}/settings", { params: { path: { pool } }, body }),
-    );
-}
-
-function useSavePoolSettings<T>(pool: string, bodyOf: (value: T) => PoolSettings) {
+export function usePoolSettings(pool: string) {
     const client = useQueryClient();
     return useMutation({
-        mutationFn: (value: T) => putSettings(pool, bodyOf(value)),
+        mutationFn: (body: PoolSettings) =>
+            unwrap(
+                api.PUT("/api/compute/pools/{pool}/settings", {
+                    params: { path: { pool } },
+                    body,
+                }),
+            ),
         onSettled: async () => {
             await client.invalidateQueries({ queryKey: ["compute", "pools"] });
             await client.invalidateQueries({ queryKey: ["audit"] });
         },
     });
-}
-
-export function usePoolSettings(pool: string) {
-    return useSavePoolSettings(pool, (body: PoolSettings) => body);
-}
-
-export function usePoolWorkloads(pool: string) {
-    return useSavePoolSettings(pool, (workloads: Workload[]) => ({ workloads }));
 }

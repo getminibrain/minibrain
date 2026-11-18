@@ -22,7 +22,7 @@ import { kindNoun } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { PoolRowMenu } from "./PoolRowMenu";
-import { UseBadge } from "./PoolUse";
+import { PoolDescription, UseBadge } from "./PoolUse";
 import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "./activity";
 import { servedOn } from "./byModel";
 import {
@@ -203,6 +203,7 @@ function PoolBand({
                     </Lead>
                     <PoolLink name={pool.name} className="shrink-0 font-medium" />
                     <UseBadge workloads={pool.workloads} />
+                    {pool.description && <PoolDescription text={pool.description} />}
                     <ProblemBadge problems={problems} />
                     <span className="shrink-0 text-sm">
                         <OnlineCount nodes={pool.nodes} />

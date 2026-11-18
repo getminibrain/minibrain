@@ -1,4 +1,3 @@
-import { IconDots, IconSettings } from "@tabler/icons-react";
 import {
     Badge,
     Button,
@@ -8,17 +7,15 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     Input,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { useState } from "react";
 import { type Workload, usePoolSettings } from "~/api/machineQueries";
 import { FormControl, FormRow, FormRows } from "~/components/FormRows";
 import { PickSelect } from "~/components/PickSelect";
-import { usePool } from "~/components/PoolLink";
 import { ErrorLine } from "~/components/Section";
 
 const DESCRIPTION_LIMIT = 120;
@@ -52,6 +49,17 @@ export function UseBadge({ workloads }: { workloads: readonly string[] | undefin
     );
 }
 
+export function PoolDescription({ text }: { text: string }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="min-w-0 truncate text-sm text-muted-foreground">{text}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-normal">{text}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 function effectText(pool: string, from: UseKey, to: UseKey): string {
     if (to === "any") {
         return `New deployments can go to pool ${pool} again, and training and scoring jobs run there again.`;
@@ -76,7 +84,7 @@ function oneLine(text: string): string {
 
 const USE_OPTIONS = USES.map((item) => ({ value: item.key, label: item.label, meta: item.hint }));
 
-function SettingsDialog({
+export function PoolSettingsDialog({
     pool,
     workloads,
     description,
@@ -165,41 +173,5 @@ function SettingsDialog({
                 </form>
             </DialogContent>
         </Dialog>
-    );
-}
-
-export function PoolMenu({
-    pool,
-    workloads,
-}: {
-    pool: string;
-    workloads: readonly string[] | undefined;
-}) {
-    const found = usePool(pool);
-    const [open, setOpen] = useState(false);
-    return (
-        <>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-xs" aria-label={`Actions for pool ${pool}`}>
-                        <IconDots />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onSelect={() => setOpen(true)}>
-                        <IconSettings />
-                        Pool settings
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            {open && (
-                <SettingsDialog
-                    pool={pool}
-                    workloads={workloads}
-                    description={found?.description ?? ""}
-                    onClose={() => setOpen(false)}
-                />
-            )}
-        </>
     );
 }
