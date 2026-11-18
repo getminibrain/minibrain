@@ -3,7 +3,8 @@ import { Button } from "obp-ui";
 import type { ReactNode } from "react";
 import type { KeyCreated, ModelRef } from "~/api/client";
 import { useKeys } from "~/api/queries";
-import { ErrorLine, PanelSection } from "~/components/Section";
+import { SectionError } from "~/components/ErrorState";
+import { PanelSection } from "~/components/Section";
 import { KeysTable, useKeyManager } from "~/components/keys/KeysTable";
 import { keyCovers } from "~/components/keys/scope";
 
@@ -35,12 +36,17 @@ export function ApiKeys({
             bare
         >
             <div className="flex flex-col gap-3">
-                <ErrorLine error={list.error} onRetry={list.refetch} />
                 <KeysTable
                     rows={rows}
                     loading={list.isLoading}
                     storageKey="minibrain.keys.model"
-                    empty="No keys can call this model yet."
+                    empty={
+                        list.error ? (
+                            <SectionError error={list.error} retry={list.refetch} />
+                        ) : (
+                            "No keys can call this model yet."
+                        )
+                    }
                     onEdit={manager.edit}
                     onRevoke={manager.revoke}
                 />

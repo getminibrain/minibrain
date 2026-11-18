@@ -17,6 +17,7 @@ import {
 import { type FormEvent, useEffect, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
+import { SectionError } from "~/components/ErrorState";
 import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine } from "~/components/Section";
 import { SettingsSection } from "~/components/SettingsSection";
@@ -442,7 +443,11 @@ export function EncryptionSettings() {
             title={SECURITY.encryption.title}
             description="Each stored file has its own data key; the master key here wraps it. Uploads, dataset versions, adapters, logs and staging copies are encrypted."
         >
-            <ErrorLine error={status.error} onRetry={status.refetch} />
+            {status.data ? (
+                <ErrorLine error={status.error} onRetry={status.refetch} />
+            ) : (
+                <SectionError error={status.error} retry={status.refetch} />
+            )}
             {status.data && (
                 <div className="flex flex-col gap-field">
                     <CurrentKey status={status.data} />

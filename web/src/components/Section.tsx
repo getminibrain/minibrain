@@ -1,6 +1,5 @@
-import { IconAlertCircle, IconRotateClockwise, type TablerIcon } from "@tabler/icons-react";
+import type { TablerIcon } from "@tabler/icons-react";
 import {
-    Button,
     Card,
     CardAction,
     CardContent,
@@ -8,9 +7,12 @@ import {
     CardHeader,
     CardTitle,
     InfoTip,
+    InlineError,
     cn,
 } from "obp-ui";
 import type { ReactNode } from "react";
+import { RetryButton } from "~/components/RetryButton";
+import { errorDetails } from "~/lib/errorDetails";
 
 export const FLUSH_GRID =
     "px-0 [--data-grid-surface:var(--card)] [&_[data-slot=data-grid]]:rounded-none [&_[data-slot=data-grid]]:border-0";
@@ -152,18 +154,14 @@ export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => 
         return null;
     }
     return (
-        <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="flex min-w-0 items-start gap-2 text-destructive">
-                <IconAlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                <span className="min-w-0 break-words">{message}</span>
-            </p>
-            {onRetry && (
-                <Button variant="outline" size="sm" onClick={() => void onRetry()}>
-                    <IconRotateClockwise aria-hidden="true" />
-                    Retry
-                </Button>
-            )}
-        </div>
+        <InlineError
+            action={
+                onRetry && <RetryButton retry={onRetry} label="Retry" primary={false} size="sm" />
+            }
+            details={errorDetails(error)}
+        >
+            {message}
+        </InlineError>
     );
 }
 

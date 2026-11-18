@@ -2,8 +2,9 @@ import { IconFilter, IconKey } from "@tabler/icons-react";
 import { Button, CheckboxSelect, SearchInput } from "obp-ui";
 import type { KeyInfo } from "~/api/client";
 import { useKeys } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page } from "~/components/Section";
+import { Page } from "~/components/Section";
 import { KeysTable, useKeyManager } from "~/components/keys/KeysTable";
 import { useCan } from "~/lib/access";
 import { splitList, useListSearch } from "~/lib/listSearch";
@@ -82,7 +83,6 @@ function KeyList({ manager }: { manager: Manager }) {
                     </Button>
                 )}
             </div>
-            <ErrorLine error={list.error} onRetry={list.refetch} />
             <KeysTable
                 rows={rows}
                 loading={list.isLoading}
@@ -90,7 +90,9 @@ function KeyList({ manager }: { manager: Manager }) {
                 onEdit={manager.edit}
                 onRevoke={manager.revoke}
                 empty={
-                    filtering ? (
+                    list.error ? (
+                        <SectionError error={list.error} retry={list.refetch} />
+                    ) : filtering ? (
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-muted-foreground">No keys match these filters.</p>
                             <Button variant="outline" onClick={clear}>

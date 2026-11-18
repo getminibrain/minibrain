@@ -138,7 +138,8 @@ function SetupTab({
 
 export function InfrastructurePage() {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const { data, error } = useSystem();
+    const system = useSystem();
+    const { data, error } = system;
     const pools = usePools();
     const infrastructure = useInfrastructure();
     const main =
@@ -155,7 +156,12 @@ export function InfrastructurePage() {
                 actions={adds ? <AddMachine pools={pools.data ?? []} /> : undefined}
             />
             <TabNav label="Infrastructure pages" tabs={SECTIONS} />
-            <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
+            <ErrorLine
+                error={error ?? pools.error ?? infrastructure.error}
+                onRetry={() =>
+                    Promise.all([system.refetch(), pools.refetch(), infrastructure.refetch()])
+                }
+            />
             {active === MACHINES && (
                 <PanelSections>
                     <NeedsAttention scope="infrastructure" />

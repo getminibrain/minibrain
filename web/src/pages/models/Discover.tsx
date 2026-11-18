@@ -35,8 +35,8 @@ import {
 import { type ReactNode, useId, useMemo, useState } from "react";
 import { type CatalogEntry, type CatalogResponse, api, unwrap } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { QueryError } from "~/components/ErrorState";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine } from "~/components/Section";
 import { StatusText, percentOf } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -774,14 +774,7 @@ export function Discover({
         return <DiscoverSkeleton columns={tableColumns} search={search} update={update} />;
     }
     if (catalog.error || !data) {
-        return (
-            <div className="flex items-center gap-2">
-                <ErrorLine error={catalog.error} onRetry={catalog.refetch} />
-                <Button variant="outline" size="sm" onClick={() => catalog.refetch()}>
-                    Try again
-                </Button>
-            </div>
-        );
+        return <QueryError heading="h2" error={catalog.error} retry={catalog.refetch} />;
     }
     const filters = readFilters(search, runsHere);
     const needsAccess = filters.access.includes("needs-access");

@@ -4,7 +4,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Button, DataGrid, Link, Tooltip, TooltipContent, TooltipTrigger, useToast } from "obp-ui";
 import { useState } from "react";
 import { type FeedbackInfo, useRemoveTestExample, useTestExamples } from "~/api/feedbackQueries";
-import { ErrorLine, errorMessage } from "~/components/Section";
+import { SectionError } from "~/components/ErrorState";
+import { errorMessage } from "~/components/Section";
 import { When } from "~/components/When";
 import { feedbackHref } from "~/lib/feedback";
 import { timeValue } from "~/lib/time";
@@ -121,9 +122,14 @@ export function TestExamples({ slug }: { slug: string }) {
                         <TooltipContent>Remove</TooltipContent>
                     </Tooltip>
                 )}
-                empty="No test examples yet. Add one, or use Save as test example on an answer in the Playground."
+                empty={
+                    examples.error ? (
+                        <SectionError error={examples.error} retry={examples.refetch} />
+                    ) : (
+                        "No test examples yet. Add one, or use Save as test example on an answer in the Playground."
+                    )
+                }
             />
-            <ErrorLine error={examples.error} onRetry={examples.refetch} />
             <ConfirmAction
                 confirmation={confirmation}
                 onOpenChange={(open) => !open && setConfirmation(null)}

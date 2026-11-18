@@ -12,9 +12,9 @@ import {
 import type { ReactNode } from "react";
 import type { BaseModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useVersionFiles } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { PoolLink } from "~/components/PoolLink";
-import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
@@ -159,11 +159,16 @@ export function CustomFiles({
         <div className="flex flex-col gap-4">
             {trained !== null && (
                 <>
-                    <ErrorLine error={files.error} onRetry={files.refetch} />
                     <FileTable
                         files={files.data?.files ?? []}
                         loading={files.isLoading}
-                        empty="The adapter has no files."
+                        empty={
+                            files.error ? (
+                                <SectionError error={files.error} retry={files.refetch} />
+                            ) : (
+                                "The adapter has no files."
+                            )
+                        }
                     />
                     {files.data?.artifact_id && (
                         <Facts

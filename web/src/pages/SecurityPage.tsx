@@ -29,6 +29,7 @@ import {
 import { type FormEvent, Fragment, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
+import { QueryError } from "~/components/ErrorState";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
 import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine, errorMessage } from "~/components/Section";
@@ -553,7 +554,11 @@ export function SecurityPage() {
             title="Security"
             caption="Install-wide policies: network, sign-in, request logs, the audit log, exports and encryption."
         >
-            <ErrorLine error={policies.error} onRetry={policies.refetch} />
+            {policies.data ? (
+                <ErrorLine error={policies.error} onRetry={policies.refetch} />
+            ) : (
+                <QueryError heading="h2" error={policies.error} retry={policies.refetch} />
+            )}
             <SettingsSections>
                 {policies.data &&
                     GROUPS.map((group) =>

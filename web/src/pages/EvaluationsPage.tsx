@@ -22,6 +22,7 @@ import {
 import { useMemo, useState } from "react";
 import { type ModelVersionRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useAllModels, useVersions } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page, Stat } from "~/components/Section";
@@ -731,7 +732,7 @@ export function EvaluationsPage() {
                     Show all versions
                 </label>
             </div>
-            <ErrorLine error={models.error ?? promote.error} />
+            <ErrorLine error={(models.data ? models.error : null) ?? promote.error} />
             <DataGrid
                 key={grouped ? "models" : "versions"}
                 columns={columns}
@@ -763,7 +764,13 @@ export function EvaluationsPage() {
                         />
                     ) : null
                 }
-                empty={<Empty filtering={filtering} grouped={grouped} onClear={clear} />}
+                empty={
+                    models.error && !models.data ? (
+                        <SectionError error={models.error} retry={models.refetch} />
+                    ) : (
+                        <Empty filtering={filtering} grouped={grouped} onClear={clear} />
+                    )
+                }
             />
             <VersionDialog
                 target={target}

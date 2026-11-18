@@ -16,6 +16,7 @@ import {
     useRequestDetail,
 } from "~/api/requestQueries";
 import { CopyButton } from "~/components/CopyButton";
+import { SectionError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { ModelName } from "~/components/ModelName";
 import { ErrorLine } from "~/components/Section";
@@ -307,10 +308,16 @@ export function RequestDialog({
                     <DialogDescription>
                         {row
                             ? `Request ${row.id}, ${exactTime(row.at)}, key ${row.key_name ?? "deleted"}`
-                            : "Loading…"}
+                            : detail.error
+                              ? null
+                              : "Loading…"}
                     </DialogDescription>
                 </DialogHeader>
-                <ErrorLine error={detail.error} onRetry={detail.refetch} />
+                {row ? (
+                    <ErrorLine error={detail.error} onRetry={detail.refetch} />
+                ) : (
+                    <SectionError error={detail.error} retry={detail.refetch} />
+                )}
                 {row && (
                     <div className="flex min-w-0 flex-col gap-6">
                         <Facts items={facts(row)} />

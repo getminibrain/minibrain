@@ -75,6 +75,7 @@ export function useFeedbackList(filter: FeedbackFilter) {
         isLoading: pages.isLoading,
         isPlaceholder: pages.isPlaceholderData,
         error: pages.error,
+        retry: () => pages.refetch(),
         hasMore: pages.hasNextPage,
         loadingMore: pages.isFetchingNextPage,
         loadMore: () => {

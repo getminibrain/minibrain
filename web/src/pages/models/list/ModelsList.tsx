@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { useAllModels } from "~/api/queries";
-import { ErrorLine } from "~/components/Section";
+import { SectionError } from "~/components/ErrorState";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { useCan } from "~/lib/access";
 import { modelVersionHref } from "~/lib/modelLinks";
@@ -534,11 +534,8 @@ export function ModelsList() {
             <SkeletonLines columns={shownColumns} nested={nested} />
         </>
     ) : all.error ? (
-        <div className="col-span-full flex items-center gap-2 px-4 py-6">
-            <ErrorLine error={all.error} />
-            <Button variant="outline" onClick={() => all.refetch()}>
-                Try again
-            </Button>
+        <div className="col-span-full flex min-h-72">
+            <SectionError error={all.error} retry={all.refetch} />
         </div>
     ) : empty ? (
         <div className="col-span-full flex min-h-72 flex-col items-center justify-center gap-3 px-4 text-center">

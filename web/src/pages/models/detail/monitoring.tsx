@@ -23,6 +23,7 @@ import { type ReactNode, useState } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
 import { useModel, useModelPage } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
 import { StatusText } from "~/components/models/StatusText";
@@ -455,7 +456,6 @@ function RecentRequests({ row }: { row: ModelRow }) {
             }
             bare
         >
-            <ErrorLine error={latest.error} onRetry={latest.refetch} />
             <DataGrid
                 columns={REQUEST_COLUMNS}
                 rows={items}
@@ -468,7 +468,13 @@ function RecentRequests({ row }: { row: ModelRow }) {
                 rowLabel={(item) =>
                     `Request ${item.id}, ${modelLabel(item)}, status ${item.status}, ${exactTime(item.at)}`
                 }
-                empty={<p className="text-muted-foreground">No requests yet.</p>}
+                empty={
+                    latest.error ? (
+                        <SectionError error={latest.error} retry={latest.refetch} />
+                    ) : (
+                        <p className="text-muted-foreground">No requests yet.</p>
+                    )
+                }
                 maxHeight="24rem"
                 className="h-96"
             />

@@ -1,7 +1,7 @@
 import { IconCheck } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button, DataGrid, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { BaseModelDetail, ModelRow } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { FILE_STATES, type HealthAction } from "~/components/models/HealthStatus";
@@ -174,7 +174,7 @@ export function FileTable({
     loading = false,
 }: {
     files: FileRow[];
-    empty: string;
+    empty: ReactNode;
     loading?: boolean;
 }) {
     return (

@@ -20,6 +20,7 @@ import {
     useFeedbackList,
 } from "~/api/feedbackQueries";
 import { useModels } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine, Page } from "~/components/Section";
@@ -376,7 +377,7 @@ export function FeedbackPage() {
                     </Button>
                 )}
             </div>
-            <ErrorLine error={list.error} />
+            {list.rows.length > 0 && <ErrorLine error={list.error} onRetry={list.retry} />}
             <DataGrid
                 columns={columns}
                 rows={list.rows}
@@ -395,7 +396,9 @@ export function FeedbackPage() {
                     `${item.input}, ${item.model_name}, ${feedbackStatusLabel(item.status)}`
                 }
                 empty={
-                    filtering ? (
+                    list.error ? (
+                        <SectionError error={list.error} retry={list.retry} />
+                    ) : filtering ? (
                         <p className="text-muted-foreground">No feedback matches these filters.</p>
                     ) : tab === "all" ? (
                         <NoFeedback />

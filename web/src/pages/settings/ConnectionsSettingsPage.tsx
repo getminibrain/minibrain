@@ -38,6 +38,7 @@ import {
     useConnections,
     useExtensions,
 } from "~/api/connectionQueries";
+import { SectionError } from "~/components/ErrorState";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
@@ -557,7 +558,11 @@ function Extensions() {
                 </>
             }
         >
-            <ErrorLine error={extensions.error} onRetry={extensions.refetch} />
+            {data ? (
+                <ErrorLine error={extensions.error} onRetry={extensions.refetch} />
+            ) : (
+                <SectionError error={extensions.error} retry={extensions.refetch} />
+            )}
             {data && (
                 <div className="flex flex-col gap-3">
                     <ul className="flex flex-col divide-y rounded-lg border">

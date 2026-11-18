@@ -46,6 +46,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components, operations } from "~/api/schema";
+import { SectionError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
@@ -480,10 +481,12 @@ function EventSheet({
                     <SheetDescription>
                         {event
                             ? `${targetLabel(event, policies)} · ${actorOf(event)} · ${relativeTime(event.at)}`
-                            : "Loading…"}
+                            : fetched.error
+                              ? null
+                              : "Loading…"}
                     </SheetDescription>
                 </SheetHeader>
-                <ErrorLine error={fetched.error} onRetry={fetched.refetch} />
+                {!event && <SectionError error={fetched.error} retry={fetched.refetch} />}
                 {event && (
                     <div className="flex flex-wrap gap-2">
                         {href && (
@@ -629,7 +632,7 @@ export function AuditLogPage() {
                         </Button>
                     )}
                 </div>
-                <ErrorLine error={page.error ?? facets.error} />
+                <ErrorLine error={(page.data ? page.error : null) ?? facets.error} />
                 <DataGrid
                     columns={columns}
                     rows={page.data?.events ?? []}
@@ -644,7 +647,9 @@ export function AuditLogPage() {
                     }
                     minWidth="min-w-[760px]"
                     empty={
-                        filtering ? (
+                        page.error && !page.data ? (
+                            <SectionError error={page.error} retry={page.refetch} />
+                        ) : filtering ? (
                             <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-muted-foreground">No events match.</p>
                                 <Button variant="outline" onClick={clear}>

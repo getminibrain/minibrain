@@ -27,6 +27,7 @@ import {
     useRequestList,
     useRequestSummary,
 } from "~/api/requestQueries";
+import { SectionError } from "~/components/ErrorState";
 import { ModelName, withDeleted } from "~/components/ModelName";
 import { modelOption } from "~/components/PublisherLogo";
 import { ErrorLine } from "~/components/Section";
@@ -367,7 +368,9 @@ export function RequestsTab({ paused }: { paused: boolean }) {
     const selected = requestId(search.request);
     const loaded = list.rows.find((row) => row.id === selected);
     const statuses = facets.data?.statuses ?? {};
-    const empty = filtering ? (
+    const empty = list.error ? (
+        <SectionError error={list.error} retry={list.retry} />
+    ) : filtering ? (
         <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground">No requests match these filters.</p>
             <Button variant="outline" onClick={clear}>
@@ -435,7 +438,9 @@ export function RequestsTab({ paused }: { paused: boolean }) {
                 />
             </div>
             <SummaryStrip summary={summary.data} />
-            <ErrorLine error={list.error ?? facets.error ?? summary.error} />
+            <ErrorLine
+                error={(list.rows.length > 0 ? list.error : null) ?? facets.error ?? summary.error}
+            />
             <DataGrid
                 columns={REQUEST_COLUMNS}
                 rows={list.rows}

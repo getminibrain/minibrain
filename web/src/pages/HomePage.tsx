@@ -4,6 +4,7 @@ import { DataGrid, Link } from "obp-ui";
 import type { JobInfo } from "~/api/client";
 import { useJobFacets } from "~/api/jobQueries";
 import { useModels, useRecentJobs } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { ModelName } from "~/components/ModelName";
 import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
@@ -81,7 +82,8 @@ function Overview({
 export function HomePage() {
     const can = useCan();
     const { data: models } = useModels();
-    const { data: jobs } = useRecentJobs(10);
+    const recentJobs = useRecentJobs(10);
+    const jobs = recentJobs.data;
     const serving = (models ?? []).filter(isLiveRow).length;
     const active = (models ?? []).some((item) => item.active_jobs > 0);
     const statuses = useJobFacets({}, active).data?.statuses;
@@ -100,7 +102,21 @@ export function HomePage() {
                 </PanelColumns>
                 <PanelSection flush icon={IconListCheck} title="Recent jobs">
                     <div className={FLUSH_GRID}>
-                        <DataGrid columns={JOB_COLUMNS} rows={jobs ?? []} empty="No jobs yet." />
+                        <DataGrid
+                            columns={JOB_COLUMNS}
+                            rows={jobs ?? []}
+                            loading={recentJobs.isLoading}
+                            empty={
+                                recentJobs.error ? (
+                                    <SectionError
+                                        error={recentJobs.error}
+                                        retry={recentJobs.refetch}
+                                    />
+                                ) : (
+                                    "No jobs yet."
+                                )
+                            }
+                        />
                     </div>
                 </PanelSection>
             </PanelSections>

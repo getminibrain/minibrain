@@ -158,17 +158,34 @@ const GATEWAY_ERRORS = new Set([502, 503, 504]);
 export class ApiError extends Error {
     readonly status: number | null;
     readonly body: unknown;
+    readonly path: string | null;
+    readonly requestId: string | null;
 
-    constructor(message: string, status: number | null, body: unknown = null) {
+    constructor(
+        message: string,
+        status: number | null,
+        body: unknown = null,
+        response: Response | null = null,
+    ) {
         super(message);
         this.name = "ApiError";
         this.status = status;
         this.body = body;
+        this.path = response ? pathOf(response.url) : null;
+        this.requestId = response?.headers.get("x-request-id") ?? null;
     }
 
     get unreachable(): boolean {
         return this.status === null || this.message === UNREACHABLE;
     }
+}
+
+function pathOf(url: string): string | null {
+    if (!url) {
+        return null;
+    }
+    const parsed = new URL(url, window.location.origin);
+    return `${parsed.pathname}${parsed.search}`;
 }
 
 export function errorStatus(error: unknown): number | null {
@@ -185,7 +202,32 @@ export function retryable(failures: number, error: unknown): boolean {
 }
 
 function failed(error: unknown, response: Response): ApiError {
-    return new ApiError(describeError(error, response), response.status, error ?? null);
+    return new ApiError(describeError(error, response), response.status, error ?? null, response);
+}
+
+type Invalid = { loc?: unknown[]; msg?: string };
+
+function fieldLabel(loc: unknown[] | undefined): string | null {
+    const field = loc?.filter((part) => typeof part === "string" && part !== "body").at(-1);
+    if (typeof field !== "string") {
+        return null;
+    }
+    const words = field.replaceAll("_", " ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function sentence(text: string): string {
+    const trimmed = text.replace(/^Value error, /, "");
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+function invalidText(item: unknown): string {
+    const { loc, msg } = (item ?? {}) as Invalid;
+    if (typeof msg !== "string") {
+        return String(item);
+    }
+    const label = fieldLabel(loc);
+    return label ? `${label}: ${sentence(msg)}` : sentence(msg);
 }
 
 function describeError(error: unknown, response: Response): string {
@@ -198,14 +240,16 @@ function describeError(error: unknown, response: Response): string {
         return detail;
     }
     if (Array.isArray(detail)) {
-        return detail.map((item) => (item as { msg?: string })?.msg ?? String(item)).join("; ");
+        return detail.map(invalidText).join("; ");
     }
-    const reference = response.headers.get("x-request-id");
-    if (GATEWAY_ERRORS.has(response.status) || (response.status === 500 && !reference)) {
+    if (
+        GATEWAY_ERRORS.has(response.status) ||
+        (response.status === 500 && !response.headers.get("x-request-id"))
+    ) {
         return UNREACHABLE;
     }
     if (response.status >= 500) {
-        return `Something went wrong on the server. Reference: ${reference}`;
+        return "Something went wrong on the server.";
     }
     return `Request failed (${response.status})`;
 }

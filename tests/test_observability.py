@@ -173,6 +173,13 @@ def test_every_response_carries_a_request_id(harness: Harness) -> None:
     assert harness.client.get("/healthz", headers={"X-Request-ID": "bad id!"}).headers["x-request-id"] != "bad id!"
 
 
+def test_api_errors_carry_a_request_id(harness: Harness) -> None:
+    missing = harness.client.get("/api/models/no-such-model", headers={"X-Request-ID": "lookup-1"})
+    invalid = harness.client.post("/api/models", json={}, headers={"X-Request-ID": "form-1"})
+    assert missing.status_code == 404 and missing.headers["x-request-id"] == "lookup-1"
+    assert invalid.status_code == 422 and invalid.headers["x-request-id"] == "form-1"
+
+
 def test_logs_inside_a_request_know_its_id() -> None:
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)

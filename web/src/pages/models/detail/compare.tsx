@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useVersions } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
@@ -224,9 +225,10 @@ function Answers({ row, a, b }: { row: ModelRow; a: VersionInfo; b: VersionInfo 
                     : "Held-out answers of both versions, row by row."
             }
         >
-            <ErrorLine error={answers.error} onRetry={answers.refetch} />
             {answers.isLoading ? (
                 <p className="text-muted-foreground">Comparing answers…</p>
+            ) : answers.error && !answers.data ? (
+                <SectionError error={answers.error} retry={answers.refetch} />
             ) : differing.length === 0 ? (
                 <p className="text-muted-foreground">
                     Both versions score every held-out row the same.

@@ -12,6 +12,7 @@ import {
 import { type ComponentType, useState } from "react";
 import type { AnswerSide, ExampleAnswer, VersionInfo } from "~/api/client";
 import { useVersionAnswers } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
@@ -364,7 +365,11 @@ function FreeTextResults({ slug, version }: { slug: string; version: VersionInfo
                     <span className="tabular-nums">{`Worse than live (${worse.length})`}</span>
                 </label>
             </div>
-            <ErrorLine error={answers.error} onRetry={answers.refetch} />
+            {answers.data ? (
+                <ErrorLine error={answers.error} onRetry={answers.refetch} />
+            ) : (
+                <SectionError error={answers.error} retry={answers.refetch} />
+            )}
             {answers.isLoading && <p className="text-muted-foreground">Loading…</p>}
             {found && rows.length === 0 && (
                 <p className="text-muted-foreground">

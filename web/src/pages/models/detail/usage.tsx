@@ -327,7 +327,7 @@ export function UsagePanel({ row }: { row: ModelRow }) {
                     <StripCell key={item.key} metric={item.key} report={report} />
                 ))}
             </div>
-            <div className="flex h-9 items-center gap-3 border-t px-4 text-sm text-muted-foreground tabular-nums">
+            <div className="flex min-h-9 items-center gap-3 border-t px-4 py-1 text-sm text-muted-foreground tabular-nums">
                 {traffic.error ? (
                     <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
                 ) : (

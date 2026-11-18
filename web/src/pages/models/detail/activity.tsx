@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import type { ModelRow } from "~/api/client";
 import { type ModelActivityEvent, useModelActivity } from "~/api/modelPageQueries";
+import { SectionError } from "~/components/ErrorState";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
@@ -370,9 +371,13 @@ export function ActivityTab({ row }: { row: ModelRow }) {
                 description="Who changed what, newest first."
             >
                 <div className="flex min-w-0 flex-col gap-3">
-                    <ErrorLine error={activity.error} onRetry={activity.refetch} />
+                    {activity.error && shown.length > 0 && (
+                        <ErrorLine error={activity.error} onRetry={activity.refetch} />
+                    )}
                     {activity.isLoading ? (
                         <p className="text-muted-foreground">Loading…</p>
+                    ) : shown.length === 0 && activity.error ? (
+                        <SectionError error={activity.error} retry={activity.refetch} />
                     ) : shown.length === 0 ? (
                         <p className="text-muted-foreground">
                             Nothing yet. Training, deploys and keys show here.

@@ -23,6 +23,7 @@ import { useEffect, useState } from "react";
 import type { JobInfo, ModelRow } from "~/api/client";
 import { type JobSortKey, NEWEST_JOBS, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useModels } from "~/api/queries";
+import { SectionError } from "~/components/ErrorState";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
@@ -340,7 +341,7 @@ function Runs() {
                     {shownCount(jobs.total, everything.data?.total)}
                 </span>
             </JobToolbar>
-            <ErrorLine error={jobs.error} />
+            {jobs.rows.length > 0 && <ErrorLine error={jobs.error} onRetry={jobs.retry} />}
             <DataGrid
                 columns={COLUMNS}
                 rows={jobs.rows}
@@ -359,7 +360,9 @@ function Runs() {
                 {...selection.grid}
                 rowLabel={jobRowLabel}
                 empty={
-                    filtering ? (
+                    jobs.error ? (
+                        <SectionError error={jobs.error} retry={jobs.retry} />
+                    ) : filtering ? (
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-muted-foreground">No runs match these filters.</p>
                             <Button variant="outline" onClick={clear}>

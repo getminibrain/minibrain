@@ -13,7 +13,8 @@ import {
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { ErrorLine, Stat } from "~/components/Section";
+import { SectionError } from "~/components/ErrorState";
+import { Stat } from "~/components/Section";
 import { count } from "~/lib/format";
 import { exactTime } from "~/lib/time";
 import { naturalSort } from "./resultColumns";
@@ -267,7 +268,7 @@ export function VersionDiffDialog({
                         What changed in the rows a model trains on between two versions.
                     </DialogDescription>
                 </DialogHeader>
-                <ErrorLine error={diff.error} onRetry={diff.refetch} />
+                <SectionError error={diff.error} retry={diff.refetch} />
                 {diff.isLoading && <p className="text-muted-foreground">Comparing…</p>}
                 {diff.data && <DiffBody diff={diff.data} />}
             </DialogContent>

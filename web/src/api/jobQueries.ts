@@ -165,6 +165,7 @@ export function useJobList(filter: JobFilter) {
         total: head?.total ?? pages.data?.pages[0]?.total,
         isLoading: pages.isLoading,
         error: pages.error ?? live.error,
+        retry: () => pages.refetch(),
         hasMore: pages.hasNextPage,
         loadingMore: pages.isFetchingNextPage,
         loadMore: () => {

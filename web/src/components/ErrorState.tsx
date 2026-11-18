@@ -1,19 +1,20 @@
 import {
-    IconAlertTriangle,
-    IconChevronRight,
-    IconShieldX,
+    IconAlertCircle,
+    IconLock,
     IconWifiOff,
     IconZoomCancel,
     type TablerIcon,
 } from "@tabler/icons-react";
 import { useRouterState } from "@tanstack/react-router";
-import { Button, Link, cn } from "obp-ui";
-import { type ReactNode, useId } from "react";
+import { Button, type ErrorDetail, ErrorPanel, type ErrorPanelVariant, Link } from "obp-ui";
+import type { ReactNode } from "react";
 import { errorStatus, isUnreachable } from "~/api/client";
 import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
+import { RetryButton } from "~/components/RetryButton";
 import { Page, errorMessage } from "~/components/Section";
 import { navEntryFor } from "~/components/navigation";
+import { errorDetails } from "~/lib/errorDetails";
 
 export type ErrorAction = { label: string; href?: string; onClick?: () => void };
 
@@ -35,111 +36,76 @@ function ActionButton({ action, primary }: { action: ErrorAction; primary: boole
     );
 }
 
-function ErrorFooter({ code }: { code: string }) {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
+function Actions({ primary, secondary }: { primary?: ErrorAction; secondary?: ErrorAction }) {
+    if (!primary && !secondary) {
+        return null;
+    }
     return (
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-t px-panel py-3 font-mono text-sm text-muted-foreground @md:px-[calc(var(--panel-padding)*1.5)]">
-            <span className="text-foreground">{code}</span>
-            <span className="min-w-0 truncate">{pathname}</span>
-        </div>
+        <>
+            {primary && <ActionButton action={primary} primary />}
+            {secondary && <ActionButton action={secondary} primary={false} />}
+        </>
     );
+}
+
+function usePathname(): string {
+    return useRouterState({ select: (state) => state.location.pathname });
+}
+
+function pageDetails(status: string, pathname: string): ErrorDetail[] {
+    return [
+        { label: "Status", value: status },
+        { label: "Path", value: pathname },
+    ];
 }
 
 export function ErrorState({
-    icon: Icon,
+    icon,
     title,
     children,
     detail,
+    actions,
     primary,
     secondary,
-    code,
-    heading: Heading = "h1",
+    details,
+    tone = "destructive",
+    heading = "h1",
+    variant = "plate",
     className,
 }: {
-    icon: TablerIcon;
+    icon?: TablerIcon;
     title: string;
     children?: ReactNode;
     detail?: ReactNode;
+    actions?: ReactNode;
     primary?: ErrorAction;
     secondary?: ErrorAction;
-    code?: string;
-    heading?: "h1" | "h2";
+    details?: ErrorDetail[];
+    tone?: "destructive" | "neutral";
+    heading?: "h1" | "h2" | "h3";
+    variant?: ErrorPanelVariant;
     className?: string;
 }) {
-    const titleId = useId();
+    const message =
+        children || detail ? (
+            <>
+                {children}
+                {detail && <span className="mt-2 block">{detail}</span>}
+            </>
+        ) : undefined;
     return (
-        <section
-            aria-labelledby={titleId}
-            className={cn(
-                "@container w-full max-w-2xl overflow-hidden rounded-xl border bg-card",
-                Heading === "h1" && "mt-4",
-                className,
-            )}
+        <ErrorPanel
+            variant={variant}
+            tone={tone}
+            icon={icon}
+            title={title}
+            heading={heading}
+            actions={actions ?? <Actions primary={primary} secondary={secondary} />}
+            details={details}
+            className={className}
         >
-            <div className="flex flex-col gap-6 p-panel @md:p-[calc(var(--panel-padding)*1.5)]">
-                <div className="grid size-11 place-items-center rounded-lg border bg-background">
-                    <Icon aria-hidden="true" className="size-5.5 text-muted-foreground" />
-                </div>
-                <div className="flex min-w-0 flex-col gap-2">
-                    <Heading id={titleId} className="text-xl font-semibold">
-                        {title}
-                    </Heading>
-                    {children && (
-                        <p className="max-w-prose text-base text-muted-foreground">{children}</p>
-                    )}
-                    {detail && (
-                        <div className="text-sm break-words text-muted-foreground">{detail}</div>
-                    )}
-                </div>
-                {(primary || secondary) && (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {primary && <ActionButton action={primary} primary />}
-                        {secondary && <ActionButton action={secondary} primary={false} />}
-                    </div>
-                )}
-            </div>
-            {code && <ErrorFooter code={code} />}
-        </section>
-    );
-}
-
-function NotFoundHeader({
-    title,
-    children,
-    detail,
-    primary,
-    secondary,
-}: {
-    title: string;
-    children: ReactNode;
-    detail?: ReactNode;
-    primary: ErrorAction;
-    secondary?: ErrorAction;
-}) {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
-    return (
-        <div className="mt-4 flex flex-col gap-4">
-            <PageHeader
-                title={title}
-                icon={false}
-                caption={children}
-                actions={
-                    <>
-                        {secondary && <ActionButton action={secondary} primary={false} />}
-                        <ActionButton action={primary} primary />
-                    </>
-                }
-            />
-            {detail && (
-                <div className="max-w-prose text-base break-words text-muted-foreground">
-                    {detail}
-                </div>
-            )}
-            <p className="flex min-w-0 flex-wrap gap-x-3 font-mono text-sm text-muted-foreground">
-                <span className="text-foreground">404 Not found</span>
-                <span className="min-w-0 truncate">{pathname}</span>
-            </p>
-        </div>
+            {message}
+        </ErrorPanel>
     );
 }
 
@@ -158,21 +124,16 @@ export function NotFoundState({
     secondary?: ErrorAction;
     heading?: "h1" | "h2";
 }) {
-    if (heading === "h1") {
-        return (
-            <NotFoundHeader title={title} detail={detail} primary={primary} secondary={secondary}>
-                {children}
-            </NotFoundHeader>
-        );
-    }
+    const pathname = usePathname();
     return (
         <ErrorState
             icon={IconZoomCancel}
+            tone="neutral"
             title={title}
             detail={detail}
             primary={primary}
             secondary={secondary}
-            code="404 Not found"
+            details={pageDetails("404", pathname)}
             heading={heading}
         >
             {children}
@@ -183,17 +144,24 @@ export function NotFoundState({
 export function ForbiddenState({
     needs,
     heading,
+    details,
+    variant,
 }: {
     needs: ReactNode;
-    heading?: "h1" | "h2";
+    heading?: "h1" | "h2" | "h3";
+    details?: ErrorDetail[];
+    variant?: ErrorPanelVariant;
 }) {
+    const pathname = usePathname();
     return (
         <ErrorState
-            icon={IconShieldX}
+            icon={IconLock}
+            tone="neutral"
             title="You don't have access"
-            primary={GO_HOME}
-            code="403 Forbidden"
+            primary={variant === "inset" ? undefined : GO_HOME}
+            details={details ?? pageDetails("403", pathname)}
             heading={heading}
+            variant={variant}
         >
             {needs}
         </ErrorState>
@@ -205,11 +173,17 @@ export function QueryError({
     retry,
     notFound,
     heading,
+    variant = "plate",
+    title = "Couldn't load this page",
+    className,
 }: {
     error: unknown;
     retry?: () => unknown;
     notFound?: ReactNode;
-    heading?: "h1" | "h2";
+    heading?: "h1" | "h2" | "h3";
+    variant?: ErrorPanelVariant;
+    title?: string;
+    className?: string;
 }) {
     const message = errorMessage(error);
     if (!message) {
@@ -224,26 +198,60 @@ export function QueryError({
             <ForbiddenState
                 needs={`${message}. Ask an admin to change your role under Settings, Accounts.`}
                 heading={heading}
+                details={errorDetails(error)}
+                variant={variant}
             />
         );
     }
-    const again = retry ? { label: "Try again", onClick: () => void retry() } : undefined;
+    const actions = retry ? (
+        <RetryButton
+            retry={retry}
+            primary={variant === "plate"}
+            size={variant === "inset" ? "sm" : undefined}
+        />
+    ) : variant === "plate" ? (
+        <ActionButton action={GO_HOME} primary />
+    ) : undefined;
     return (
         <ErrorState
-            icon={isUnreachable(error) ? IconWifiOff : IconAlertTriangle}
-            title="Couldn't load this page"
-            primary={again ?? GO_HOME}
-            secondary={again ? GO_HOME : undefined}
-            code={isUnreachable(error) ? "No connection" : `Error ${status ?? ""}`.trim()}
+            icon={isUnreachable(error) ? IconWifiOff : IconAlertCircle}
+            title={title}
+            actions={actions}
+            details={errorDetails(error)}
             heading={heading}
+            variant={variant}
+            className={className}
         >
             {message}
         </ErrorState>
     );
 }
 
+export function SectionError({
+    error,
+    retry,
+    title = "Couldn't load",
+    className,
+}: {
+    error: unknown;
+    retry?: () => unknown;
+    title?: string;
+    className?: string;
+}) {
+    return (
+        <QueryError
+            error={error}
+            retry={retry}
+            heading="h3"
+            variant="inset"
+            title={title}
+            className={className}
+        />
+    );
+}
+
 export function ErrorPage({ fallback, children }: { fallback: string; children: ReactNode }) {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const pathname = usePathname();
     return (
         <Page>
             <PageHeader title={navEntryFor(pathname)?.label ?? fallback} />
@@ -263,12 +271,12 @@ function sectionCrumbs(pathname: string): Crumb[] {
 }
 
 export function NotFoundPage() {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    const pathname = usePathname();
     return (
         <Page>
             <PageCrumbs items={sectionCrumbs(pathname)} />
             <NotFoundState title="Page not found" primary={GO_HOME}>
-                Nothing lives at this address. Check it, or start again from Home.
+                Nothing lives at this address.
             </NotFoundState>
         </Page>
     );
@@ -278,38 +286,20 @@ function reload() {
     window.location.reload();
 }
 
-function goHome() {
-    window.location.assign("/");
-}
-
 export function CrashPage({ error }: { error: unknown }) {
+    const pathname = usePathname();
     const message = errorMessage(error) ?? "Unknown error";
-    const stack = error instanceof Error ? error.stack : undefined;
     return (
         <ErrorPage fallback="Something went wrong">
             <ErrorState
-                icon={IconAlertTriangle}
                 title="This page hit an unexpected error"
                 heading="h2"
                 primary={{ label: "Reload", onClick: reload }}
-                secondary={{ label: "Go home", onClick: goHome }}
-                detail={
-                    <details className="group mt-2 rounded-lg border bg-background">
-                        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
-                            <IconChevronRight
-                                aria-hidden="true"
-                                className="size-3.5 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none"
-                            />
-                            Error details
-                        </summary>
-                        <pre className="max-h-64 overflow-auto border-t px-3 py-2 font-mono text-sm whitespace-pre-wrap text-foreground">
-                            {stack ?? message}
-                        </pre>
-                    </details>
-                }
-            >
-                Reloading usually fixes it; your saved work is safe on the server.
-            </ErrorState>
+                details={[
+                    { label: "Error", value: message },
+                    { label: "Path", value: pathname },
+                ]}
+            />
         </ErrorPage>
     );
 }

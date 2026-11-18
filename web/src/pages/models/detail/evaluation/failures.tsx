@@ -12,6 +12,7 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import type { ExampleAnswer, ModelRow, VersionInfo } from "~/api/client";
+import { SectionError } from "~/components/ErrorState";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { count, percent } from "~/lib/format";
 import { isDeployed } from "../header";
@@ -310,13 +311,19 @@ export function FailuresPanel({ row, versions }: { row: ModelRow; versions: Vers
                         rowLabel={(item) => `Held-out row ${inputOf(item.answer)}`}
                         maxHeight="28rem"
                         empty={
-                            picked
-                                ? emptyText(mode, picked.number, against, rowsKnown)
-                                : "No version scored yet."
+                            answers.error ? (
+                                <SectionError error={answers.error} retry={answers.refetch} />
+                            ) : picked ? (
+                                emptyText(mode, picked.number, against, rowsKnown)
+                            ) : (
+                                "No version scored yet."
+                            )
                         }
                     />
                 )}
-                {mode !== "labels" && <ErrorLine error={answers.error} onRetry={answers.refetch} />}
+                {mode !== "labels" && rows.length > 0 && (
+                    <ErrorLine error={answers.error} onRetry={answers.refetch} />
+                )}
             </div>
             <AnswerSheet
                 row={open}

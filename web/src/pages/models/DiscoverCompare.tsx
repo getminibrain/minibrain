@@ -27,9 +27,10 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Page } from "~/components/Section";
+import { Page } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { discoverListHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
@@ -850,18 +851,8 @@ export function DiscoverComparePage() {
             />
             <output className="sr-only">{copy === "copied" ? "Link copied" : ""}</output>
             {copy === "failed" && <CopyFallback href={window.location.href} />}
-            {catalog.error && (
-                <div className="flex flex-wrap items-center gap-3">
-                    <ErrorLine error={catalog.error} onRetry={catalog.refetch} />
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={catalog.isFetching}
-                        onClick={() => catalog.refetch()}
-                    >
-                        Retry
-                    </Button>
-                </div>
+            {catalog.error && !catalog.data && (
+                <QueryError heading="h2" error={catalog.error} retry={catalog.refetch} />
             )}
             {catalog.isLoading && <CompareSkeleton ids={ids} />}
             {missing.length > 0 && (

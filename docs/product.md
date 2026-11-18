@@ -695,6 +695,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Grafana dashboard** · partial · admin
   Import a ready dashboard over the Prometheus metrics.
   Roadmap: Observability
+- **Error details** · shipped · product, ml, engineer, admin
+  Failures keep their place; Details shows status, path and request id.
+  UI: Home, Models, Jobs, Settings › Accounts
 - **Health checks** · shipped · admin
   Probe liveness and readiness from a load balancer.
   API: GET /healthz, GET /readyz
