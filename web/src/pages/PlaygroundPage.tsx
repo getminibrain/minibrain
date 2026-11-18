@@ -105,12 +105,12 @@ function playgroundUrl(model: string | null, chat: number | null): string {
 function gridColumns(recent: boolean, settings: boolean): string {
     const fill = "grid min-h-[32rem] flex-1 grid-rows-[minmax(0,1fr)] gap-4";
     if (recent && settings) {
-        return cn(fill, "grid-cols-[16rem_minmax(0,1fr)_22rem]");
+        return cn(fill, "grid-cols-[16rem_minmax(0,1fr)_25rem]");
     }
     if (recent) {
         return cn(fill, "grid-cols-[16rem_minmax(0,1fr)]");
     }
-    return cn(fill, settings ? "grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1");
+    return cn(fill, settings ? "grid-cols-[minmax(0,1fr)_25rem]" : "grid-cols-1");
 }
 
 function assistantTurn(json: boolean): AssistantTurn {
