@@ -4,7 +4,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, TabNav, type TabNavItem } from "obp-ui";
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
-import { NeedsAttention } from "~/components/NeedsAttention";
 import { PageHeader } from "~/components/PageHeader";
 import {
     ErrorLine,
@@ -164,7 +163,6 @@ export function InfrastructurePage() {
             />
             {active === MACHINES && (
                 <PanelSections>
-                    <NeedsAttention scope="infrastructure" />
                     {can.admin && <JoinRequests pools={pools.data ?? []} />}
                     <MachinesTab
                         pools={pools.data ?? []}

@@ -14,7 +14,7 @@ import {
 } from "./activity";
 import { servedOn } from "./byModel";
 import { type MachineRow, machineStatus } from "./machines";
-import type { NodeInfo, PoolInfo } from "./parts";
+import type { NodeInfo } from "./parts";
 
 export function shortGpu(name: string): string {
     return name
@@ -156,35 +156,18 @@ export function jobChips(node: NodeInfo): JobChip[] {
     }));
 }
 
-export type PoolTotals = {
-    machines: number;
-    gpus: string;
-    capacity: number;
-    used: number;
-    engines: number;
-    jobs: number;
-};
-
-function gpuSummary(nodes: NodeInfo[]): string {
-    const names = nodes.flatMap((node) => node.gpus.map((gpu) => shortGpu(gpu.name)));
-    if (names.length === 0) {
-        return "No GPUs";
+export function poolMemory(rows: MachineRow[]): Memory | null {
+    const memory = rows
+        .filter((row) => row.node.online)
+        .map(memoryOf)
+        .filter((item): item is Memory => item !== null);
+    if (memory.length === 0) {
+        return null;
     }
-    return tally(names)
-        .map(([name, many]) => `${many} × ${name}`)
-        .join(", ");
-}
-
-export function poolTotals(pool: PoolInfo, rows: MachineRow[]): PoolTotals {
-    const live = rows.filter((row) => row.node.online);
-    const memory = live.map(memoryOf).filter((item): item is Memory => item !== null);
     return {
-        machines: rows.length,
-        gpus: gpuSummary(rows.map((row) => row.node).filter((node) => node.accelerator !== "cpu")),
         capacity: memory.reduce((sum, item) => sum + item.capacity, 0),
         used: memory.reduce((sum, item) => sum + item.used, 0),
-        engines: pool.engines.length,
-        jobs: rows.reduce((sum, row) => sum + row.node.jobs.length, 0),
+        basis: memory.every((item) => item.basis === "measured") ? "measured" : "estimated",
     };
 }
 

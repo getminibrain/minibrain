@@ -15,13 +15,16 @@ import {
     modelState,
     replicasOf,
 } from "./byModel";
-import { Dash, MachineLabel } from "./cells";
+import { Dash, Lead, MachineLabel } from "./cells";
 import type { MachineRow } from "./machines";
 import { type OpenRows, RowToggle, rowEvents } from "./parts";
 
 const SPAN = 5;
 const LINK = "text-primary hover:underline";
-const LEAF = "h-14 border-border-soft";
+const ROW = "h-12";
+const LEAF = "h-12 border-border-soft";
+const CELL = "py-1.5";
+const LEADING = "flex min-w-0 items-center gap-2";
 
 function ModelLine({
     group,
@@ -40,16 +43,21 @@ function ModelLine({
         <TableRow
             {...rowEvents(toggle, onToggle)}
             aria-label={`${model.name}, ${state.label.toLowerCase()}`}
-            className="h-14 cursor-pointer bg-muted outline-none hover:bg-muted focus-visible:bg-secondary"
+            className={cn(
+                ROW,
+                "cursor-pointer bg-muted outline-none hover:bg-muted focus-visible:bg-secondary",
+            )}
         >
-            <TableCell className="py-1.5 pl-1.5">
-                <span className="flex min-w-0 items-center gap-2">
+            <TableCell className={CELL}>
+                <span className={LEADING}>
                     <RowToggle
                         open={open}
                         label={`${open ? "Hide" : "Show"} machines serving ${model.name}`}
                         onToggle={toggle}
                     />
-                    <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
+                    <Lead>
+                        <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
+                    </Lead>
                     <Link
                         href={modelPageHref(model.model)}
                         className={cn(LINK, "truncate font-medium")}
@@ -61,12 +69,12 @@ function ModelLine({
                     )}
                 </span>
             </TableCell>
-            <TableCell className="py-1.5">
+            <TableCell className={CELL}>
                 <StatusText tone={state.tone} active={state.active}>
                     {state.label}
                 </StatusText>
             </TableCell>
-            <TableCell className="py-1.5">
+            <TableCell className={CELL}>
                 {model.version === null ? (
                     <Dash />
                 ) : (
@@ -78,10 +86,10 @@ function ModelLine({
                     </Link>
                 )}
             </TableCell>
-            <TableCell className="py-1.5 text-right tabular-nums">
+            <TableCell className={cn(CELL, "text-right tabular-nums")}>
                 {count(replicasOf(group).length)}
             </TableCell>
-            <TableCell className="py-1.5">
+            <TableCell className={CELL}>
                 <span className="block truncate">
                     {group.places.map((place, index) => (
                         <Fragment key={place.pool.name}>
@@ -116,19 +124,25 @@ function MachineSubRow({
                 !row.node.online && "text-muted-foreground",
             )}
         >
-            <TableCell className="py-1 pl-[3.75rem]">
-                <MachineLabel row={row} problems={problems} />
+            <TableCell className={CELL}>
+                <span className={LEADING}>
+                    <span className="w-6 shrink-0" />
+                    <MachineLabel row={row} problems={problems} />
+                </span>
             </TableCell>
-            <TableCell className="py-1">
-                <StatusText tone={state.tone} active={state.active}>
-                    {state.label}
-                </StatusText>
+            <TableCell className={CELL}>
+                <span className="flex min-w-0 items-center gap-2">
+                    <StatusText tone={state.tone} active={state.active}>
+                        {state.label}
+                    </StatusText>
+                    <span className="truncate text-muted-foreground">
+                        {engineLabel(engine.engine)}
+                    </span>
+                </span>
             </TableCell>
-            <TableCell className="py-1 text-muted-foreground">
-                {engineLabel(engine.engine)}
-            </TableCell>
-            <TableCell className="py-1" />
-            <TableCell className="py-1">
+            <TableCell className={CELL} />
+            <TableCell className={CELL} />
+            <TableCell className={CELL}>
                 <PoolLink name={row.pool.name} />
             </TableCell>
         </TableRow>
@@ -138,15 +152,21 @@ function MachineSubRow({
 function NoReplicaRow({ place }: { place: ModelPlace }) {
     return (
         <TableRow className={cn(LEAF, "hover:bg-transparent")}>
-            <TableCell className="py-1 pl-[3.75rem] text-muted-foreground">
-                No machine in this pool runs it
+            <TableCell className={CELL}>
+                <span className={LEADING}>
+                    <span className="w-6 shrink-0" />
+                    <Lead />
+                    <span className="truncate text-muted-foreground">
+                        No machine in this pool runs it
+                    </span>
+                </span>
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className={CELL}>
                 <StatusText tone="warning">No replica</StatusText>
             </TableCell>
-            <TableCell className="py-1" />
-            <TableCell className="py-1" />
-            <TableCell className="py-1">
+            <TableCell className={CELL} />
+            <TableCell className={CELL} />
+            <TableCell className={CELL}>
                 <PoolLink name={place.pool.name} />
             </TableCell>
         </TableRow>

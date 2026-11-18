@@ -1,19 +1,15 @@
-import {
-    IconAlertTriangle,
-    IconArrowDown,
-    IconArrowUp,
-    IconSelector,
-    IconServer,
-} from "@tabler/icons-react";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import {
     Badge,
     Link,
+    SortButton,
     StatusDot,
     TableHead,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
     cn,
+    sortAria,
 } from "obp-ui";
 import type { ReactNode } from "react";
 import type { Problem } from "~/api/problemQueries";
@@ -163,7 +159,7 @@ export function MemoryFigure({
                     label={`${host} memory`}
                     className="w-16 shrink-0"
                 />
-                <span className="text-sm tabular-nums">{percentText(shareOf(used, capacity))}</span>
+                <span className="tabular-nums">{percentText(shareOf(used, capacity))}</span>
                 {basis === "estimated" && (
                     <span className="text-sm text-muted-foreground">est.</span>
                 )}
@@ -185,31 +181,22 @@ export function SortHead({
     onSort: (key: SortKey) => void;
     numeric?: boolean;
 }) {
-    const active = sort?.key === sortKey;
-    const Icon = !active ? IconSelector : sort.desc ? IconArrowDown : IconArrowUp;
+    const direction = sort?.key === sortKey ? (sort.desc ? "desc" : "asc") : false;
     return (
-        <TableHead
-            aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}
-            className={cn(numeric && "text-right")}
-        >
-            <button
-                type="button"
+        <TableHead aria-sort={sortAria(direction)} className={cn(numeric && "text-right")}>
+            <SortButton
+                direction={direction}
                 onClick={() => onSort(sortKey)}
-                className={cn(
-                    "inline-flex max-w-full items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-                    active && "text-foreground",
-                )}
+                className={cn(direction && "text-foreground")}
             >
-                <span className="truncate">{label}</span>
-                {(active || !numeric) && (
-                    <Icon
-                        aria-hidden="true"
-                        className={cn("size-3.5 shrink-0", !active && "text-muted-foreground")}
-                    />
-                )}
-            </button>
+                {label}
+            </SortButton>
         </TableHead>
     );
+}
+
+export function Lead({ children }: { children?: ReactNode }) {
+    return <span className="flex w-5 shrink-0 items-center justify-center">{children}</span>;
 }
 
 export function ProblemTags({ problems }: { problems: Problem[] }) {
@@ -250,13 +237,14 @@ export function MachineLabel({ row, problems }: { row: MachineRow; problems: Pro
     const status = statusTone(row);
     const draining = node.state === "draining";
     return (
-        <span className="flex min-w-0 items-center gap-1.5">
-            <Tip tip={status.label}>
-                <span className="flex shrink-0 cursor-default">
-                    <StatusDot tone={status.tone} active={status.active} label={status.label} />
-                </span>
-            </Tip>
-            <IconServer aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+        <span className="flex min-w-0 items-center gap-2">
+            <Lead>
+                <Tip tip={status.label}>
+                    <span className="flex cursor-default">
+                        <StatusDot tone={status.tone} active={status.active} label={status.label} />
+                    </span>
+                </Tip>
+            </Lead>
             <span
                 className={cn(
                     "max-w-full shrink-0 truncate font-mono",

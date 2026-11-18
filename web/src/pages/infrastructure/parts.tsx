@@ -11,38 +11,9 @@ export type NodeInfo = components["schemas"]["NodeInfo"];
 export type ReplicaInfo = components["schemas"]["ReplicaInfo"];
 export type StoreInfo = components["schemas"]["StoreInfo"];
 export type InfrastructureInfo = components["schemas"]["InfrastructureInfo"];
-export type PoolRoom = components["schemas"]["PoolRoom"];
 
 export function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
-}
-
-export function roomText(room: PoolRoom): string {
-    const serve =
-        room.serve_size && room.serve_count > 0
-            ? `Room for ${count(room.serve_count)} more ${room.serve_size} model${room.serve_count === 1 ? "" : "s"}`
-            : "No room for another model";
-    const train =
-        room.train_size && room.train_strategy
-            ? `trains up to ${room.train_size} (${room.train_strategy})`
-            : "too full to train";
-    return `${serve} · ${train}`;
-}
-
-export function RoomLine({ room }: { room: PoolRoom | null | undefined }) {
-    if (!room) {
-        return null;
-    }
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="min-w-0 cursor-default text-sm text-muted-foreground tabular-nums">
-                    {roomText(room)}
-                </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm whitespace-normal">{room.basis}</TooltipContent>
-        </Tooltip>
-    );
 }
 
 export function MachineName({ node, busy = false }: { node: NodeInfo; busy?: boolean }) {

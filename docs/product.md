@@ -521,7 +521,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Infrastructure › Machines, Infrastructure › Setup · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
 - **Needs attention** · shipped · admin
   What is wrong now, worst first, each with its fix.
-  UI: Infrastructure › Machines › Needs attention, Home › Needs attention, Models › model › Overview › Needs attention · API: GET /api/problems
+  UI: Home › Needs attention, Models › model › Overview › Needs attention · API: GET /api/problems
 - **Machine list** · shipped · admin
   Sort and filter every machine, spot its problems, open its details.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
@@ -537,9 +537,6 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Drain and remove machines** · shipped · admin
   Drain a machine of new work, undrain it, or remove it.
   UI: Infrastructure › Machines · API: POST /api/compute/pools/{pool}/machines/{host}/drain, POST /api/compute/pools/{pool}/machines/{host}/undrain, DELETE /api/compute/pools/{pool}/machines/{host}
-- **Room per pool** · shipped · admin
-  See how many more models fit and the largest that trains.
-  UI: Infrastructure › Machines · API: GET /api/compute/pools
 - **Pool use** · shipped · admin
   Use each pool for any work, serving only or training only.
   UI: Infrastructure › Machines › pool menu › Used for · API: GET /api/compute/pools/{pool}/settings, PUT /api/compute/pools/{pool}/settings, GET /api/compute/pools

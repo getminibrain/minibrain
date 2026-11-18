@@ -11,39 +11,28 @@ import { jobHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { LOCAL_POOL, PoolJoinControls } from "./PoolJoin";
 import { PoolMenu, UseBadge } from "./PoolUse";
-import {
-    type NodeJob,
-    engineLabel,
-    jobLink,
-    jobSubject,
-    servedHref,
-    versioned,
-    worstState,
-} from "./activity";
+import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "./activity";
 import { servedOn } from "./byModel";
 import {
     Dash,
     JobProgressChip,
+    Lead,
     MachineLabel,
     MemoryFigure,
-    MeterBar,
     ModelChip,
     SortHead,
-    Tip,
 } from "./cells";
 import {
     cpuOf,
     gpuText,
     jobChips,
     memoryOf,
-    memoryText,
     modelChips,
     percentText,
+    poolMemory,
     poolProblems,
-    poolTotals,
     ramOf,
     shareOf,
-    statusTone,
 } from "./fleet";
 import type { MachineRow } from "./machines";
 import {
@@ -53,44 +42,31 @@ import {
     ProblemBadge,
     RowToggle,
     plural,
-    roomText,
     rowEvents,
 } from "./parts";
 import { type Sort, type SortKey, nextSort, sortRows } from "./sorting";
 
 const COLUMNS: { key: SortKey; label: string; width: string; numeric?: boolean }[] = [
-    { key: "host", label: "Machine", width: "w-[20rem]" },
+    { key: "host", label: "Machine", width: "w-[18rem]" },
     { key: "gpu", label: "GPU", width: "w-[7.5rem]" },
     { key: "memory", label: "GPU memory", width: "w-[8.5rem]" },
-    { key: "cpu", label: "CPU", width: "w-[4.5rem]", numeric: true },
-    { key: "ram", label: "RAM", width: "w-[4.5rem]", numeric: true },
+    { key: "cpu", label: "CPU", width: "w-[5.5rem]", numeric: true },
+    { key: "ram", label: "RAM", width: "w-[5.5rem]", numeric: true },
     { key: "models", label: "Models", width: "" },
-    { key: "jobs", label: "Jobs", width: "w-[8.5rem]" },
+    { key: "jobs", label: "Jobs", width: "w-[7.5rem]" },
 ];
 
 const SPAN = COLUMNS.length;
+const TRAILING = 4;
+const DETAIL = SPAN - 1;
 const MAX_CHIPS = 5;
 const NAMED = ["@[13rem]:flex", "@[24rem]:flex"];
 const COMPACT = ["@[13rem]:hidden", "@[24rem]:hidden"];
 const LINK = "text-primary hover:underline";
-const SUB_GRID = "grid grid-cols-[9rem_minmax(0,18rem)_minmax(0,1fr)] items-center gap-x-4";
-
-function Stat({
-    label,
-    children,
-    className,
-}: {
-    label: string;
-    children: ReactNode;
-    className?: string;
-}) {
-    return (
-        <span className={cn("flex shrink-0 items-center gap-1.5 tabular-nums", className)}>
-            <span className="text-muted-foreground">{label}</span>
-            {children}
-        </span>
-    );
-}
+const ROW = "h-12";
+const CELL = "py-1.5";
+const NUMBER = "py-1.5 text-right tabular-nums";
+const LEADING = "flex min-w-0 items-center gap-2";
 
 function PoolBand({
     pool,
@@ -109,79 +85,58 @@ function PoolBand({
     open: boolean;
     onToggle: (open: boolean) => void;
 }) {
-    const totals = poolTotals(pool, rows);
+    const memory = poolMemory(rows);
     return (
         <TableRow
             id={`pool-${pool.name}`}
-            className="h-14 scroll-mt-24 bg-muted transition-colors duration-150 hover:bg-muted data-flash:bg-highlight motion-reduce:transition-none"
+            className={cn(
+                ROW,
+                "scroll-mt-24 bg-muted transition-colors duration-150 hover:bg-muted data-flash:bg-highlight motion-reduce:transition-none",
+            )}
         >
-            <TableCell colSpan={SPAN} className="py-1.5 pl-1.5">
-                <span className="@container flex min-w-0 items-center gap-x-5 text-sm">
-                    <span className="flex shrink-0 items-center gap-2 text-base">
-                        <RowToggle
-                            open={open}
-                            label={`${open ? "Hide" : "Show"} machines of ${pool.name}`}
-                            onToggle={() => onToggle(!open)}
-                        />
-                        <IconStack2
-                            aria-hidden="true"
-                            className="size-4 shrink-0 text-muted-foreground"
-                        />
-                        <span className="font-medium">{pool.name}</span>
-                        {pool.label !== pool.name && (
-                            <span className="text-sm text-muted-foreground">{pool.label}</span>
-                        )}
-                        <UseBadge workloads={pool.workloads} />
-                        <ProblemBadge problems={problems} />
+            <TableCell className={CELL}>
+                <span className={LEADING}>
+                    <RowToggle
+                        open={open}
+                        label={`${open ? "Hide" : "Show"} machines of ${pool.name}`}
+                        onToggle={() => onToggle(!open)}
+                    />
+                    <Lead>
+                        <IconStack2 aria-hidden="true" className="size-4 text-muted-foreground" />
+                    </Lead>
+                    <span
+                        className="shrink-0 font-medium"
+                        title={pool.label !== pool.name ? pool.label : undefined}
+                    >
+                        {pool.name}
                     </span>
-                    <OnlineCount nodes={pool.nodes} />
-                    {rows.length < pool.nodes.length && (
-                        <span className="shrink-0 text-muted-foreground tabular-nums">
-                            {`${count(rows.length)} shown`}
-                        </span>
-                    )}
-                    {totals.machines > 0 && (
-                        <Stat label="GPUs" className="hidden min-w-0 shrink @[64rem]:flex">
-                            <span className="truncate" title={totals.gpus}>
-                                {totals.gpus}
-                            </span>
-                        </Stat>
-                    )}
-                    {totals.capacity > 0 && (
-                        <Stat label="Memory">
-                            <Tip
-                                tip={`${memoryText(totals.used, totals.capacity)} in use across the online machines`}
-                            >
-                                <span className="flex cursor-default items-center gap-2">
-                                    <MeterBar
-                                        used={totals.used}
-                                        capacity={totals.capacity}
-                                        label={`${pool.name} memory`}
-                                        className="w-16 shrink-0"
-                                    />
-                                    {percentText(shareOf(totals.used, totals.capacity))}
-                                </span>
-                            </Tip>
-                        </Stat>
-                    )}
-                    <Stat label="Engines">{count(totals.engines)}</Stat>
-                    <Stat label="Jobs">{count(totals.jobs)}</Stat>
-                    {pool.room && (
-                        <Tip tip={pool.room.basis}>
-                            <span className="hidden min-w-0 cursor-default truncate text-muted-foreground @[80rem]:block">
-                                {roomText(pool.room)}
-                            </span>
-                        </Tip>
-                    )}
-                    {admin && (
-                        <span className="ml-auto flex shrink-0 items-center gap-2">
-                            {pool.name !== LOCAL_POOL && (
-                                <PoolJoinControls pool={pool.name} token={token} />
-                            )}
-                            <PoolMenu pool={pool.name} workloads={pool.workloads} />
-                        </span>
-                    )}
+                    <UseBadge workloads={pool.workloads} />
+                    <ProblemBadge problems={problems} />
+                    <span className="min-w-0 truncate text-sm">
+                        <OnlineCount nodes={pool.nodes} />
+                    </span>
                 </span>
+            </TableCell>
+            <TableCell className={CELL} />
+            <TableCell className={CELL}>
+                {memory && (
+                    <MemoryFigure
+                        used={memory.used}
+                        capacity={memory.capacity}
+                        basis={memory.basis}
+                        host={pool.name}
+                    />
+                )}
+            </TableCell>
+            <TableCell colSpan={TRAILING} className={CELL}>
+                {admin && (
+                    <span className="flex items-center justify-end gap-2">
+                        {pool.name !== LOCAL_POOL && (
+                            <PoolJoinControls pool={pool.name} token={token} />
+                        )}
+                        <PoolMenu pool={pool.name} workloads={pool.workloads} />
+                    </span>
+                )}
             </TableCell>
         </TableRow>
     );
@@ -193,7 +148,7 @@ function ModelsCell({ row }: { row: MachineRow }) {
     }
     const chips = modelChips(row);
     if (chips.length === 0) {
-        return <span className="text-muted-foreground">None</span>;
+        return <Dash />;
     }
     const shown = chips.slice(0, MAX_CHIPS);
     return (
@@ -252,7 +207,6 @@ function MachineLine({
     onOpen: (row: MachineRow) => void;
 }) {
     const { node } = row;
-    const status = statusTone(row);
     const memory = memoryOf(row);
     const cpu = cpuOf(node);
     const ram = ramOf(node);
@@ -260,14 +214,15 @@ function MachineLine({
     return (
         <TableRow
             {...rowEvents(() => onOpen(row), expandable ? onToggle : undefined)}
-            aria-label={`${node.host}, ${status.label.toLowerCase()}`}
+            aria-label={node.host}
             className={cn(
-                "h-14 cursor-pointer outline-none focus-visible:bg-secondary",
+                ROW,
+                "cursor-pointer outline-none focus-visible:bg-secondary",
                 !node.online && "text-muted-foreground",
             )}
         >
-            <TableCell className="py-1 pl-1.5">
-                <span className="flex min-w-0 items-center gap-1.5 pl-6">
+            <TableCell className={CELL}>
+                <span className={LEADING}>
                     <span className="flex w-6 shrink-0">
                         {expandable && (
                             <RowToggle
@@ -280,12 +235,12 @@ function MachineLine({
                     <MachineLabel row={row} problems={problems} />
                 </span>
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className={CELL}>
                 <span className="block truncate" title={gpuText(node)}>
                     {gpuText(node, true)}
                 </span>
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className={CELL}>
                 {memory ? (
                     <MemoryFigure
                         used={memory.used}
@@ -297,49 +252,58 @@ function MachineLine({
                     <Dash />
                 )}
             </TableCell>
-            <TableCell className="py-1 text-right tabular-nums">
+            <TableCell className={NUMBER}>
                 {cpu === null ? <Dash /> : `${Math.round(cpu)}%`}
             </TableCell>
-            <TableCell className="py-1 text-right tabular-nums">
+            <TableCell className={NUMBER}>
                 {ram.used !== null && ram.total ? (
-                    <Tip tip={`${bytes(ram.used)} of ${bytes(ram.total)} RAM in use`}>
-                        <span className="cursor-default">
-                            {percentText(shareOf(ram.used, ram.total))}
-                        </span>
-                    </Tip>
+                    <span title={`${bytes(ram.used)} of ${bytes(ram.total)} RAM in use`}>
+                        {percentText(shareOf(ram.used, ram.total))}
+                    </span>
                 ) : (
                     <Dash />
                 )}
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className={CELL}>
                 <ModelsCell row={row} />
             </TableCell>
-            <TableCell className="py-1">
+            <TableCell className={CELL}>
                 <JobsCell row={row} />
             </TableCell>
         </TableRow>
     );
 }
 
-function SubRow({ children }: { children: ReactNode }) {
+function SubRow({
+    lead,
+    name,
+    detail,
+}: {
+    lead: ReactNode;
+    name: ReactNode;
+    detail: ReactNode;
+}) {
     return (
-        <TableRow className="h-10 border-border-soft hover:bg-transparent">
-            <TableCell colSpan={SPAN} className="py-1.5 pl-[5.25rem]">
-                <span className={SUB_GRID}>{children}</span>
+        <TableRow className={cn(ROW, "border-border-soft hover:bg-transparent")}>
+            <TableCell className={CELL}>
+                <span className={LEADING}>
+                    <span className="w-6 shrink-0" />
+                    <Lead>{lead}</Lead>
+                    <span className="min-w-0 truncate">{name}</span>
+                </span>
+            </TableCell>
+            <TableCell colSpan={DETAIL} className={CELL}>
+                <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                    {detail}
+                </span>
             </TableCell>
         </TableRow>
     );
 }
 
-function JobDetail({ job }: { job: NodeJob }) {
-    return (
-        <span className="truncate text-sm text-muted-foreground tabular-nums">
-            {`${Math.round(job.progress * 100)}% · `}
-            <Link href={jobHref(job)} className={LINK}>
-                {`Job ${job.id}`}
-            </Link>
-        </span>
-    );
+function engineDetail(replicas: number, engine: string): string {
+    const label = engineLabel(engine);
+    return replicas > 1 ? `${plural(replicas, "replica")} · ${label}` : label;
 }
 
 function ActivityRows({ row }: { row: MachineRow }) {
@@ -349,59 +313,82 @@ function ActivityRows({ row }: { row: MachineRow }) {
             {models.map(({ served, engines }) => {
                 const state = worstState(engines);
                 return (
-                    <SubRow key={`served-${served.model}`}>
-                        <StatusText tone={state.tone} active={state.active}>
-                            {state.label}
-                        </StatusText>
-                        <span className="flex min-w-0 items-center gap-2">
+                    <SubRow
+                        key={`served-${served.model}`}
+                        lead={
                             <PublisherLogo name={served.name} modelKey={served.model} size="sm" />
-                            <Link href={servedHref(served)} className={cn(LINK, "truncate")}>
+                        }
+                        name={
+                            <Link href={servedHref(served)} className={LINK}>
                                 {versioned(served.name, served.version)}
                             </Link>
-                        </span>
-                        <span className="truncate text-sm text-muted-foreground tabular-nums">
-                            {`${plural(engines.length, "replica")} here · ${engineLabel(engines[0].engine)}`}
-                        </span>
-                    </SubRow>
+                        }
+                        detail={
+                            <>
+                                <StatusText tone={state.tone} active={state.active}>
+                                    {state.label}
+                                </StatusText>
+                                <span className="truncate">
+                                    {engineDetail(engines.length, engines[0].engine)}
+                                </span>
+                            </>
+                        }
+                    />
                 );
             })}
             {bare.map((engine) => {
                 const state = worstState([engine]);
                 return (
-                    <SubRow key={`engine-${engine.id}`}>
-                        <StatusText tone={state.tone} active={state.active}>
-                            {state.label}
-                        </StatusText>
-                        <span className="flex min-w-0 items-center gap-2">
+                    <SubRow
+                        key={`engine-${engine.id}`}
+                        lead={
                             <PublisherLogo
                                 name={engine.base_model}
                                 modelKey={engine.base_model}
                                 size="sm"
                             />
-                            <span className="truncate font-mono">{engine.base_model}</span>
-                        </span>
-                        <span className="truncate text-sm text-muted-foreground">
-                            {`No model deployed · ${engineLabel(engine.engine)}`}
-                        </span>
-                    </SubRow>
+                        }
+                        name={<span className="font-mono">{engine.base_model}</span>}
+                        detail={
+                            <>
+                                <StatusText tone={state.tone} active={state.active}>
+                                    {state.label}
+                                </StatusText>
+                                <span className="truncate">
+                                    {`No model deployed · ${engineLabel(engine.engine)}`}
+                                </span>
+                            </>
+                        }
+                    />
                 );
             })}
             {row.node.jobs.map((job) => (
-                <SubRow key={`job-${job.id}`}>
-                    <StatusText
-                        tone="info"
-                        active
-                        progress={job.progress > 0 ? percentOf(job.progress) : null}
-                    >
-                        {kindNoun(job.kind)}
-                    </StatusText>
-                    <span className="truncate">
+                <SubRow
+                    key={`job-${job.id}`}
+                    lead={null}
+                    name={
                         <Link href={jobLink(job)} className={LINK}>
                             {jobSubject(job)}
                         </Link>
-                    </span>
-                    <JobDetail job={job} />
-                </SubRow>
+                    }
+                    detail={
+                        <>
+                            <StatusText
+                                tone="info"
+                                active
+                                progress={job.progress > 0 ? percentOf(job.progress) : null}
+                            >
+                                {kindNoun(job.kind)}
+                            </StatusText>
+                            <span className="truncate tabular-nums">
+                                {`${Math.round(job.progress * 100)}% · `}
+                                <Link href={jobHref(job)} className={LINK}>
+                                    {`Job ${job.id}`}
+                                </Link>
+                            </span>
+                        </>
+                    }
+                />
             ))}
         </>
     );
