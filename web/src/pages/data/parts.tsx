@@ -196,6 +196,27 @@ export function AboutPart({
     );
 }
 
+export function PartAction({
+    label,
+    onClick,
+    children,
+}: {
+    label: string;
+    onClick: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={label} onClick={onClick}>
+                    {children}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 export function Facts({ children }: { children: ReactNode }) {
     return (
         <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 tabular-nums">
@@ -365,6 +386,10 @@ export function DeleteMenuItem({
 
 const SHOWN_LABELS = 10;
 
+function percent(share: number): string {
+    return `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
+}
+
 export function LabelBalance({
     counts,
     labels,
@@ -389,6 +414,11 @@ export function LabelBalance({
         <div className="flex flex-col gap-1">
             <table className="w-full table-fixed border-collapse">
                 <caption className="sr-only">Rows per label</caption>
+                <colgroup>
+                    <col className="w-1/2" />
+                    <col />
+                    <col className="w-22" />
+                </colgroup>
                 <thead className="sr-only">
                     <tr>
                         <th scope="col">Label</th>
@@ -401,26 +431,25 @@ export function LabelBalance({
                         const share = item.rows / total;
                         return (
                             <tr key={item.label} className="group/bar h-8 hover:bg-secondary">
-                                <th scope="row" className="w-[40%] pr-2 text-left font-normal">
+                                <th scope="row" className="pr-3 text-left font-normal">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <span className="block truncate">{item.label}</span>
                                         </TooltipTrigger>
                                         <TooltipContent className="max-w-96 break-all">
-                                            {`${item.label}: ${item.rows.toLocaleString()} rows, ${(share * 100).toFixed(1)}%`}
+                                            {item.label}
                                         </TooltipContent>
                                     </Tooltip>
                                 </th>
-                                <td className="pr-2">
+                                <td className="pr-3">
                                     <div
                                         aria-hidden="true"
-                                        className="h-3 rounded-r-sm bg-primary"
+                                        className="h-1.5 rounded-r-sm bg-primary"
                                         style={{ width: `${(item.rows / largest) * 100}%` }}
                                     />
-                                    <span className="sr-only">{`${(share * 100).toFixed(1)}%`}</span>
                                 </td>
-                                <td className="w-16 text-right text-sm text-muted-foreground tabular-nums group-hover/bar:text-foreground">
-                                    {item.rows.toLocaleString()}
+                                <td className="text-right text-sm whitespace-nowrap text-muted-foreground tabular-nums group-hover/bar:text-foreground">
+                                    {`${item.rows.toLocaleString()} · ${percent(share)}`}
                                 </td>
                             </tr>
                         );

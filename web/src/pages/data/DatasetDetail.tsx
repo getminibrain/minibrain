@@ -1,4 +1,4 @@
-import { IconFolderDown, IconPencil, IconSql, IconTags } from "@tabler/icons-react";
+import { IconFolderDown, IconPencil, IconSchool, IconSql, IconTags } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -30,6 +30,7 @@ import {
     unwrap,
 } from "~/api/client";
 import {
+    type DatasetVersionInfo,
     type DatasetVersionStats,
     useDatasetVersionStats,
     useDatasetVersions,
@@ -40,6 +41,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Section } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { asCode, count } from "~/lib/format";
+import { modelVersionHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { ChecksList, checksCaption } from "./Checks";
 import { MoveDialog, type MoveTarget, PathLinks, folderRef } from "./DatasetFolders";
@@ -76,6 +78,7 @@ import {
     ItemHeader,
     ItemMenu,
     LabelBalance,
+    PartAction,
     SplitDetail,
     modelHref,
     useDataRefresh,
@@ -199,9 +202,9 @@ function QueryPart({
             title="Query"
             tip={QUERY_HELP}
             action={
-                <Button variant="outline" size="sm" onClick={onEdit}>
-                    Edit query
-                </Button>
+                <PartAction label="Edit query" onClick={onEdit}>
+                    <IconPencil />
+                </PartAction>
             }
         >
             {body}
@@ -349,7 +352,23 @@ function TestExampleNote({ count: total }: { count: number }) {
     );
 }
 
-function UsedBy({ dataset }: { dataset: DatasetSummary }) {
+function newestVersions(versions: DatasetVersionInfo[]): Map<string, number> {
+    const newest = new Map<string, number>();
+    for (const tag of versions.flatMap((item) => item.versions)) {
+        const [slug, number] = tag.split("@");
+        newest.set(slug, Math.max(newest.get(slug) ?? 0, Number(number)));
+    }
+    return newest;
+}
+
+function UsedBy({
+    dataset,
+    versions,
+}: {
+    dataset: DatasetSummary;
+    versions: DatasetVersionInfo[];
+}) {
+    const newest = newestVersions(versions);
     const nameOf = useModelNames();
     const models = useAllModels();
     const avatarOf = (slug: string) =>
@@ -375,6 +394,14 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
                                 {nameOf(slug)}
                             </Link>
                             <TestExampleNote count={dataset.test_examples?.[slug] ?? 0} />
+                            {newest.has(slug) && (
+                                <Link
+                                    href={modelVersionHref(slug, newest.get(slug) ?? 0)}
+                                    className="shrink-0 text-primary tabular-nums hover:underline"
+                                >
+                                    {`v${newest.get(slug)}`}
+                                </Link>
+                            )}
                         </li>
                     ))}
                 </ul>
@@ -601,10 +628,14 @@ export function DatasetDetail({
                         versions={versions.data ?? []}
                     />
                     {tooFew ? (
-                        <BlockedButton reason={tooFew}>Train a model</BlockedButton>
+                        <BlockedButton reason={tooFew}>
+                            <IconSchool />
+                            Train a model
+                        </BlockedButton>
                     ) : (
                         <Button asChild>
                             <Link href={`/models/new?dataset=${encodeURIComponent(dataset.slug)}`}>
+                                <IconSchool />
                                 Train a model
                             </Link>
                         </Button>
@@ -664,19 +695,19 @@ export function DatasetDetail({
             />
             <SampleLine dataset={dataset} save={save} />
             <DatasetStats dataset={dataset} stats={stats.data} />
-            <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
             <AboutPart
                 title="Data quality"
                 tip={checksCaption(dataset.dataset_version) || undefined}
             >
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             </AboutPart>
+            <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
             {mapped && (
                 <AboutPart title="Label balance" tip={LABEL_BALANCE_TIP}>
                     <SavedLabelBalance saved={Boolean(dataset.dataset_version)} stats={stats} />
                 </AboutPart>
             )}
-            <UsedBy dataset={dataset} />
+            <UsedBy dataset={dataset} versions={versions.data ?? []} />
         </>
     );
     return (

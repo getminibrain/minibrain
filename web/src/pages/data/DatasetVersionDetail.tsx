@@ -1,4 +1,4 @@
-import { IconChevronDown, IconGitCompare } from "@tabler/icons-react";
+import { IconChevronDown, IconGitCompare, IconSchool } from "@tabler/icons-react";
 import {
     Button,
     CodeBlock,
@@ -68,13 +68,21 @@ function TrainFrom({
     const nameOf = useModelNames();
     const label = `Train from v${datasetVersion.number}`;
     if (datasetVersion.too_few_rows) {
-        return <BlockedButton reason={datasetVersion.too_few_rows}>{label}</BlockedButton>;
+        return (
+            <BlockedButton reason={datasetVersion.too_few_rows}>
+                <IconSchool />
+                {label}
+            </BlockedButton>
+        );
     }
     const fresh = newModelHref(dataset.slug, datasetVersion);
     if (dataset.models.length === 0) {
         return (
             <Button asChild>
-                <Link href={fresh}>{label}</Link>
+                <Link href={fresh}>
+                    <IconSchool />
+                    {label}
+                </Link>
             </Button>
         );
     }
@@ -82,6 +90,7 @@ function TrainFrom({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button>
+                    <IconSchool />
                     {label}
                     <IconChevronDown aria-hidden="true" />
                 </Button>
@@ -307,10 +316,10 @@ function SavedVersion({
         <>
             <ViewingNotice number={number} latest={latest?.number ?? number} slug={dataset.slug} />
             <VersionStats datasetVersion={datasetVersion} stats={stats} />
-            <SavedQuery sql={datasetVersion.sql} />
             <AboutPart title="Data quality" tip={checksCaption(datasetVersion) || undefined}>
                 <ChecksList datasetVersion={datasetVersion} dataset={dataset.slug} readOnly />
             </AboutPart>
+            <SavedQuery sql={datasetVersion.sql} />
             <AboutPart title="Label balance" tip={LABEL_BALANCE_TIP}>
                 <SavedLabelBalance saved stats={stats} />
             </AboutPart>

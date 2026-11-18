@@ -1,4 +1,9 @@
-import { IconChevronDown, IconDeviceFloppy, IconGitCompare } from "@tabler/icons-react";
+import {
+    IconChevronDown,
+    IconDeviceFloppy,
+    IconGitCompare,
+    IconHistory,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -538,6 +543,7 @@ export function VersionPicker({
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" aria-label={`Version ${shown}, pick another`}>
+                        <IconHistory aria-hidden="true" />
                         <span className="tabular-nums">{versionTitle(shown, latest)}</span>
                         <IconChevronDown aria-hidden="true" />
                     </Button>

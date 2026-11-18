@@ -1,6 +1,15 @@
-import { IconCheck } from "@tabler/icons-react";
+import { IconCheck, IconX } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Link } from "obp-ui";
+import {
+    Button,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+    Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "obp-ui";
 import { api, succeed } from "~/api/client";
 import type { DatasetVersionInfo } from "~/api/dataQueries";
 import type { components } from "~/api/schema";
@@ -165,7 +174,7 @@ function CompactFinding({
     actions: ReturnType<typeof useDismiss> | null;
 }) {
     return (
-        <li className="flex flex-col">
+        <li className="group/finding flex flex-col">
             <Collapsible>
                 <div className="flex min-h-8 items-center gap-2">
                     <CollapsibleTrigger className="min-w-0 flex-1 font-normal">
@@ -174,14 +183,21 @@ function CompactFinding({
                         </StatusText>
                     </CollapsibleTrigger>
                     {actions && check.status === "warning" && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={actions.dismiss.isPending}
-                            onClick={() => actions.dismiss.mutate(check)}
-                        >
-                            Dismiss
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={`Dismiss ${check.title}`}
+                                    disabled={actions.dismiss.isPending}
+                                    onClick={() => actions.dismiss.mutate(check)}
+                                    className="opacity-0 group-hover/finding:opacity-100 focus-visible:opacity-100"
+                                >
+                                    <IconX />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Dismiss</TooltipContent>
+                        </Tooltip>
                     )}
                 </div>
                 <CollapsibleContent className="flex flex-col gap-1 pb-1 pl-5">
