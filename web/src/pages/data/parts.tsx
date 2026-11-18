@@ -116,6 +116,35 @@ export function ItemHeader({
     );
 }
 
+export function ResizeHandle({
+    label,
+    width,
+    className,
+}: {
+    label: string;
+    width: ReturnType<typeof useResizableWidth>;
+    className?: string;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={`Resize ${label}`}
+                    onPointerDown={width.onPointerDown}
+                    onKeyDown={width.onKeyDown}
+                    onDoubleClick={width.reset}
+                    className={cn(
+                        "absolute inset-y-0 -right-1 z-10 w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary",
+                        className,
+                    )}
+                />
+            </TooltipTrigger>
+            <TooltipContent side="right">Drag to resize, double-click to reset</TooltipContent>
+        </Tooltip>
+    );
+}
+
 export type SplitSide = {
     label: string;
     sizing: WidthOptions;
@@ -162,21 +191,11 @@ export function SplitDetail({
                     >
                         {about}
                     </section>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                aria-label={`Resize ${side.label}`}
-                                onPointerDown={width.onPointerDown}
-                                onKeyDown={width.onKeyDown}
-                                onDoubleClick={width.reset}
-                                className="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary @3xl/data:block"
-                            />
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            Drag to resize, double-click to reset
-                        </TooltipContent>
-                    </Tooltip>
+                    <ResizeHandle
+                        label={side.label}
+                        width={width}
+                        className="hidden @3xl/data:block"
+                    />
                 </div>
                 {preview}
             </div>

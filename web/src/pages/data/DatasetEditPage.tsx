@@ -1,25 +1,45 @@
-import { IconDeviceFloppy, IconPlayerPlay, IconPlus, IconX } from "@tabler/icons-react";
+import {
+    IconArrowLeft,
+    IconDeviceFloppy,
+    IconNotes,
+    IconPlayerPlay,
+    IconPlus,
+    IconX,
+} from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useBlocker, useRouter } from "@tanstack/react-router";
-import { Button, ConfirmDialog, Input, Kbd, type SqlEditorHandle, Textarea } from "obp-ui";
+import {
+    Button,
+    ConfirmDialog,
+    Field,
+    FieldGroup,
+    Input,
+    Kbd,
+    Link,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    SegmentedTabs,
+    type SqlEditorHandle,
+    Textarea,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+    cn,
+} from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
 import { useDataSettings } from "~/api/dataQueries";
-import {
-    FORM_GROUP_GAP,
-    FORM_ROW_GAP,
-    FormControl,
-    FormRow,
-    FormRows,
-} from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { sqlProblem } from "~/lib/sqlError";
+import { useResizableWidth } from "~/lib/useResizableWidth";
 import { splitTags } from "../models/dialogs";
 import { useDatasetRefresh } from "./DatasetDetail";
 import { type Fix, type FixContext, type Limits, limitsOf } from "./QualityTab";
 import {
     type Draft,
+    MODES,
     type MappingBody,
     QueryEditor,
     chosenSources,
@@ -28,6 +48,7 @@ import {
     previewSql,
     sameDraft,
     savedDraft,
+    switchedDraft,
     withRole,
 } from "./QueryEditor";
 import {
@@ -35,7 +56,6 @@ import {
     type Focus,
     QueryPreviewPanel,
     type QueryShape,
-    shapeSummary,
     useLivePreview,
     useSettled,
 } from "./QueryPreview";
@@ -53,15 +73,10 @@ import {
     sourceRef,
 } from "./catalogue";
 import { NO_CLEANUP, affectedStep, wrappedSql } from "./cleanup";
-import { type Described, ItemHeader, SplitDetail, type SplitSide, useDataRefresh } from "./parts";
+import { type Described, ResizeHandle, useDataRefresh } from "./parts";
 import { defaultName, mentions, sharedColumns, unionSql } from "./sql";
 
-const EDITOR_SIDE: SplitSide = {
-    label: "Dataset",
-    sizing: { key: "minibrain.data.queryWidth", initial: null, min: 420, max: 1100 },
-    widths: "@3xl/data:w-80 @min-[52rem]/detail:w-[26rem] @min-[80rem]/detail:w-1/2",
-    className: FORM_GROUP_GAP,
-};
+const QUERY_WIDTH = { key: "minibrain.data.editorQueryWidth", initial: null, min: 416, max: 2400 };
 
 const EMPTY_DRAFT: Draft = {
     mode: "columns",
@@ -229,54 +244,90 @@ function useFocusWithin(focus: boolean) {
     return box;
 }
 
-function DetailsFields({
+function DetailsPopover({
     details,
-    problem,
+    note,
     onChange,
 }: {
     details: Details;
-    problem: string | null;
+    note: ReactNode;
     onChange: (details: Details) => void;
 }) {
+    const filled = [details.description.trim() !== "", details.tags.trim() !== ""].filter(
+        Boolean,
+    ).length;
     return (
-        <FormRows labels="compact">
-            <FormRow id="dataset-name" label="Name">
-                <FormControl width="text">
-                    <Input
-                        id="dataset-name"
-                        value={details.name}
-                        maxLength={80}
-                        placeholder="Support tickets by team"
-                        aria-invalid={problem ? true : undefined}
-                        onChange={(event) => onChange({ ...details, name: event.target.value })}
-                    />
-                    {problem && <p className="text-sm text-destructive">{problem}</p>}
-                </FormControl>
-            </FormRow>
-            <FormRow id="dataset-description" label="Description" align="start">
-                <FormControl width="wide">
-                    <Textarea
-                        id="dataset-description"
-                        value={details.description}
-                        maxLength={1000}
-                        rows={2}
-                        onChange={(event) =>
-                            onChange({ ...details, description: event.target.value })
-                        }
-                    />
-                </FormControl>
-            </FormRow>
-            <FormRow id="dataset-tags" label="Tags" align="start">
-                <FormControl width="wide">
-                    <Input
-                        id="dataset-tags"
-                        value={details.tags}
-                        onChange={(event) => onChange({ ...details, tags: event.target.value })}
-                    />
-                    <p className="text-sm text-muted-foreground">{TAGS_HINT}</p>
-                </FormControl>
-            </FormRow>
-        </FormRows>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm">
+                    <IconNotes />
+                    Details
+                    {filled > 0 && (
+                        <span className="text-sm text-muted-foreground tabular-nums">{filled}</span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-96">
+                <FieldGroup>
+                    <p className="text-sm text-muted-foreground">{note}</p>
+                    <Field id="dataset-description" label="Description">
+                        <Textarea
+                            id="dataset-description"
+                            value={details.description}
+                            maxLength={1000}
+                            rows={3}
+                            onChange={(event) =>
+                                onChange({ ...details, description: event.target.value })
+                            }
+                        />
+                    </Field>
+                    <Field id="dataset-tags" label="Tags" hint={TAGS_HINT}>
+                        <Input
+                            id="dataset-tags"
+                            value={details.tags}
+                            onChange={(event) => onChange({ ...details, tags: event.target.value })}
+                        />
+                    </Field>
+                </FieldGroup>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function TitleField({
+    name,
+    placeholder,
+    problem,
+    onChange,
+}: {
+    name: string;
+    placeholder: string;
+    problem: string | null;
+    onChange: (name: string) => void;
+}) {
+    return (
+        <span className="flex min-w-32 max-w-96 flex-1 items-center gap-2">
+            <Input
+                id="dataset-name"
+                aria-label="Dataset name"
+                value={name}
+                maxLength={80}
+                placeholder={placeholder}
+                aria-invalid={problem ? true : undefined}
+                aria-describedby={problem ? "dataset-name-problem" : undefined}
+                onChange={(event) => onChange(event.target.value)}
+                className="min-w-0 flex-1 border-transparent bg-transparent text-lg font-semibold hover:border-input focus-visible:border-ring"
+            />
+            {problem && (
+                <span
+                    id="dataset-name-problem"
+                    className="max-w-48 shrink-0 truncate text-sm text-destructive"
+                    title={problem}
+                >
+                    {problem}
+                </span>
+            )}
+        </span>
     );
 }
 
@@ -369,6 +420,7 @@ function DatasetWorkbench({
     const detailsChanged = !sameDetails(details, initialDetails);
     const guard = useLeaveGuard(detailsChanged || !sameDraft(draft, initialDraft));
     const queryBox = useFocusWithin(focusQuery);
+    const split = useResizableWidth(QUERY_WIDTH);
     const save = useMutation({
         mutationFn: onSave,
         onSuccess: (slug) => {
@@ -380,7 +432,6 @@ function DatasetWorkbench({
     const body = queryChanged ? draftBody(draft, sources) : null;
     const problem = details.name.trim() ? nameProblem(details.name) : null;
     const current = live !== null && live === settled;
-    const numbers = current ? shapeSummary(preview.counted) : null;
     const missing = queryChanged && current && preview.missing.length > 0;
     const ready =
         (detailsChanged || queryChanged) &&
@@ -393,126 +444,155 @@ function DatasetWorkbench({
         ? null
         : sqlProblem(save.error, save.variables?.body?.sql ?? undefined, draft.sql);
     const header = (
-        <ItemHeader
-            title={title}
-            detail={detail}
-            actions={
-                <>
-                    <Button variant="outline" disabled={live === null} onClick={run}>
-                        <IconPlayerPlay />
-                        Run
-                        <Kbd>{RUN_KEYS}</Kbd>
-                    </Button>
-                    <Button variant="outline" onClick={() => router.history.push(backHref)}>
-                        <IconX />
-                        Cancel
-                    </Button>
-                    <Button
-                        className="tabular-nums"
-                        disabled={!ready || save.isPending}
-                        onClick={() => save.mutate({ details: described(details), body })}
-                    >
-                        {creating ? <IconPlus /> : <IconDeviceFloppy />}
-                        {save.isPending
-                            ? "Saving…"
-                            : numbers
-                              ? `${saveLabel} · ${numbers}`
-                              : saveLabel}
-                    </Button>
-                </>
-            }
-        />
-    );
-    const editor = (
-        <>
-            <DetailsFields details={details} problem={problem} onChange={setDetails} />
-            <section
-                ref={queryBox}
-                aria-labelledby="dataset-query-title"
-                className={`flex min-w-0 scroll-mt-6 flex-col ${FORM_ROW_GAP}`}
-            >
-                <h3 id="dataset-query-title" className="font-medium">
-                    Query
-                </h3>
-                <QueryEditor
-                    draft={draft}
-                    sources={sources}
-                    problem={draft.mode === "sql" ? (runProblem ?? saveProblem) : null}
-                    chars={chars}
-                    cleanupDefaults={{
-                        rare: limits?.minLabelRows ?? 10,
-                        maxTokens: limits?.longTokens ?? 2048,
-                        perLabel: context.perLabel,
-                    }}
-                    editor={sqlEditor}
-                    onChange={setDraft}
-                    onRun={(text) => runNow(text, live)}
-                />
-                {over && save.variables?.body ? (
-                    <SampleOffer
-                        total={over.total_rows}
-                        limit={over.row_limit}
-                        seed={save.variables.body.sample?.seed}
-                        pending={save.isPending}
-                        onTake={(sample) =>
-                            save.variables?.body &&
-                            save.mutate({
-                                ...save.variables,
-                                body: { ...save.variables.body, sample },
-                            })
-                        }
-                    />
-                ) : (
-                    <ErrorLine error={saveProblem?.message} />
-                )}
-            </section>
-        </>
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
+            <nav aria-label="Breadcrumb" className="flex shrink-0 items-center gap-1">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Back"
+                            onClick={() => router.history.push(backHref)}
+                        >
+                            <IconArrowLeft />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Back</TooltipContent>
+                </Tooltip>
+                <Link
+                    href={itemHref(DATASETS_GROUP)}
+                    className="text-muted-foreground hover:text-foreground"
+                >
+                    Data
+                </Link>
+                <span aria-hidden="true" className="text-muted-foreground">
+                    /
+                </span>
+            </nav>
+            <TitleField
+                name={details.name}
+                placeholder={title}
+                problem={problem}
+                onChange={(name) => setDetails({ ...details, name })}
+            />
+            <DetailsPopover details={details} note={detail} onChange={setDetails} />
+            <SegmentedTabs
+                size="sm"
+                tabs={MODES}
+                active={draft.mode}
+                onSelect={(next) => setDraft(switchedDraft(draft, next, sources, chars))}
+            />
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+                <Button variant="outline" disabled={live === null} onClick={run}>
+                    <IconPlayerPlay />
+                    Run
+                    <Kbd>{RUN_KEYS}</Kbd>
+                </Button>
+                <Button variant="outline" onClick={() => router.history.push(backHref)}>
+                    <IconX />
+                    Cancel
+                </Button>
+                <Button
+                    className="tabular-nums"
+                    disabled={!ready || save.isPending}
+                    onClick={() => save.mutate({ details: described(details), body })}
+                >
+                    {creating ? <IconPlus /> : <IconDeviceFloppy />}
+                    {save.isPending ? "Saving…" : saveLabel}
+                </Button>
+            </div>
+        </header>
     );
     return (
-        <>
-            <SplitDetail
-                header={header}
-                about={editor}
-                side={EDITOR_SIDE}
-                preview={
-                    <QueryPreviewPanel
-                        preview={preview}
-                        waiting={waiting}
-                        idle={
-                            draft.mode === "sql"
-                                ? "Write a query to see its rows."
-                                : "Pick a source to see its rows."
-                        }
-                        pickable={
-                            draft.mode === "columns"
-                                ? sharedColumns(chosenSources(draft, sources))
-                                : undefined
-                        }
-                        onPick={(column, role) => setDraft(withRole(draft, column, role))}
-                        quality={{
-                            dataset,
-                            context,
-                            effect,
-                            focus,
-                            canFix: draft.mode === "columns" || Boolean(draft.sql.trim()),
-                            onShowRows: (check) =>
-                                setFocus({
-                                    check: check.check,
-                                    title: check.title,
-                                    rows: check.rows,
-                                    majority:
-                                        check.check === "balance" && !context.rare
-                                            ? (check.table[0]?.[0] ?? null)
-                                            : null,
-                                }),
-                            onShowAll: () => setFocus(null),
-                            onFix: (fix) => void applyFix(fix),
-                        }}
-                    />
-                }
-            />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {header}
+            <div className="flex min-h-0 flex-1">
+                <section
+                    ref={queryBox}
+                    aria-label="Query"
+                    className={cn(
+                        "relative flex min-h-0 max-w-[calc(100%-26rem)] min-w-[26rem] shrink-0 flex-col border-r",
+                        split.width === null && "w-1/2",
+                    )}
+                    style={split.width === null ? undefined : { width: split.width }}
+                >
+                    <div
+                        className={cn(
+                            "flex min-h-0 flex-1 flex-col gap-3 p-6",
+                            draft.mode === "columns" && "overflow-y-auto",
+                        )}
+                    >
+                        <QueryEditor
+                            draft={draft}
+                            sources={sources}
+                            problem={draft.mode === "sql" ? (runProblem ?? saveProblem) : null}
+                            chars={chars}
+                            cleanupDefaults={{
+                                rare: limits?.minLabelRows ?? 10,
+                                maxTokens: limits?.longTokens ?? 2048,
+                                perLabel: context.perLabel,
+                            }}
+                            editor={sqlEditor}
+                            onChange={setDraft}
+                            onRun={(text) => runNow(text, live)}
+                        />
+                        {over && save.variables?.body ? (
+                            <SampleOffer
+                                total={over.total_rows}
+                                limit={over.row_limit}
+                                seed={save.variables.body.sample?.seed}
+                                pending={save.isPending}
+                                onTake={(sample) =>
+                                    save.variables?.body &&
+                                    save.mutate({
+                                        ...save.variables,
+                                        body: { ...save.variables.body, sample },
+                                    })
+                                }
+                            />
+                        ) : (
+                            <ErrorLine error={saveProblem?.message} />
+                        )}
+                    </div>
+                    <ResizeHandle label="Query" width={split} />
+                </section>
+                <QueryPreviewPanel
+                    preview={preview}
+                    waiting={waiting}
+                    idle={
+                        draft.mode === "sql"
+                            ? "Write a query to see its rows."
+                            : "Pick a source to see its rows."
+                    }
+                    pickable={
+                        draft.mode === "columns"
+                            ? sharedColumns(chosenSources(draft, sources))
+                            : undefined
+                    }
+                    onPick={(column, role) => setDraft(withRole(draft, column, role))}
+                    quality={{
+                        dataset,
+                        context,
+                        effect,
+                        focus,
+                        canFix: draft.mode === "columns" || Boolean(draft.sql.trim()),
+                        onShowRows: (check) =>
+                            setFocus({
+                                check: check.check,
+                                title: check.title,
+                                rows: check.rows,
+                                majority:
+                                    check.check === "balance" && !context.rare
+                                        ? (check.table[0]?.[0] ?? null)
+                                        : null,
+                            }),
+                        onShowAll: () => setFocus(null),
+                        onFix: (fix) => void applyFix(fix),
+                    }}
+                />
+            </div>
             {guard.dialog}
-        </>
+        </div>
     );
 }
 

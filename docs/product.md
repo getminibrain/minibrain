@@ -50,7 +50,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Join, filter and clean several sources in locked-down DuckDB SQL.
   UI: Data › dataset › … › Edit dataset › Write SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
 - **Dataset editor** · shipped · product, ml
-  Name, describe, tag and query a dataset on one page.
+  Query and preview side by side at full height; resizable divider.
   UI: Data › Add › New dataset, Data › dataset › … › Edit dataset, Data › dataset › Query › Edit · API: POST /api/datasets, PATCH /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping
 - **Column picker** · shipped · product, ml
   Pick text and answer columns by type, sample values and suggestions.

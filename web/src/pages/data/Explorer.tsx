@@ -25,9 +25,6 @@ import {
     DropdownMenuTrigger,
     FileName,
     SearchInput,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
     Tree,
     type TreeNode,
     TreeRowMenu,
@@ -105,7 +102,7 @@ import {
     usesSource,
 } from "./catalogue";
 import { GroupIcon, SourceIcon } from "./icons";
-import { FILL } from "./parts";
+import { FILL, ResizeHandle } from "./parts";
 
 const TREE_WIDTH = { key: "minibrain.data.treeWidth", initial: 288, min: 200, max: 520 };
 const DEFAULT_ITEM: ItemRef = DATASETS_GROUP;
@@ -889,6 +886,14 @@ export function DataExplorer() {
         }
     }
 
+    if (queryPage) {
+        return (
+            <div className="@container/data flex min-h-0 flex-1 flex-col">
+                {detail ?? (loading && <p className="px-6 py-4 text-muted-foreground">Loading…</p>)}
+            </div>
+        );
+    }
+
     return (
         <div className="@container/data flex min-h-0 flex-1 flex-col">
             <div className={pageFrame("full")}>
@@ -978,21 +983,7 @@ export function DataExplorer() {
                             </>
                         )}
                     </div>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                aria-label="Resize the list"
-                                onPointerDown={width.onPointerDown}
-                                onKeyDown={width.onKeyDown}
-                                onDoubleClick={width.reset}
-                                className="absolute inset-y-0 -right-1 z-10 hidden w-2 cursor-col-resize touch-none outline-none select-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 after:-translate-x-1/2 hover:after:bg-primary focus-visible:after:bg-primary @3xl:block"
-                            />
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                            Drag to resize, double-click to reset
-                        </TooltipContent>
-                    </Tooltip>
+                    <ResizeHandle label="the list" width={width} className="hidden @3xl:block" />
                 </aside>
                 <section
                     aria-label="Details"

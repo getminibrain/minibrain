@@ -40,7 +40,7 @@ export function useResizableWidth(options: WidthOptions) {
         event.preventDefault();
         const startX = event.clientX;
         const panel = event.currentTarget.parentElement;
-        const startWidth = width ?? panel?.getBoundingClientRect().width ?? options.min;
+        const startWidth = panel?.getBoundingClientRect().width ?? width ?? options.min;
         const move = (moved: globalThis.PointerEvent) =>
             setWidth(clamp(startWidth + moved.clientX - startX, options));
         const stop = (ended: globalThis.PointerEvent) => {
@@ -57,7 +57,7 @@ export function useResizableWidth(options: WidthOptions) {
         }
         event.preventDefault();
         const panel = event.currentTarget.parentElement;
-        const current = width ?? panel?.getBoundingClientRect().width ?? options.min;
+        const current = panel?.getBoundingClientRect().width ?? width ?? options.min;
         commit(current + (event.key === "ArrowLeft" ? -STEP : STEP));
     };
     return { width, onPointerDown, onKeyDown, reset: () => commit(options.initial) };

@@ -7,6 +7,7 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    InfoTip,
     SegmentedTabs,
     Select,
     SelectContent,
@@ -73,10 +74,20 @@ export type Draft = {
     guessed: Role[];
 };
 
-const MODES = [
+export const MODES = [
     { key: "columns", label: "Pick columns" },
     { key: "sql", label: "Write SQL" },
 ];
+
+export function switchedDraft(
+    draft: Draft,
+    next: string,
+    sources: SourceSummary[],
+    chars: number | null,
+): Draft {
+    const seeded = next === "sql" && !draft.sql.trim() ? draftSql(draft, sources, chars) : null;
+    return { ...draft, mode: next as Mode, sql: seeded ?? draft.sql };
+}
 
 const NONE = "none";
 
@@ -636,14 +647,14 @@ function TableList({
     const insertable =
         "rounded-sm outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
     return (
-        <div className="flex min-w-0 flex-col rounded-lg border">
+        <div className="flex max-h-64 min-h-0 min-w-0 flex-col rounded-lg border @2xl:max-h-none">
             <div className="border-b px-3 py-1.5 text-sm text-muted-foreground">
                 Tables you can query
             </div>
             {sources.length === 0 ? (
                 <p className="px-3 py-2 text-muted-foreground">No sources yet.</p>
             ) : (
-                <ul className="max-h-64 divide-y overflow-y-auto">
+                <ul className="min-h-0 flex-1 divide-y overflow-y-auto">
                     {[...sources]
                         .sort((left, right) => left.table.localeCompare(right.table))
                         .map((source) => (
@@ -794,15 +805,26 @@ function SqlMode({
         known[0];
     const base = draft.sql.trim() ? draft.sql : (starter ?? null);
     return (
-        <div className="@container flex flex-col gap-3">
-            <div className="flex items-center gap-2">
+        <div className="@container flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex shrink-0 items-center gap-2">
                 <ExamplesMenu
                     base={base}
                     others={known.filter((item) => item !== current)}
                     onPick={(sql) => void editor.current?.replace(sql, { format: true })}
                 />
+                <p className="min-w-0 truncate text-sm text-muted-foreground">
+                    Return columns named <span className="font-mono">input</span> and{" "}
+                    <span className="font-mono">label</span>
+                </p>
+                <InfoTip label="About dataset SQL" side="bottom">
+                    Other columns are kept in each version. Join, union, filter and clean up with
+                    DuckDB SQL. On sources under a million rows the preview runs when you stop
+                    typing; on larger ones it runs when you press Run. Cmd/Ctrl+Enter runs it at
+                    once, or only the selected part. Hover a column name for its type and values.
+                    Queries are read-only and cannot reach other files or the network.
+                </InfoTip>
             </div>
-            <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_14rem]">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-3 @2xl:grid-cols-[minmax(0,1fr)_14rem] @2xl:grid-rows-[minmax(0,1fr)]">
                 <SqlEditor
                     ref={editor}
                     value={draft.sql}
@@ -811,23 +833,14 @@ function SqlMode({
                     schema={editorSchema(sources, stats)}
                     completions={DUCKDB_WORDS}
                     diagnostics={problem?.diagnostics}
-                    minLines={12}
-                    maxLines={32}
+                    minLines={8}
+                    fill
                     aria-label="SQL"
                     starter={starter}
                     placeholder="SELECT text AS input, category AS label FROM tickets"
                 />
                 <TableList sources={sources} onInsert={(name) => editor.current?.insert(name)} />
             </div>
-            <p className="text-sm text-muted-foreground">
-                Return columns named <span className="font-mono">input</span> and{" "}
-                <span className="font-mono">label</span>; other columns are kept in each version.
-                Join, union, filter and clean up with DuckDB SQL. On sources under a million rows
-                the preview runs when you stop typing; on larger ones it runs when you press Run.
-                Cmd/Ctrl+Enter runs it at once, or only the selected part. Hover a column name for
-                its type and values. Queries are read-only and cannot reach other files or the
-                network.
-            </p>
         </div>
     );
 }
@@ -851,13 +864,8 @@ export function QueryEditor({
     onChange: (draft: Draft) => void;
     onRun: (sql: string) => void;
 }) {
-    const switchMode = (next: string) => {
-        const seeded = next === "sql" && !draft.sql.trim() ? draftSql(draft, sources, chars) : null;
-        onChange({ ...draft, mode: next as Mode, sql: seeded ?? draft.sql });
-    };
     return (
-        <div className={`flex min-w-0 flex-col ${FORM_ROW_GAP}`}>
-            <SegmentedTabs tabs={MODES} active={draft.mode} onSelect={switchMode} />
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${FORM_ROW_GAP}`}>
             {draft.mode === "sql" ? (
                 <SqlMode
                     draft={draft}
@@ -873,7 +881,7 @@ export function QueryEditor({
                     sources={sources}
                     cleanupDefaults={cleanupDefaults}
                     onChange={onChange}
-                    onSwitch={() => switchMode("sql")}
+                    onSwitch={() => onChange(switchedDraft(draft, "sql", sources, chars))}
                 />
             )}
         </div>

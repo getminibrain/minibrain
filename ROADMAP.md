@@ -455,6 +455,10 @@ Data is shared across models:
   Ctrl+↵) is pressed, one action for both. A preview connection takes at most a quarter of the machine's memory and
   half its cores (`SET memory_limit`, `SET threads`, `minibrain/data/runs.py`), keeps the 30-second stop, and each
   person runs one preview at a time: a new preview stops their previous one.
+- The editor (`/data/datasets/new`, `/data/datasets/<slug>/edit`) is a page of its own beside the app's menu, without
+  the Data tree and header: a title bar (back, the name as an editable title, Details for description and tags, Pick
+  columns / Write SQL, Run, Cancel, Save) over the query and the preview side by side at full height, split by a
+  divider whose position the browser keeps; the SQL editor fills its pane.
 
 ### Sources
 
