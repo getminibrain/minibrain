@@ -1,5 +1,4 @@
-import { IconServer } from "@tabler/icons-react";
-import { Link, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
+import { Link, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, cn } from "obp-ui";
 import { Fragment, type ReactNode } from "react";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
 import { PoolLink } from "~/components/PoolLink";
@@ -16,12 +15,13 @@ import {
     modelState,
     replicasOf,
 } from "./byModel";
+import { Dash, MachineLabel } from "./cells";
 import type { MachineRow } from "./machines";
-import { MachineName, type OpenRows, ProblemBadge, RowToggle, rowEvents } from "./parts";
+import { type OpenRows, RowToggle, rowEvents } from "./parts";
 
-const COLUMNS = 6;
+const SPAN = 5;
 const LINK = "text-primary hover:underline";
-const SUB_ROW = "border-border-soft";
+const LEAF = "h-14 border-border-soft";
 
 function ModelLine({
     group,
@@ -40,24 +40,20 @@ function ModelLine({
         <TableRow
             {...rowEvents(toggle, onToggle)}
             aria-label={`${model.name}, ${state.label.toLowerCase()}`}
-            className="cursor-pointer outline-none focus-visible:bg-secondary"
+            className="h-14 cursor-pointer bg-muted outline-none hover:bg-muted focus-visible:bg-secondary"
         >
-            <TableCell className="px-2 py-2">
-                <RowToggle
-                    open={open}
-                    label={`${open ? "Hide" : "Show"} machines serving ${model.name}`}
-                    onToggle={toggle}
-                />
-            </TableCell>
-            <TableCell className="py-2">
-                <StatusText tone={state.tone} active={state.active}>
-                    {state.label}
-                </StatusText>
-            </TableCell>
-            <TableCell className="py-2">
+            <TableCell className="py-1.5 pl-1.5">
                 <span className="flex min-w-0 items-center gap-2">
+                    <RowToggle
+                        open={open}
+                        label={`${open ? "Hide" : "Show"} machines serving ${model.name}`}
+                        onToggle={toggle}
+                    />
                     <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
-                    <Link href={modelPageHref(model.model)} className={cn(LINK, "truncate")}>
+                    <Link
+                        href={modelPageHref(model.model)}
+                        className={cn(LINK, "truncate font-medium")}
+                    >
                         {model.name}
                     </Link>
                     {base && (
@@ -65,17 +61,27 @@ function ModelLine({
                     )}
                 </span>
             </TableCell>
-            <TableCell className="py-2">
+            <TableCell className="py-1.5">
+                <StatusText tone={state.tone} active={state.active}>
+                    {state.label}
+                </StatusText>
+            </TableCell>
+            <TableCell className="py-1.5">
                 {model.version === null ? (
-                    <span className="text-muted-foreground">–</span>
+                    <Dash />
                 ) : (
-                    <Link href={modelVersionHref(model.model, model.version)} className={LINK}>
+                    <Link
+                        href={modelVersionHref(model.model, model.version)}
+                        className={cn(LINK, "tabular-nums")}
+                    >
                         {`v${model.version}`}
                     </Link>
                 )}
             </TableCell>
-            <TableCell className="py-2 tabular-nums">{count(replicasOf(group).length)}</TableCell>
-            <TableCell className="py-2">
+            <TableCell className="py-1.5 text-right tabular-nums">
+                {count(replicasOf(group).length)}
+            </TableCell>
+            <TableCell className="py-1.5">
                 <span className="block truncate">
                     {group.places.map((place, index) => (
                         <Fragment key={place.pool.name}>
@@ -105,33 +111,24 @@ function MachineSubRow({
             {...rowEvents(() => onOpen(row))}
             aria-label={`${row.node.host}, ${state.label.toLowerCase()}`}
             className={cn(
-                SUB_ROW,
+                LEAF,
                 "cursor-pointer outline-none focus-visible:bg-secondary",
                 !row.node.online && "text-muted-foreground",
             )}
         >
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5">
+            <TableCell className="py-1 pl-[3.75rem]">
+                <MachineLabel row={row} problems={problems} />
+            </TableCell>
+            <TableCell className="py-1">
                 <StatusText tone={state.tone} active={state.active}>
                     {state.label}
                 </StatusText>
             </TableCell>
-            <TableCell className="py-1.5 pl-6">
-                <span className="flex min-w-0 items-center gap-2">
-                    <IconServer
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-muted-foreground"
-                    />
-                    <MachineName node={row.node} busy />
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                        {engineLabel(engine.engine)}
-                    </span>
-                    <ProblemBadge problems={problems} />
-                </span>
+            <TableCell className="py-1 text-muted-foreground">
+                {engineLabel(engine.engine)}
             </TableCell>
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5">
+            <TableCell className="py-1" />
+            <TableCell className="py-1">
                 <PoolLink name={row.pool.name} />
             </TableCell>
         </TableRow>
@@ -140,17 +137,16 @@ function MachineSubRow({
 
 function NoReplicaRow({ place }: { place: ModelPlace }) {
     return (
-        <TableRow className={cn(SUB_ROW, "hover:bg-transparent")}>
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5">
-                <StatusText tone="warning">No replica</StatusText>
-            </TableCell>
-            <TableCell className="py-1.5 pl-6 text-muted-foreground">
+        <TableRow className={cn(LEAF, "hover:bg-transparent")}>
+            <TableCell className="py-1 pl-[3.75rem] text-muted-foreground">
                 No machine in this pool runs it
             </TableCell>
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5" />
-            <TableCell className="py-1.5">
+            <TableCell className="py-1">
+                <StatusText tone="warning">No replica</StatusText>
+            </TableCell>
+            <TableCell className="py-1" />
+            <TableCell className="py-1" />
+            <TableCell className="py-1">
                 <PoolLink name={place.pool.name} />
             </TableCell>
         </TableRow>
@@ -183,34 +179,7 @@ function PlaceRows({
     );
 }
 
-export function ModelColumns() {
-    return (
-        <>
-            <colgroup>
-                <col className="w-10" />
-                <col className="w-44" />
-                <col className="w-[32%]" />
-                <col className="w-28" />
-                <col className="w-24" />
-                <col />
-            </colgroup>
-            <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                    <TableHead>
-                        <span className="sr-only">Expand</span>
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead>Live version</TableHead>
-                    <TableHead>Replicas</TableHead>
-                    <TableHead>Pools</TableHead>
-                </TableRow>
-            </TableHeader>
-        </>
-    );
-}
-
-export function ModelRows({
+export function ModelTable({
     groups,
     problems,
     open,
@@ -224,37 +193,58 @@ export function ModelRows({
     onOpen: (row: MachineRow) => void;
 }) {
     return (
-        <TableBody>
-            {groups.length > 0 ? (
-                groups.map(({ group, places }) => {
-                    const key = `model:${group.model.model}`;
-                    const expanded = open.isOpen(key, true);
-                    return (
-                        <Fragment key={key}>
-                            <ModelLine
-                                group={group}
-                                open={expanded}
-                                onToggle={(next) => open.set(key, next)}
-                            />
-                            {expanded &&
-                                places.map((place) => (
-                                    <PlaceRows
-                                        key={place.pool.name}
-                                        place={place}
-                                        problems={problems}
-                                        onOpen={onOpen}
-                                    />
-                                ))}
-                        </Fragment>
-                    );
-                })
-            ) : (
+        <Table className="table-fixed [&_td]:overflow-hidden">
+            <colgroup>
+                <col />
+                <col className="w-48" />
+                <col className="w-32" />
+                <col className="w-24" />
+                <col className="w-[22%]" />
+            </colgroup>
+            <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={COLUMNS} className="h-32 text-center text-muted-foreground">
-                        {empty}
-                    </TableCell>
+                    <TableHead>Model</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Live version</TableHead>
+                    <TableHead className="text-right">Replicas</TableHead>
+                    <TableHead>Pools</TableHead>
                 </TableRow>
-            )}
-        </TableBody>
+            </TableHeader>
+            <TableBody>
+                {groups.length > 0 ? (
+                    groups.map(({ group, places }) => {
+                        const key = `model:${group.model.model}`;
+                        const expanded = open.isOpen(key, true);
+                        return (
+                            <Fragment key={key}>
+                                <ModelLine
+                                    group={group}
+                                    open={expanded}
+                                    onToggle={(next) => open.set(key, next)}
+                                />
+                                {expanded &&
+                                    places.map((place) => (
+                                        <PlaceRows
+                                            key={place.pool.name}
+                                            place={place}
+                                            problems={problems}
+                                            onOpen={onOpen}
+                                        />
+                                    ))}
+                            </Fragment>
+                        );
+                    })
+                ) : (
+                    <TableRow className="hover:bg-transparent">
+                        <TableCell
+                            colSpan={SPAN}
+                            className="h-32 text-center text-muted-foreground"
+                        >
+                            {empty}
+                        </TableCell>
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
     );
 }

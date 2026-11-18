@@ -1,11 +1,4 @@
-import {
-    Button,
-    FilterMenu,
-    type FilterMenuSection,
-    SearchInput,
-    SegmentedTabs,
-    Table,
-} from "obp-ui";
+import { Button, FilterMenu, type FilterMenuSection, SearchInput, SegmentedTabs } from "obp-ui";
 import { Fragment, type ReactNode } from "react";
 import { useJoinTokens } from "~/api/joinTokenQueries";
 import { problemsOfMachine, useProblems } from "~/api/problemQueries";
@@ -14,8 +7,8 @@ import { count } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { useScrollToHash } from "~/lib/scrollToHash";
 import { MachineSheet } from "./MachineSheet";
-import { ModelColumns, ModelRows } from "./ModelView";
-import { PoolColumns, PoolRows } from "./PoolView";
+import { ModelTable } from "./ModelView";
+import { PoolTable } from "./PoolView";
 import { type ShownGroup, modelGroups, shownGroups } from "./byModel";
 import {
     type MachineFilters,
@@ -200,34 +193,26 @@ export function MachinesTab({
                 </span>
             </div>
             <div className="overflow-hidden rounded-md border bg-card">
-                <Table className="table-fixed [&_td]:overflow-hidden">
-                    {byModel ? (
-                        <>
-                            <ModelColumns />
-                            <ModelRows
-                                groups={groups}
-                                problems={problems}
-                                open={open}
-                                empty={empty}
-                                onOpen={openRow}
-                            />
-                        </>
-                    ) : (
-                        <>
-                            <PoolColumns />
-                            <PoolRows
-                                pools={pools}
-                                shown={shown}
-                                problems={problems}
-                                admin={can.admin}
-                                tokens={tokens.data}
-                                open={open}
-                                empty={empty}
-                                onOpen={openRow}
-                            />
-                        </>
-                    )}
-                </Table>
+                {byModel ? (
+                    <ModelTable
+                        groups={groups}
+                        problems={problems}
+                        open={open}
+                        empty={empty}
+                        onOpen={openRow}
+                    />
+                ) : (
+                    <PoolTable
+                        pools={pools}
+                        shown={shown}
+                        problems={problems}
+                        admin={can.admin}
+                        tokens={tokens.data}
+                        open={open}
+                        empty={empty}
+                        onOpen={openRow}
+                    />
+                )}
                 {unlisted.length > 0 && (
                     <p className="border-t px-3 py-2 text-sm text-muted-foreground">
                         {"Not listed, nothing deployed: "}
