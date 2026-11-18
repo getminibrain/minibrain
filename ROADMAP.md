@@ -1948,6 +1948,13 @@ it finds:
 - [ ] Backup and restore, tested and documented
 - [ ] Licences: third-party notices, model licences shown before download, LICENSE and the CLA
 - [ ] Release process: versioning, changelog, signed artefacts
+- [ ] Deployment manifests: docker-compose for one VM and a Helm chart for Kubernetes
+- [ ] Prometheus alert rules shipped with minibrain (main or gateway down, live model without replica, error rate or
+      p95 over threshold, disk nearly full, machine offline, job queue backlog, audit chain broken), each with a
+      runbook page
+- [ ] Upgrades: rolling, zero-downtime (migrations both versions run against), a main/worker version-skew policy,
+      and rollback
+- [ ] Trace ids carried across main, gateway and engines in the JSON logs
 
 ## v2
 
