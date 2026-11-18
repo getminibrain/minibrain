@@ -1,4 +1,4 @@
-import { IconDeviceFloppy } from "@tabler/icons-react";
+import { IconChevronDown, IconDeviceFloppy, IconGitCompare } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -11,20 +11,23 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Link,
+    StatusDot,
+    type StatusDotTone,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
 import { useId, useState } from "react";
 import { type DatasetSummary, api, unwrap } from "~/api/client";
-import {
-    type ChangeInfo,
-    type DatasetVersionInfo,
-    dataKeys,
-    useDatasetVersions,
-} from "~/api/dataQueries";
+import { type ChangeInfo, type DatasetVersionInfo, dataKeys } from "~/api/dataQueries";
 import { keys } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { ErrorLine } from "~/components/Section";
@@ -32,7 +35,7 @@ import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
-import { bytes, relativeTime } from "~/lib/time";
+import { bytes, relativeTime, timeText } from "~/lib/time";
 import {
     SampleOffer,
     type SampleRequest,
@@ -41,6 +44,7 @@ import {
     useOverLimit,
 } from "./SampleOffer";
 import { VersionDiffDialog, compareParam, parseCompare, versionName } from "./VersionDiff";
+import { datasetHref, datasetVersionHref } from "./catalogue";
 import { modelHref, useModelNames } from "./parts";
 
 export function takenAt(datasetVersion: DatasetVersionInfo): string {
@@ -415,7 +419,7 @@ function ordered(pair: string[], datasetVersions: DatasetVersionInfo[]): [number
     return [older.id, newer.id];
 }
 
-function useCompareParam() {
+export function useCompareParam() {
     const router = useRouter();
     const requested = useRouterState({
         select: (state) => parseCompare((state.location.search as { compare?: unknown }).compare),
@@ -485,66 +489,93 @@ function AllVersionsDialog({
     );
 }
 
-const RECENT_VERSIONS = 3;
-
-function RecentVersion({ datasetVersion }: { datasetVersion: DatasetVersionInfo }) {
-    return (
-        <li className="flex flex-col gap-0.5 py-2">
-            <div className="flex items-baseline gap-2">
-                <span className="font-semibold tabular-nums">{`Version ${datasetVersion.number}`}</span>
-                <span className="min-w-0 truncate text-sm text-muted-foreground">
-                    <When value={takenAt(datasetVersion)} />
-                </span>
-                <span className="ml-auto shrink-0">
-                    <VersionRows datasetVersion={datasetVersion} />
-                    <span className="text-muted-foreground"> rows</span>
-                </span>
-            </div>
-            <div className="flex min-w-0 items-center gap-3 text-sm">
-                <ChecksSummary datasetVersion={datasetVersion} />
-                {datasetVersion.versions.length > 0 && (
-                    <span className="min-w-0 truncate">
-                        <UsedBy datasetVersion={datasetVersion} />
-                    </span>
-                )}
-            </div>
-        </li>
-    );
+function checkTone(datasetVersion: DatasetVersionInfo): StatusDotTone {
+    const open = openWarnings(datasetVersion);
+    if (open === undefined) {
+        return "muted";
+    }
+    return open === 0 ? "success" : "warning";
 }
 
-export function VersionsPart({ dataset }: { dataset: DatasetSummary }) {
-    const datasetVersions = useDatasetVersions(dataset.slug);
+function checkLabel(datasetVersion: DatasetVersionInfo): string {
+    const open = openWarnings(datasetVersion);
+    if (open === undefined) {
+        return "Checks not run";
+    }
+    if (open === 0) {
+        return "Checks passed";
+    }
+    return open === 1 ? "1 warning" : `${count(open)} warnings`;
+}
+
+export function versionTitle(number: number, latest: number | undefined): string {
+    return number === latest ? `v${number} · latest` : `v${number}`;
+}
+
+export function VersionPicker({
+    slug,
+    current,
+    versions,
+}: {
+    slug: string;
+    current: number | null;
+    versions: DatasetVersionInfo[];
+}) {
+    const router = useRouter();
     const compare = useCompareParam();
     const [all, setAll] = useState(false);
-    const rows = datasetVersions.data ?? [];
+    const latest = versions[0]?.number ?? undefined;
+    const shown = current ?? latest;
+    if (shown === undefined || shown === null) {
+        return null;
+    }
+    const open = (number: number) =>
+        router.history.push(
+            number === latest ? datasetHref(slug) : datasetVersionHref(slug, number),
+        );
     return (
         <>
-            <ErrorLine error={datasetVersions.error} onRetry={datasetVersions.refetch} />
-            {rows.length === 0 ? (
-                <p className="text-muted-foreground">
-                    {datasetVersions.isLoading
-                        ? "Loading…"
-                        : "No version yet. Save the query to make version 1."}
-                </p>
-            ) : (
-                <ul className="flex flex-col divide-y">
-                    {rows.slice(0, RECENT_VERSIONS).map((datasetVersion) => (
-                        <RecentVersion key={datasetVersion.id} datasetVersion={datasetVersion} />
-                    ))}
-                </ul>
-            )}
-            {rows.length > 0 && (
-                <div>
-                    <Button variant="link" className="h-auto px-0" onClick={() => setAll(true)}>
-                        {rows.length > 1
-                            ? `All ${count(rows.length)} versions and compare`
-                            : "Version details"}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" aria-label={`Version ${shown}, pick another`}>
+                        <span className="tabular-nums">{versionTitle(shown, latest)}</span>
+                        <IconChevronDown aria-hidden="true" />
                     </Button>
-                </div>
-            )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-96 w-80">
+                    <DropdownMenuRadioGroup
+                        value={String(shown)}
+                        onValueChange={(value) => open(Number(value))}
+                    >
+                        {versions.map((item) =>
+                            item.number === null || item.number === undefined ? null : (
+                                <DropdownMenuRadioItem key={item.id} value={String(item.number)}>
+                                    <span className="tabular-nums">
+                                        {versionTitle(item.number, latest)}
+                                    </span>
+                                    <span className="ml-auto flex items-center gap-3 text-sm text-muted-foreground tabular-nums">
+                                        <span>{timeText(takenAt(item))}</span>
+                                        <span>{`${count(item.rows)} rows`}</span>
+                                        <StatusDot
+                                            tone={checkTone(item)}
+                                            label={checkLabel(item)}
+                                            className="shrink-0"
+                                        />
+                                    </span>
+                                </DropdownMenuRadioItem>
+                            ),
+                        )}
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem disabled={versions.length < 2} onSelect={() => setAll(true)}>
+                        <IconGitCompare />
+                        Compare versions…
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
             <AllVersionsDialog
-                rows={rows}
-                loading={datasetVersions.isLoading}
+                rows={versions}
+                loading={false}
                 open={all}
                 onOpenChange={setAll}
                 onCompare={(pair) => {

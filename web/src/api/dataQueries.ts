@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import type { components } from "./schema";
 
@@ -6,6 +6,7 @@ type Schemas = components["schemas"];
 
 export type DatasetVersionInfo = Schemas["DatasetVersionInfo"];
 export type DatasetVersionStats = Schemas["DatasetVersionStats"];
+export type DatasetVersionRows = Schemas["DatasetVersionRows"];
 export type ChangeInfo = Schemas["ChangeInfo"];
 export type DataSettings = Schemas["DataSettings"];
 export type DatasetFolder = Schemas["DatasetFolderInfo"];
@@ -15,6 +16,8 @@ export const dataKeys = {
     datasetFolders: ["datasetFolders"] as const,
     datasetVersions: (slug: string) => ["datasets", slug, "versions"] as const,
     datasetVersionStats: (id: number) => ["dataset-versions", id, "stats"] as const,
+    datasetVersionRows: (id: number, rows: number) =>
+        ["dataset-versions", id, "rows", rows] as const,
     settings: ["settings", "data"] as const,
 };
 
@@ -52,6 +55,22 @@ export function useDatasetVersionStats(id: number | null | undefined) {
             ),
         enabled: typeof id === "number",
         staleTime: Number.POSITIVE_INFINITY,
+        retry: false,
+    });
+}
+
+export function useDatasetVersionRows(id: number | null | undefined, rows: number) {
+    return useQuery({
+        queryKey: dataKeys.datasetVersionRows(id ?? 0, rows),
+        queryFn: () =>
+            unwrap(
+                api.GET("/api/dataset-versions/{dataset_version_id}/rows", {
+                    params: { path: { dataset_version_id: id ?? 0 }, query: { rows } },
+                }),
+            ),
+        enabled: typeof id === "number",
+        staleTime: Number.POSITIVE_INFINITY,
+        placeholderData: keepPreviousData,
         retry: false,
     });
 }

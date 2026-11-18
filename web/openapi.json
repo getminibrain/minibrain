@@ -3144,6 +3144,72 @@
         }
       }
     },
+    "/api/dataset-versions/{dataset_version_id}/rows": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Read the rows a dataset version holds",
+        "description": "A page of the saved rows in stored order, with the column types and one training example.",
+        "operationId": "dataset_version_rows_api_dataset_versions__dataset_version_id__rows_get",
+        "parameters": [
+          {
+            "name": "dataset_version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Dataset Version Id"
+            }
+          },
+          {
+            "name": "rows",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 20,
+              "title": "Rows"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetVersionRows"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dataset-versions/{dataset_version_id}/diff/{other_id}": {
       "get": {
         "tags": [
@@ -17233,6 +17299,24 @@
             ],
             "title": "Too Few Rows",
             "description": "Why training and scoring refuse this version, when it holds too few rows."
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql",
+            "description": "The query the version was saved with."
+          },
+          "sources": {
+            "type": "integer",
+            "title": "Sources",
+            "description": "How many sources the query read.",
+            "default": 0
           }
         },
         "type": "object",
@@ -17266,6 +17350,48 @@
         },
         "type": "object",
         "title": "DatasetVersionRequest"
+      },
+      "DatasetVersionRows": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnInfo"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "example": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Example"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns",
+          "rows",
+          "total",
+          "offset",
+          "example"
+        ],
+        "title": "DatasetVersionRows"
       },
       "DatasetVersionStats": {
         "properties": {

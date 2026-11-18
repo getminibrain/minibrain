@@ -68,6 +68,7 @@ import {
 import { AddDatabaseDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { CreateDataset, DatasetDetail } from "./DatasetDetail";
 import { DatasetsRoot, FolderDetail, folderOf, folderRef, useMoveItem } from "./DatasetFolders";
+import { DatasetVersionDetail } from "./DatasetVersionDetail";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
 import { AddLakehouseDialog, LakehouseGroup } from "./Lakehouse";
@@ -85,6 +86,7 @@ import {
     TABLE_FORMATS,
     datasetNamed,
     datasetText,
+    datasetVersionOf,
     datasetsInside,
     folderIndex,
     groupOf,
@@ -409,6 +411,7 @@ export function DataExplorer() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const requested = parseItem(pathname);
+    const version = datasetVersionOf(pathname);
     const unknownPath = requested === null && pathname.replace(/\/+$/, "") !== DATA_PATH;
     const startAdding = useSearchParam("add") !== null;
     const sources = useSources();
@@ -848,7 +851,16 @@ export function DataExplorer() {
         } else {
             const dataset = datasetList.find((item) => item.slug === selected.id);
             split = Boolean(dataset);
-            detail = dataset ? (
+            detail = !dataset ? (
+                <Missing item={selected} />
+            ) : version !== null ? (
+                <DatasetVersionDetail
+                    key={`${selectedKey}@${version}`}
+                    dataset={dataset}
+                    number={version}
+                    index={index}
+                />
+            ) : (
                 <DatasetDetail
                     key={selectedKey}
                     dataset={dataset}
@@ -856,8 +868,6 @@ export function DataExplorer() {
                     index={index}
                     onSelect={select}
                 />
-            ) : (
-                <Missing item={selected} />
             );
         }
     }

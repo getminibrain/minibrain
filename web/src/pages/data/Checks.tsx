@@ -162,7 +162,7 @@ function CompactFinding({
     actions,
 }: {
     check: CheckInfo;
-    actions: ReturnType<typeof useDismiss>;
+    actions: ReturnType<typeof useDismiss> | null;
 }) {
     return (
         <li className="flex flex-col py-1">
@@ -173,7 +173,7 @@ function CompactFinding({
                             <span className="truncate">{check.title}</span>
                         </StatusText>
                     </CollapsibleTrigger>
-                    {check.status === "warning" && (
+                    {actions && check.status === "warning" && (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -204,11 +204,14 @@ function CompactFinding({
 export function ChecksList({
     datasetVersion,
     dataset,
+    readOnly = false,
 }: {
     datasetVersion: DatasetVersionInfo | null | undefined;
     dataset: string;
+    readOnly?: boolean;
 }) {
-    const actions = useDismiss(dataset);
+    const dismissing = useDismiss(dataset);
+    const actions = readOnly ? null : dismissing;
     if (!datasetVersion) {
         return <p className="text-muted-foreground">Checks run when a version is saved.</p>;
     }
@@ -266,17 +269,19 @@ export function ChecksList({
                     <span className="min-w-0 truncate text-muted-foreground">
                         {`Dismissed: ${check.title}`}
                     </span>
-                    <Button
-                        variant="link"
-                        className="h-auto shrink-0 px-0"
-                        disabled={actions.restore.isPending}
-                        onClick={() => actions.restore.mutate(check)}
-                    >
-                        Show again
-                    </Button>
+                    {actions && (
+                        <Button
+                            variant="link"
+                            className="h-auto shrink-0 px-0"
+                            disabled={actions.restore.isPending}
+                            onClick={() => actions.restore.mutate(check)}
+                        >
+                            Show again
+                        </Button>
+                    )}
                 </p>
             ))}
-            <ErrorLine error={actions.dismiss.error ?? actions.restore.error} />
+            <ErrorLine error={dismissing.dismiss.error ?? dismissing.restore.error} />
         </div>
     );
 }

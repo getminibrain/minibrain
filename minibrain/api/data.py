@@ -24,6 +24,7 @@ from minibrain.api.schemas import (
     DatasetVersionDiff,
     DatasetVersionInfo,
     DatasetVersionRequest,
+    DatasetVersionRows,
     DatasetVersionStats,
     DeltaSourceCreate,
     DemoDataInfo,
@@ -112,6 +113,7 @@ from minibrain.data.sources import (
     run_query,
     safe_filename,
     saved_quality,
+    saved_rows,
     summarize,
     to_text,
 )
@@ -765,6 +767,30 @@ def dataset_version_stats(dataset_version_id: int, session: SessionDep, store: S
     return DatasetVersionStats(
         quality=QualityInfo.model_validate(quality, from_attributes=True),
         label_counts=[LabelCount(label=label, rows=size) for label, size in counts],
+    )
+
+
+@router.get(
+    "/dataset-versions/{dataset_version_id}/rows",
+    dependencies=[Depends(builder)],
+    summary="Read the rows a dataset version holds",
+    description="A page of the saved rows in stored order, with the column types and one training example.",
+)
+def dataset_version_rows(
+    dataset_version_id: int,
+    session: SessionDep,
+    store: StoreDep,
+    rows: int = Query(PREVIEW_ROWS, ge=1, le=MORE_ROWS),
+    offset: int = Query(0, ge=0),
+) -> DatasetVersionRows:
+    found = get_dataset_version(session, dataset_version_id)
+    saved = saved_rows(dataset_version_location(session, store, found), offset, rows)
+    return DatasetVersionRows(
+        columns=[ColumnInfo(name=name, type=kind) for name, kind in saved.columns],
+        rows=[PreviewRow(input=text, label=expected) for _, text, expected in saved.rows],
+        total=saved.total,
+        offset=offset,
+        example=chat_example(*saved.example),
     )
 
 

@@ -42,7 +42,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Sources, Data › source › Schema, Data › source › … › Rename · API: GET /api/sources, GET /api/sources/{source_id}, PATCH /api/sources/{source_id}, DELETE /api/sources/{source_id}, GET /api/sources/{source_id}/rows, GET /api/sources/{source_id}/stats
 - **Record preview** · shipped · product, ml
   Read rows as foldable JSON records, a table or one example.
-  UI: Data › source › Preview, Data › dataset › Preview · API: GET /api/sources/{source_id}/rows, GET /api/datasets/{slug}/preview
+  UI: Data › source › Preview, Data › dataset › Preview, Data › dataset › version › Preview · API: GET /api/sources/{source_id}/rows, GET /api/datasets/{slug}/preview, GET /api/dataset-versions/{dataset_version_id}/rows
 - **Datasets** · shipped · product, ml
   Turn sources into chat examples that models share.
   UI: Data › Add › New dataset, Data › Add › From sources, Data › source › Create dataset, Data › Datasets, Data › dataset › … › Rename · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
@@ -60,13 +60,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Datasets, Data › Sources · API: POST /api/datasets, PATCH /api/datasets/{slug}, PATCH /api/sources/{source_id}, PUT /api/datasets/{slug}/folder
 - **Dataset versions** · shipped · product, ml
   Train on exactly the rows you checked, and see their stats.
-  UI: Data › dataset, Data › dataset › Versions · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, GET /api/dataset-versions/{dataset_version_id}/stats, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
+  UI: Data › dataset, Data › dataset › Version · API: GET /api/datasets/{slug}/versions, POST /api/datasets/{slug}/versions, GET /api/dataset-versions/{dataset_version_id}/stats, POST /api/models/{name}/dataset-versions · Config: data.row_limit, data.keep_versions
+- **Dataset version page** · shipped · product, ml
+  Open a saved version read-only: rows, query, checks, users; train from it.
+  UI: Data › dataset › Version › version, Data › dataset › version › Train from · API: GET /api/datasets/{slug}/versions, GET /api/dataset-versions/{dataset_version_id}/rows, GET /api/dataset-versions/{dataset_version_id}/stats
 - **Sampled versions** · shipped · product, ml
   Sample over the row limit; save in full once the limit allows.
   UI: Data › dataset, Data › dataset › Edit query, Data › dataset › … › Save full version, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
-  UI: Data › dataset › Versions › All versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
+  UI: Data › dataset › Version › Compare versions, Data › dataset › version › … › Compare with latest · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
 - **Change detection** · shipped · product, ml
   Know when sources or the query changed since the last version.
   UI: Data › dataset, Models › model › Train › Data

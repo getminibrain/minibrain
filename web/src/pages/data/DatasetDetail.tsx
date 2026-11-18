@@ -29,7 +29,11 @@ import {
     succeed,
     unwrap,
 } from "~/api/client";
-import { type DatasetVersionStats, useDatasetVersionStats } from "~/api/dataQueries";
+import {
+    type DatasetVersionStats,
+    useDatasetVersionStats,
+    useDatasetVersions,
+} from "~/api/dataQueries";
 import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -45,7 +49,7 @@ import {
     FullVersionItem,
     RowLimitNotice,
     SampleLine,
-    VersionsPart,
+    VersionPicker,
     needsSample,
     useSaveVersion,
     useVersionRefresh,
@@ -65,7 +69,6 @@ import {
 import {
     AboutPart,
     DeleteMenuItem,
-    Description,
     EditDialog,
     type EditFocus,
     ItemHeader,
@@ -85,6 +88,9 @@ const SPLITS: [string, string][] = [
     ["golden", "Test set"],
     ["shots", "Few-shot"],
 ];
+
+export const LABEL_BALANCE_TIP =
+    "Rows per label in the saved version, the rows a model trains on. Rare labels are the ones a model gets wrong.";
 
 const QUERY_HELP =
     "Pick a source and the columns a model reads and answers with, or write SQL over one or more sources.";
@@ -394,6 +400,12 @@ function liveRowsNote(dataset: DatasetSummary): string | null {
     return `The query now returns ${count(live)} rows; save a version to use them.`;
 }
 
+export function splitText(splits: Record<string, number>): string {
+    return SPLITS.filter(([key]) => key in splits)
+        .map(([key, label]) => `${count(splits[key])} ${label.toLowerCase()}`)
+        .join(" · ");
+}
+
 function DatasetStats({
     dataset,
     stats,
@@ -405,9 +417,7 @@ function DatasetStats({
     const quality = stats?.quality;
     const splits = latest?.counts ?? {};
     const notes = [splitsNote(dataset), liveRowsNote(dataset)].filter(Boolean);
-    const splitLine = SPLITS.filter(([key]) => key in splits)
-        .map(([key, label]) => `${count(splits[key])} ${label.toLowerCase()}`)
-        .join(" · ");
+    const splitLine = splitText(splits);
     return (
         <AboutPart title="Overview">
             <Stats>
@@ -425,14 +435,14 @@ function DatasetStats({
     );
 }
 
-function SavedLabelBalance({
-    dataset,
+export function SavedLabelBalance({
+    saved,
     stats,
 }: {
-    dataset: DatasetSummary;
+    saved: boolean;
     stats: ReturnType<typeof useDatasetVersionStats>;
 }) {
-    if (!dataset.dataset_version) {
+    if (!saved) {
         return <p className="text-muted-foreground">No version yet.</p>;
     }
     if (!stats.data) {
@@ -454,7 +464,7 @@ function SavedLabelBalance({
 
 type PreviewRow = PreviewResponse["rows"][number];
 
-const PREVIEW_COLUMNS: ColumnDef<PreviewRow, unknown>[] = [
+export const PREVIEW_COLUMNS: ColumnDef<PreviewRow, unknown>[] = [
     { header: "Input", accessorKey: "input", cell: (info) => <Clamp text={info.getValue()} /> },
     {
         header: "Label",
@@ -466,7 +476,7 @@ const PREVIEW_COLUMNS: ColumnDef<PreviewRow, unknown>[] = [
     },
 ];
 
-function rowSummary(record: unknown): ReactNode {
+export function rowSummary(record: unknown): ReactNode {
     const row = record as PreviewRow;
     return (
         <>
@@ -480,7 +490,7 @@ function rowSummary(record: unknown): ReactNode {
 
 const CHAT_ROLES = new Set(["user", "assistant"]);
 
-function TrainingExample({ data }: { data: PreviewResponse | undefined }) {
+export function TrainingExample({ data }: { data: Pick<PreviewResponse, "example"> | undefined }) {
     if (!data || data.example.length === 0) {
         return <p className="px-3 py-2 text-muted-foreground">No example yet.</p>;
     }
@@ -557,6 +567,7 @@ export function DatasetDetail({
     const folderId = dataset.folder_id ?? null;
     const mapped = Boolean(dataset.mapping.sql);
     const stats = useDatasetVersionStats(dataset.dataset_version?.id);
+    const versions = useDatasetVersions(dataset.slug);
     const save = useSaveVersion(dataset.slug);
     const tooFew = dataset.dataset_version?.too_few_rows ?? null;
     const path = { params: { path: { slug: dataset.slug } } };
@@ -570,6 +581,7 @@ export function DatasetDetail({
     const header = (
         <ItemHeader
             title={dataset.name}
+            described={dataset}
             detail={
                 <>
                     {`Updated ${relativeTime(dataset.updated_at)}`}
@@ -583,6 +595,11 @@ export function DatasetDetail({
             }
             actions={
                 <>
+                    <VersionPicker
+                        slug={dataset.slug}
+                        current={null}
+                        versions={versions.data ?? []}
+                    />
                     {tooFew ? (
                         <BlockedButton reason={tooFew}>Train a model</BlockedButton>
                     ) : (
@@ -629,7 +646,6 @@ export function DatasetDetail({
     );
     const about = (
         <>
-            <Description item={dataset} onEdit={() => setEditing("description")} />
             <ErrorLine error={remove.error} />
             {dataset.error && (
                 <p className="text-destructive">{`The query fails: ${dataset.error}`}</p>
@@ -656,16 +672,10 @@ export function DatasetDetail({
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             </AboutPart>
             {mapped && (
-                <AboutPart
-                    title="Label balance"
-                    tip="Rows per label in the saved version, the rows a model trains on. Rare labels are the ones a model gets wrong."
-                >
-                    <SavedLabelBalance dataset={dataset} stats={stats} />
+                <AboutPart title="Label balance" tip={LABEL_BALANCE_TIP}>
+                    <SavedLabelBalance saved={Boolean(dataset.dataset_version)} stats={stats} />
                 </AboutPart>
             )}
-            <AboutPart title="Versions">
-                <VersionsPart dataset={dataset} />
-            </AboutPart>
             <UsedBy dataset={dataset} />
         </>
     );

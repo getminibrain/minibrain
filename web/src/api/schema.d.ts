@@ -1037,6 +1037,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dataset-versions/{dataset_version_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the rows a dataset version holds
+         * @description A page of the saved rows in stored order, with the column types and one training example.
+         */
+        get: operations["dataset_version_rows_api_dataset_versions__dataset_version_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dataset-versions/{dataset_version_id}/diff/{other_id}": {
         parameters: {
             query?: never;
@@ -5141,10 +5161,34 @@ export interface components {
              * @description Why training and scoring refuse this version, when it holds too few rows.
              */
             too_few_rows?: string | null;
+            /**
+             * Sql
+             * @description The query the version was saved with.
+             */
+            sql?: string | null;
+            /**
+             * Sources
+             * @description How many sources the query read.
+             * @default 0
+             */
+            sources?: number;
         };
         /** DatasetVersionRequest */
         DatasetVersionRequest: {
             sample?: components["schemas"]["SampleRequest"] | null;
+        };
+        /** DatasetVersionRows */
+        DatasetVersionRows: {
+            /** Columns */
+            columns: components["schemas"]["ColumnInfo"][];
+            /** Rows */
+            rows: components["schemas"]["PreviewRow"][];
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            /** Example */
+            example: components["schemas"]["ChatMessage"][];
         };
         /** DatasetVersionStats */
         DatasetVersionStats: {
@@ -13101,6 +13145,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DatasetVersionStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dataset_version_rows_api_dataset_versions__dataset_version_id__rows_get: {
+        parameters: {
+            query?: {
+                rows?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                dataset_version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetVersionRows"];
                 };
             };
             /** @description Validation Error */

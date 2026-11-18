@@ -78,6 +78,10 @@ export function datasetHref(slug: string): string {
     return `${DATA_PATH}/datasets/${encodeURIComponent(slug)}`;
 }
 
+export function datasetVersionHref(slug: string, number: number): string {
+    return `${datasetHref(slug)}/versions/${number}`;
+}
+
 export function uploadHref(id: number | string): string {
     return `${DATA_PATH}/sources/${groupPath("upload")}/${id}`;
 }
@@ -127,6 +131,17 @@ function parseSource(rest: string[]): ItemRef | null {
         : null;
 }
 
+function versionIn(rest: string[]): number | null {
+    return rest.length === 3 && rest[1] === "versions" && WHOLE_NUMBER.test(rest[2])
+        ? Number(rest[2])
+        : null;
+}
+
+export function datasetVersionOf(path: string): number | null {
+    const segments = segmentsOf(path);
+    return segments && segments[0] === "datasets" ? versionIn(segments.slice(1)) : null;
+}
+
 export function parseItem(path: string | null | undefined): ItemRef | null {
     const segments = path ? segmentsOf(path) : null;
     if (!segments || segments.length === 0) {
@@ -134,10 +149,12 @@ export function parseItem(path: string | null | undefined): ItemRef | null {
     }
     const [head, ...rest] = segments;
     if (head === "datasets") {
-        if (rest.length > 1) {
-            return null;
+        if (rest.length === 0) {
+            return DATASETS_GROUP;
         }
-        return rest.length === 0 ? DATASETS_GROUP : { kind: "dataset", id: rest[0] };
+        return rest.length === 1 || versionIn(rest) !== null
+            ? { kind: "dataset", id: rest[0] }
+            : null;
     }
     if (head === "folders") {
         return rest.length === 1 && WHOLE_NUMBER.test(rest[0])

@@ -197,6 +197,8 @@ def dataset_version_info(dataset_version: DatasetVersion) -> DatasetVersionInfo:
         feedback_rows=dataset_version.feedback_rows,
         sample=SampleInfo.model_validate(dataset_version.sample) if dataset_version.sample else None,
         too_few_rows=too_few_rows(dataset_version),
+        sql=dataset_version.sql,
+        sources=len(dataset_version.fingerprints or {}),
     )
 
 

@@ -349,6 +349,8 @@ class DatasetVersionInfo(BaseModel):
     too_few_rows: str | None = Field(
         default=None, description="Why training and scoring refuse this version, when it holds too few rows."
     )
+    sql: str | None = Field(default=None, description="The query the version was saved with.")
+    sources: int = Field(default=0, description="How many sources the query read.")
 
 
 class DismissRequest(BaseModel):
@@ -1034,6 +1036,14 @@ class PreviewResponse(BaseModel):
     quality: QualityInfo
     labels: list[str]
     label_counts: list[LabelCount]
+    example: list[ChatMessage]
+
+
+class DatasetVersionRows(BaseModel):
+    columns: list[ColumnInfo]
+    rows: list[PreviewRow]
+    total: int
+    offset: int
     example: list[ChatMessage]
 
 

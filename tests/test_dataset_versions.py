@@ -295,3 +295,44 @@ def test_the_models_list_shows_the_dataset_and_a_newer_version(harness: Harness)
     row = next(item for item in harness.client.get("/api/models").json() if item["key"] == SLUG)
     assert row["dataset"] == {"key": "tickets", "name": "Tickets", "version": 1, "latest": 2}
     assert row["versions"][0]["dataset_version"] == 1
+
+
+def test_a_dataset_version_pages_its_saved_rows_with_their_types(harness: Harness) -> None:
+    dataset_with_model(harness)
+    first = save(harness)
+    remap(harness, "category <> 'bug'")
+    page = harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"rows": 30})
+    assert page.status_code == 200, page.text
+    found = page.json()
+    assert (found["total"], found["offset"], len(found["rows"])) == (200, 0, 30)
+    assert found["columns"] == [{"name": "input", "type": "VARCHAR"}, {"name": "label", "type": "VARCHAR"}]
+    assert set(found["rows"][0]) == {"input", "label"}
+    assert [message["role"] for message in found["example"]] == ["user", "assistant"]
+    rest = harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"rows": 500, "offset": 190}).json()
+    assert (rest["offset"], len(rest["rows"])) == (190, 10)
+    whole = harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"rows": 200}).json()["rows"]
+    assert (
+        whole[30:40]
+        == harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"rows": 10, "offset": 30}).json()[
+            "rows"
+        ]
+    )
+    assert {row["label"] for row in whole} == {"billing", "bug", "account", "feature"}
+
+
+def test_dataset_version_rows_refuse_unknown_versions_and_oversized_pages(harness: Harness) -> None:
+    dataset_with_model(harness)
+    first = save(harness)
+    assert harness.client.get("/api/dataset-versions/999/rows").status_code == 404
+    assert harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"rows": 501}).status_code == 422
+    assert harness.client.get(f"/api/dataset-versions/{first['id']}/rows", params={"offset": -1}).status_code == 422
+
+
+def test_a_dataset_version_keeps_the_query_and_sources_it_was_saved_with(harness: Harness) -> None:
+    dataset_with_model(harness)
+    first = save(harness)
+    remap(harness, "category <> 'bug'")
+    older = next(item for item in versions(harness) if item["id"] == first["id"])
+    assert (older["sql"], older["sources"]) == (first["sql"], 1)
+    assert "WHERE" not in (older["sql"] or "")
+    assert "category <> 'bug'" in (versions(harness)[0]["sql"] or "")

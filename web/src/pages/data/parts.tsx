@@ -67,20 +67,33 @@ export function modelHref(slug: string): string {
     return modelPageHref(slug);
 }
 
+function HeaderDescription({ text }: { text: string }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <p className="truncate text-base">{text}</p>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md whitespace-pre-line">{text}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 export function ItemHeader({
     title,
     icon,
+    described,
     detail,
     actions,
 }: {
     title: ReactNode;
     icon?: ReactNode;
+    described?: Described;
     detail?: ReactNode;
     actions?: ReactNode;
 }) {
     return (
-        <header className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-0.5">
+        <header className="flex items-start justify-between gap-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <h2 className="flex min-w-0 items-center gap-2 text-2xl font-semibold">
                     {icon && (
                         <span aria-hidden="true" className="shrink-0 [&>svg]:size-5">
@@ -89,9 +102,15 @@ export function ItemHeader({
                     )}
                     <span className="truncate">{title}</span>
                 </h2>
+                {described?.description && <HeaderDescription text={described.description} />}
+                {described && described.tags.length > 0 && (
+                    <div className="py-1">
+                        <Tags tags={described.tags} />
+                    </div>
+                )}
                 {detail && <p className="text-muted-foreground">{detail}</p>}
             </div>
-            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </header>
     );
 }
@@ -179,26 +198,6 @@ export function AboutPart({
 
 export function Stats({ children }: { children: ReactNode }) {
     return <div className="grid grid-cols-3 gap-x-4 gap-y-3">{children}</div>;
-}
-
-export function Description({ item, onEdit }: { item: Described; onEdit: () => void }) {
-    if (!item.description && item.tags.length === 0) {
-        return (
-            <div>
-                <Button variant="link" className="h-auto px-0" onClick={onEdit}>
-                    Add a description and tags
-                </Button>
-            </div>
-        );
-    }
-    return (
-        <div className="flex flex-col gap-2">
-            {item.description && (
-                <p className="text-base break-words whitespace-pre-line">{item.description}</p>
-            )}
-            <Tags tags={item.tags} />
-        </div>
-    );
 }
 
 export type EditFocus = "name" | "description";

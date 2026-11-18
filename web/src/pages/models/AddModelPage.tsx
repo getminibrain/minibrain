@@ -11,6 +11,7 @@ import {
     api,
     unwrap,
 } from "~/api/client";
+import { useDatasetVersions } from "~/api/dataQueries";
 import { useAllModels, useCatalog, useDatasets, useDemoData } from "~/api/queries";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
@@ -21,7 +22,7 @@ import { type Identity, NameAvatarField, newIdentity } from "~/components/avatar
 import { avatarBody } from "~/components/avatar/avatarSvg";
 import { generateName } from "~/lib/avatarNames";
 import { count } from "~/lib/format";
-import { modelPageHref } from "~/lib/modelLinks";
+import { modelPageHref, trainHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
 import { useSourceAdder } from "../data/AddSource";
@@ -95,7 +96,28 @@ type Search = {
     model?: string;
     variant?: string;
     dataset?: string;
+    data?: string | number;
 };
+
+function trainsOn(params: Search, dataset: string | null): number | null {
+    const data = Number(params.data);
+    return params.data !== undefined && Number.isInteger(data) && dataset === String(params.dataset)
+        ? data
+        : null;
+}
+
+function TrainsOnNote({ slug, data }: { slug: string | null; data: number | null }) {
+    const versions = useDatasetVersions(slug ?? "", data !== null);
+    const number = versions.data?.find((item) => item.id === data)?.number;
+    if (data === null || number === undefined || number === null) {
+        return null;
+    }
+    return (
+        <span className="text-sm text-muted-foreground tabular-nums">
+            {`After creating, Train opens with v${number} picked.`}
+        </span>
+    );
+}
 
 function initialPick(params: Search): Picked | null {
     if (params.model) {
@@ -356,7 +378,10 @@ export function AddModelPage() {
                       : `${created.name}: v0 is being scored.`,
                 tone: "success",
             });
-            router.history.push(modelPageHref(created.slug));
+            const data = trainsOn(params, created.dataset ?? null);
+            router.history.push(
+                data === null ? modelPageHref(created.slug) : trainHref(created.slug, { data }),
+            );
         },
     });
     const baseReady =
@@ -468,7 +493,11 @@ export function AddModelPage() {
                         </FormControl>
                     </FormRow>
                 )}
-                <FormRow id="create-dataset" label="Dataset" align={over ? "start" : undefined}>
+                <FormRow
+                    id="create-dataset"
+                    label="Dataset"
+                    align={over || trainsOn(params, dataset) !== null ? "start" : undefined}
+                >
                     <FormControl>
                         <DatasetPicker
                             value={dataset}
@@ -479,6 +508,7 @@ export function AddModelPage() {
                             onUpload={() => setUploading(true)}
                             onDemo={addDemo}
                         />
+                        <TrainsOnNote slug={dataset} data={trainsOn(params, dataset)} />
                         {demoBusy && addingDemo && (
                             <span className="text-sm text-muted-foreground">
                                 {`Adding ${addingDemo.name}…`}

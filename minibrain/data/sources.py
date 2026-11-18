@@ -517,6 +517,38 @@ def example_rows(
     return [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found]
 
 
+@dataclass(frozen=True)
+class SavedRows:
+    columns: list[tuple[str, str]]
+    rows: list[ExampleRow]
+    total: int
+    example: tuple[str | None, str | None]
+
+
+SAVED_SHOWN = (("input", "input"), ("expected", "label"))
+
+
+def saved_rows(location: str, offset: int, limit: int) -> SavedRows:
+    saved = f"read_parquet({quote_literal(location)})"
+    usable = f"SELECT messages, expected FROM ({usable_examples(f'SELECT * FROM {saved}')}) LIMIT 1"
+    with duckdb.connect() as connection:
+        register(connection)
+        types = dict(
+            connection.execute(f"SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM {saved})").fetchall()
+        )
+        counted = connection.execute(f"SELECT count(*) FROM {saved}").fetchone()
+        found = connection.execute(
+            f"SELECT messages, input, expected FROM {saved} LIMIT {int(limit)} OFFSET {int(offset)}"
+        ).fetchall()
+        first = connection.execute(usable).fetchone()
+    return SavedRows(
+        columns=[(shown, str(types.get(name, "VARCHAR"))) for name, shown in SAVED_SHOWN],
+        rows=[(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found],
+        total=int(counted[0]) if counted else 0,
+        example=(to_text(first[0]), to_text(first[1])) if first else (None, None),
+    )
+
+
 def copy_rows(
     tables: Sequence[Table], sql: str, target: Path, limit: int, aliases: dict[str, str] | None = None
 ) -> int:

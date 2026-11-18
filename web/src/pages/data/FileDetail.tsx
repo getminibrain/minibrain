@@ -42,7 +42,6 @@ import { SourceIcon } from "./icons";
 import {
     AboutPart,
     DeleteMenuItem,
-    Description,
     EditDialog,
     type EditFocus,
     ItemHeader,
@@ -294,6 +293,7 @@ export function FileDetail({
     const header = (
         <ItemHeader
             title={source.kind === "upload" ? <FileName name={source.name} /> : source.name}
+            described={source}
             icon={source.kind === "upload" || format ? <SourceIcon source={source} /> : undefined}
             detail={`Added ${relativeTime(source.created_at)}`}
             actions={
@@ -325,7 +325,6 @@ export function FileDetail({
     );
     const about = (
         <>
-            <Description item={source} onEdit={() => setEditing("description")} />
             <ErrorLine error={remove.error} />
             {source.error && <p className="text-destructive">{source.error}</p>}
             <SourceStats source={source} datasets={datasets.length} />
