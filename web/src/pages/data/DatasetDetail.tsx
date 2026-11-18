@@ -4,9 +4,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     CodeBlock,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
     ConfirmDialog,
     DataGrid,
     Dialog,
@@ -424,40 +421,7 @@ function DatasetStats({
                     {note}
                 </p>
             ))}
-            {quality && (
-                <Collapsible>
-                    <CollapsibleTrigger className="flex min-h-8 items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                        Data quality
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 pt-1 text-sm tabular-nums">
-                            <QualityFact label="Empty rows" value={count(quality.empty)} />
-                            <QualityFact
-                                label="Duplicate inputs"
-                                value={count(quality.duplicates)}
-                            />
-                            <QualityFact
-                                label="Rows per label"
-                                value={`${count(quality.smallest_label)}–${count(quality.largest_label)}`}
-                            />
-                            <QualityFact
-                                label="Average input"
-                                value={`${count(quality.mean_input_chars)} chars`}
-                            />
-                        </dl>
-                    </CollapsibleContent>
-                </Collapsible>
-            )}
         </AboutPart>
-    );
-}
-
-function QualityFact({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex flex-col">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-medium">{value}</dd>
-        </div>
     );
 }
 
@@ -685,7 +649,10 @@ export function DatasetDetail({
             <SampleLine dataset={dataset} save={save} />
             <DatasetStats dataset={dataset} stats={stats.data} />
             <QueryPart dataset={dataset} sources={sources} onEdit={() => setEditingQuery(true)} />
-            <AboutPart title="Checks" tip={checksCaption(dataset.dataset_version) || undefined}>
+            <AboutPart
+                title="Data quality"
+                tip={checksCaption(dataset.dataset_version) || undefined}
+            >
                 <ChecksList datasetVersion={dataset.dataset_version} dataset={dataset.slug} />
             </AboutPart>
             {mapped && (
