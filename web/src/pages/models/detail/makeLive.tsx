@@ -226,7 +226,7 @@ export function DeployVersionDialog({
                         </DialogDescription>
                     )}
                 </DialogHeader>
-                <FormRows labels="narrow">
+                <FormRows labels="compact">
                     {pick && version && (
                         <FormRow id="deploy-version" label="Version">
                             <PickSelect
@@ -238,12 +238,18 @@ export function DeployVersionDialog({
                             />
                         </FormRow>
                     )}
-                    <PoolRow placement={placement.data} value={poolValue} onChange={choosePool} />
+                    <PoolRow
+                        placement={placement.data}
+                        value={poolValue}
+                        onChange={choosePool}
+                        newTab
+                    />
                     <ReplicasRow
                         placement={placement.data}
                         target={target}
                         value={replicaValue}
                         onChange={setReplicas}
+                        newTab
                     />
                 </FormRows>
                 {already && version && (

@@ -138,13 +138,19 @@ export function DeployBaseDialog({
                         <DeploymentStatus row={row} />
                     </p>
                 )}
-                <FormRows labels="narrow">
-                    <PoolRow placement={placement.data} value={poolValue} onChange={choosePool} />
+                <FormRows labels="compact">
+                    <PoolRow
+                        placement={placement.data}
+                        value={poolValue}
+                        onChange={choosePool}
+                        newTab
+                    />
                     <ReplicasRow
                         placement={placement.data}
                         target={target}
                         value={replicaValue}
                         onChange={setReplicas}
+                        newTab
                     />
                 </FormRows>
                 <ErrorLine error={deploy.error ?? placement.error} />

@@ -7,11 +7,12 @@ const ROWS_GAP = "gap-y-label sm:gap-y-6";
 const STACKED_ROW_END = "pb-4 sm:pb-0";
 const GROUP_RULE = "border-t pt-10 first:border-t-0 first:pt-0";
 
-type LabelWidth = "wide" | "narrow";
+type LabelWidth = "wide" | "narrow" | "compact";
 
 const COLUMNS: Record<LabelWidth, string> = {
     wide: "sm:grid-cols-[12rem_minmax(0,1fr)]",
     narrow: "sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-4",
+    compact: "sm:grid-cols-[5rem_minmax(0,1fr)] sm:gap-x-4",
 };
 
 export function FormRows({

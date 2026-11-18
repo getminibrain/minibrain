@@ -85,14 +85,16 @@ export function PoolCard({
     name,
     pool,
     details,
+    newTab: forceNewTab = false,
 }: {
     name: string;
     pool: PoolInfo | undefined;
     details?: ReactNode;
+    newTab?: boolean;
 }) {
     const online = pool?.nodes.filter((node) => node.online).length ?? 0;
     const purpose = pool ? usedFor(pool) : null;
-    const newTab = useNewTab();
+    const newTab = useNewTab(forceNewTab);
     return (
         <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-0.5">
@@ -160,16 +162,18 @@ export function PoolLink({
     machine,
     details,
     align = "start",
+    newTab: forceNewTab = false,
     className,
 }: {
     name: string;
     machine?: string | null;
     details?: ReactNode;
     align?: "start" | "center" | "end";
+    newTab?: boolean;
     className?: string;
 }) {
     const pool = usePool(name);
-    const newTab = useNewTab();
+    const newTab = useNewTab(forceNewTab);
     const [open, setOpen] = useState(false);
     const card = useRef<HTMLDivElement>(null);
     return (
@@ -195,7 +199,7 @@ export function PoolLink({
                     }
                 >
                     {name}
-                    <NewTabIcon />
+                    <NewTabIcon force={forceNewTab} />
                 </PopoverTrigger>
                 <PopoverContent
                     align={align}
@@ -204,7 +208,7 @@ export function PoolLink({
                     finalFocus={false}
                     ref={card}
                 >
-                    <PoolCard name={name} pool={pool} details={details} />
+                    <PoolCard name={name} pool={pool} details={details} newTab={forceNewTab} />
                 </PopoverContent>
             </Popover>
             {machine && (

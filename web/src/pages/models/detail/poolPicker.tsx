@@ -75,10 +75,12 @@ export function PoolRow({
     placement,
     value,
     onChange,
+    newTab = false,
 }: {
     placement: Placement | undefined;
     value: string;
     onChange: (value: string) => void;
+    newTab?: boolean;
 }) {
     const target = resolvedPool(placement, value);
     const needs = needsText(placement?.pools.find((pool) => pool.name === target));
@@ -96,12 +98,12 @@ export function PoolRow({
             {target && (
                 <span className="text-sm text-muted-foreground">
                     {"Runs on "}
-                    <PoolLink name={target} />
+                    <PoolLink name={target} newTab={newTab} />
                     {needs && ` · ${needs}`}
                     {placement?.pool && placement.pool !== target && (
                         <>
                             {" · moves from "}
-                            <PoolLink name={placement.pool} />
+                            <PoolLink name={placement.pool} newTab={newTab} />
                         </>
                     )}
                 </span>
@@ -155,6 +157,7 @@ export function ReplicasRow({
     disabled = false,
     note,
     selectClassName,
+    newTab = false,
     children,
 }: {
     placement: Placement | undefined;
@@ -164,6 +167,7 @@ export function ReplicasRow({
     disabled?: boolean;
     note?: ReactNode;
     selectClassName?: string;
+    newTab?: boolean;
     children?: ReactNode;
 }) {
     const room = replicaRoom(placement, target);
@@ -187,7 +191,7 @@ export function ReplicasRow({
                 target && (
                     <span className="text-sm text-muted-foreground">
                         {"One per machine where it fits: "}
-                        <PoolLink name={target} />
+                        <PoolLink name={target} newTab={newTab} />
                         {` has room for ${room}`}
                     </span>
                 )

@@ -7,12 +7,14 @@ export function NewTabLinks({ children }: { children: ReactNode }) {
     return <NewTabContext.Provider value>{children}</NewTabContext.Provider>;
 }
 
-export function useNewTab(): { target?: "_blank"; rel?: string } {
-    return useContext(NewTabContext) ? { target: "_blank", rel: "noreferrer" } : {};
+export function useNewTab(force = false): { target?: "_blank"; rel?: string } {
+    const inside = useContext(NewTabContext);
+    return force || inside ? { target: "_blank", rel: "noopener noreferrer" } : {};
 }
 
-export function NewTabIcon() {
-    return useContext(NewTabContext) ? (
+export function NewTabIcon({ force = false }: { force?: boolean }) {
+    const inside = useContext(NewTabContext);
+    return force || inside ? (
         <IconExternalLink
             aria-label="opens in a new tab"
             className="ml-0.5 inline size-3.5 shrink-0"
