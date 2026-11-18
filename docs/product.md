@@ -535,7 +535,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   What is wrong now, worst first, each with its fix.
   UI: Home › Needs attention, Models › model › Overview › Needs attention · API: GET /api/problems
 - **Machine list** · shipped · admin
-  Sort and filter every machine, spot its problems, open its details.
+  Sort, filter and resize columns; spot problems; open a machine's details.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
 - **Machines by pool or model** · shipped · admin
   Group machines by pool, or by the models they serve.

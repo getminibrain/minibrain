@@ -26,7 +26,7 @@ export function shortGpu(name: string): string {
 
 function briefGpu(name: string): string {
     return shortGpu(name)
-        .replace(/\s*\d+GB$/i, "")
+        .replace(/\s*\d+\s?GB\b.*$/i, "")
         .replace(/\s+Ada$/i, "");
 }
 

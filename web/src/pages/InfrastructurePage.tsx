@@ -22,6 +22,7 @@ import { MachinesTab } from "./infrastructure/MachinesTab";
 import { SetupDiagram } from "./infrastructure/SetupDiagram";
 import { StorageTab } from "./infrastructure/StorageTab";
 import { StoresSection } from "./infrastructure/StoresSection";
+import { LayoutSwitch } from "./infrastructure/layouts/switcher";
 import type { InfrastructureInfo, PoolInfo } from "./infrastructure/parts";
 
 type LoadedModel = components["schemas"]["LoadedModel"];
@@ -152,7 +153,14 @@ export function InfrastructurePage() {
             <PageHeader
                 title="Infrastructure"
                 caption="Where minibrain runs and where it keeps its data."
-                actions={adds ? <AddMachine pools={pools.data ?? []} /> : undefined}
+                actions={
+                    active === MACHINES ? (
+                        <>
+                            <LayoutSwitch />
+                            {adds && <AddMachine pools={pools.data ?? []} />}
+                        </>
+                    ) : undefined
+                }
             />
             <TabNav label="Infrastructure pages" tabs={SECTIONS} />
             <ErrorLine

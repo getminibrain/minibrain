@@ -1,6 +1,18 @@
 import { IconStack2 } from "@tabler/icons-react";
-import { Link, Table, TableBody, TableCell, TableHeader, TableRow, cn } from "obp-ui";
-import { Fragment, type ReactNode, useState } from "react";
+import {
+    type ColumnSize,
+    type ColumnSizing,
+    Link,
+    SegmentedTabs,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    cn,
+    useColumnSizing,
+} from "obp-ui";
+import { Fragment, type ReactNode } from "react";
 import type { PoolToken } from "~/api/joinTokenQueries";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -9,32 +21,38 @@ import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
-import { LOCAL_POOL, PoolJoinControls } from "./PoolJoin";
-import { PoolMenu, UseBadge } from "./PoolUse";
-import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "./activity";
-import { servedOn } from "./byModel";
+import { ModelTable } from "../ModelView";
+import { UseBadge } from "../PoolUse";
+import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "../activity";
+import {
+    type DeployedModel,
+    type ShownGroup,
+    modelGroups,
+    servedOn,
+    shownGroups,
+} from "../byModel";
 import {
     Dash,
     JobProgressChip,
     Lead,
     MachineLabel,
     MemoryFigure,
-    ModelChip,
+    ModelsCell,
     SortHead,
-} from "./cells";
+    Tip,
+} from "../cells";
 import {
     cpuOf,
     gpuText,
     jobChips,
     memoryOf,
-    modelChips,
     percentText,
     poolMemory,
     poolProblems,
     ramOf,
     shareOf,
-} from "./fleet";
-import type { MachineRow } from "./machines";
+} from "../fleet";
+import type { MachineRow } from "../machines";
 import {
     OnlineCount,
     type OpenRows,
@@ -43,30 +61,70 @@ import {
     RowToggle,
     plural,
     rowEvents,
-} from "./parts";
-import { type Sort, type SortKey, nextSort, sortRows } from "./sorting";
+} from "../parts";
+import { type Sort, type SortKey, sortRows } from "../sorting";
+import { PoolRowMenu } from "./PoolRowMenu";
+import {
+    MachineToolbar,
+    type MachinesView,
+    ViewMenu,
+    WIDTHS_KEY,
+    emptyText,
+    fitKeyOf,
+    useMachineFilters,
+} from "./shared";
 
-const COLUMNS: { key: SortKey; label: string; width: string; numeric?: boolean }[] = [
-    { key: "host", label: "Machine", width: "w-[18rem]" },
-    { key: "gpu", label: "GPU", width: "w-[7.5rem]" },
-    { key: "memory", label: "GPU memory", width: "w-[8.5rem]" },
-    { key: "cpu", label: "CPU", width: "w-[5.5rem]", numeric: true },
-    { key: "ram", label: "RAM", width: "w-[5.5rem]", numeric: true },
-    { key: "models", label: "Models", width: "" },
-    { key: "jobs", label: "Jobs", width: "w-[7.5rem]" },
+const COLUMNS: (ColumnSize & { id: SortKey; label: string; numeric?: boolean })[] = [
+    { id: "host", label: "Machine", width: 200, min: 160 },
+    { id: "gpu", label: "GPU", width: 88, min: 64 },
+    { id: "memory", label: "GPU memory", width: 128, min: 104 },
+    { id: "cpu", label: "CPU", width: 64, min: 56, numeric: true },
+    { id: "ram", label: "RAM", width: 64, min: 56, numeric: true },
+    { id: "models", label: "Models", width: 240, min: 200, flex: true },
+    { id: "jobs", label: "Jobs", width: 120, min: 104 },
 ];
 
 const SPAN = COLUMNS.length;
-const TRAILING = 4;
 const DETAIL = SPAN - 1;
-const MAX_CHIPS = 5;
-const NAMED = ["@[13rem]:flex", "@[24rem]:flex"];
-const COMPACT = ["@[13rem]:hidden", "@[24rem]:hidden"];
+const MAX_AVATARS = 5;
 const LINK = "text-primary hover:underline";
-const ROW = "h-12";
-const CELL = "py-1.5";
-const NUMBER = "py-1.5 text-right tabular-nums";
+const ROW = "h-10";
+const CELL = "py-1";
+const NUMBER = "py-1 text-right tabular-nums";
 const LEADING = "flex min-w-0 items-center gap-2";
+const MODEL_VIEW = "model";
+const GROUPS = [
+    { key: "pool", label: "Pool" },
+    { key: MODEL_VIEW, label: "Model" },
+];
+
+function PoolModels({ deployed }: { deployed: DeployedModel[] }) {
+    if (deployed.length === 0) {
+        return null;
+    }
+    const shown = deployed.slice(0, MAX_AVATARS);
+    return (
+        <span className="flex min-w-0 items-center gap-1">
+            {shown.map((model) => (
+                <Tip key={model.model} tip={versioned(model.name, model.version)}>
+                    <span className="flex shrink-0 cursor-default">
+                        <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
+                    </span>
+                </Tip>
+            ))}
+            {deployed.length > shown.length && (
+                <Tip
+                    tip={deployed
+                        .slice(MAX_AVATARS)
+                        .map((model) => versioned(model.name, model.version))
+                        .join(", ")}
+                >
+                    <span className="shrink-0 cursor-default text-sm text-muted-foreground tabular-nums">{`+${count(deployed.length - shown.length)}`}</span>
+                </Tip>
+            )}
+        </span>
+    );
+}
 
 function PoolBand({
     pool,
@@ -86,6 +144,7 @@ function PoolBand({
     onToggle: (open: boolean) => void;
 }) {
     const memory = poolMemory(rows);
+    const jobs = rows.reduce((sum, row) => sum + row.node.jobs.length, 0);
     return (
         <TableRow
             id={`pool-${pool.name}`}
@@ -94,7 +153,7 @@ function PoolBand({
                 "scroll-mt-24 bg-muted transition-colors duration-150 hover:bg-muted data-flash:bg-highlight motion-reduce:transition-none",
             )}
         >
-            <TableCell className={CELL}>
+            <TableCell colSpan={2} className={CELL}>
                 <span className={LEADING}>
                     <RowToggle
                         open={open}
@@ -117,8 +176,7 @@ function PoolBand({
                     </span>
                 </span>
             </TableCell>
-            <TableCell className={CELL} />
-            <TableCell className={CELL}>
+            <TableCell data-column="memory" className={CELL}>
                 {memory && (
                     <MemoryFigure
                         used={memory.used}
@@ -128,49 +186,20 @@ function PoolBand({
                     />
                 )}
             </TableCell>
-            <TableCell colSpan={TRAILING} className={CELL}>
-                {admin && (
-                    <span className="flex items-center justify-end gap-2">
-                        {pool.name !== LOCAL_POOL && (
-                            <PoolJoinControls pool={pool.name} token={token} />
-                        )}
-                        <PoolMenu pool={pool.name} workloads={pool.workloads} />
+            <TableCell className={CELL} />
+            <TableCell className={CELL} />
+            <TableCell className={CELL}>
+                <PoolModels deployed={pool.deployed ?? []} />
+            </TableCell>
+            <TableCell data-column="jobs" className={CELL}>
+                <span className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="truncate text-muted-foreground tabular-nums">
+                        {jobs > 0 ? `${count(jobs)} running` : ""}
                     </span>
-                )}
+                    {admin && <PoolRowMenu pool={pool} token={token} />}
+                </span>
             </TableCell>
         </TableRow>
-    );
-}
-
-function ModelsCell({ row }: { row: MachineRow }) {
-    if (!row.node.online) {
-        return <Dash />;
-    }
-    const chips = modelChips(row);
-    if (chips.length === 0) {
-        return <Dash />;
-    }
-    const shown = chips.slice(0, MAX_CHIPS);
-    return (
-        <div className="@container w-full">
-            <span className="flex min-w-0 items-center gap-1">
-                {shown.map((chip, index) => (
-                    <Fragment key={chip.key}>
-                        {index < NAMED.length && (
-                            <span className={cn("hidden min-w-0", NAMED[index])}>
-                                <ModelChip chip={chip} />
-                            </span>
-                        )}
-                        <span className={cn("flex shrink-0", COMPACT[index])}>
-                            <ModelChip chip={chip} compact />
-                        </span>
-                    </Fragment>
-                ))}
-                {chips.length > shown.length && (
-                    <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{`+${count(chips.length - shown.length)}`}</span>
-                )}
-            </span>
-        </div>
     );
 }
 
@@ -221,7 +250,7 @@ function MachineLine({
                 !node.online && "text-muted-foreground",
             )}
         >
-            <TableCell className={CELL}>
+            <TableCell data-column="host" className={CELL}>
                 <span className={LEADING}>
                     <span className="flex w-6 shrink-0">
                         {expandable && (
@@ -235,12 +264,12 @@ function MachineLine({
                     <MachineLabel row={row} problems={problems} />
                 </span>
             </TableCell>
-            <TableCell className={CELL}>
+            <TableCell data-column="gpu" className={CELL}>
                 <span className="block truncate" title={gpuText(node)}>
                     {gpuText(node, true)}
                 </span>
             </TableCell>
-            <TableCell className={CELL}>
+            <TableCell data-column="memory" className={CELL}>
                 {memory ? (
                     <MemoryFigure
                         used={memory.used}
@@ -252,10 +281,10 @@ function MachineLine({
                     <Dash />
                 )}
             </TableCell>
-            <TableCell className={NUMBER}>
+            <TableCell data-column="cpu" className={NUMBER}>
                 {cpu === null ? <Dash /> : `${Math.round(cpu)}%`}
             </TableCell>
-            <TableCell className={NUMBER}>
+            <TableCell data-column="ram" className={NUMBER}>
                 {ram.used !== null && ram.total ? (
                     <span title={`${bytes(ram.used)} of ${bytes(ram.total)} RAM in use`}>
                         {percentText(shareOf(ram.used, ram.total))}
@@ -267,7 +296,7 @@ function MachineLine({
             <TableCell className={CELL}>
                 <ModelsCell row={row} />
             </TableCell>
-            <TableCell className={CELL}>
+            <TableCell data-column="jobs" className={CELL}>
                 <JobsCell row={row} />
             </TableCell>
         </TableRow>
@@ -437,7 +466,7 @@ function bodyRows({
         }
         return [
             band,
-            ...sortRows(rows, sort).flatMap((row) => {
+            ...sortRows(rows, sort, problems).flatMap((row) => {
                 const key = `machine:${row.node.id}`;
                 const expanded = hasActivity(row) && open.isOpen(key, false);
                 return [
@@ -456,44 +485,45 @@ function bodyRows({
     });
 }
 
-export function PoolTable({
-    pools,
+function PoolTable({
+    view,
     shown,
-    problems,
-    admin,
-    tokens,
-    open,
+    sizing,
     empty,
-    onOpen,
 }: {
-    pools: PoolInfo[];
+    view: MachinesView;
     shown: MachineRow[];
-    problems: Problem[] | undefined;
-    admin: boolean;
-    tokens: PoolToken[] | undefined;
-    open: OpenRows;
+    sizing: ColumnSizing;
     empty: ReactNode;
-    onOpen: (row: MachineRow) => void;
 }) {
-    const [sort, setSort] = useState<Sort | null>(null);
-    const body = bodyRows({ pools, shown, problems, admin, tokens, sort, open, onOpen });
+    const body = bodyRows({
+        pools: view.pools,
+        shown,
+        problems: view.problems,
+        admin: view.admin,
+        tokens: view.tokens,
+        sort: view.sort,
+        open: view.open,
+        onOpen: view.onOpen,
+    });
     return (
-        <Table className="table-fixed [&_td]:overflow-hidden">
+        <Table ref={sizing.tableRef} style={sizing.tableStyle} className="[&_td]:overflow-hidden">
             <colgroup>
                 {COLUMNS.map((column) => (
-                    <col key={column.key} className={column.width} />
+                    <col key={column.id} style={sizing.colStyle(column.id)} />
                 ))}
             </colgroup>
             <TableHeader>
                 <TableRow className="hover:bg-transparent">
                     {COLUMNS.map((column) => (
                         <SortHead
-                            key={column.key}
+                            key={column.id}
                             label={column.label}
-                            sortKey={column.key}
+                            sortKey={column.id}
                             numeric={column.numeric}
-                            sort={sort}
-                            onSort={(key) => setSort((current) => nextSort(current, key))}
+                            sort={view.sort}
+                            onSort={view.onSort}
+                            sizing={sizing}
                         />
                     ))}
                 </TableRow>
@@ -513,5 +543,89 @@ export function PoolTable({
                 )}
             </TableBody>
         </Table>
+    );
+}
+
+function unlistedParts(rows: MachineRow[], groups: ShownGroup[]): string[] {
+    const listed = new Set(
+        groups.flatMap(({ places }) =>
+            places.flatMap((place) => place.machines.map((machine) => machine.row.node.id)),
+        ),
+    );
+    const unlisted = rows.filter((row) => !listed.has(row.node.id));
+    const idle = unlisted.filter((row) => row.node.jobs.length === 0).length;
+    const jobsOnly = unlisted.length - idle;
+    return [
+        idle > 0 ? plural(idle, "idle machine") : null,
+        jobsOnly > 0 ? `${plural(jobsOnly, "machine")} running jobs only` : null,
+    ].filter((part): part is string => part !== null);
+}
+
+export function RefinedLayout({ view }: { view: MachinesView }) {
+    const filtered = useMachineFilters(view);
+    const byModel = view.search.group === MODEL_VIEW;
+    const sizing = useColumnSizing({
+        columns: COLUMNS,
+        storageKey: WIDTHS_KEY,
+        fitKey: byModel ? undefined : fitKeyOf(filtered.shown, view.problems),
+    });
+    const groups = byModel ? shownGroups(modelGroups(view.pools, view.all), filtered.filters) : [];
+    const unlisted = byModel ? unlistedParts(filtered.shown, groups) : [];
+    const empty =
+        byModel && !view.loading && !filtered.filtering
+            ? "No model is deployed."
+            : emptyText(view, filtered);
+    return (
+        <>
+            <MachineToolbar
+                view={view}
+                filtered={filtered}
+                placeholder={byModel ? "Search by model or machine" : "Search by machine name"}
+                end={
+                    <>
+                        <span className="text-muted-foreground">Group by</span>
+                        <SegmentedTabs
+                            size="sm"
+                            tabs={GROUPS}
+                            active={byModel ? MODEL_VIEW : "pool"}
+                            onSelect={(key) =>
+                                view.update({ group: key === MODEL_VIEW ? key : "" })
+                            }
+                        />
+                        {!byModel && <ViewMenu sizing={sizing} />}
+                    </>
+                }
+            />
+            <div className="overflow-hidden rounded-md border bg-card">
+                {byModel ? (
+                    <ModelTable
+                        groups={groups}
+                        problems={view.problems}
+                        open={view.open}
+                        empty={empty}
+                        onOpen={view.onOpen}
+                    />
+                ) : (
+                    <PoolTable view={view} shown={filtered.shown} sizing={sizing} empty={empty} />
+                )}
+                {unlisted.length > 0 && (
+                    <p className="border-t px-3 py-2 text-sm text-muted-foreground">
+                        {"Not listed, nothing deployed: "}
+                        {unlisted.map((part, index) => (
+                            <Fragment key={part}>
+                                {index > 0 && " · "}
+                                <button
+                                    type="button"
+                                    className="text-primary hover:underline"
+                                    onClick={() => view.update({ group: "" })}
+                                >
+                                    {part}
+                                </button>
+                            </Fragment>
+                        ))}
+                    </p>
+                )}
+            </div>
+        </>
     );
 }

@@ -1,6 +1,8 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 import {
     Badge,
+    ColumnResizer,
+    type ColumnSizing,
     Link,
     SortButton,
     StatusDot,
@@ -11,7 +13,7 @@ import {
     cn,
     sortAria,
 } from "obp-ui";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { Problem } from "~/api/problemQueries";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { BASIS_HINTS, type GaugeBasis } from "~/components/UsageGauge";
@@ -23,6 +25,7 @@ import {
     type Chip,
     type JobChip,
     agoText,
+    modelChips,
     percentText,
     problemLabel,
     problemTone,
@@ -31,6 +34,10 @@ import {
 } from "./fleet";
 import type { MachineRow } from "./machines";
 import type { Sort, SortKey } from "./sorting";
+
+const MAX_CHIPS = 6;
+const NAMED = ["@[13rem]:flex", "@[24rem]:flex", "@[36rem]:flex"];
+const COMPACT = ["@[13rem]:hidden", "@[24rem]:hidden", "@[36rem]:hidden"];
 
 const CHIP =
     "inline-flex h-6 min-w-0 max-w-full shrink items-center gap-1.5 rounded-md border px-1.5 text-sm outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring";
@@ -71,6 +78,38 @@ export function ModelChip({ chip, compact = false }: { chip: Chip; compact?: boo
                 <span className={cn(CHIP, "hover:bg-transparent")}>{body}</span>
             )}
         </Tip>
+    );
+}
+
+export function ModelsCell({ row }: { row: MachineRow }) {
+    if (!row.node.online) {
+        return <Dash />;
+    }
+    const chips = modelChips(row);
+    if (chips.length === 0) {
+        return <Dash />;
+    }
+    const shown = chips.slice(0, MAX_CHIPS);
+    return (
+        <div className="@container w-full">
+            <span className="flex min-w-0 items-center gap-1">
+                {shown.map((chip, index) => (
+                    <Fragment key={chip.key}>
+                        {index < NAMED.length && (
+                            <span className={cn("hidden min-w-0", NAMED[index])}>
+                                <ModelChip chip={chip} />
+                            </span>
+                        )}
+                        <span className={cn("flex shrink-0", COMPACT[index])}>
+                            <ModelChip chip={chip} compact />
+                        </span>
+                    </Fragment>
+                ))}
+                {chips.length > shown.length && (
+                    <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{`+${count(chips.length - shown.length)}`}</span>
+                )}
+            </span>
+        </div>
     );
 }
 
@@ -174,16 +213,23 @@ export function SortHead({
     sort,
     onSort,
     numeric = false,
+    sizing,
 }: {
     label: string;
     sortKey: SortKey;
     sort: Sort | null;
     onSort: (key: SortKey) => void;
     numeric?: boolean;
+    sizing?: ColumnSizing;
 }) {
     const direction = sort?.key === sortKey ? (sort.desc ? "desc" : "asc") : false;
+    const handle = sizing?.handle(sortKey, label);
     return (
-        <TableHead aria-sort={sortAria(direction)} className={cn(numeric && "text-right")}>
+        <TableHead
+            data-column={sortKey}
+            aria-sort={sortAria(direction)}
+            className={cn("relative overflow-hidden", numeric && "text-right")}
+        >
             <SortButton
                 direction={direction}
                 onClick={() => onSort(sortKey)}
@@ -191,6 +237,7 @@ export function SortHead({
             >
                 {label}
             </SortButton>
+            {handle && <ColumnResizer {...handle} />}
         </TableHead>
     );
 }

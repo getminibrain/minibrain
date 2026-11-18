@@ -17,10 +17,9 @@ import {
 } from "obp-ui";
 import { useState } from "react";
 import { type PoolToken, type PoolTokenIssued, useIssueJoinToken } from "~/api/joinTokenQueries";
-import { CopyButton } from "~/components/CopyButton";
 import { FormRow } from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
-import { Command, tokenCommand, workerCommand } from "./commands";
+import { Command, tokenCommand } from "./commands";
 
 export const LOCAL_POOL = "local";
 const NEW_POOL = "__new__";
@@ -187,7 +186,10 @@ export function IssuedCommand({ issued, origin }: { issued: PoolTokenIssued; ori
     );
 }
 
-function RotatedDialog({ issued, onClose }: { issued: PoolTokenIssued; onClose: () => void }) {
+export function RotatedDialog({
+    issued,
+    onClose,
+}: { issued: PoolTokenIssued; onClose: () => void }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-3xl">
@@ -205,29 +207,5 @@ function RotatedDialog({ issued, onClose }: { issued: PoolTokenIssued; onClose: 
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    );
-}
-
-export function PoolJoinControls({ pool, token }: { pool: string; token: PoolToken | undefined }) {
-    const [issued, setIssued] = useState<PoolTokenIssued | null>(null);
-    return (
-        <span className="ml-auto flex items-center gap-2">
-            <span className="text-muted-foreground">
-                {token ? (
-                    <>
-                        {"Token "}
-                        <span className="font-mono text-foreground">{`${token.prefix}…`}</span>
-                    </>
-                ) : (
-                    "No join token"
-                )}
-            </span>
-            <CopyButton
-                value={workerCommand(pool, window.location.origin)}
-                label={`Copy the command that joins a machine to pool ${pool}`}
-            />
-            <RotateToken pool={pool} exists={Boolean(token)} size="sm" onIssued={setIssued} />
-            {issued && <RotatedDialog issued={issued} onClose={() => setIssued(null)} />}
-        </span>
     );
 }
