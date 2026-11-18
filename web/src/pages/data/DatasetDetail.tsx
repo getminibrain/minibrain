@@ -37,7 +37,7 @@ import {
 import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Section, Stat } from "~/components/Section";
+import { ErrorLine, Section } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { asCode, count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
@@ -71,11 +71,12 @@ import {
     DeleteMenuItem,
     EditDialog,
     type EditFocus,
+    Fact,
+    Facts,
     ItemHeader,
     ItemMenu,
     LabelBalance,
     SplitDetail,
-    Stats,
     modelHref,
     useDataRefresh,
     useModelNames,
@@ -166,7 +167,7 @@ function QueryPart({
         body = <p className="text-muted-foreground">No query yet. Edit it to pick the columns.</p>;
     } else if (dataset.mode === "columns" && source) {
         body = (
-            <dl className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+            <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
                 <dt className="text-muted-foreground">Source</dt>
                 <dd className="truncate">
                     <Link
@@ -400,10 +401,10 @@ function liveRowsNote(dataset: DatasetSummary): string | null {
     return `The query now returns ${count(live)} rows; save a version to use them.`;
 }
 
-export function splitText(splits: Record<string, number>): string {
-    return SPLITS.filter(([key]) => key in splits)
-        .map(([key, label]) => `${count(splits[key])} ${label.toLowerCase()}`)
-        .join(" · ");
+export function SplitFacts({ splits }: { splits: Record<string, number> }) {
+    return SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
+        <Fact key={key} label={label} value={count(splits[key])} />
+    ));
 }
 
 function DatasetStats({
@@ -417,15 +418,14 @@ function DatasetStats({
     const quality = stats?.quality;
     const splits = latest?.counts ?? {};
     const notes = [splitsNote(dataset), liveRowsNote(dataset)].filter(Boolean);
-    const splitLine = splitText(splits);
     return (
         <AboutPart title="Overview">
-            <Stats>
-                <Stat label="Rows" value={latest ? count(quality?.rows ?? latest.rows) : "–"} />
-                <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
-                <Stat label="Sources" value={count(dataset.sources.length)} />
-            </Stats>
-            {splitLine && <p className="text-sm text-muted-foreground tabular-nums">{splitLine}</p>}
+            <Facts>
+                <Fact label="Rows" value={latest ? count(quality?.rows ?? latest.rows) : "–"} />
+                <Fact label="Labels" value={quality ? count(quality.labels) : "–"} />
+                <Fact label="Sources" value={count(dataset.sources.length)} />
+                <SplitFacts splits={splits} />
+            </Facts>
             {notes.map((note) => (
                 <p key={note} className="text-sm text-muted-foreground tabular-nums">
                     {note}

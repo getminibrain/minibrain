@@ -21,7 +21,7 @@ import {
     unwrap,
 } from "~/api/client";
 import { useSourceRows, useSourceStats } from "~/api/queries";
-import { ErrorLine, Stat } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { count } from "~/lib/format";
 import { fileSize, relativeTime } from "~/lib/time";
 import { ConnectedFacts } from "./Connected";
@@ -44,10 +44,11 @@ import {
     DeleteMenuItem,
     EditDialog,
     type EditFocus,
+    Fact,
+    Facts,
     ItemHeader,
     ItemMenu,
     SplitDetail,
-    Stats,
     useDataRefresh,
 } from "./parts";
 import { resultColumns } from "./resultColumns";
@@ -237,29 +238,29 @@ function Datasets({ datasets }: { datasets: DatasetSummary[] }) {
 function SourceStats({ source, datasets }: { source: SourceSummary; datasets: number }) {
     const lastChange = source.modified_at ? relativeTime(source.modified_at) : "–";
     return (
-        <Stats>
-            <Stat label="Rows" value={count(source.rows)} />
-            <Stat label="Columns" value={count(source.columns.length)} />
+        <Facts>
+            <Fact label="Rows" value={count(source.rows)} />
+            <Fact label="Columns" value={count(source.columns.length)} />
             {(source.kind === "upload" || source.kind === "folder" || source.kind === "s3") && (
-                <Stat label="Size" value={fileSize(source.size)} />
+                <Fact label="Size" value={fileSize(source.size)} />
             )}
-            <Stat label="Datasets" value={count(datasets)} />
+            <Fact label="Datasets" value={count(datasets)} />
             {(source.kind === "folder" || source.kind === "s3") && (
-                <Stat
+                <Fact
                     label={source.kind === "s3" ? "Objects" : "Files"}
                     value={`${count(source.files)} ${FORMAT_LABELS[source.format ?? ""] ?? ""}`}
                 />
             )}
             {(source.kind === "folder" || source.kind === "s3" || tableFormat(source.kind)) && (
-                <Stat label="Last change" value={lastChange} />
+                <Fact label="Last change" value={lastChange} />
             )}
             {source.encoding && (
-                <Stat
+                <Fact
                     label="Encoding"
                     value={ENCODING_LABELS[source.encoding] ?? source.encoding}
                 />
             )}
-        </Stats>
+        </Facts>
     );
 }
 

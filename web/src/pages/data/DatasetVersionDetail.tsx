@@ -22,7 +22,7 @@ import { useAllModels } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
 import { NotFoundState } from "~/components/ErrorState";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Stat } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { count } from "~/lib/format";
 import { modelVersionHref, trainHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
@@ -31,9 +31,9 @@ import {
     LABEL_BALANCE_TIP,
     PREVIEW_COLUMNS,
     SavedLabelBalance,
+    SplitFacts,
     TrainingExample,
     rowSummary,
-    splitText,
 } from "./DatasetDetail";
 import { PathLinks } from "./DatasetFolders";
 import { VersionPicker, takenAt, useCompareParam } from "./DatasetVersions";
@@ -42,10 +42,11 @@ import { sampleText } from "./SampleOffer";
 import { type FolderIndex, datasetHref } from "./catalogue";
 import {
     AboutPart,
+    Fact,
+    Facts,
     ItemHeader,
     ItemMenu,
     SplitDetail,
-    Stats,
     modelHref,
     useModelNames,
 } from "./parts";
@@ -110,22 +111,21 @@ function VersionStats({
     stats: ReturnType<typeof useDatasetVersionStats>;
 }) {
     const quality = stats.data?.quality;
-    const splitLine = splitText(datasetVersion.counts);
     const notes = [
         datasetVersion.sample ? sampleText(datasetVersion.sample) : null,
         datasetVersion.too_few_rows ?? null,
     ].filter((note): note is string => Boolean(note));
     return (
         <AboutPart title="Overview">
-            <Stats>
-                <Stat label="Rows" value={count(quality?.rows ?? datasetVersion.rows)} />
-                <Stat
+            <Facts>
+                <Fact label="Rows" value={count(quality?.rows ?? datasetVersion.rows)} />
+                <Fact
                     label="Labels"
                     value={count(quality?.labels ?? datasetVersion.labels.length)}
                 />
-                <Stat label="Sources" value={count(datasetVersion.sources ?? 0)} />
-            </Stats>
-            {splitLine && <p className="text-sm text-muted-foreground tabular-nums">{splitLine}</p>}
+                <Fact label="Sources" value={count(datasetVersion.sources ?? 0)} />
+                <SplitFacts splits={datasetVersion.counts} />
+            </Facts>
             {notes.map((note) => (
                 <p key={note} className="text-sm text-muted-foreground tabular-nums">
                     {note}

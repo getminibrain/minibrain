@@ -191,8 +191,25 @@ export function AboutPart({
                 </h3>
                 {action}
             </div>
-            {children}
+            <div className="flex min-w-0 flex-col gap-2 pl-3">{children}</div>
         </section>
+    );
+}
+
+export function Facts({ children }: { children: ReactNode }) {
+    return (
+        <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 tabular-nums">
+            {children}
+        </dl>
+    );
+}
+
+export function Fact({ label, value }: { label: string; value: ReactNode }) {
+    return (
+        <>
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="min-w-0 truncate">{value}</dd>
+        </>
     );
 }
 
