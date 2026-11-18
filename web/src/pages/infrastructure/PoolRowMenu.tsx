@@ -16,10 +16,10 @@ import { useState } from "react";
 import { type PoolToken, type PoolTokenIssued, useIssueJoinToken } from "~/api/joinTokenQueries";
 import { type Workload, usePoolWorkloads } from "~/api/machineQueries";
 import { ErrorLine } from "~/components/Section";
-import { LOCAL_POOL, RotatedDialog } from "../PoolJoin";
-import { useOf } from "../PoolUse";
-import { workerCommand } from "../commands";
-import type { PoolInfo } from "../parts";
+import { LOCAL_POOL, RotatedDialog } from "./PoolJoin";
+import { useOf } from "./PoolUse";
+import { workerCommand } from "./commands";
+import type { PoolInfo } from "./parts";
 
 type UseKey = ReturnType<typeof useOf>;
 

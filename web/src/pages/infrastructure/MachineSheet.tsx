@@ -53,7 +53,7 @@ const OUTCOMES: Record<string, { label: string; tone: Tone }> = {
 
 const LINK = "text-primary hover:underline";
 
-export function Block({ title, children }: { title: string; children: ReactNode }) {
+function Block({ title, children }: { title: string; children: ReactNode }) {
     return (
         <section className="flex min-w-0 flex-col gap-3 border-t pt-5">
             <h3 className="text-base font-medium">{title}</h3>
@@ -461,46 +461,6 @@ function ProblemsBlock({ row, problems }: { row: MachineRow; problems: Problem[]
     );
 }
 
-export function MachineSummary({ row }: { row: MachineRow }) {
-    return (
-        <>
-            <MachineState row={row} />
-            <span>{`· ${row.node.roles.join(", ")} · ${hardwareText(row.node)}`}</span>
-        </>
-    );
-}
-
-export function MachineBlocks({
-    row,
-    main,
-    info,
-    problems,
-    after,
-}: {
-    row: MachineRow;
-    main: Record<string, string>;
-    info: InfrastructureInfo | undefined;
-    problems: Problem[];
-    after?: ReactNode;
-}) {
-    return (
-        <>
-            <ProblemsBlock row={row} problems={problems} />
-            <HardwareBlock row={row} info={info} />
-            {after}
-            <RunningBlock row={row} />
-            <Block title="Live">
-                <LiveMetrics row={row} />
-            </Block>
-            <VersionsBlock node={row.node} main={main} />
-            <ConnectionBlock row={row} />
-            <Block title="Actions">
-                <MachineActions row={row} />
-            </Block>
-        </>
-    );
-}
-
 export function MachineSheet({
     row,
     main,
@@ -527,10 +487,21 @@ export function MachineSheet({
                         <SheetHeader>
                             <SheetTitle className="font-mono">{row.node.host}</SheetTitle>
                             <SheetDescription className="flex flex-wrap items-baseline gap-x-2">
-                                <MachineSummary row={row} />
+                                <MachineState row={row} />
+                                <span>{`· ${row.node.roles.join(", ")} · ${hardwareText(row.node)}`}</span>
                             </SheetDescription>
                         </SheetHeader>
-                        <MachineBlocks row={row} main={main} info={info} problems={problems} />
+                        <ProblemsBlock row={row} problems={problems} />
+                        <HardwareBlock row={row} info={info} />
+                        <RunningBlock row={row} />
+                        <Block title="Live">
+                            <LiveMetrics row={row} />
+                        </Block>
+                        <VersionsBlock node={row.node} main={main} />
+                        <ConnectionBlock row={row} />
+                        <Block title="Actions">
+                            <MachineActions row={row} />
+                        </Block>
                     </>
                 )}
             </SheetContent>

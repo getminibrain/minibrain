@@ -3,7 +3,6 @@ import {
     type ColumnSize,
     type ColumnSizing,
     Link,
-    SegmentedTabs,
     Table,
     TableBody,
     TableCell,
@@ -12,47 +11,43 @@ import {
     cn,
     useColumnSizing,
 } from "obp-ui";
-import { Fragment, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { PoolToken } from "~/api/joinTokenQueries";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
 import { jobHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
-import { ModelTable } from "../ModelView";
-import { UseBadge } from "../PoolUse";
-import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "../activity";
+import { PoolRowMenu } from "./PoolRowMenu";
+import { UseBadge } from "./PoolUse";
+import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "./activity";
+import { servedOn } from "./byModel";
 import {
-    type DeployedModel,
-    type ShownGroup,
-    modelGroups,
-    servedOn,
-    shownGroups,
-} from "../byModel";
-import {
-    Dash,
-    JobProgressChip,
+    JobsCell,
     Lead,
-    MachineLabel,
     MemoryFigure,
-    ModelsCell,
+    ModelChips,
     SortHead,
+    StatusCell,
     Tip,
-} from "../cells";
+    UsagePercent,
+} from "./cells";
 import {
     cpuOf,
     gpuText,
     jobChips,
+    machineStatuses,
     memoryOf,
-    percentText,
+    modelChips,
     poolMemory,
     poolProblems,
     ramOf,
     shareOf,
-} from "../fleet";
-import type { MachineRow } from "../machines";
+} from "./fleet";
+import type { MachineRow } from "./machines";
 import {
     OnlineCount,
     type OpenRows,
@@ -61,68 +56,111 @@ import {
     RowToggle,
     plural,
     rowEvents,
-} from "../parts";
-import { type Sort, type SortKey, sortRows } from "../sorting";
-import { PoolRowMenu } from "./PoolRowMenu";
-import {
-    MachineToolbar,
-    type MachinesView,
-    ViewMenu,
-    WIDTHS_KEY,
-    emptyText,
-    fitKeyOf,
-    useMachineFilters,
-} from "./shared";
+} from "./parts";
+import { type Sort, type SortKey, sortRows } from "./sorting";
 
-const COLUMNS: (ColumnSize & { id: SortKey; label: string; numeric?: boolean })[] = [
-    { id: "host", label: "Machine", width: 200, min: 160 },
-    { id: "gpu", label: "GPU", width: 88, min: 64 },
-    { id: "memory", label: "GPU memory", width: 128, min: 104 },
-    { id: "cpu", label: "CPU", width: 64, min: 56, numeric: true },
-    { id: "ram", label: "RAM", width: 64, min: 56, numeric: true },
-    { id: "models", label: "Models", width: 240, min: 200, flex: true },
-    { id: "jobs", label: "Jobs", width: 120, min: 104 },
+type Column = ColumnSize & { id: SortKey; label: string; numeric?: boolean };
+
+const COLUMNS: Column[] = [
+    { id: "host", label: "Machine", width: 144, min: 120 },
+    { id: "status", label: "Status", width: 112, min: 96 },
+    { id: "gpu", label: "GPU", width: 72, min: 64 },
+    { id: "memory", label: "GPU memory", width: 112, min: 104 },
+    { id: "cpu", label: "CPU", width: 56, min: 56, numeric: true },
+    { id: "ram", label: "RAM", width: 56, min: 56, numeric: true },
+    { id: "models", label: "Models", width: 136, min: 136, flex: true },
+    { id: "jobs", label: "Jobs", width: 144, min: 128 },
 ];
 
+const MODELS_MIN = 136;
+const MODELS_MAX = 400;
+const MODELS_SHARE = 0.22;
+const SHARE_FROM = 1100;
+
 const SPAN = COLUMNS.length;
-const DETAIL = SPAN - 1;
-const MAX_AVATARS = 5;
+const POOL_LEAD = 3;
 const LINK = "text-primary hover:underline";
 const ROW = "h-10";
 const CELL = "py-1";
 const NUMBER = "py-1 text-right tabular-nums";
 const LEADING = "flex min-w-0 items-center gap-2";
-const MODEL_VIEW = "model";
-const GROUPS = [
-    { key: "pool", label: "Pool" },
-    { key: MODEL_VIEW, label: "Model" },
-];
+const WIDTHS_KEY = "minibrain.machines.widths";
 
-function PoolModels({ deployed }: { deployed: DeployedModel[] }) {
+function modelsMin(width: number): number {
+    if (width < SHARE_FROM) {
+        return MODELS_MIN;
+    }
+    const share = Math.round((width * MODELS_SHARE) / 8) * 8;
+    return Math.min(MODELS_MAX, Math.max(MODELS_MIN, share));
+}
+
+function useBoxWidth() {
+    const [box, setBox] = useState<HTMLElement | null>(null);
+    const [width, setWidth] = useState(0);
+    useEffect(() => {
+        if (!box) {
+            return;
+        }
+        const read = () => setWidth(box.clientWidth);
+        read();
+        const observer = new ResizeObserver(read);
+        observer.observe(box);
+        return () => observer.disconnect();
+    }, [box]);
+    return { width, setBox };
+}
+
+export function usePoolSizing(
+    rows: MachineRow[],
+    problems: Problem[] | undefined,
+    fit: boolean,
+): ColumnSizing {
+    const { width, setBox } = useBoxWidth();
+    const models = modelsMin(width);
+    const columns = useMemo(
+        () =>
+            COLUMNS.map((column) =>
+                column.flex ? { ...column, width: models, min: models } : column,
+            ),
+        [models],
+    );
+    const ids = rows.map((row) => row.node.id).join(",");
+    const found = (problems ?? []).map((problem) => problem.id).join(",");
+    const sizing = useColumnSizing({
+        columns,
+        storageKey: WIDTHS_KEY,
+        fitKey: fit ? `${ids}|${found}|${models}` : undefined,
+    });
+    const { tableRef } = sizing;
+    const observe = useCallback(
+        (table: HTMLTableElement | null) => {
+            tableRef(table);
+            setBox(table?.parentElement ?? null);
+        },
+        [tableRef, setBox],
+    );
+    return { ...sizing, tableRef: observe };
+}
+
+function PoolModels({ pool }: { pool: PoolInfo }) {
+    const deployed = pool.deployed ?? [];
     if (deployed.length === 0) {
         return null;
     }
-    const shown = deployed.slice(0, MAX_AVATARS);
     return (
-        <span className="flex min-w-0 items-center gap-1">
-            {shown.map((model) => (
-                <Tip key={model.model} tip={versioned(model.name, model.version)}>
-                    <span className="flex shrink-0 cursor-default">
-                        <PublisherLogo name={model.name} modelKey={model.model} size="sm" />
-                    </span>
-                </Tip>
-            ))}
-            {deployed.length > shown.length && (
-                <Tip
-                    tip={deployed
-                        .slice(MAX_AVATARS)
-                        .map((model) => versioned(model.name, model.version))
-                        .join(", ")}
-                >
-                    <span className="shrink-0 cursor-default text-sm text-muted-foreground tabular-nums">{`+${count(deployed.length - shown.length)}`}</span>
-                </Tip>
-            )}
-        </span>
+        <Tip
+            tip={
+                <ul className="flex flex-col gap-1">
+                    {deployed.map((model) => (
+                        <li key={model.model}>{versioned(model.name, model.version)}</li>
+                    ))}
+                </ul>
+            }
+        >
+            <span className="cursor-default text-muted-foreground tabular-nums">
+                {plural(deployed.length, "model")}
+            </span>
+        </Tip>
     );
 }
 
@@ -153,7 +191,7 @@ function PoolBand({
                 "scroll-mt-24 bg-muted transition-colors duration-150 hover:bg-muted data-flash:bg-highlight motion-reduce:transition-none",
             )}
         >
-            <TableCell colSpan={2} className={CELL}>
+            <TableCell colSpan={POOL_LEAD} className={CELL}>
                 <span className={LEADING}>
                     <RowToggle
                         open={open}
@@ -163,15 +201,10 @@ function PoolBand({
                     <Lead>
                         <IconStack2 aria-hidden="true" className="size-4 text-muted-foreground" />
                     </Lead>
-                    <span
-                        className="shrink-0 font-medium"
-                        title={pool.label !== pool.name ? pool.label : undefined}
-                    >
-                        {pool.name}
-                    </span>
+                    <PoolLink name={pool.name} className="shrink-0 font-medium" />
                     <UseBadge workloads={pool.workloads} />
                     <ProblemBadge problems={problems} />
-                    <span className="min-w-0 truncate text-sm">
+                    <span className="shrink-0 text-sm">
                         <OnlineCount nodes={pool.nodes} />
                     </span>
                 </span>
@@ -189,7 +222,7 @@ function PoolBand({
             <TableCell className={CELL} />
             <TableCell className={CELL} />
             <TableCell className={CELL}>
-                <PoolModels deployed={pool.deployed ?? []} />
+                <PoolModels pool={pool} />
             </TableCell>
             <TableCell data-column="jobs" className={CELL}>
                 <span className="flex min-w-0 items-center justify-between gap-2">
@@ -200,21 +233,6 @@ function PoolBand({
                 </span>
             </TableCell>
         </TableRow>
-    );
-}
-
-function JobsCell({ row }: { row: MachineRow }) {
-    const jobs = jobChips(row.node);
-    if (jobs.length === 0) {
-        return <Dash />;
-    }
-    return (
-        <span className="flex min-w-0 items-center gap-1">
-            <JobProgressChip chip={jobs[0]} />
-            {jobs.length > 1 && (
-                <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{`+${count(jobs.length - 1)}`}</span>
-            )}
-        </span>
     );
 }
 
@@ -261,8 +279,19 @@ function MachineLine({
                             />
                         )}
                     </span>
-                    <MachineLabel row={row} problems={problems} />
+                    <span
+                        className={cn(
+                            "min-w-0 truncate font-mono",
+                            node.online && "text-foreground",
+                        )}
+                        title={node.host}
+                    >
+                        {node.host}
+                    </span>
                 </span>
+            </TableCell>
+            <TableCell data-column="status" className={CELL}>
+                <StatusCell items={machineStatuses(row, problems)} />
             </TableCell>
             <TableCell data-column="gpu" className={CELL}>
                 <span className="block truncate" title={gpuText(node)}>
@@ -270,34 +299,36 @@ function MachineLine({
                 </span>
             </TableCell>
             <TableCell data-column="memory" className={CELL}>
-                {memory ? (
+                {memory && (
                     <MemoryFigure
                         used={memory.used}
                         capacity={memory.capacity}
                         basis={memory.basis}
                         host={node.host}
                     />
-                ) : (
-                    <Dash />
                 )}
             </TableCell>
             <TableCell data-column="cpu" className={NUMBER}>
-                {cpu === null ? <Dash /> : `${Math.round(cpu)}%`}
+                {cpu !== null && (
+                    <UsagePercent
+                        fraction={cpu / 100}
+                        tip={`CPU ${Math.round(cpu)}% busy across ${plural(node.cpu_count, "core")}`}
+                    />
+                )}
             </TableCell>
             <TableCell data-column="ram" className={NUMBER}>
                 {ram.used !== null && ram.total ? (
-                    <span title={`${bytes(ram.used)} of ${bytes(ram.total)} RAM in use`}>
-                        {percentText(shareOf(ram.used, ram.total))}
-                    </span>
-                ) : (
-                    <Dash />
-                )}
+                    <UsagePercent
+                        fraction={shareOf(ram.used, ram.total)}
+                        tip={`${bytes(ram.used)} of ${bytes(ram.total)} RAM in use`}
+                    />
+                ) : null}
             </TableCell>
             <TableCell className={CELL}>
-                <ModelsCell row={row} />
+                {node.online && <ModelChips chips={modelChips(row)} host={node.host} />}
             </TableCell>
             <TableCell data-column="jobs" className={CELL}>
-                <JobsCell row={row} />
+                <JobsCell jobs={jobChips(node)} />
             </TableCell>
         </TableRow>
     );
@@ -306,10 +337,12 @@ function MachineLine({
 function SubRow({
     lead,
     name,
+    status,
     detail,
 }: {
     lead: ReactNode;
     name: ReactNode;
+    status: ReactNode;
     detail: ReactNode;
 }) {
     return (
@@ -321,10 +354,9 @@ function SubRow({
                     <span className="min-w-0 truncate">{name}</span>
                 </span>
             </TableCell>
-            <TableCell colSpan={DETAIL} className={CELL}>
-                <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                    {detail}
-                </span>
+            <TableCell className={CELL}>{status}</TableCell>
+            <TableCell colSpan={SPAN - 2} className={CELL}>
+                <span className="block truncate text-muted-foreground">{detail}</span>
             </TableCell>
         </TableRow>
     );
@@ -352,16 +384,12 @@ function ActivityRows({ row }: { row: MachineRow }) {
                                 {versioned(served.name, served.version)}
                             </Link>
                         }
-                        detail={
-                            <>
-                                <StatusText tone={state.tone} active={state.active}>
-                                    {state.label}
-                                </StatusText>
-                                <span className="truncate">
-                                    {engineDetail(engines.length, engines[0].engine)}
-                                </span>
-                            </>
+                        status={
+                            <StatusText tone={state.tone} active={state.active}>
+                                {state.label}
+                            </StatusText>
                         }
+                        detail={`${engineDetail(engines.length, engines[0].engine)} on ${engines[0].base_model}`}
                     />
                 );
             })}
@@ -378,16 +406,12 @@ function ActivityRows({ row }: { row: MachineRow }) {
                             />
                         }
                         name={<span className="font-mono">{engine.base_model}</span>}
-                        detail={
-                            <>
-                                <StatusText tone={state.tone} active={state.active}>
-                                    {state.label}
-                                </StatusText>
-                                <span className="truncate">
-                                    {`No model deployed · ${engineLabel(engine.engine)}`}
-                                </span>
-                            </>
+                        status={
+                            <StatusText tone={state.tone} active={state.active}>
+                                {state.label}
+                            </StatusText>
                         }
+                        detail={`No model deployed · ${engineLabel(engine.engine)}`}
                     />
                 );
             })}
@@ -400,21 +424,21 @@ function ActivityRows({ row }: { row: MachineRow }) {
                             {jobSubject(job)}
                         </Link>
                     }
+                    status={
+                        <StatusText
+                            tone="info"
+                            active
+                            progress={job.progress > 0 ? percentOf(job.progress) : null}
+                        >
+                            {kindNoun(job.kind)}
+                        </StatusText>
+                    }
                     detail={
                         <>
-                            <StatusText
-                                tone="info"
-                                active
-                                progress={job.progress > 0 ? percentOf(job.progress) : null}
-                            >
-                                {kindNoun(job.kind)}
-                            </StatusText>
-                            <span className="truncate tabular-nums">
-                                {`${Math.round(job.progress * 100)}% · `}
-                                <Link href={jobHref(job)} className={LINK}>
-                                    {`Job ${job.id}`}
-                                </Link>
-                            </span>
+                            <span className="tabular-nums">{`${Math.round(job.progress * 100)}% done · `}</span>
+                            <Link href={jobHref(job)} className={LINK}>
+                                {`Job ${job.id}`}
+                            </Link>
                         </>
                     }
                 />
@@ -485,27 +509,32 @@ function bodyRows({
     });
 }
 
-function PoolTable({
-    view,
+export function PoolTable({
+    pools,
     shown,
+    problems,
+    admin,
+    tokens,
+    sort,
+    onSort,
+    open,
+    onOpen,
     sizing,
     empty,
 }: {
-    view: MachinesView;
+    pools: PoolInfo[];
     shown: MachineRow[];
+    problems: Problem[] | undefined;
+    admin: boolean;
+    tokens: PoolToken[] | undefined;
+    sort: Sort | null;
+    onSort: (key: SortKey) => void;
+    open: OpenRows;
+    onOpen: (row: MachineRow) => void;
     sizing: ColumnSizing;
     empty: ReactNode;
 }) {
-    const body = bodyRows({
-        pools: view.pools,
-        shown,
-        problems: view.problems,
-        admin: view.admin,
-        tokens: view.tokens,
-        sort: view.sort,
-        open: view.open,
-        onOpen: view.onOpen,
-    });
+    const body = bodyRows({ pools, shown, problems, admin, tokens, sort, open, onOpen });
     return (
         <Table ref={sizing.tableRef} style={sizing.tableStyle} className="[&_td]:overflow-hidden">
             <colgroup>
@@ -521,8 +550,8 @@ function PoolTable({
                             label={column.label}
                             sortKey={column.id}
                             numeric={column.numeric}
-                            sort={view.sort}
-                            onSort={view.onSort}
+                            sort={sort}
+                            onSort={onSort}
                             sizing={sizing}
                         />
                     ))}
@@ -543,89 +572,5 @@ function PoolTable({
                 )}
             </TableBody>
         </Table>
-    );
-}
-
-function unlistedParts(rows: MachineRow[], groups: ShownGroup[]): string[] {
-    const listed = new Set(
-        groups.flatMap(({ places }) =>
-            places.flatMap((place) => place.machines.map((machine) => machine.row.node.id)),
-        ),
-    );
-    const unlisted = rows.filter((row) => !listed.has(row.node.id));
-    const idle = unlisted.filter((row) => row.node.jobs.length === 0).length;
-    const jobsOnly = unlisted.length - idle;
-    return [
-        idle > 0 ? plural(idle, "idle machine") : null,
-        jobsOnly > 0 ? `${plural(jobsOnly, "machine")} running jobs only` : null,
-    ].filter((part): part is string => part !== null);
-}
-
-export function RefinedLayout({ view }: { view: MachinesView }) {
-    const filtered = useMachineFilters(view);
-    const byModel = view.search.group === MODEL_VIEW;
-    const sizing = useColumnSizing({
-        columns: COLUMNS,
-        storageKey: WIDTHS_KEY,
-        fitKey: byModel ? undefined : fitKeyOf(filtered.shown, view.problems),
-    });
-    const groups = byModel ? shownGroups(modelGroups(view.pools, view.all), filtered.filters) : [];
-    const unlisted = byModel ? unlistedParts(filtered.shown, groups) : [];
-    const empty =
-        byModel && !view.loading && !filtered.filtering
-            ? "No model is deployed."
-            : emptyText(view, filtered);
-    return (
-        <>
-            <MachineToolbar
-                view={view}
-                filtered={filtered}
-                placeholder={byModel ? "Search by model or machine" : "Search by machine name"}
-                end={
-                    <>
-                        <span className="text-muted-foreground">Group by</span>
-                        <SegmentedTabs
-                            size="sm"
-                            tabs={GROUPS}
-                            active={byModel ? MODEL_VIEW : "pool"}
-                            onSelect={(key) =>
-                                view.update({ group: key === MODEL_VIEW ? key : "" })
-                            }
-                        />
-                        {!byModel && <ViewMenu sizing={sizing} />}
-                    </>
-                }
-            />
-            <div className="overflow-hidden rounded-md border bg-card">
-                {byModel ? (
-                    <ModelTable
-                        groups={groups}
-                        problems={view.problems}
-                        open={view.open}
-                        empty={empty}
-                        onOpen={view.onOpen}
-                    />
-                ) : (
-                    <PoolTable view={view} shown={filtered.shown} sizing={sizing} empty={empty} />
-                )}
-                {unlisted.length > 0 && (
-                    <p className="border-t px-3 py-2 text-sm text-muted-foreground">
-                        {"Not listed, nothing deployed: "}
-                        {unlisted.map((part, index) => (
-                            <Fragment key={part}>
-                                {index > 0 && " · "}
-                                <button
-                                    type="button"
-                                    className="text-primary hover:underline"
-                                    onClick={() => view.update({ group: "" })}
-                                >
-                                    {part}
-                                </button>
-                            </Fragment>
-                        ))}
-                    </p>
-                )}
-            </div>
-        </>
     );
 }

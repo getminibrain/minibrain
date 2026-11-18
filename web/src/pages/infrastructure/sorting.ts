@@ -1,37 +1,12 @@
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
-import { cpuOf, gpuCount, memoryOf, modelChips, ramOf, shareOf } from "./fleet";
+import { cpuOf, gpuCount, machineStatuses, memoryOf, modelChips, ramOf, shareOf } from "./fleet";
 import type { MachineRow } from "./machines";
 
-export type SortKey =
-    | "host"
-    | "pool"
-    | "status"
-    | "gpu"
-    | "memory"
-    | "cpu"
-    | "ram"
-    | "models"
-    | "jobs";
+export type SortKey = "host" | "status" | "gpu" | "memory" | "cpu" | "ram" | "models" | "jobs";
 
 export type Sort = { key: SortKey; desc: boolean };
 
-const ASCENDING_FIRST: SortKey[] = ["host", "pool", "gpu"];
-
-export function statusRank(row: MachineRow, problems: Problem[] | undefined): number {
-    const found = problemsOfMachine(problems, row.node.id).filter(
-        (problem) => problem.kind !== "machine_offline",
-    );
-    if (found.some((problem) => problem.severity === "critical")) {
-        return 4;
-    }
-    if (found.length > 0) {
-        return 3;
-    }
-    if (!row.node.online) {
-        return 2;
-    }
-    return row.node.state === "draining" ? 1 : 0;
-}
+const ASCENDING_FIRST: SortKey[] = ["host", "gpu"];
 
 function sortValue(
     row: MachineRow,
@@ -41,8 +16,7 @@ function sortValue(
     const { node } = row;
     const values: Record<SortKey, () => number | string> = {
         host: () => node.host,
-        pool: () => `${row.pool.name}\u0000${node.host}`,
-        status: () => statusRank(row, problems),
+        status: () => machineStatuses(row, problemsOfMachine(problems, node.id))[0].rank,
         gpu: () => gpuCount(node) * 1000 + (node.usable_bytes ?? 0) / 1024 ** 3,
         memory: () => {
             const memory = memoryOf(row);
