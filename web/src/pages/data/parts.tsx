@@ -31,6 +31,7 @@ import { ErrorLine } from "~/components/Section";
 import { TAGS_HINT, Tags, editableTags } from "~/components/Tags";
 import { modelPageHref } from "~/lib/modelLinks";
 import { type WidthOptions, useResizableWidth } from "~/lib/useResizableWidth";
+import { Clipped } from "../models/detail/facts";
 import { splitTags } from "../models/dialogs";
 import { sourceNameProblem } from "./catalogue";
 
@@ -406,6 +407,10 @@ function percent(share: number): string {
     return `${(share * 100).toFixed(share < 0.1 ? 1 : 0)}%`;
 }
 
+function sizeText(rows: number, total: number): string {
+    return `${rows.toLocaleString()} · ${percent(rows / total)}`;
+}
+
 export function LabelBalance({
     counts,
     labels,
@@ -426,50 +431,38 @@ export function LabelBalance({
     if (total === 0) {
         return <p className="text-muted-foreground">No labelled rows yet.</p>;
     }
+    const sizes = shown.map((item) => sizeText(item.rows, total));
+    const widest = Math.max(...sizes.map((text) => text.length), 1);
     return (
         <div className="flex flex-col gap-1">
             <table className="w-full table-fixed border-collapse">
                 <caption className="sr-only">Rows per label</caption>
                 <colgroup>
-                    <col className="w-1/2" />
                     <col />
-                    <col className="w-22" />
+                    <col style={{ width: `${widest + 2}ch` }} />
                 </colgroup>
                 <thead className="sr-only">
                     <tr>
                         <th scope="col">Label</th>
-                        <th scope="col">Share</th>
-                        <th scope="col">Rows</th>
+                        <th scope="col">Rows and share</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {shown.map((item) => {
-                        const share = item.rows / total;
-                        return (
-                            <tr key={item.label} className="group/bar h-8 hover:bg-secondary">
-                                <th scope="row" className="pr-3 text-left font-normal">
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="block truncate">{item.label}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-96 break-all">
-                                            {item.label}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </th>
-                                <td className="pr-3">
-                                    <div
-                                        aria-hidden="true"
-                                        className="h-1.5 rounded-r-sm bg-primary"
-                                        style={{ width: `${(item.rows / largest) * 100}%` }}
-                                    />
-                                </td>
-                                <td className="text-right text-sm whitespace-nowrap text-muted-foreground tabular-nums group-hover/bar:text-foreground">
-                                    {`${item.rows.toLocaleString()} · ${percent(share)}`}
-                                </td>
-                            </tr>
-                        );
-                    })}
+                    {shown.map((item, index) => (
+                        <tr key={item.label} className="group/bar hover:bg-secondary">
+                            <th scope="row" className="py-1 pr-3 text-left font-normal">
+                                <Clipped text={item.label} className="block" />
+                                <div
+                                    aria-hidden="true"
+                                    className="mt-1 h-1.5 rounded-r-sm bg-primary"
+                                    style={{ width: `${(item.rows / largest) * 100}%` }}
+                                />
+                            </th>
+                            <td className="py-1 text-right align-top text-sm whitespace-nowrap text-muted-foreground tabular-nums group-hover/bar:text-foreground">
+                                {sizes[index]}
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
             {(hidden > 0 || all) && counts.length > SHOWN_LABELS && (
