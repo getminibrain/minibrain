@@ -47,6 +47,7 @@ import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { bytes } from "~/lib/time";
 import { useResizableWidth } from "~/lib/useResizableWidth";
+import { useStoredList } from "~/lib/useStoredList";
 import { AddMenu, SourceChoices, useSourceBlocks } from "./AddMenu";
 import {
     type AddKind,
@@ -338,7 +339,7 @@ export function DataExplorer() {
     const move = useMoveItem();
     const width = useResizableWidth(TREE_WIDTH);
     const [query, setQuery] = useState("");
-    const [collapsed, setCollapsed] = useState<string[]>([]);
+    const [collapsed, setCollapsed] = useStoredList("minibrain.data.collapsed");
     const [creatingFor, setCreatingFor] = useState<number | string | null>(null);
     const [adding, setAdding] = useState<AddKind | null>(null);
     const [already, setAlready] = useState<SourceSummary | null>(null);
@@ -387,7 +388,7 @@ export function DataExplorer() {
                 ? current.filter((id) => !above.includes(id))
                 : current,
         );
-    }, [nodes, selectedKey]);
+    }, [nodes, selectedKey, setCollapsed]);
 
     const select = (item: ItemRef) => {
         const href = itemHref(item);
