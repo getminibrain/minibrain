@@ -103,10 +103,12 @@ from minibrain.data.shared import (
     remote_state,
     require_free_source_name,
     sources_in,
+    suggested_pair,
     table_of,
     tables_of,
 )
 from minibrain.data.sources import (
+    ColumnSummary,
     ExampleRow,
     SourceError,
     Table,
@@ -126,7 +128,7 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.data.splits import answer_labels, clean, pairs
-from minibrain.data.templates import Template, pair_template, template_sql
+from minibrain.data.templates import Template, pair_template, skipping_empty, template_sql
 from minibrain.data.transcoded import drop_fallbacks
 from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import dataset_version_location
@@ -158,6 +160,12 @@ def cached_shape(tables: tuple[Table, ...], aliases: Aliases, sql: str) -> tuple
     columns = output_columns(tables, sql, dict(aliases))
     rows = count_rows(tables, sql, dict(aliases))
     return tuple(ColumnInfo(name=column.name, type=column.type) for column in columns), rows
+
+
+@lru_cache(maxsize=128)
+def cached_summary(table: Table) -> tuple[tuple[ColumnSummary, ...], int]:
+    summaries, sampled = summarize(table, STATS_SAMPLE)
+    return tuple(summaries), sampled
 
 
 @lru_cache(maxsize=512)
@@ -331,13 +339,15 @@ def require_rows(settings: Settings, store: ArtifactStore, source: Source) -> No
         raise ConflictError(f"{source.name} has no rows: add rows to it, then make the dataset")
 
 
-def column_source(session: Session, dataset: Dataset, body: MappingUpdate) -> Source:
+def column_sources(session: Session, dataset: Dataset, body: MappingUpdate) -> list[Source]:
+    if body.source_ids:
+        return [get_source(session, source_id) for source_id in dict.fromkeys(body.source_ids)]
     if body.source_id is not None:
-        return get_source(session, body.source_id)
+        return [get_source(session, body.source_id)]
     current = dataset.source or (dataset.sources[0] if dataset.sources else None)
     if current is None:
         raise ConflictError("pick the source the columns come from")
-    return current
+    return [current]
 
 
 def check_mapping(tables: Sequence[Table], aliases: dict[str, str], sql: str) -> None:
@@ -347,9 +357,9 @@ def check_mapping(tables: Sequence[Table], aliases: dict[str, str], sql: str) ->
 
 def requested_template(body: MappingUpdate) -> Template | None:
     if body.template is not None:
-        return dict(body.template)
+        return skipping_empty(dict(body.template), body.skip_empty)
     if body.input_column and body.label_column:
-        return pair_template(body.input_column, body.label_column)
+        return skipping_empty(pair_template(body.input_column, body.label_column), body.skip_empty)
     return None
 
 
@@ -365,12 +375,13 @@ def apply_mapping(
         dataset.source = sources[0] if len(sources) == 1 else None
         dataset.template = None
     elif template is not None:
-        source = column_source(session, dataset, body)
-        require_rows(settings, store, source)
-        sql = template_sql(template, source.table_name)
-        check_mapping([table_of(settings, store, source)], {}, sql)
-        dataset.source = source
-        dataset.sources = [source]
+        sources = column_sources(session, dataset, body)
+        for source in sources:
+            require_rows(settings, store, source)
+        sql = template_sql(template, [source.table_name for source in sources])
+        check_mapping(tables_of(settings, store, sources), {}, sql)
+        dataset.source = sources[0] if len(sources) == 1 else None
+        dataset.sources = sources
         dataset.template = template
         dataset.sql = sql
     else:
@@ -597,11 +608,14 @@ def source_rows(
 @router.get("/sources/{source_id}/stats", dependencies=[Depends(builder)], summary="Read a source's column statistics")
 def source_stats(source_id: int, session: SessionDep, settings: SettingsDep, store: StoreDep) -> SourceStats:
     table = table_of(settings, store, get_source(session, source_id))
-    summaries, sampled = summarize(table, STATS_SAMPLE)
+    summaries, sampled = cached_summary(table)
+    suggested_input, suggested_label = suggested_pair(summaries)
     return SourceStats(
         rows=cached_describe(table)[1],
         sampled=sampled,
         columns=[ColumnStats.model_validate(summary, from_attributes=True) for summary in summaries],
+        suggested_input=suggested_input,
+        suggested_label=suggested_label,
     )
 
 
@@ -681,7 +695,8 @@ def list_datasets(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     summary="Create a dataset",
 )
 def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
-    source = get_source(session, body.source_id) if body.source_id is not None else None
+    first = body.source_ids[0] if body.source_ids else body.source_id
+    source = get_source(session, first) if first is not None else None
     if source is None and body.sql is None:
         raise ConflictError("pick a source, or write SQL over the sources")
     folder = folder_or_root(session, body.folder_id)
@@ -691,9 +706,11 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     dataset = add_dataset(session, settings, store, body.name, source, folder)
     mapping = MappingUpdate(
         source_id=body.source_id,
+        source_ids=body.source_ids,
         input_column=body.input_column,
         label_column=body.label_column,
         template=body.template,
+        skip_empty=body.skip_empty,
         sql=body.sql,
     )
     if mapping.sql is not None or requested_template(mapping) is not None:

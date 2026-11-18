@@ -48,7 +48,7 @@ from minibrain.api.schemas import (
 from minibrain.data.dataset_versions import Changes, Sample, changes_since, too_few_rows, version_number
 from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
-from minibrain.data.templates import plain_columns
+from minibrain.data.templates import plain_columns, skips_empty
 from minibrain.jobs.removal import kept_by
 from minibrain.models.safety import model_safety
 from minibrain.policy import bodies_choice
@@ -171,7 +171,13 @@ def mapping_info(dataset: Dataset | None) -> MappingInfo:
     if dataset is None:
         return MappingInfo(input_column=None, label_column=None, sql=None)
     input_column, label_column = plain_columns(dataset.template)
-    return MappingInfo(input_column=input_column, label_column=label_column, template=dataset.template, sql=dataset.sql)
+    return MappingInfo(
+        input_column=input_column,
+        label_column=label_column,
+        template=dataset.template,
+        skip_empty=skips_empty(dataset.template),
+        sql=dataset.sql,
+    )
 
 
 def dataset_version_info(dataset_version: DatasetVersion) -> DatasetVersionInfo:

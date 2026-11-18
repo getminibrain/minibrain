@@ -3,22 +3,46 @@ import { plural, stem } from "./catalogue";
 
 const INPUT_NAMES = /text|message|input|question|prompt|content|body|utterance|query/i;
 const LABEL_NAMES = /label|intent|category|class|target|tag|topic|answer/i;
+const MAPPED = new Set(["input", "label"]);
+
+export type Picks = { tables: string[]; input: string; label: string; skipEmpty: boolean };
 
 export function quoted(name: string): string {
     return `"${name.replaceAll('"', '""')}"`;
 }
 
-export function columnsSql(table: string, input: string, label: string): string {
-    return `SELECT CAST(${quoted(input)} AS VARCHAR) AS input, CAST(${quoted(label)} AS VARCHAR) AS label FROM ${quoted(table)}`;
+export function fromSql(tables: string[]): string {
+    if (tables.length === 1) {
+        return quoted(tables[0] ?? "");
+    }
+    const union = tables
+        .map((table) => `  SELECT * FROM ${quoted(table)}`)
+        .join("\n  UNION ALL BY NAME\n");
+    return `(\n${union}\n)`;
 }
 
-export function stackedSql(sources: SourceSummary[], input: string, label: string): string {
-    return sources
-        .map(
-            (source) =>
-                `SELECT ${quoted(input)} AS input, ${quoted(label)} AS label FROM ${quoted(source.table)}`,
-        )
-        .join("\nUNION ALL\n");
+function text(column: string): string {
+    return `CAST(${quoted(column)} AS VARCHAR)`;
+}
+
+export function columnsSql(picks: Picks, kept: string[] = []): string {
+    const others = kept
+        .filter((name) => !MAPPED.has(name) && name !== picks.input && name !== picks.label)
+        .map(quoted);
+    const listed = [`${text(picks.input)} AS input`, `${text(picks.label)} AS label`, ...others];
+    const query = `SELECT ${listed.join(", ")}\nFROM ${fromSql(picks.tables)}`;
+    if (!picks.skipEmpty) {
+        return query;
+    }
+    return `${query}\nWHERE ${quoted(picks.label)} IS NOT NULL AND trim(${text(picks.label)}) <> ''`;
+}
+
+export function everythingSql(tables: string[]): string {
+    return `SELECT *\nFROM ${fromSql(tables)}`;
+}
+
+export function starterSql(table: string, input: string, label: string): string {
+    return `SELECT ${quoted(input)} AS input, ${quoted(label)} AS label FROM ${quoted(table)}`;
 }
 
 export function unionSql(sources: SourceSummary[]): string {

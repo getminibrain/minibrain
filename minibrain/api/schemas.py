@@ -191,6 +191,7 @@ class MappingInfo(BaseModel):
     input_column: str | None
     label_column: str | None
     template: dict[str, str] | None = None
+    skip_empty: bool = False
     sql: str | None
 
 
@@ -425,9 +426,17 @@ class DatasetSummary(BaseModel):
 class DatasetCreate(BaseModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     source_id: int | None = None
+    source_ids: list[int] | None = Field(
+        default=None,
+        max_length=20,
+        description="Several sources whose rows are combined by column name before the columns are picked.",
+    )
     input_column: str | None = None
     label_column: str | None = None
     template: dict[str, str] | None = None
+    skip_empty: bool = Field(
+        default=False, description="Leave out rows whose answer column is empty, when columns are picked."
+    )
     sql: str | None = None
     folder_id: int | None = None
     sample: SampleRequest | None = None
@@ -473,12 +482,18 @@ class ColumnStats(BaseModel):
     distinct: int
     min: str | None
     max: str | None
+    samples: list[str] = Field(default_factory=list, description="Up to three of the most common values, shortened.")
+    average_length: float | None = Field(default=None, description="Average characters per value, for text columns.")
 
 
 class SourceStats(BaseModel):
     rows: int
     sampled: int
     columns: list[ColumnStats]
+    suggested_input: str | None = Field(default=None, description="The text column with the longest values.")
+    suggested_label: str | None = Field(
+        default=None, description="A short text column with a few distinct values, likely the answer."
+    )
 
 
 class DatasetChoice(BaseModel):
@@ -487,9 +502,17 @@ class DatasetChoice(BaseModel):
 
 class MappingUpdate(BaseModel):
     source_id: int | None = None
+    source_ids: list[int] | None = Field(
+        default=None,
+        max_length=20,
+        description="Several sources whose rows are combined by column name before the columns are picked.",
+    )
     input_column: str | None = None
     label_column: str | None = None
     template: dict[str, str] | None = None
+    skip_empty: bool = Field(
+        default=False, description="Leave out rows whose answer column is empty, when columns are picked."
+    )
     sql: str | None = None
     sample: SampleRequest | None = None
 

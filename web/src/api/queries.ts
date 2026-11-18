@@ -132,8 +132,9 @@ export function useSources() {
 
 const sourcePath = (id: number) => ({ params: { path: { source_id: id } } });
 
-export function useSourceRows(id: number, rows?: number) {
+export function useSourceRows(id: number, rows?: number, enabled = true) {
     return useQuery({
+        enabled,
         queryKey: [...keys.sourceRows(id), rows ?? null],
         queryFn: () =>
             unwrap(
@@ -146,12 +147,21 @@ export function useSourceRows(id: number, rows?: number) {
     });
 }
 
-export function useSourceStats(id: number) {
-    return useQuery({
+function sourceStatsQuery(id: number) {
+    return {
         queryKey: keys.sourceStats(id),
         queryFn: () => unwrap(api.GET("/api/sources/{source_id}/stats", sourcePath(id))),
         retry: false,
-    });
+        staleTime: 5 * 60_000,
+    };
+}
+
+export function useSourceStats(id: number) {
+    return useQuery(sourceStatsQuery(id));
+}
+
+export function useSourcesStats(ids: number[]) {
+    return useQueries({ queries: ids.map(sourceStatsQuery) });
 }
 
 export function useDatasetPreview(slug: string, enabled: boolean, rows?: number) {

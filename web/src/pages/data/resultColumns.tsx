@@ -1,4 +1,5 @@
 import type { ColumnDef, SortingFn } from "@tanstack/react-table";
+import type { ReactNode } from "react";
 import type { QueryResponse } from "~/api/client";
 import { typeWord } from "./columnTypes";
 
@@ -85,12 +86,17 @@ function ResultCell({ value, kind }: { value: Cell; kind: Kind }) {
     return <span className="line-clamp-2 max-w-xl whitespace-normal">{value}</span>;
 }
 
-export function resultColumns(result: QueryResponse): ColumnDef<Row, unknown>[] {
+export function resultColumns(
+    result: QueryResponse,
+    heading?: (name: string) => ReactNode | null,
+): ColumnDef<Row, unknown>[] {
     return result.columns.map((name, index) => {
         const kind = columnKind(result, index);
+        const custom = heading?.(name) ?? null;
         return {
             id: `${index}:${name}`,
-            header: () => <span className="font-mono">{name}</span>,
+            header: () => custom ?? <span className="font-mono">{name}</span>,
+            enableSorting: custom === null,
             accessorFn: (row) => sortValue(kind, row[index] ?? null),
             sortingFn: kind === "text" ? "text" : "basic",
             sortUndefined: "last",

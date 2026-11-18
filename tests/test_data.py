@@ -51,10 +51,10 @@ def test_user_sql_is_sandboxed(staging: list[Table], sql: str) -> None:
 
 
 def test_mapping_quotes_identifiers(staging: list[Table]) -> None:
-    rows = example_rows(staging, template_sql(pair_template("text", "category"), "source"))
+    rows = example_rows(staging, template_sql(pair_template("text", "category"), ["source"]))
     assert len(rows) == 200
     with pytest.raises(SourceError):
-        run_query(staging, template_sql(pair_template('text" FROM source; --', "category"), "source"), 1)
+        run_query(staging, template_sql(pair_template('text" FROM source; --', "category"), ["source"]), 1)
 
 
 def test_rows_as_text_keep_nested_values_as_json(staging: list[Table]) -> None:
@@ -67,14 +67,14 @@ def test_rows_as_text_keep_nested_values_as_json(staging: list[Table]) -> None:
 
 def test_templates_compile_to_chat_messages(staging: list[Table]) -> None:
     template = {"user": "Ticket: {text}\nWhy: {category}", "assistant": "{category}"}
-    sql = template_sql(template, "source")
+    sql = template_sql(template, ["source"])
     messages, text, expected = example_rows(staging, sql, limit=1)[0]
     assert text == f"Ticket: ticket 0 about billing\nWhy: {expected}"
     assert json.loads(messages or "") == [{"role": "user", "content": text}]
     assert plain_columns(template) == (None, "category")
     assert plain_columns(pair_template("text", "category")) == ("text", "category")
     with pytest.raises(SourceError, match="names at least one column"):
-        template_sql({"user": "no columns", "assistant": "{category}"}, "source")
+        template_sql({"user": "no columns", "assistant": "{category}"}, ["source"])
 
 
 def test_chat_rows_split_off_the_last_answer(tmp_path: Path) -> None:

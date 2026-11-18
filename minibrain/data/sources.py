@@ -62,6 +62,8 @@ class ColumnSummary:
     distinct: int
     min: str | None
     max: str | None
+    samples: tuple[str, ...] = ()
+    average_length: float | None = None
 
 
 @dataclass(frozen=True)
@@ -308,15 +310,50 @@ def describe(table: Table) -> tuple[list[Column], int]:
     return columns, int(count[0]) if count else 0
 
 
+SAMPLE_VALUES = 3
+SAMPLE_CHARS = 40
+PROFILED = "profiled"
+TEXT_TYPE = "VARCHAR"
+
+PROFILE_SQL = f"""
+WITH cells AS (
+    UNPIVOT (SELECT COLUMNS(*)::VARCHAR FROM {PROFILED}) ON COLUMNS(*) INTO NAME name VALUE value
+),
+counted AS (SELECT name, value, count(*) AS n FROM cells GROUP BY ALL),
+ranked AS (
+    SELECT name, value, n, row_number() OVER (PARTITION BY name ORDER BY n DESC, value) AS rank FROM counted
+)
+SELECT
+    name,
+    list(value ORDER BY rank) FILTER (WHERE rank <= {SAMPLE_VALUES}),
+    sum(length(value) * n) / sum(n)
+FROM ranked
+GROUP BY name
+"""
+
+
+def profiled_values(connection: duckdb.DuckDBPyConnection) -> dict[str, tuple[tuple[str, ...], float]]:
+    found = connection.execute(PROFILE_SQL).fetchall()
+    return {
+        str(name): (tuple(clip(value, SAMPLE_CHARS) or "" for value in values or []), float(length or 0))
+        for name, values, length in found
+    }
+
+
 def summarize(table: Table, sample: int) -> tuple[list[ColumnSummary], int]:
     with sandbox([table]) as connection:
-        cursor = connection.execute(f"SUMMARIZE (SELECT * FROM {quote_identifier(table.name)} LIMIT {int(sample)})")
+        connection.execute(
+            f"CREATE TEMP TABLE {PROFILED} AS SELECT * FROM {quote_identifier(table.name)} LIMIT {int(sample)}"
+        )
+        cursor = connection.execute(f"SUMMARIZE {PROFILED}")
         names = [description[0] for description in cursor.description or []]
         found = [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+        values = profiled_values(connection) if found else {}
     sampled = int(found[0]["count"]) if found else 0
     summaries = []
     for row in found:
         nulls = round(sampled * float(row["null_percentage"] or 0) / 100)
+        samples, length = values.get(row["column_name"], ((), 0.0))
         summaries.append(
             ColumnSummary(
                 name=row["column_name"],
@@ -325,6 +362,8 @@ def summarize(table: Table, sample: int) -> tuple[list[ColumnSummary], int]:
                 distinct=min(int(row["approx_unique"] or 0), sampled - nulls),
                 min=clip(row["min"]),
                 max=clip(row["max"]),
+                samples=samples,
+                average_length=round(length, 1) if row["column_type"] == TEXT_TYPE else None,
             )
         )
     return summaries, sampled
@@ -502,9 +541,23 @@ def table_identifier(name: str) -> str:
     return name if plain else quote_identifier(name)
 
 
-def select_from(expressions: Sequence[tuple[str, str]], table: str) -> str:
+def union_of(tables: Sequence[str]) -> str:
+    if not tables:
+        raise SourceError("pick the source the columns come from")
+    if len(tables) == 1:
+        return table_identifier(tables[0])
+    union = "\nUNION ALL BY NAME\n".join(f"SELECT * FROM {table_identifier(table)}" for table in tables)
+    return f"({union})"
+
+
+def select_from(expressions: Sequence[tuple[str, str]], tables: Sequence[str], where: str | None = None) -> str:
     listed = ", ".join(f"{expression} AS {alias}" for expression, alias in expressions)
-    return f"SELECT {listed} FROM {table_identifier(table)}"
+    query = f"SELECT {listed} FROM {union_of(tables)}"
+    return query if where is None else f"{query} WHERE {where}"
+
+
+def filled(expression: str) -> str:
+    return f"{expression} IS NOT NULL AND trim({expression}) <> ''"
 
 
 def to_text(value: Any) -> str | None:

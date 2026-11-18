@@ -52,6 +52,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Dataset editor** · shipped · product, ml
   Name, describe, tag and query a dataset on one page.
   UI: Data › Add › New dataset, Data › dataset › … › Edit dataset, Data › dataset › Query › Edit · API: POST /api/datasets, PATCH /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping
+- **Column picker** · shipped · product, ml
+  Pick text and answer columns by type, sample values and suggestions.
+  UI: Data › Add › New dataset › Pick columns, Data › dataset › … › Edit dataset › Pick columns, Data › dataset › … › Edit dataset › Preview › Table · API: GET /api/sources/{source_id}/stats, POST /api/datasets, PUT /api/datasets/{slug}/mapping
+- **SQL editor** · shipped · product, ml
+  Format, fold, multiple cursors, run a selection, column values on hover.
+  UI: Data › Add › New dataset › Write SQL, Data › dataset › … › Edit dataset › Write SQL · API: GET /api/sources/{source_id}/stats
 - **Live query preview** · shipped · product, ml
   See rows, labels and quick checks while writing a dataset query.
   UI: Data › Add › New dataset, Data › dataset › … › Edit dataset · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape

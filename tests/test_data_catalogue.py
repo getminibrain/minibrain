@@ -68,6 +68,59 @@ def test_column_stats_come_from_a_bounded_sample(harness: Harness) -> None:
     assert queried["columns"] == ["category", "n"] and len(queried["rows"]) == 4
 
 
+def test_column_stats_carry_samples_lengths_and_a_suggested_pair(harness: Harness) -> None:
+    rows = b"id,text,category,lang\n" + b"".join(
+        f"{index},a much longer ticket text number {index},{('bug', 'billing')[index % 2]},en\n".encode()
+        for index in range(12)
+    )
+    source = harness.client.post("/api/sources", files={"file": ("profiled.csv", rows, "text/csv")}).json()
+    stats = harness.client.get(f"/api/sources/{source['id']}/stats").json()
+    by_name = {column["name"]: column for column in stats["columns"]}
+    assert by_name["category"]["samples"] == ["billing", "bug"]
+    assert by_name["lang"]["samples"] == ["en"]
+    assert len(by_name["text"]["samples"]) == 3
+    assert all(len(sample) <= 40 for sample in by_name["text"]["samples"])
+    assert by_name["id"]["average_length"] is None
+    assert by_name["category"]["average_length"] == 5.0
+    assert by_name["text"]["average_length"] > 30
+    assert (stats["suggested_input"], stats["suggested_label"]) == ("text", "category")
+
+
+def test_picked_columns_can_skip_rows_with_no_answer(harness: Harness) -> None:
+    rows = tickets_csv(20) + b"no answer here,\nblank answer,  \n"
+    source = harness.client.post("/api/sources", files={"file": ("gaps.csv", rows, "text/csv")}).json()
+    body = {"source_id": source["id"], "input_column": "text", "label_column": "category"}
+    kept = harness.client.post("/api/datasets", json={"name": "Kept", **body}).json()
+    assert (kept["rows"], kept["mapping"]["skip_empty"]) == (22, False)
+    skipped = harness.client.post("/api/datasets", json={"name": "Skipped", **body, "skip_empty": True}).json()
+    assert (skipped["rows"], skipped["mode"], skipped["mapping"]["skip_empty"]) == (20, "columns", True)
+    assert (skipped["mapping"]["input_column"], skipped["mapping"]["label_column"]) == ("text", "category")
+    assert "WHERE" in skipped["mapping"]["sql"]
+    again = harness.client.put("/api/datasets/skipped/mapping", json={**body, "skip_empty": False}).json()
+    assert (again["rows"], again["mapping"]["skip_empty"]) == (22, False)
+
+
+def test_picked_columns_combine_several_sources_by_name(harness: Harness) -> None:
+    first = upload(harness)
+    more = b"category,text,extra\nbug,another ticket,1\nbilling,one more ticket,2\n"
+    second = harness.client.post("/api/sources", files={"file": ("more.csv", more, "text/csv")}).json()
+    body = {
+        "name": "Combined",
+        "source_ids": [first["id"], second["id"]],
+        "input_column": "text",
+        "label_column": "category",
+    }
+    created = harness.client.post("/api/datasets", json=body).json()
+    assert (created["rows"], created["mode"], created["source_id"]) == (202, "columns", None)
+    assert [item["id"] for item in created["sources"]] == [first["id"], second["id"]]
+    assert "UNION ALL BY NAME" in created["mapping"]["sql"]
+    assert created["mapping"]["input_column"] == "text"
+    single = harness.client.put("/api/datasets/combined/mapping", json={**body, "source_ids": [second["id"]]}).json()
+    assert (single["rows"], single["source_id"]) == (2, second["id"])
+    missing = {**body, "name": "Missing", "label_column": "nope"}
+    assert harness.client.post("/api/datasets", json=missing).status_code == 422
+
+
 def test_preview_counts_rows_per_label(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})

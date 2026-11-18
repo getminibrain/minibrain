@@ -1,5 +1,16 @@
+import { IconChevronDown, IconMessage, IconTag } from "@tabler/icons-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { DataGrid, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
+import {
+    DataGrid,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+    cn,
+} from "obp-ui";
 import { useEffect, useState } from "react";
 import { type QueryResponse, api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
@@ -220,7 +231,49 @@ function recordsOf(result: QueryResponse | undefined): Record<string, string | n
     );
 }
 
-export function QueryPreviewPanel({ preview, idle }: { preview: LivePreview; idle: string }) {
+type Role = "input" | "label";
+
+function RoleMenu({
+    name,
+    onPick,
+}: { name: string; onPick: (column: string, role: Role) => void }) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={`Use ${name} as`}
+                    className="inline-flex items-center gap-1 rounded-md font-mono outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    {name}
+                    <IconChevronDown className="size-3.5 text-muted-foreground" />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onSelect={() => onPick(name, "input")}>
+                    <IconMessage />
+                    Use as text
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onPick(name, "label")}>
+                    <IconTag />
+                    Use as answer
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+export function QueryPreviewPanel({
+    preview,
+    idle,
+    pickable,
+    onPick,
+}: {
+    preview: LivePreview;
+    idle: string;
+    pickable?: string[];
+    onPick?: (column: string, role: Role) => void;
+}) {
     const { result } = preview;
     const records = recordsOf(result);
     const paired = preview.missing.length === 0 && Boolean(result?.columns.includes("input"));
@@ -240,7 +293,11 @@ export function QueryPreviewPanel({ preview, idle }: { preview: LivePreview; idl
             table={
                 result ? (
                     <DataGrid
-                        columns={resultColumns(result)}
+                        columns={resultColumns(result, (name) =>
+                            onPick && pickable?.includes(name) ? (
+                                <RoleMenu name={name} onPick={onPick} />
+                            ) : null,
+                        )}
                         rows={result.rows}
                         maxHeight="100%"
                         minWidth={result.columns.length > 4 ? "min-w-[960px]" : undefined}

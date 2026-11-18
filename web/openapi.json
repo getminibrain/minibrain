@@ -16103,6 +16103,26 @@
               }
             ],
             "title": "Max"
+          },
+          "samples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Samples",
+            "description": "Up to three of the most common values, shortened."
+          },
+          "average_length": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Length",
+            "description": "Average characters per value, for text columns."
           }
         },
         "type": "object",
@@ -16978,6 +16998,22 @@
             ],
             "title": "Source Id"
           },
+          "source_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ids",
+            "description": "Several sources whose rows are combined by column name before the columns are picked."
+          },
           "input_column": {
             "anyOf": [
               {
@@ -17013,6 +17049,12 @@
               }
             ],
             "title": "Template"
+          },
+          "skip_empty": {
+            "type": "boolean",
+            "title": "Skip Empty",
+            "description": "Leave out rows whose answer column is empty, when columns are picked.",
+            "default": false
           },
           "sql": {
             "anyOf": [
@@ -23809,6 +23851,11 @@
             ],
             "title": "Template"
           },
+          "skip_empty": {
+            "type": "boolean",
+            "title": "Skip Empty",
+            "default": false
+          },
           "sql": {
             "anyOf": [
               {
@@ -23841,6 +23888,22 @@
               }
             ],
             "title": "Source Id"
+          },
+          "source_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ids",
+            "description": "Several sources whose rows are combined by column name before the columns are picked."
           },
           "input_column": {
             "anyOf": [
@@ -23877,6 +23940,12 @@
               }
             ],
             "title": "Template"
+          },
+          "skip_empty": {
+            "type": "boolean",
+            "title": "Skip Empty",
+            "description": "Leave out rows whose answer column is empty, when columns are picked.",
+            "default": false
           },
           "sql": {
             "anyOf": [
@@ -30697,6 +30766,30 @@
             },
             "type": "array",
             "title": "Columns"
+          },
+          "suggested_input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Input",
+            "description": "The text column with the longest values."
+          },
+          "suggested_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Label",
+            "description": "A short text column with a few distinct values, likely the answer."
           }
         },
         "type": "object",

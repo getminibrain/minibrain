@@ -19,11 +19,13 @@ import {
     type Draft,
     type MappingBody,
     QueryEditor,
+    chosenSources,
     draftBody,
-    draftSql,
     pickedDraft,
+    previewSql,
     sameDraft,
     savedDraft,
+    withRole,
 } from "./QueryEditor";
 import { QueryPreviewPanel, shapeSummary, useLivePreview, useSettled } from "./QueryPreview";
 import { SampleOffer, useOverLimit } from "./SampleOffer";
@@ -40,7 +42,7 @@ import {
     sourceRef,
 } from "./catalogue";
 import { type Described, ItemHeader, SplitDetail, type SplitSide, useDataRefresh } from "./parts";
-import { defaultName, guessPair, sharedColumns, stackedSql, unionSql } from "./sql";
+import { defaultName, sharedColumns, unionSql } from "./sql";
 
 const EDITOR_SIDE: SplitSide = {
     label: "Dataset",
@@ -49,7 +51,15 @@ const EDITOR_SIDE: SplitSide = {
     className: FORM_GROUP_GAP,
 };
 
-const EMPTY_DRAFT: Draft = { mode: "columns", source: "", input: "", label: "", sql: "" };
+const EMPTY_DRAFT: Draft = {
+    mode: "columns",
+    sources: [],
+    input: "",
+    label: "",
+    skipEmpty: true,
+    sql: "",
+    guessed: [],
+};
 
 type Details = { name: string; description: string; tags: string };
 
@@ -207,7 +217,7 @@ function DatasetWorkbench({
     const router = useRouter();
     const [draft, setDraft] = useState(initialDraft);
     const [details, setDetails] = useState(initialDetails);
-    const live = draftSql(draft, sources);
+    const live = previewSql(draft, sources);
     const { settled, runNow } = useSettled(live, draft.mode === "columns");
     const preview = useLivePreview(settled, dataset);
     const queryChanged = creating || !sameDraft(draft, initialDraft);
@@ -311,8 +321,14 @@ function DatasetWorkbench({
                         idle={
                             draft.mode === "sql"
                                 ? "Write a query to see its rows."
-                                : "Pick a source, an input and a label to see the rows."
+                                : "Pick a source to see its rows."
                         }
+                        pickable={
+                            draft.mode === "columns"
+                                ? sharedColumns(chosenSources(draft, sources))
+                                : undefined
+                        }
+                        onPick={(column, role) => setDraft(withRole(draft, column, role))}
                     />
                 }
             />
@@ -322,18 +338,13 @@ function DatasetWorkbench({
 }
 
 function prefilledDraft(picked: SourceSummary[]): Draft {
-    if (picked.length === 1) {
-        return pickedDraft(picked[0]);
-    }
     if (picked.length === 0) {
         return EMPTY_DRAFT;
     }
-    const [input, label] = guessPair(sharedColumns(picked));
-    return {
-        ...EMPTY_DRAFT,
-        mode: "sql",
-        sql: input ? stackedSql(picked, input, label) : unionSql(picked),
-    };
+    if (picked.length === 1 || sharedColumns(picked).length > 0) {
+        return pickedDraft(picked);
+    }
+    return { ...EMPTY_DRAFT, mode: "sql", sql: unionSql(picked) };
 }
 
 function backFrom(picked: SourceSummary[], folder: number | null): ItemRef {
@@ -420,7 +431,12 @@ export function EditDatasetPage({
 }) {
     const refresh = useDatasetRefresh(dataset.slug);
     const [initialDraft] = useState(() =>
-        savedDraft(dataset.mapping, dataset.mode, dataset.source_id, sources),
+        savedDraft(
+            dataset.mapping,
+            dataset.mode,
+            dataset.sources.map((source) => source.id),
+            sources,
+        ),
     );
     const [initialDetails] = useState(() => detailsOf(dataset));
     const siblings = index.datasets.get(dataset.folder_id ?? null) ?? [];

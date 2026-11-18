@@ -4743,6 +4743,16 @@ export interface components {
             min: string | null;
             /** Max */
             max: string | null;
+            /**
+             * Samples
+             * @description Up to three of the most common values, shortened.
+             */
+            samples?: string[];
+            /**
+             * Average Length
+             * @description Average characters per value, for text columns.
+             */
+            average_length?: number | null;
         };
         /** ComparableRun */
         ComparableRun: {
@@ -5073,6 +5083,11 @@ export interface components {
             name: string;
             /** Source Id */
             source_id?: number | null;
+            /**
+             * Source Ids
+             * @description Several sources whose rows are combined by column name before the columns are picked.
+             */
+            source_ids?: number[] | null;
             /** Input Column */
             input_column?: string | null;
             /** Label Column */
@@ -5081,6 +5096,12 @@ export interface components {
             template?: {
                 [key: string]: string;
             } | null;
+            /**
+             * Skip Empty
+             * @description Leave out rows whose answer column is empty, when columns are picked.
+             * @default false
+             */
+            skip_empty?: boolean;
             /** Sql */
             sql?: string | null;
             /** Folder Id */
@@ -7353,6 +7374,11 @@ export interface components {
             template?: {
                 [key: string]: string;
             } | null;
+            /**
+             * Skip Empty
+             * @default false
+             */
+            skip_empty?: boolean;
             /** Sql */
             sql: string | null;
         };
@@ -7360,6 +7386,11 @@ export interface components {
         MappingUpdate: {
             /** Source Id */
             source_id?: number | null;
+            /**
+             * Source Ids
+             * @description Several sources whose rows are combined by column name before the columns are picked.
+             */
+            source_ids?: number[] | null;
             /** Input Column */
             input_column?: string | null;
             /** Label Column */
@@ -7368,6 +7399,12 @@ export interface components {
             template?: {
                 [key: string]: string;
             } | null;
+            /**
+             * Skip Empty
+             * @description Leave out rows whose answer column is empty, when columns are picked.
+             * @default false
+             */
+            skip_empty?: boolean;
             /** Sql */
             sql?: string | null;
             sample?: components["schemas"]["SampleRequest"] | null;
@@ -9707,6 +9744,16 @@ export interface components {
             sampled: number;
             /** Columns */
             columns: components["schemas"]["ColumnStats"][];
+            /**
+             * Suggested Input
+             * @description The text column with the longest values.
+             */
+            suggested_input?: string | null;
+            /**
+             * Suggested Label
+             * @description A short text column with a few distinct values, likely the answer.
+             */
+            suggested_label?: string | null;
         };
         /** SourceSummary */
         SourceSummary: {

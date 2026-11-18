@@ -1,4 +1,8 @@
+import { IconPlus, IconX } from "@tabler/icons-react";
 import {
+    Badge,
+    Button,
+    CheckboxField,
     SegmentedTabs,
     Select,
     SelectContent,
@@ -7,30 +11,60 @@ import {
     SelectValue,
     SqlEditor,
     type SqlEditorHandle,
+    type SqlSchema,
 } from "obp-ui";
-import { useRef } from "react";
-import type { DatasetSummary, MappingInfo, SourceSummary } from "~/api/client";
+import { useEffect, useRef } from "react";
+import type { DatasetSummary, MappingInfo, SourceStats, SourceSummary } from "~/api/client";
+import { useSourceRows, useSourcesStats } from "~/api/queries";
 import { FORM_ROW_GAP, FormControl, FormRow, FormRows } from "~/components/FormRows";
+import { count } from "~/lib/format";
 import type { SqlProblem } from "~/lib/sqlError";
 import type { SampleRequest } from "./SampleOffer";
+import {
+    type ColumnFacts,
+    type Suggestion,
+    columnFacts,
+    rowsSuggestion,
+    statsSuggestion,
+} from "./columnFacts";
 import { typeWord } from "./columnTypes";
-import { columnsSql, guessPair } from "./sql";
+import { type Picks, columnsSql, everythingSql, guessPair, sharedColumns, starterSql } from "./sql";
 
 export type MappingBody = {
     source_id?: number;
+    source_ids?: number[];
     input_column?: string;
     label_column?: string;
+    skip_empty?: boolean;
     sql?: string;
     sample?: SampleRequest;
 };
 
 type Mode = DatasetSummary["mode"];
 
-export type Draft = { mode: Mode; source: string; input: string; label: string; sql: string };
+export type Role = "input" | "label";
+
+export type Draft = {
+    mode: Mode;
+    sources: string[];
+    input: string;
+    label: string;
+    skipEmpty: boolean;
+    sql: string;
+    guessed: Role[];
+};
 
 const MODES = [
     { key: "columns", label: "Pick columns" },
     { key: "sql", label: "Write SQL" },
+];
+
+const NONE = "none";
+
+const ROLE_TABS = [
+    { key: "input", label: "Text" },
+    { key: "label", label: "Answer" },
+    { key: NONE, label: "—", tip: "Not used" },
 ];
 
 export const QUERY_HELP =
@@ -44,28 +78,63 @@ export function Clamp({ text }: { text: unknown }) {
     );
 }
 
-function sourceOf(draft: Draft, sources: SourceSummary[]): SourceSummary | undefined {
-    return sources.find((item) => String(item.id) === draft.source);
+export function chosenSources(draft: Draft, sources: SourceSummary[]): SourceSummary[] {
+    return draft.sources.flatMap((id) => sources.filter((item) => String(item.id) === id));
+}
+
+function picksOf(draft: Draft, sources: SourceSummary[]): Picks | null {
+    const chosen = chosenSources(draft, sources);
+    const columns = sharedColumns(chosen);
+    if (!draft.input || !draft.label || !columns.includes(draft.input)) {
+        return null;
+    }
+    if (!columns.includes(draft.label)) {
+        return null;
+    }
+    return {
+        tables: chosen.map((item) => item.table),
+        input: draft.input,
+        label: draft.label,
+        skipEmpty: draft.skipEmpty,
+    };
 }
 
 export function draftSql(draft: Draft, sources: SourceSummary[]): string | null {
     if (draft.mode === "sql") {
         return draft.sql.trim() || null;
     }
-    const chosen = sourceOf(draft, sources);
-    return chosen && draft.input && draft.label
-        ? columnsSql(chosen.table, draft.input, draft.label)
-        : null;
+    const picks = picksOf(draft, sources);
+    return picks ? columnsSql(picks) : null;
+}
+
+export function previewSql(draft: Draft, sources: SourceSummary[]): string | null {
+    if (draft.mode === "sql") {
+        return draft.sql.trim() || null;
+    }
+    const chosen = chosenSources(draft, sources);
+    const columns = sharedColumns(chosen);
+    if (columns.length === 0) {
+        return null;
+    }
+    const picks = picksOf(draft, sources);
+    return picks ? columnsSql(picks, columns) : everythingSql(chosen.map((item) => item.table));
 }
 
 export function draftBody(draft: Draft, sources: SourceSummary[]): MappingBody | null {
     if (draft.mode === "sql") {
         return draft.sql.trim() ? { sql: draft.sql } : null;
     }
-    const chosen = sourceOf(draft, sources);
-    return chosen && draft.input && draft.label
-        ? { source_id: chosen.id, input_column: draft.input, label_column: draft.label }
-        : null;
+    const picks = picksOf(draft, sources);
+    if (!picks) {
+        return null;
+    }
+    const ids = chosenSources(draft, sources).map((item) => item.id);
+    return {
+        ...(ids.length === 1 ? { source_id: ids[0] } : { source_ids: ids }),
+        input_column: picks.input,
+        label_column: picks.label,
+        skip_empty: picks.skipEmpty,
+    };
 }
 
 export function sameDraft(left: Draft, right: Draft): boolean {
@@ -74,81 +143,432 @@ export function sameDraft(left: Draft, right: Draft): boolean {
     }
     return left.mode === "sql"
         ? left.sql === right.sql
-        : left.source === right.source && left.input === right.input && left.label === right.label;
+        : left.sources.join() === right.sources.join() &&
+              left.input === right.input &&
+              left.label === right.label &&
+              left.skipEmpty === right.skipEmpty;
 }
 
 export function savedDraft(
     mapping: MappingInfo,
     mode: Mode,
-    sourceId: number | null | undefined,
+    sourceIds: number[],
     sources: SourceSummary[],
 ): Draft {
-    const source =
-        sourceId !== null && sourceId !== undefined
-            ? String(sourceId)
-            : mapping.sql
-              ? ""
-              : String(sources[0]?.id ?? "");
+    const columns = mode === "columns" && sourceIds.length > 0;
+    const fallback = mapping.sql ? [] : [String(sources[0]?.id ?? "")].filter(Boolean);
     return {
         mode,
-        source,
+        sources: columns ? sourceIds.map(String) : fallback,
         input: mapping.input_column ?? "",
         label: mapping.label_column ?? "",
+        skipEmpty: mode === "columns" ? Boolean(mapping.skip_empty) : true,
         sql: mapping.sql ?? "",
+        guessed: [],
     };
 }
 
-function sourceColumns(source: SourceSummary | undefined): string[] {
-    return (source?.columns ?? []).map((column) => column.name);
+export function pickedDraft(chosen: SourceSummary[]): Draft {
+    const [input, label] = guessPair(sharedColumns(chosen));
+    const guessed: Role[] = [];
+    if (input) {
+        guessed.push("input");
+    }
+    if (label) {
+        guessed.push("label");
+    }
+    return {
+        mode: "columns",
+        sources: chosen.map((item) => String(item.id)),
+        input,
+        label,
+        skipEmpty: true,
+        sql: "",
+        guessed,
+    };
 }
 
-export function pickedDraft(source: SourceSummary | undefined): Draft {
-    const [input, label] = guessPair(sourceColumns(source));
-    return { mode: "columns", source: source ? String(source.id) : "", input, label, sql: "" };
+function without(list: Role[], ...roles: Role[]): Role[] {
+    return list.filter((role) => !roles.includes(role));
 }
 
-function ColumnSelect({
+export function withRole(draft: Draft, column: string, role: Role | null): Draft {
+    if (role === null) {
+        const cleared: Role[] = [];
+        if (draft.input === column) {
+            cleared.push("input");
+        }
+        if (draft.label === column) {
+            cleared.push("label");
+        }
+        return {
+            ...draft,
+            input: draft.input === column ? "" : draft.input,
+            label: draft.label === column ? "" : draft.label,
+            guessed: without(draft.guessed, ...cleared),
+        };
+    }
+    const other: Role = role === "input" ? "label" : "input";
+    const moved = draft[other] === column;
+    return {
+        ...draft,
+        [role]: column,
+        [other]: moved ? "" : draft[other],
+        guessed: moved ? without(draft.guessed, role, other) : without(draft.guessed, role),
+    };
+}
+
+function applied(draft: Draft, suggestion: Suggestion): Draft {
+    const input = draft.guessed.includes("input") ? suggestion.input : draft.input;
+    const label =
+        draft.guessed.includes("label") && suggestion.label && suggestion.label !== input
+            ? suggestion.label
+            : draft.label === input
+              ? ""
+              : draft.label;
+    return {
+        ...draft,
+        input,
+        label,
+        guessed: draft.guessed.filter((role) => Boolean(role === "input" ? input : label)),
+    };
+}
+
+function useSuggestion(chosen: SourceSummary[], columns: string[]) {
+    const stats = useSourcesStats(chosen.map((item) => item.id));
+    const first = stats[0];
+    const fallback = useSourceRows(chosen[0]?.id ?? 0, undefined, Boolean(first?.isError));
+    const suggestion = first?.isError
+        ? rowsSuggestion(fallback.data, columns)
+        : statsSuggestion(first?.data, columns);
+    return { stats: stats.map((item) => item.data), suggestion };
+}
+
+function SourceSelect({
     id,
-    label,
     value,
-    options,
     placeholder,
+    sources,
     onChange,
-    disabled,
 }: {
     id: string;
-    label: string;
     value: string;
-    options: { value: string; label: string; description?: string }[];
     placeholder: string;
+    sources: SourceSummary[];
     onChange: (value: string) => void;
-    disabled?: boolean;
 }) {
     return (
-        <FormRow id={id} label={label}>
-            <FormControl>
-                <Select
-                    value={value}
-                    onValueChange={(next) => onChange(String(next ?? ""))}
-                    disabled={disabled}
-                >
-                    <SelectTrigger id={id} className="w-full">
-                        <SelectValue placeholder={placeholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {options.map((option) => (
-                            <SelectItem
-                                key={option.value}
-                                value={option.value}
-                                description={option.description}
-                            >
-                                {option.label}
-                            </SelectItem>
+        <Select value={value} onValueChange={(next) => onChange(String(next ?? ""))}>
+            <SelectTrigger id={id} className="w-full">
+                <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+                {sources.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)} description={item.table}>
+                        {item.name}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function AddSource({
+    sources,
+    onAdd,
+}: {
+    sources: SourceSummary[];
+    onAdd: (id: string) => void;
+}) {
+    return (
+        <Select value="" onValueChange={(next) => next && onAdd(String(next))}>
+            <SelectTrigger aria-label="Combine with another source" className="w-auto">
+                <span className="inline-flex items-center gap-1.5">
+                    <IconPlus className="size-4" />
+                    Combine
+                </span>
+            </SelectTrigger>
+            <SelectContent>
+                {sources.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)} description={item.table}>
+                        {item.name}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function SourcePicker({
+    draft,
+    sources,
+    onPick,
+}: {
+    draft: Draft;
+    sources: SourceSummary[];
+    onPick: (ids: string[]) => void;
+}) {
+    const [first = "", ...rest] = draft.sources;
+    const chosen = chosenSources(draft, sources);
+    const others = sources.filter((item) => !draft.sources.includes(String(item.id)));
+    return (
+        <FormRows labels="compact">
+            <FormRow id="dataset-source" label="Source">
+                <FormControl>
+                    <SourceSelect
+                        id="dataset-source"
+                        value={first}
+                        placeholder="Pick a source"
+                        sources={sources.filter(
+                            (item) => String(item.id) === first || !rest.includes(String(item.id)),
+                        )}
+                        onChange={(next) => onPick([next, ...rest])}
+                    />
+                </FormControl>
+                {first && others.length > 0 && (
+                    <AddSource
+                        sources={others}
+                        onAdd={(next) => onPick([...draft.sources, next])}
+                    />
+                )}
+            </FormRow>
+            {rest.length > 0 && (
+                <FormRow label="Plus" align="start">
+                    <ul className="flex w-full flex-col">
+                        {chosen.slice(1).map((item) => (
+                            <li key={item.id} className="flex h-8 min-w-0 items-center gap-2">
+                                <span className="truncate">{item.name}</span>
+                                <span className="truncate font-mono text-sm text-muted-foreground">
+                                    {item.table}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    aria-label={`Stop combining ${item.name}`}
+                                    onClick={() =>
+                                        onPick(draft.sources.filter((id) => id !== String(item.id)))
+                                    }
+                                >
+                                    <IconX />
+                                </Button>
+                            </li>
                         ))}
-                    </SelectContent>
-                </Select>
-            </FormControl>
-        </FormRow>
+                    </ul>
+                </FormRow>
+            )}
+        </FormRows>
+    );
+}
+
+function RoleLine({
+    title,
+    hint,
+    column,
+    guessed,
+}: {
+    title: string;
+    hint: string;
+    column: string;
+    guessed: boolean;
+}) {
+    return (
+        <>
+            <dt className="flex items-baseline gap-2">
+                {title}
+                <span className="font-mono text-sm text-muted-foreground">{hint}</span>
+            </dt>
+            <dd className="flex min-w-0 items-center gap-2">
+                {column ? (
+                    <span className="truncate font-mono">{column}</span>
+                ) : (
+                    <span className="text-muted-foreground">Pick a column below</span>
+                )}
+                {guessed && column && <Badge variant="neutral">suggested</Badge>}
+            </dd>
+        </>
+    );
+}
+
+function roleOf(draft: Draft, column: string): string {
+    if (draft.input === column) {
+        return "input";
+    }
+    return draft.label === column ? "label" : NONE;
+}
+
+function ColumnRow({
+    facts,
+    role,
+    onRole,
+}: {
+    facts: ColumnFacts;
+    role: string;
+    onRole: (role: string) => void;
+}) {
+    return (
+        <tr className="h-10">
+            <td className="max-w-0 px-3">
+                <span
+                    className="flex min-w-0 items-baseline gap-2"
+                    title={facts.type ? `${facts.name}: ${typeWord(facts.type)}` : facts.name}
+                >
+                    <span className="max-w-full shrink-0 truncate font-mono">{facts.name}</span>
+                    <span className="hidden min-w-0 truncate text-sm text-muted-foreground @xs:inline @2xl:hidden">
+                        {facts.samples.join(" · ")}
+                    </span>
+                </span>
+            </td>
+            <td className="hidden px-3 whitespace-nowrap text-sm text-muted-foreground @lg:table-cell">
+                {facts.type ? typeWord(facts.type) : "–"}
+            </td>
+            <td className="hidden max-w-0 px-3 @2xl:table-cell">
+                <span
+                    className="block truncate text-sm text-muted-foreground"
+                    title={facts.samples.join("\n")}
+                >
+                    {facts.samples.join(" · ") || "–"}
+                </span>
+            </td>
+            <td className="hidden px-3 text-right text-sm tabular-nums @xs:table-cell">
+                {facts.distinct === null ? "–" : count(facts.distinct)}
+            </td>
+            <td className="py-1 pr-1.5 pl-0 text-right">
+                <SegmentedTabs size="sm" tabs={ROLE_TABS} active={role} onSelect={onRole} />
+            </td>
+        </tr>
+    );
+}
+
+function ColumnList({
+    facts,
+    draft,
+    onChange,
+}: {
+    facts: ColumnFacts[];
+    draft: Draft;
+    onChange: (draft: Draft) => void;
+}) {
+    const choose = (column: string, role: string) => {
+        if (role === roleOf(draft, column) && role !== NONE) {
+            onChange({ ...draft, guessed: without(draft.guessed, role as Role) });
+            return;
+        }
+        onChange(withRole(draft, column, role === NONE ? null : (role as Role)));
+    };
+    return (
+        <div className="@container max-h-[28rem] overflow-y-auto rounded-lg border">
+            <table className="w-full table-fixed border-collapse">
+                <thead className="sticky top-0 z-[1] bg-card text-left text-sm text-muted-foreground">
+                    <tr className="h-8 border-b">
+                        <th className="px-3 font-normal">Column</th>
+                        <th className="hidden w-32 px-3 font-normal @lg:table-cell">Type</th>
+                        <th className="hidden px-3 font-normal @2xl:table-cell">Values</th>
+                        <th className="hidden w-20 px-3 text-right font-normal @xs:table-cell">
+                            Distinct
+                        </th>
+                        <th className="w-43 pr-3 text-right font-normal">Use as</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y">
+                    {facts.map((item) => (
+                        <ColumnRow
+                            key={item.name}
+                            facts={item}
+                            role={roleOf(draft, item.name)}
+                            onRole={(role) => choose(item.name, role)}
+                        />
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function ColumnsMode({
+    draft,
+    sources,
+    onChange,
+    onSwitch,
+}: {
+    draft: Draft;
+    sources: SourceSummary[];
+    onChange: (draft: Draft) => void;
+    onSwitch: () => void;
+}) {
+    const chosen = chosenSources(draft, sources);
+    const columns = sharedColumns(chosen);
+    const { stats, suggestion } = useSuggestion(chosen, columns);
+    const facts = columnFacts(chosen, stats, columns);
+    const latest = useRef({ draft, onChange });
+    latest.current = { draft, onChange };
+    const suggestionKey = suggestion
+        ? [suggestion.input, suggestion.label, ...draft.sources].join("\n")
+        : "";
+    useEffect(() => {
+        const { draft: current, onChange: change } = latest.current;
+        if (!suggestionKey || current.guessed.length === 0) {
+            return;
+        }
+        const [input = "", label = ""] = suggestionKey.split("\n");
+        const next = applied(current, { input, label });
+        if (next.input !== current.input || next.label !== current.label) {
+            change(next);
+        }
+    }, [suggestionKey]);
+    const pick = (ids: string[]) =>
+        onChange({
+            ...pickedDraft(ids.flatMap((id) => sources.filter((item) => String(item.id) === id))),
+            skipEmpty: draft.skipEmpty,
+            sql: draft.sql,
+        });
+    return (
+        <div className={`flex min-w-0 flex-col ${FORM_ROW_GAP}`}>
+            <SourcePicker draft={draft} sources={sources} onPick={pick} />
+            {chosen.length > 1 && columns.length === 0 ? (
+                <p className="text-muted-foreground">
+                    These sources share no column names.{" "}
+                    <Button variant="link" className="h-auto p-0" onClick={onSwitch}>
+                        Write SQL
+                    </Button>{" "}
+                    to join them or map their columns.
+                </p>
+            ) : chosen.length > 0 ? (
+                <>
+                    <div className="@container">
+                        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 @sm:grid-cols-[max-content_minmax(0,1fr)] @sm:items-center @sm:gap-y-2">
+                            <RoleLine
+                                title="Text the model reads"
+                                hint="input"
+                                column={draft.input}
+                                guessed={draft.guessed.includes("input")}
+                            />
+                            <RoleLine
+                                title="Answer it should give"
+                                hint="label"
+                                column={draft.label}
+                                guessed={draft.guessed.includes("label")}
+                            />
+                        </dl>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        {chosen.length > 1 && (
+                            <p className="text-sm text-muted-foreground">
+                                Rows from {chosen.length} sources are combined by column name; the
+                                list shows the columns they share.
+                            </p>
+                        )}
+                        <ColumnList facts={facts} draft={draft} onChange={onChange} />
+                    </div>
+                    <CheckboxField
+                        label="Skip rows with no answer"
+                        checked={draft.skipEmpty}
+                        onCheckedChange={(checked) =>
+                            onChange({ ...draft, skipEmpty: checked === true })
+                        }
+                    />
+                </>
+            ) : null}
+        </div>
     );
 }
 
@@ -190,6 +610,36 @@ function TableList({
     );
 }
 
+function editorSchema(sources: SourceSummary[], stats: (SourceStats | undefined)[]): SqlSchema {
+    return Object.fromEntries(
+        sources.map((source, index) => [
+            source.table,
+            columnFacts(
+                [source],
+                [stats[index]],
+                source.columns.map((column) => column.name),
+            ).map((facts) => ({ name: facts.name, type: facts.type, samples: facts.samples })),
+        ]),
+    );
+}
+
+function starterFor(draft: Draft, sources: SourceSummary[], stats: (SourceStats | undefined)[]) {
+    const index = Math.max(
+        0,
+        sources.findIndex((item) => String(item.id) === draft.sources[0]),
+    );
+    const source = sources[index];
+    if (!source) {
+        return undefined;
+    }
+    const names = source.columns.map((column) => column.name);
+    const suggestion = statsSuggestion(stats[index], names);
+    const [input, label] = guessPair(names);
+    const text = suggestion?.input || input;
+    const answer = suggestion?.label || label;
+    return text && answer ? starterSql(source.table, text, answer) : undefined;
+}
+
 function SqlMode({
     draft,
     sources,
@@ -204,9 +654,7 @@ function SqlMode({
     onRun: (sql: string) => void;
 }) {
     const editor = useRef<SqlEditorHandle>(null);
-    const schema = Object.fromEntries(
-        sources.map((item) => [item.table, item.columns.map((column) => column.name)]),
-    );
+    const stats = useSourcesStats(sources.map((item) => item.id)).map((item) => item.data);
     return (
         <div className="@container flex flex-col gap-3">
             <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_14rem]">
@@ -215,12 +663,13 @@ function SqlMode({
                     value={draft.sql}
                     onValueChange={(sql) => onChange({ ...draft, sql })}
                     onRun={onRun}
-                    schema={schema}
+                    schema={editorSchema(sources, stats)}
                     diagnostics={problem?.diagnostics}
                     minLines={12}
                     maxLines={32}
                     aria-label="SQL"
-                    placeholder="SELECT text AS input, category AS label FROM tickets WHERE category IS NOT NULL"
+                    starter={starterFor(draft, sources, stats)}
+                    placeholder="SELECT text AS input, category AS label FROM tickets"
                 />
                 <TableList sources={sources} onInsert={(name) => editor.current?.insert(name)} />
             </div>
@@ -228,66 +677,11 @@ function SqlMode({
                 Return columns named <span className="font-mono">input</span> and{" "}
                 <span className="font-mono">label</span>; other columns are kept in each version.
                 Join, union, filter and clean up with DuckDB SQL. The preview runs when you stop
-                typing; Cmd/Ctrl+Enter runs it at once. Queries are read-only and cannot reach other
-                files or the network.
+                typing; Cmd/Ctrl+Enter runs it at once, or only the selected part. Hover a column
+                name for its type and values. Queries are read-only and cannot reach other files or
+                the network.
             </p>
         </div>
-    );
-}
-
-function ColumnsMode({
-    draft,
-    sources,
-    onChange,
-}: {
-    draft: Draft;
-    sources: SourceSummary[];
-    onChange: (draft: Draft) => void;
-}) {
-    const chosen = sourceOf(draft, sources);
-    const columns = (chosen?.columns ?? []).map((column) => ({
-        value: column.name,
-        label: column.name,
-        description: typeWord(column.type),
-    }));
-    return (
-        <FormRows labels="compact">
-            <ColumnSelect
-                id="dataset-source"
-                label="Source"
-                value={draft.source}
-                placeholder="Pick a source"
-                options={sources.map((item) => ({
-                    value: String(item.id),
-                    label: item.name,
-                    description: item.table,
-                }))}
-                onChange={(next) =>
-                    onChange({
-                        ...pickedDraft(sources.find((item) => String(item.id) === next)),
-                        sql: draft.sql,
-                    })
-                }
-            />
-            <ColumnSelect
-                id="dataset-input"
-                label="Input"
-                value={draft.input}
-                placeholder="Pick a column"
-                options={columns}
-                onChange={(input) => onChange({ ...draft, input })}
-                disabled={!chosen}
-            />
-            <ColumnSelect
-                id="dataset-label"
-                label="Label"
-                value={draft.label}
-                placeholder="Pick a column"
-                options={columns}
-                onChange={(label) => onChange({ ...draft, label })}
-                disabled={!chosen}
-            />
-        </FormRows>
     );
 }
 
@@ -320,7 +714,12 @@ export function QueryEditor({
                     onRun={onRun}
                 />
             ) : (
-                <ColumnsMode draft={draft} sources={sources} onChange={onChange} />
+                <ColumnsMode
+                    draft={draft}
+                    sources={sources}
+                    onChange={onChange}
+                    onSwitch={() => switchMode("sql")}
+                />
             )}
         </div>
     );

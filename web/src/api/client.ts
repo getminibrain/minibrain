@@ -32,6 +32,7 @@ export type Uploaded = SourceAdded | { outcome: "name_taken"; taken: NameTakenIn
 export type MappingInfo = Schemas["MappingInfo"];
 export type LabelCount = Schemas["LabelCount"];
 export type ColumnStats = Schemas["ColumnStats"];
+export type SourceStats = Schemas["SourceStats"];
 export type SplitScore = Schemas["SplitScore"];
 export type PresetInfo = Schemas["PresetInfo"];
 export type PresetsResponse = Schemas["PresetsResponse"];

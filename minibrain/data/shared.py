@@ -35,6 +35,7 @@ from minibrain.data.remote import (
 from minibrain.data.sources import (
     READERS,
     SOURCE_TABLE,
+    ColumnSummary,
     SourceError,
     Table,
     describe,
@@ -509,11 +510,37 @@ def guessed_template(columns: list[str]) -> Template | None:
     return pair_template(input_column, answer_column) if input_column and answer_column else None
 
 
+ANSWER_VALUES = (2, 200)
+ANSWER_CHARS = 40
+
+
+def named(column: str, names: tuple[str, ...]) -> bool:
+    return column.lower() in names
+
+
+def could_answer(column: ColumnSummary, text: ColumnSummary) -> bool:
+    low, high = ANSWER_VALUES
+    short = column.average_length is not None and column.average_length <= ANSWER_CHARS
+    return column is not text and short and low <= column.distinct <= high
+
+
+def suggested_pair(columns: Sequence[ColumnSummary]) -> tuple[str | None, str | None]:
+    texts = [column for column in columns if column.average_length]
+    text = max(texts, key=lambda column: column.average_length or 0, default=None)
+    if text is None:
+        return None, None
+    answers = [column for column in texts if could_answer(column, text)]
+    answer = min(
+        answers, key=lambda column: (not named(column.name, LABEL_NAMES + ANSWER_NAMES), column.distinct), default=None
+    )
+    return text.name, answer.name if answer is not None else None
+
+
 def apply_template(dataset: Dataset, source: Source, template: Template | None) -> None:
     dataset.source = source
     dataset.sources = [source]
     dataset.template = template
-    dataset.sql = template_sql(template, source.table_name) if template else None
+    dataset.sql = template_sql(template, [source.table_name]) if template else None
     dataset.updated_at = now()
 
 
