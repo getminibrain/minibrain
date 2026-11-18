@@ -4,6 +4,9 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
     CodeBlock,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     ConfirmDialog,
     DataGrid,
     Dialog,
@@ -405,35 +408,55 @@ function DatasetStats({
     const quality = stats?.quality;
     const splits = latest?.counts ?? {};
     const notes = [splitsNote(dataset), liveRowsNote(dataset)].filter(Boolean);
+    const splitLine = SPLITS.filter(([key]) => key in splits)
+        .map(([key, label]) => `${count(splits[key])} ${label.toLowerCase()}`)
+        .join(" · ");
     return (
-        <div className="flex flex-col gap-3">
+        <AboutPart title="Overview">
             <Stats>
                 <Stat label="Rows" value={latest ? count(quality?.rows ?? latest.rows) : "–"} />
                 <Stat label="Labels" value={quality ? count(quality.labels) : "–"} />
                 <Stat label="Sources" value={count(dataset.sources.length)} />
-                {SPLITS.filter(([key]) => key in splits).map(([key, label]) => (
-                    <Stat key={key} label={label} value={count(splits[key])} />
-                ))}
-                {quality && (
-                    <>
-                        <Stat label="Empty" value={count(quality.empty)} />
-                        <Stat label="Duplicate inputs" value={count(quality.duplicates)} />
-                        <Stat
-                            label="Rows per label"
-                            value={`${count(quality.smallest_label)}–${count(quality.largest_label)}`}
-                        />
-                        <Stat
-                            label="Average input"
-                            value={`${count(quality.mean_input_chars)} chars`}
-                        />
-                    </>
-                )}
             </Stats>
+            {splitLine && <p className="text-sm text-muted-foreground tabular-nums">{splitLine}</p>}
             {notes.map((note) => (
                 <p key={note} className="text-sm text-muted-foreground tabular-nums">
                     {note}
                 </p>
             ))}
+            {quality && (
+                <Collapsible>
+                    <CollapsibleTrigger className="flex min-h-8 items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                        Data quality
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 pt-1 text-sm tabular-nums">
+                            <QualityFact label="Empty rows" value={count(quality.empty)} />
+                            <QualityFact
+                                label="Duplicate inputs"
+                                value={count(quality.duplicates)}
+                            />
+                            <QualityFact
+                                label="Rows per label"
+                                value={`${count(quality.smallest_label)}–${count(quality.largest_label)}`}
+                            />
+                            <QualityFact
+                                label="Average input"
+                                value={`${count(quality.mean_input_chars)} chars`}
+                            />
+                        </dl>
+                    </CollapsibleContent>
+                </Collapsible>
+            )}
+        </AboutPart>
+    );
+}
+
+function QualityFact({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex flex-col">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="font-medium">{value}</dd>
         </div>
     );
 }
