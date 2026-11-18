@@ -28,7 +28,6 @@ import { ModelHeader, baseNameOf } from "./header";
 import { KeysTab } from "./keys";
 import { liveOf } from "./makeLive";
 import { MonitoringTab } from "./monitoring";
-import { NextStep } from "./nextStep";
 import { VersionsPanel } from "./overviewVersions";
 import { HealthNotice, TeardownNotice } from "./parts";
 import { SettingsTab } from "./settings";
@@ -180,10 +179,8 @@ function Overview({
         <OverviewLayout
             main={
                 <>
-                    {row.kind === "base" ? (
+                    {row.kind === "base" && (
                         <NeedsAttention scope="model" model={row.key} compact />
-                    ) : (
-                        <NextStep row={row} base={base} versions={versions} />
                     )}
                     <UsagePanel row={row} />
                     {row.kind === "base" ? (
