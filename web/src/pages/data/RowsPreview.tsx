@@ -26,6 +26,7 @@ export function RowsPreview({
     loadingMore = false,
     counting = false,
     strip,
+    idle = false,
 }: {
     records: unknown[];
     total: number | null | undefined;
@@ -41,6 +42,7 @@ export function RowsPreview({
     loadingMore?: boolean;
     counting?: boolean;
     strip?: ReactNode;
+    idle?: boolean;
 }) {
     const [view, setView] = useState<View>("records");
     const [open, setOpen] = useState<number[]>([0]);
@@ -48,13 +50,15 @@ export function RowsPreview({
     const active = view === "example" && !example ? "records" : view;
     const whole = total === null || total === undefined || total <= records.length;
     const shown = `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`;
-    const status = loading
-        ? "Loading…"
-        : counting
-          ? `${shown} shown · counting…`
-          : whole
-            ? shown
-            : `First ${count(records.length)} of ${count(total)} rows`;
+    const status = idle
+        ? "Not run"
+        : loading
+          ? "Loading…"
+          : counting
+            ? `${shown} shown · counting…`
+            : whole
+              ? shown
+              : `First ${count(records.length)} of ${count(total)} rows`;
     return (
         <section aria-label="Preview" className="flex min-h-96 min-w-0 flex-1 flex-col">
             {strip && (

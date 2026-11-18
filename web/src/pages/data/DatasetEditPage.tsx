@@ -1,6 +1,7 @@
+import { IconDeviceFloppy, IconPlayerPlay, IconPlus, IconX } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useBlocker, useRouter } from "@tanstack/react-router";
-import { Button, ConfirmDialog, Input, Textarea } from "obp-ui";
+import { Button, ConfirmDialog, Input, Kbd, Textarea } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
 import {
@@ -27,7 +28,13 @@ import {
     savedDraft,
     withRole,
 } from "./QueryEditor";
-import { QueryPreviewPanel, shapeSummary, useLivePreview, useSettled } from "./QueryPreview";
+import {
+    AUTO_RUN_ROWS,
+    QueryPreviewPanel,
+    shapeSummary,
+    useLivePreview,
+    useSettled,
+} from "./QueryPreview";
 import { SampleOffer, useOverLimit } from "./SampleOffer";
 import {
     DATASETS_GROUP,
@@ -42,7 +49,7 @@ import {
     sourceRef,
 } from "./catalogue";
 import { type Described, ItemHeader, SplitDetail, type SplitSide, useDataRefresh } from "./parts";
-import { defaultName, sharedColumns, unionSql } from "./sql";
+import { defaultName, mentions, sharedColumns, unionSql } from "./sql";
 
 const EDITOR_SIDE: SplitSide = {
     label: "Dataset",
@@ -80,6 +87,65 @@ function described(details: Details): Described {
 function sameDetails(left: Details, right: Details): boolean {
     const [a, b] = [described(left), described(right)];
     return a.name === b.name && a.description === b.description && a.tags.join() === b.tags.join();
+}
+
+const RUN_KEYS =
+    typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent)
+        ? "⌘↵"
+        : "Ctrl+↵";
+
+function queriedSources(
+    draft: Draft,
+    sources: SourceSummary[],
+    alias: SourceSummary | null,
+): SourceSummary[] {
+    if (draft.mode === "columns") {
+        return chosenSources(draft, sources);
+    }
+    const named = sources.filter((source) => mentions(draft.sql, source.table));
+    return alias && !named.includes(alias) && mentions(draft.sql, "source")
+        ? [...named, alias]
+        : named;
+}
+
+function rowsToRead(found: SourceSummary[]): number | null {
+    let total = 0;
+    for (const source of found) {
+        if (source.rows === null || source.rows === undefined) {
+            return null;
+        }
+        total += source.rows;
+    }
+    return total;
+}
+
+function waitingText(settled: string | null, stale: boolean): string | null {
+    if (!stale) {
+        return null;
+    }
+    return settled === null
+        ? "Large sources: press Run to preview"
+        : "Changed since the last run: press Run to update";
+}
+
+function useRunKey(run: () => void) {
+    const latest = useRef(run);
+    latest.current = run;
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (
+                event.key !== "Enter" ||
+                !(event.metaKey || event.ctrlKey) ||
+                event.defaultPrevented
+            ) {
+                return;
+            }
+            event.preventDefault();
+            latest.current();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
 }
 
 function useLeaveGuard(dirty: boolean) {
@@ -191,6 +257,7 @@ function DatasetWorkbench({
     title,
     detail,
     dataset,
+    alias = null,
     initialDraft,
     initialDetails,
     creating,
@@ -204,6 +271,7 @@ function DatasetWorkbench({
     title: string;
     detail: ReactNode;
     dataset: string | null;
+    alias?: SourceSummary | null;
     initialDraft: Draft;
     initialDetails: Details;
     creating: boolean;
@@ -218,8 +286,22 @@ function DatasetWorkbench({
     const [draft, setDraft] = useState(initialDraft);
     const [details, setDetails] = useState(initialDetails);
     const live = previewSql(draft, sources);
-    const { settled, runNow } = useSettled(live, draft.mode === "columns");
+    const reading = rowsToRead(queriedSources(draft, sources, alias));
+    const auto = reading !== null && reading < AUTO_RUN_ROWS;
+    const { settled, stale, runNow } = useSettled(live, draft.mode === "columns", auto);
     const preview = useLivePreview(settled, dataset);
+    const waiting = waitingText(settled, stale);
+    const run = () => {
+        if (live === null) {
+            return;
+        }
+        if (live === settled) {
+            preview.rerun();
+        } else {
+            runNow(live);
+        }
+    };
+    useRunKey(run);
     const queryChanged = creating || !sameDraft(draft, initialDraft);
     const detailsChanged = !sameDetails(details, initialDetails);
     const guard = useLeaveGuard(detailsChanged || !sameDraft(draft, initialDraft));
@@ -253,7 +335,13 @@ function DatasetWorkbench({
             detail={detail}
             actions={
                 <>
+                    <Button variant="outline" disabled={live === null} onClick={run}>
+                        <IconPlayerPlay />
+                        Run
+                        <Kbd>{RUN_KEYS}</Kbd>
+                    </Button>
                     <Button variant="outline" onClick={() => router.history.push(backHref)}>
+                        <IconX />
                         Cancel
                     </Button>
                     <Button
@@ -261,6 +349,7 @@ function DatasetWorkbench({
                         disabled={!ready || save.isPending}
                         onClick={() => save.mutate({ details: described(details), body })}
                     >
+                        {creating ? <IconPlus /> : <IconDeviceFloppy />}
                         {save.isPending
                             ? "Saving…"
                             : numbers
@@ -287,7 +376,7 @@ function DatasetWorkbench({
                     sources={sources}
                     problem={draft.mode === "sql" ? (runProblem ?? saveProblem) : null}
                     onChange={setDraft}
-                    onRun={runNow}
+                    onRun={(text) => runNow(text, live)}
                 />
                 {over && save.variables?.body ? (
                     <SampleOffer
@@ -318,6 +407,7 @@ function DatasetWorkbench({
                 preview={
                     <QueryPreviewPanel
                         preview={preview}
+                        waiting={waiting}
                         idle={
                             draft.mode === "sql"
                                 ? "Write a query to see its rows."
@@ -446,6 +536,11 @@ export function EditDatasetPage({
             title={`Edit ${dataset.name}`}
             detail="Saving a changed query makes the next version of the dataset."
             dataset={dataset.slug}
+            alias={
+                dataset.sources.length === 1
+                    ? (sources.find((source) => source.id === dataset.sources[0]?.id) ?? null)
+                    : null
+            }
             creating={false}
             initialDraft={initialDraft}
             initialDetails={initialDetails}

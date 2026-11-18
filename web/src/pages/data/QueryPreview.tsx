@@ -26,6 +26,7 @@ type PairColumn = QueryShape["missing"][number];
 
 const PREVIEW_ROWS = 50;
 const SETTLE_MS = 500;
+export const AUTO_RUN_ROWS = 1_000_000;
 const PAIR: PairColumn[] = ["input", "label"];
 const WARNING_TONES: Partial<Record<CheckInfo["status"], Tone>> = {
     warning: "warning",
@@ -66,17 +67,28 @@ function fetchShape(dataset: string | null, sql: string, run: string, signal: Ab
     );
 }
 
-export function useSettled(live: string | null, immediate: boolean) {
-    const [settled, setSettled] = useState(live);
+export function useSettled(live: string | null, immediate: boolean, auto: boolean) {
+    const [settled, setSettled] = useState(auto ? live : null);
+    const [asked, setAsked] = useState<string | null>(null);
     useEffect(() => {
+        if (!auto) {
+            return;
+        }
         if (immediate) {
             setSettled(live);
             return;
         }
         const timer = window.setTimeout(() => setSettled(live), SETTLE_MS);
         return () => window.clearTimeout(timer);
-    }, [live, immediate]);
-    return { settled, runNow: (text: string) => setSettled(text.trim() || null) };
+    }, [live, immediate, auto]);
+    return {
+        settled,
+        stale: !auto && live !== null && live !== (asked ?? settled),
+        runNow: (text: string, from: string | null = text) => {
+            setSettled(text.trim() || null);
+            setAsked(from);
+        },
+    };
 }
 
 export function useLivePreview(sql: string | null, dataset: string | null) {
@@ -119,6 +131,10 @@ export function useLivePreview(sql: string | null, dataset: string | null) {
     const counted = current && !shape.isPlaceholderData ? shape.data : undefined;
     return {
         sql,
+        rerun: () => {
+            rows.refetch();
+            shape.refetch();
+        },
         result,
         running: current && rows.isFetching,
         error: current && !rows.isPlaceholderData ? rows.error : null,
@@ -181,8 +197,11 @@ function shapeFacts(shape: QueryShape, quality: NonNullable<QueryShape["quality"
         .join(" · ");
 }
 
-function ShapeStrip({ preview }: { preview: LivePreview }) {
+function ShapeStrip({ preview, waiting }: { preview: LivePreview; waiting: string | null }) {
     const { shape, missing } = preview;
+    if (waiting) {
+        return <span className="text-muted-foreground">{waiting}</span>;
+    }
     if (preview.sql === null) {
         return <span className="text-muted-foreground">No query to run yet</span>;
     }
@@ -266,30 +285,33 @@ function RoleMenu({
 export function QueryPreviewPanel({
     preview,
     idle,
+    waiting,
     pickable,
     onPick,
 }: {
     preview: LivePreview;
     idle: string;
+    waiting: string | null;
     pickable?: string[];
     onPick?: (column: string, role: Role) => void;
 }) {
     const { result } = preview;
     const records = recordsOf(result);
     const paired = preview.missing.length === 0 && Boolean(result?.columns.includes("input"));
-    const empty = preview.sql === null ? idle : "The query returned no rows.";
+    const empty = preview.sql === null ? (waiting ?? idle) : "The query returned no rows.";
     const loading = preview.sql !== null && !result && preview.running;
     return (
         <RowsPreview
             records={records}
             total={preview.counted?.rows}
             counting={preview.counting && !preview.counted}
+            idle={preview.sql === null}
             loading={loading}
             error={preview.error}
             marked={["label"]}
             summary={paired ? rowSummary : undefined}
             empty={empty}
-            strip={<ShapeStrip preview={preview} />}
+            strip={<ShapeStrip preview={preview} waiting={waiting} />}
             table={
                 result ? (
                     <DataGrid

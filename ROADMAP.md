@@ -450,6 +450,11 @@ Data is shared across models:
   stops after 30 seconds. Sources are named by table name alone: a catalog- or schema-qualified name and the scanner
   table functions (`postgres_query`, `mysql_*`, `iceberg_*`, `delta_*`, `query`, `query_table`) are refused, so
   dataset SQL cannot reach past its sources into the rest of an attached database.
+- The dataset editor's preview (first rows, then the full count and quick checks) runs as you type only when the
+  sources it reads hold under 1,000,000 rows by their known counts; larger or uncounted sources run when Run (⌘↵ /
+  Ctrl+↵) is pressed, one action for both. A preview connection takes at most a quarter of the machine's memory and
+  half its cores (`SET memory_limit`, `SET threads`, `minibrain/data/runs.py`), keeps the 30-second stop, and each
+  person runs one preview at a time: a new preview stops their previous one.
 
 ### Sources
 

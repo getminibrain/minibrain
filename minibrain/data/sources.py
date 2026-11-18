@@ -11,7 +11,7 @@ from typing import Any, Literal, Protocol
 import duckdb
 
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
-from minibrain.data.runs import QueryCancelled, cancelled, watched
+from minibrain.data.runs import QueryCancelled, cancelled, cap, watched
 from minibrain.encryption.duck import register
 
 MAX_ROW_BYTES = 64 * 1024 * 1024
@@ -207,6 +207,7 @@ def connect(
         for alias, target in (aliases or {}).items():
             if target in names and alias not in names:
                 connection.execute(f"CREATE VIEW {quote_identifier(alias)} AS SELECT * FROM {quote_identifier(target)}")
+        cap(connection)
         connection.execute("SET enable_external_access = false")
         connection.execute("SET lock_configuration = true")
     except ExtensionMissingError as error:

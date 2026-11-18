@@ -1,9 +1,19 @@
+import os
 import threading
 import time
 
+import duckdb
+import psutil
 import pytest
 
-from minibrain.data.runs import QueryCancelled, cancel, running
+from minibrain.data.runs import (
+    PREVIEW_MEMORY_SHARE,
+    PREVIEW_THREAD_SHARE,
+    QueryCancelled,
+    cancel,
+    preview_caps,
+    running,
+)
 from minibrain.data.sources import run_query
 from tests.conftest import Harness, tickets_csv
 
@@ -121,3 +131,52 @@ def test_new_is_never_a_dataset_slug(harness: Harness) -> None:
     created = harness.client.post("/api/datasets", json={"name": "New", "source_id": tickets["id"]})
     assert created.status_code == 201, created.text
     assert created.json()["slug"] == "new-2"
+
+
+SETTINGS = "SELECT current_setting('threads') AS threads, current_setting('memory_limit') AS memory"
+
+
+def formatted_memory(limit: str) -> str:
+    with duckdb.connect() as connection:
+        connection.execute(f"SET memory_limit = '{limit}'")
+        found = connection.execute("SELECT current_setting('memory_limit')").fetchone()
+    return str(found[0]) if found else ""
+
+
+def test_a_preview_takes_at_most_a_quarter_of_memory_and_half_the_cores() -> None:
+    caps = preview_caps()
+    assert caps.threads == max(int((os.cpu_count() or 1) * PREVIEW_THREAD_SHARE), 1)
+    megabytes = int(caps.memory.removesuffix("MB"))
+    assert megabytes <= max(psutil.virtual_memory().total * PREVIEW_MEMORY_SHARE / (1024 * 1024), 256)
+    with running("ana", "editor.rows"):
+        capped = run_query([], SETTINGS, None).rows
+    assert capped == [[caps.threads, formatted_memory(caps.memory)]]
+    with running("ana", None):
+        assert run_query([], SETTINGS, None).rows == capped
+    assert run_query([], SETTINGS, None).rows != capped
+
+
+def test_a_new_preview_from_the_same_person_stops_their_previous_one() -> None:
+    first: list[BaseException | None] = []
+    other: list[BaseException | None] = []
+    older = slow_run("ana", "editor-1.rows", first)
+    elsewhere = slow_run("bob", "editor-9.rows", other)
+    with running("ana", "editor-2.rows"):
+        older.join(timeout=10)
+        assert not older.is_alive()
+        assert isinstance(first[0], QueryCancelled)
+        assert elsewhere.is_alive()
+    assert cancel("bob", "editor-9.rows")
+    elsewhere.join(timeout=10)
+    assert isinstance(other[0], QueryCancelled)
+
+
+def test_the_rows_and_the_shape_of_one_preview_run_side_by_side() -> None:
+    outcome: list[BaseException | None] = []
+    rows = slow_run("ana", "editor-1.rows", outcome)
+    with running("ana", "editor-1.shape"):
+        assert run_query([], "SELECT 1 AS n", None).rows == [[1]]
+        assert rows.is_alive()
+    assert cancel("ana", "editor-1.rows")
+    rows.join(timeout=10)
+    assert isinstance(outcome[0], QueryCancelled)

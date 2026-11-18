@@ -79,6 +79,14 @@ export function guessPair(columns: string[]): [string, string] {
     return [input, guess(columns, LABEL_NAMES, input)];
 }
 
+function escaped(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function mentions(sql: string, name: string): boolean {
+    return new RegExp(`(^|[^\\w"])"?${escaped(name)}"?($|[^\\w"])`, "i").test(sql);
+}
+
 export function defaultName(sources: SourceSummary[]): string {
     const first = sources[0];
     if (!first) {

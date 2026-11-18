@@ -676,10 +676,11 @@ function SqlMode({
             <p className="text-sm text-muted-foreground">
                 Return columns named <span className="font-mono">input</span> and{" "}
                 <span className="font-mono">label</span>; other columns are kept in each version.
-                Join, union, filter and clean up with DuckDB SQL. The preview runs when you stop
-                typing; Cmd/Ctrl+Enter runs it at once, or only the selected part. Hover a column
-                name for its type and values. Queries are read-only and cannot reach other files or
-                the network.
+                Join, union, filter and clean up with DuckDB SQL. On sources under a million rows
+                the preview runs when you stop typing; on larger ones it runs when you press Run.
+                Cmd/Ctrl+Enter runs it at once, or only the selected part. Hover a column name for
+                its type and values. Queries are read-only and cannot reach other files or the
+                network.
             </p>
         </div>
     );

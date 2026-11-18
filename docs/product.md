@@ -59,7 +59,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Format, fold, multiple cursors, run a selection, column values on hover.
   UI: Data › Add › New dataset › Write SQL, Data › dataset › … › Edit dataset › Write SQL · API: GET /api/sources/{source_id}/stats
 - **Live query preview** · shipped · product, ml
-  See rows, labels and quick checks while writing a dataset query.
+  See rows and quick checks as you type; large sources on Run.
   UI: Data › Add › New dataset, Data › dataset › … › Edit dataset · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
