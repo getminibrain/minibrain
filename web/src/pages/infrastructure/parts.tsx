@@ -40,6 +40,19 @@ export function OnlineCount({ nodes }: { nodes: NodeInfo[] }) {
     );
 }
 
+export function OfflineCount({ nodes }: { nodes: NodeInfo[] }) {
+    const offline = nodes.filter((node) => !node.online).length;
+    if (offline === 0) {
+        return null;
+    }
+    const all = offline === nodes.length;
+    return (
+        <StatusText tone={all ? "neutral" : "warning"} className="shrink-0 text-sm tabular-nums">
+            {all ? "All offline" : `${count(offline)} offline`}
+        </StatusText>
+    );
+}
+
 export function RowToggle({
     open,
     label,

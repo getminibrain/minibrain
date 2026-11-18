@@ -1,20 +1,21 @@
 import type { Problem } from "~/api/problemQueries";
 import type { GaugeBasis } from "~/components/UsageGauge";
 import type { Tone } from "~/components/models/StatusText";
-import { bytes, exactTime } from "~/lib/time";
+import { kindNoun } from "~/lib/jobs";
+import { jobHref } from "~/lib/modelLinks";
+import { exactTime } from "~/lib/time";
 import {
     type EngineState,
     type NodeJob,
     engineLabel,
     engineState,
-    jobLink,
     jobSubject,
     memoryView,
     servedHref,
 } from "./activity";
 import { servedOn } from "./byModel";
 import { type MachineRow, machineStatus } from "./machines";
-import type { NodeInfo } from "./parts";
+import { type NodeInfo, plural } from "./parts";
 
 function shortGpu(name: string): string {
     return name
@@ -58,11 +59,38 @@ export function gpuCount(node: NodeInfo): number {
     return node.accelerator === "cpu" ? 0 : node.gpus.length;
 }
 
-export type Memory = { capacity: number; used: number; basis: GaugeBasis };
+export type GpuShare = { index: number; used: number; capacity: number };
+
+export type Memory = { capacity: number; used: number; basis: GaugeBasis; gpus: GpuShare[] };
+
+function gpuShares(node: NodeInfo): GpuShare[] {
+    const samples = node.online ? (node.metrics?.gpus ?? []) : [];
+    const shares = samples.flatMap((gpu) =>
+        gpu.memory_total_bytes && typeof gpu.memory_used_bytes === "number"
+            ? [{ index: gpu.index, used: gpu.memory_used_bytes, capacity: gpu.memory_total_bytes }]
+            : [],
+    );
+    if (shares.length < 2 || shares.length !== samples.length) {
+        return [];
+    }
+    return shares.sort((left, right) => left.index - right.index);
+}
 
 export function memoryOf(row: MachineRow): Memory | null {
     const view = memoryView(row.node, row.engines);
-    return view ? { capacity: view.capacity, used: view.used, basis: view.basis } : null;
+    return view
+        ? {
+              capacity: view.capacity,
+              used: view.used,
+              basis: view.basis,
+              gpus: view.basis === "measured" ? gpuShares(row.node) : [],
+          }
+        : null;
+}
+
+export function capacityOf(node: NodeInfo): number | null {
+    const total = node.gpus.reduce((sum, gpu) => sum + gpu.memory_bytes, 0);
+    return node.usable_bytes ?? (total > 0 ? total : null);
 }
 
 export function shareOf(used: number, capacity: number): number {
@@ -73,10 +101,28 @@ export function percentText(fraction: number): string {
     return `${Math.round(Math.min(fraction, 9.99) * 100)}%`;
 }
 
-export function memoryText(used: number, capacity: number): string {
-    const total = bytes(capacity);
-    const [amount, unit] = bytes(used).split(" ");
-    return total.endsWith(` ${unit}`) ? `${amount} of ${total}` : `${bytes(used)} of ${total}`;
+const UNIT_SIZES: [number, string][] = [
+    [1024 ** 4, "TB"],
+    [1024 ** 3, "GB"],
+    [1024 ** 2, "MB"],
+];
+
+function unitOf(value: number): [number, string] {
+    return UNIT_SIZES.find(([size]) => value >= size) ?? UNIT_SIZES[UNIT_SIZES.length - 1];
+}
+
+function amount(value: number): string {
+    return String(value < 10 ? Math.round(value * 10) / 10 : Math.round(value));
+}
+
+export function memoryPair(used: number, capacity: number, separator = " / "): string {
+    const [size, unit] = unitOf(capacity);
+    return `${amount(used / size)}${separator}${amount(capacity / size)} ${unit}`;
+}
+
+export function sizeText(value: number): string {
+    const [size, unit] = unitOf(value);
+    return `${amount(value / size)} ${unit}`;
 }
 
 export function ramOf(node: NodeInfo): { used: number | null; total: number | null } {
@@ -147,15 +193,34 @@ export function modelChips(row: MachineRow): Chip[] {
     return [...served, ...engines];
 }
 
-export type JobChip = { key: string; job: NodeJob; subject: string; href: string };
+export type JobChip = {
+    key: string;
+    job: NodeJob;
+    subject: string;
+    href: string;
+    done: string;
+    tip: string;
+};
 
 export function jobChips(node: NodeInfo): JobChip[] {
-    return node.jobs.map((job) => ({
-        key: `job-${job.id}`,
-        job,
-        subject: jobSubject(job),
-        href: jobLink(job),
-    }));
+    return node.jobs.map((job) => {
+        const subject = jobSubject(job);
+        const done = `${Math.round(job.progress * 100)}%`;
+        return {
+            key: `job-${job.id}`,
+            job,
+            subject,
+            href: jobHref(job),
+            done,
+            tip: `${kindNoun(job.kind)} · ${subject} · ${done} · job ${job.id}`,
+        };
+    });
+}
+
+export function runningText(models: number, jobs: number): string {
+    return [models > 0 ? plural(models, "model") : "", jobs > 0 ? plural(jobs, "job") : ""]
+        .filter((part) => part !== "")
+        .join(" · ");
 }
 
 export function poolMemory(rows: MachineRow[]): Memory | null {
@@ -170,7 +235,15 @@ export function poolMemory(rows: MachineRow[]): Memory | null {
         capacity: memory.reduce((sum, item) => sum + item.capacity, 0),
         used: memory.reduce((sum, item) => sum + item.used, 0),
         basis: memory.every((item) => item.basis === "measured") ? "measured" : "estimated",
+        gpus: [],
     };
+}
+
+export function offlineCapacity(rows: MachineRow[]): number | null {
+    const total = rows
+        .filter((row) => !row.node.online)
+        .reduce((sum, row) => sum + (capacityOf(row.node) ?? 0), 0);
+    return total > 0 ? total : null;
 }
 
 export type StatusItem = {

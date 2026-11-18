@@ -39,13 +39,18 @@ export function useOf(workloads: readonly string[] | undefined): UseKey {
 
 export function UseBadge({ workloads }: { workloads: readonly string[] | undefined }) {
     const found = USES.find((item) => item.key === useOf(workloads));
-    if (!found || found.key === "any") {
+    if (!found) {
         return null;
     }
     return (
-        <Badge variant="outline" className="shrink-0">
-            {found.label}
-        </Badge>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Badge variant="outline" className="shrink-0 cursor-default">
+                    {found.label}
+                </Badge>
+            </TooltipTrigger>
+            <TooltipContent>{`Used for: ${found.hint.toLowerCase()}`}</TooltipContent>
+        </Tooltip>
     );
 }
 

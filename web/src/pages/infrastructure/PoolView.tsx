@@ -2,10 +2,10 @@ import { IconStack2 } from "@tabler/icons-react";
 import {
     type ColumnSize,
     type ColumnSizing,
-    Link,
     Table,
     TableBody,
     TableCell,
+    TableFooter,
     TableHeader,
     TableRow,
     cn,
@@ -15,41 +15,40 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 import type { PoolToken } from "~/api/joinTokenQueries";
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
 import { PoolLink } from "~/components/PoolLink";
-import { PublisherLogo } from "~/components/PublisherLogo";
-import { StatusText, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { kindNoun } from "~/lib/jobs";
-import { jobHref } from "~/lib/modelLinks";
 import { bytes } from "~/lib/time";
 import { PoolRowMenu } from "./PoolRowMenu";
 import { PoolDescription, UseBadge } from "./PoolUse";
-import { engineLabel, jobLink, jobSubject, servedHref, versioned, worstState } from "./activity";
-import { servedOn } from "./byModel";
+import { versioned } from "./activity";
 import {
-    JobsCell,
+    FitText,
     Lead,
-    MemoryFigure,
-    ModelChips,
+    MemoryCell,
+    RunningChips,
     SortHead,
     StatusCell,
     Tip,
     UsagePercent,
 } from "./cells";
 import {
+    capacityOf,
     cpuOf,
+    gpuCount,
     gpuText,
     jobChips,
     machineStatuses,
     memoryOf,
     modelChips,
+    offlineCapacity,
     poolMemory,
     poolProblems,
     ramOf,
+    runningText,
     shareOf,
 } from "./fleet";
 import type { MachineRow } from "./machines";
 import {
-    OnlineCount,
+    OfflineCount,
     type OpenRows,
     type PoolInfo,
     ProblemBadge,
@@ -62,36 +61,32 @@ import { type Sort, type SortKey, sortRows } from "./sorting";
 type Column = ColumnSize & { id: SortKey; label: string; numeric?: boolean };
 
 const COLUMNS: Column[] = [
-    { id: "host", label: "Machine", width: 144, min: 120 },
-    { id: "status", label: "Status", width: 112, min: 96 },
-    { id: "gpu", label: "GPU", width: 72, min: 64 },
-    { id: "memory", label: "GPU memory", width: 112, min: 104 },
-    { id: "cpu", label: "CPU", width: 56, min: 56, numeric: true },
-    { id: "ram", label: "RAM", width: 56, min: 56, numeric: true },
-    { id: "models", label: "Models", width: 136, min: 136, flex: true },
-    { id: "jobs", label: "Jobs", width: 144, min: 128 },
+    { id: "host", label: "Machine", width: 176, min: 104 },
+    { id: "status", label: "Status", width: 120, min: 96 },
+    { id: "gpu", label: "GPU", width: 96, min: 80 },
+    { id: "memory", label: "GPU memory", width: 168, min: 136 },
+    { id: "cpu", label: "CPU", width: 74, min: 74, numeric: true },
+    { id: "ram", label: "RAM", width: 76, min: 76, numeric: true },
+    { id: "running", label: "Running", width: 240, min: 240, flex: true },
 ];
 
-const MODELS_MIN = 136;
-const MODELS_MAX = 400;
-const MODELS_SHARE = 0.22;
+const RUNNING_MIN = 240;
+const RUNNING_SHARE = 0.3;
 const SHARE_FROM = 1100;
 
 const SPAN = COLUMNS.length;
 const POOL_LEAD = 3;
-const LINK = "text-primary hover:underline";
 const ROW = "h-10";
 const CELL = "py-1";
 const NUMBER = "py-1 text-right tabular-nums";
 const LEADING = "flex min-w-0 items-center gap-2";
-const WIDTHS_KEY = "minibrain.machines.widths";
+const WIDTHS_KEY = "minibrain.machines.columns";
 
-function modelsMin(width: number): number {
+function runningMin(width: number): number {
     if (width < SHARE_FROM) {
-        return MODELS_MIN;
+        return RUNNING_MIN;
     }
-    const share = Math.round((width * MODELS_SHARE) / 8) * 8;
-    return Math.min(MODELS_MAX, Math.max(MODELS_MIN, share));
+    return Math.max(RUNNING_MIN, Math.round((width * RUNNING_SHARE) / 8) * 8);
 }
 
 function useBoxWidth() {
@@ -116,20 +111,20 @@ export function usePoolSizing(
     fit: boolean,
 ): ColumnSizing {
     const { width, setBox } = useBoxWidth();
-    const models = modelsMin(width);
+    const running = runningMin(width);
     const columns = useMemo(
         () =>
             COLUMNS.map((column) =>
-                column.flex ? { ...column, width: models, min: models } : column,
+                column.flex ? { ...column, width: running, min: running } : column,
             ),
-        [models],
+        [running],
     );
     const ids = rows.map((row) => row.node.id).join(",");
     const found = (problems ?? []).map((problem) => problem.id).join(",");
     const sizing = useColumnSizing({
         columns,
         storageKey: WIDTHS_KEY,
-        fitKey: fit ? `${ids}|${found}|${models}` : undefined,
+        fitKey: fit ? `${ids}|${found}|${running}` : undefined,
     });
     const { tableRef } = sizing;
     const observe = useCallback(
@@ -142,26 +137,52 @@ export function usePoolSizing(
     return { ...sizing, tableRef: observe };
 }
 
-function PoolModels({ pool }: { pool: PoolInfo }) {
-    const deployed = pool.deployed ?? [];
-    if (deployed.length === 0) {
+function jobsOf(rows: MachineRow[]): number {
+    return rows.reduce((sum, row) => sum + (row.node.online ? row.node.jobs.length : 0), 0);
+}
+
+function RunningSummary({
+    models,
+    jobs,
+}: {
+    models: { key: string; text: string }[];
+    jobs: number;
+}) {
+    const text = runningText(models.length, jobs);
+    if (text === "") {
         return null;
+    }
+    const summary = (
+        <span className="min-w-0 cursor-default truncate text-muted-foreground tabular-nums">
+            {text}
+        </span>
+    );
+    if (models.length === 0) {
+        return summary;
     }
     return (
         <Tip
             tip={
                 <ul className="flex flex-col gap-1">
-                    {deployed.map((model) => (
-                        <li key={model.model}>{versioned(model.name, model.version)}</li>
+                    {models.map((model) => (
+                        <li key={model.key}>{model.text}</li>
                     ))}
                 </ul>
             }
         >
-            <span className="cursor-default text-muted-foreground tabular-nums">
-                {plural(deployed.length, "model")}
-            </span>
+            {summary}
         </Tip>
     );
+}
+
+function deployedOf(pools: PoolInfo[]): { key: string; text: string }[] {
+    const found = new Map<string, string>();
+    for (const pool of pools) {
+        for (const model of pool.deployed ?? []) {
+            found.set(model.model, versioned(model.name, model.version));
+        }
+    }
+    return [...found.entries()].map(([key, text]) => ({ key, text }));
 }
 
 function PoolBand({
@@ -181,8 +202,6 @@ function PoolBand({
     open: boolean;
     onToggle: (open: boolean) => void;
 }) {
-    const memory = poolMemory(rows);
-    const jobs = rows.reduce((sum, row) => sum + row.node.jobs.length, 0);
     return (
         <TableRow
             id={`pool-${pool.name}`}
@@ -205,63 +224,47 @@ function PoolBand({
                     <UseBadge workloads={pool.workloads} />
                     {pool.description && <PoolDescription text={pool.description} />}
                     <ProblemBadge problems={problems} />
-                    <span className="shrink-0 text-sm">
-                        <OnlineCount nodes={pool.nodes} />
-                    </span>
+                    <OfflineCount nodes={pool.nodes} />
                 </span>
             </TableCell>
             <TableCell data-column="memory" className={CELL}>
-                {memory && (
-                    <MemoryFigure
-                        used={memory.used}
-                        capacity={memory.capacity}
-                        basis={memory.basis}
-                        host={pool.name}
-                    />
-                )}
+                <MemoryCell
+                    memory={poolMemory(rows)}
+                    offline={offlineCapacity(rows)}
+                    label={`Pool ${pool.name} GPU memory`}
+                />
             </TableCell>
             <TableCell className={CELL} />
             <TableCell className={CELL} />
             <TableCell className={CELL}>
-                <PoolModels pool={pool} />
-            </TableCell>
-            <TableCell data-column="jobs" className={CELL}>
                 <span className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="truncate text-muted-foreground tabular-nums">
-                        {jobs > 0 ? `${count(jobs)} running` : ""}
-                    </span>
-                    {admin && <PoolRowMenu pool={pool} token={token} />}
+                    <RunningSummary models={deployedOf([pool])} jobs={jobsOf(rows)} />
+                    {admin && (
+                        <span className="ml-auto flex shrink-0">
+                            <PoolRowMenu pool={pool} token={token} />
+                        </span>
+                    )}
                 </span>
             </TableCell>
         </TableRow>
     );
 }
 
-function hasActivity(row: MachineRow): boolean {
-    return row.engines.length > 0 || row.node.jobs.length > 0;
-}
-
 function MachineLine({
     row,
     problems,
-    open,
-    onToggle,
     onOpen,
 }: {
     row: MachineRow;
     problems: Problem[];
-    open: boolean;
-    onToggle: (open: boolean) => void;
     onOpen: (row: MachineRow) => void;
 }) {
     const { node } = row;
-    const memory = memoryOf(row);
     const cpu = cpuOf(node);
     const ram = ramOf(node);
-    const expandable = hasActivity(row);
     return (
         <TableRow
-            {...rowEvents(() => onOpen(row), expandable ? onToggle : undefined)}
+            {...rowEvents(() => onOpen(row))}
             aria-label={node.host}
             className={cn(
                 ROW,
@@ -271,24 +274,11 @@ function MachineLine({
         >
             <TableCell data-column="host" className={CELL}>
                 <span className={LEADING}>
-                    <span className="flex w-6 shrink-0">
-                        {expandable && (
-                            <RowToggle
-                                open={open}
-                                label={`${open ? "Hide" : "Show"} what runs on ${node.host}`}
-                                onToggle={() => onToggle(!open)}
-                            />
-                        )}
-                    </span>
-                    <span
-                        className={cn(
-                            "min-w-0 truncate font-mono",
-                            node.online && "text-foreground",
-                        )}
-                        title={node.host}
-                    >
-                        {node.host}
-                    </span>
+                    <span className="w-6 shrink-0" />
+                    <FitText
+                        text={node.host}
+                        className={cn("font-mono", node.online && "text-foreground")}
+                    />
                 </span>
             </TableCell>
             <TableCell data-column="status" className={CELL}>
@@ -300,14 +290,11 @@ function MachineLine({
                 </span>
             </TableCell>
             <TableCell data-column="memory" className={CELL}>
-                {memory && (
-                    <MemoryFigure
-                        used={memory.used}
-                        capacity={memory.capacity}
-                        basis={memory.basis}
-                        host={node.host}
-                    />
-                )}
+                <MemoryCell
+                    memory={memoryOf(row)}
+                    offline={node.online ? null : capacityOf(node)}
+                    label={`${node.host} GPU memory`}
+                />
             </TableCell>
             <TableCell data-column="cpu" className={NUMBER}>
                 {cpu !== null && (
@@ -326,131 +313,51 @@ function MachineLine({
                 ) : null}
             </TableCell>
             <TableCell className={CELL}>
-                {node.online && <ModelChips chips={modelChips(row)} host={node.host} />}
-            </TableCell>
-            <TableCell data-column="jobs" className={CELL}>
-                <JobsCell jobs={jobChips(node)} />
-            </TableCell>
-        </TableRow>
-    );
-}
-
-function SubRow({
-    lead,
-    name,
-    status,
-    detail,
-}: {
-    lead: ReactNode;
-    name: ReactNode;
-    status: ReactNode;
-    detail: ReactNode;
-}) {
-    return (
-        <TableRow className={cn(ROW, "border-border-soft hover:bg-transparent")}>
-            <TableCell className={CELL}>
-                <span className={LEADING}>
-                    <span className="w-6 shrink-0" />
-                    <Lead>{lead}</Lead>
-                    <span className="min-w-0 truncate">{name}</span>
-                </span>
-            </TableCell>
-            <TableCell className={CELL}>{status}</TableCell>
-            <TableCell colSpan={SPAN - 2} className={CELL}>
-                <span className="block truncate text-muted-foreground">{detail}</span>
+                {node.online && (
+                    <RunningChips models={modelChips(row)} jobs={jobChips(node)} host={node.host} />
+                )}
             </TableCell>
         </TableRow>
     );
 }
 
-function engineDetail(replicas: number, engine: string): string {
-    const label = engineLabel(engine);
-    return replicas > 1 ? `${plural(replicas, "replica")} · ${label}` : label;
-}
-
-function ActivityRows({ row }: { row: MachineRow }) {
-    const { models, bare } = servedOn(row.engines);
+function TotalsRow({ pools, rows }: { pools: PoolInfo[]; rows: MachineRow[] }) {
+    const online = rows.filter((row) => row.node.online).length;
+    const gpus = rows.reduce((sum, row) => sum + gpuCount(row.node), 0);
     return (
-        <>
-            {models.map(({ served, engines }) => {
-                const state = worstState(engines);
-                return (
-                    <SubRow
-                        key={`served-${served.model}`}
-                        lead={
-                            <PublisherLogo name={served.name} modelKey={served.model} size="sm" />
-                        }
-                        name={
-                            <Link href={servedHref(served)} className={LINK}>
-                                {versioned(served.name, served.version)}
-                            </Link>
-                        }
-                        status={
-                            <StatusText tone={state.tone} active={state.active}>
-                                {state.label}
-                            </StatusText>
-                        }
-                        detail={`${engineDetail(engines.length, engines[0].engine)} on ${engines[0].base_model}`}
+        <TableFooter className="bg-transparent font-normal text-muted-foreground">
+            <TableRow className={cn(ROW, "hover:bg-transparent")}>
+                <TableCell data-column="host" className={CELL}>
+                    <span className={LEADING}>
+                        <span className="w-6 shrink-0" />
+                        Total
+                    </span>
+                </TableCell>
+                <TableCell data-column="status" className={CELL}>
+                    {`${count(online)} of ${count(rows.length)} online`}
+                </TableCell>
+                <TableCell data-column="gpu" className={CELL}>
+                    {plural(gpus, "GPU")}
+                </TableCell>
+                <TableCell data-column="memory" className={CELL}>
+                    <MemoryCell
+                        memory={poolMemory(rows)}
+                        offline={offlineCapacity(rows)}
+                        label="Total GPU memory"
                     />
-                );
-            })}
-            {bare.map((engine) => {
-                const state = worstState([engine]);
-                return (
-                    <SubRow
-                        key={`engine-${engine.id}`}
-                        lead={
-                            <PublisherLogo
-                                name={engine.base_model}
-                                modelKey={engine.base_model}
-                                size="sm"
-                            />
-                        }
-                        name={<span className="font-mono">{engine.base_model}</span>}
-                        status={
-                            <StatusText tone={state.tone} active={state.active}>
-                                {state.label}
-                            </StatusText>
-                        }
-                        detail={`No model deployed · ${engineLabel(engine.engine)}`}
-                    />
-                );
-            })}
-            {row.node.jobs.map((job) => (
-                <SubRow
-                    key={`job-${job.id}`}
-                    lead={null}
-                    name={
-                        <Link href={jobLink(job)} className={LINK}>
-                            {jobSubject(job)}
-                        </Link>
-                    }
-                    status={
-                        <StatusText
-                            tone="info"
-                            active
-                            progress={job.progress > 0 ? percentOf(job.progress) : null}
-                        >
-                            {kindNoun(job.kind)}
-                        </StatusText>
-                    }
-                    detail={
-                        <>
-                            <span className="tabular-nums">{`${Math.round(job.progress * 100)}% done · `}</span>
-                            <Link href={jobHref(job)} className={LINK}>
-                                {`Job ${job.id}`}
-                            </Link>
-                        </>
-                    }
-                />
-            ))}
-        </>
+                </TableCell>
+                <TableCell className={CELL} />
+                <TableCell className={CELL} />
+                <TableCell className={CELL}>
+                    <RunningSummary models={deployedOf(pools)} jobs={jobsOf(rows)} />
+                </TableCell>
+            </TableRow>
+        </TableFooter>
     );
 }
 
 function bodyRows({
-    pools,
-    shown,
+    groups,
     problems,
     admin,
     tokens,
@@ -458,8 +365,7 @@ function bodyRows({
     open,
     onOpen,
 }: {
-    pools: PoolInfo[];
-    shown: MachineRow[];
+    groups: { pool: PoolInfo; rows: MachineRow[] }[];
     problems: Problem[] | undefined;
     admin: boolean;
     tokens: PoolToken[] | undefined;
@@ -467,11 +373,7 @@ function bodyRows({
     open: OpenRows;
     onOpen: (row: MachineRow) => void;
 }): ReactNode[] {
-    return pools.flatMap((pool) => {
-        const rows = shown.filter((row) => row.pool.name === pool.name);
-        if (rows.length === 0) {
-            return [];
-        }
+    return groups.flatMap(({ pool, rows }) => {
         const poolKey = `pool:${pool.name}`;
         const poolOpen = open.isOpen(poolKey, true);
         const band = (
@@ -491,21 +393,14 @@ function bodyRows({
         }
         return [
             band,
-            ...sortRows(rows, sort, problems).flatMap((row) => {
-                const key = `machine:${row.node.id}`;
-                const expanded = hasActivity(row) && open.isOpen(key, false);
-                return [
-                    <MachineLine
-                        key={key}
-                        row={row}
-                        problems={problemsOfMachine(problems, row.node.id)}
-                        open={expanded}
-                        onToggle={(next) => open.set(key, next)}
-                        onOpen={onOpen}
-                    />,
-                    expanded ? <ActivityRows key={`${key}:activity`} row={row} /> : null,
-                ];
-            }),
+            ...sortRows(rows, sort, problems).map((row) => (
+                <MachineLine
+                    key={`machine:${row.node.id}`}
+                    row={row}
+                    problems={problemsOfMachine(problems, row.node.id)}
+                    onOpen={onOpen}
+                />
+            )),
         ];
     });
 }
@@ -535,7 +430,10 @@ export function PoolTable({
     sizing: ColumnSizing;
     empty: ReactNode;
 }) {
-    const body = bodyRows({ pools, shown, problems, admin, tokens, sort, open, onOpen });
+    const groups = pools
+        .map((pool) => ({ pool, rows: shown.filter((row) => row.pool.name === pool.name) }))
+        .filter((group) => group.rows.length > 0);
+    const body = bodyRows({ groups, problems, admin, tokens, sort, open, onOpen });
     return (
         <Table ref={sizing.tableRef} style={sizing.tableStyle} className="[&_td]:overflow-hidden">
             <colgroup>
@@ -572,6 +470,9 @@ export function PoolTable({
                     </TableRow>
                 )}
             </TableBody>
+            {groups.length > 1 && (
+                <TotalsRow pools={groups.map((group) => group.pool)} rows={shown} />
+            )}
         </Table>
     );
 }

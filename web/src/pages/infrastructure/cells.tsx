@@ -14,23 +14,25 @@ import {
     cn,
     sortAria,
 } from "obp-ui";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type PointerEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { Problem } from "~/api/problemQueries";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { BASIS_HINTS, type GaugeBasis } from "~/components/UsageGauge";
+import { BASIS_HINTS } from "~/components/UsageGauge";
 import { StatusText, percentOf } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { kindNoun } from "~/lib/jobs";
-import { bytes } from "~/lib/time";
 import { versioned } from "./activity";
 import {
     type Chip,
     type JobChip,
+    type Memory,
     type StatusItem,
     machineStatuses,
-    memoryText,
+    memoryPair,
     percentText,
+    runningText,
     shareOf,
+    sizeText,
 } from "./fleet";
 import type { MachineRow } from "./machines";
 import type { Sort, SortKey } from "./sorting";
@@ -40,6 +42,9 @@ const MIN_CHIP = 80;
 const WARN_AT = 0.9;
 const MORE =
     "shrink-0 rounded-sm text-sm text-muted-foreground tabular-nums outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
+const CHIP = "flex min-w-0 max-w-48 items-center gap-1.5";
+const CHIP_LINK =
+    "rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring";
 
 export function Tip({ tip, children }: { tip: ReactNode; children: ReactNode }) {
     return (
@@ -61,6 +66,18 @@ function TipList({ items }: { items: { key: string; text: string }[] }) {
                 <li key={item.key}>{item.text}</li>
             ))}
         </ul>
+    );
+}
+
+export function FitText({ text, className }: { text: string; className?: string }) {
+    const label = (event: PointerEvent<HTMLSpanElement>) => {
+        const element = event.currentTarget;
+        element.title = element.scrollWidth > element.clientWidth ? text : "";
+    };
+    return (
+        <span onPointerEnter={label} className={cn("min-w-0 truncate", className)}>
+            {text}
+        </span>
     );
 }
 
@@ -97,7 +114,7 @@ export function StatusCell({ items, dot = true }: { items: StatusItem[]; dot?: b
     );
 }
 
-function ChipBody({ chip }: { chip: Chip }) {
+function ModelBody({ chip }: { chip: Chip }) {
     return (
         <>
             <PublisherLogo name={chip.name} modelKey={chip.model} size="sm" />
@@ -114,28 +131,43 @@ function ChipBody({ chip }: { chip: Chip }) {
     );
 }
 
-const CHIP = "flex min-w-0 max-w-48 items-center gap-1.5";
+function jobProgress(chip: JobChip): number | null {
+    return chip.job.progress > 0 ? percentOf(chip.job.progress) : null;
+}
+
+function JobBody({ chip }: { chip: JobChip }) {
+    return (
+        <>
+            <StatusDot tone="info" active progress={jobProgress(chip)} size="sm" />
+            <span className="min-w-0 truncate">{chip.subject}</span>
+            <span className="shrink-0 text-muted-foreground tabular-nums">{chip.done}</span>
+        </>
+    );
+}
 
 function ModelChip({ chip, last }: { chip: Chip; last: boolean }) {
     const tip = `${versioned(chip.name, chip.version)} · ${chip.detail}`;
     return (
         <Tip tip={tip}>
             {chip.href ? (
-                <Link
-                    href={chip.href}
-                    className={cn(
-                        CHIP,
-                        "rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring",
-                        !last && "shrink-0",
-                    )}
-                >
-                    <ChipBody chip={chip} />
+                <Link href={chip.href} className={cn(CHIP, CHIP_LINK, !last && "shrink-0")}>
+                    <ModelBody chip={chip} />
                 </Link>
             ) : (
                 <span className={cn(CHIP, "cursor-default", !last && "shrink-0")}>
-                    <ChipBody chip={chip} />
+                    <ModelBody chip={chip} />
                 </span>
             )}
+        </Tip>
+    );
+}
+
+function JobChipLink({ chip, last }: { chip: JobChip; last: boolean }) {
+    return (
+        <Tip tip={chip.tip}>
+            <Link href={chip.href} className={cn(CHIP, CHIP_LINK, !last && "shrink-0")}>
+                <JobBody chip={chip} />
+            </Link>
         </Tip>
     );
 }
@@ -180,69 +212,111 @@ function useFit(key: string, total: number) {
     return { box, probe, shown: Math.min(shown, total) };
 }
 
-function ModelList({ chips }: { chips: Chip[] }) {
+function ModelItem({ chip }: { chip: Chip }) {
     return (
-        <ul className="flex flex-col gap-2">
-            {chips.map((chip) => (
-                <li key={chip.key} className="flex min-w-0 items-center gap-2">
-                    <PublisherLogo name={chip.name} modelKey={chip.model} size="sm" />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                        {chip.href ? (
-                            <Link
-                                href={chip.href}
-                                className="truncate text-primary hover:underline"
-                            >
-                                {versioned(chip.name, chip.version)}
-                            </Link>
-                        ) : (
-                            <span className="truncate font-mono">{chip.name}</span>
-                        )}
-                        <span className="truncate text-sm text-muted-foreground">{chip.where}</span>
-                    </span>
-                    <StatusText
-                        tone={chip.state.tone}
-                        active={chip.state.active}
-                        className="shrink-0 text-sm"
-                    >
-                        {chip.state.label}
-                    </StatusText>
-                </li>
-            ))}
-        </ul>
+        <li className="flex min-w-0 items-center gap-2">
+            <PublisherLogo name={chip.name} modelKey={chip.model} size="sm" />
+            <span className="flex min-w-0 flex-1 flex-col">
+                {chip.href ? (
+                    <Link href={chip.href} className="truncate text-primary hover:underline">
+                        {versioned(chip.name, chip.version)}
+                    </Link>
+                ) : (
+                    <span className="truncate font-mono">{chip.name}</span>
+                )}
+                <span className="truncate text-sm text-muted-foreground">{chip.where}</span>
+            </span>
+            <StatusText
+                tone={chip.state.tone}
+                active={chip.state.active}
+                className="shrink-0 text-sm"
+            >
+                {chip.state.label}
+            </StatusText>
+        </li>
     );
 }
 
-function MoreModels({ chips, hidden, host }: { chips: Chip[]; hidden: number; host: string }) {
+function JobItem({ chip }: { chip: JobChip }) {
+    return (
+        <li className="flex min-w-0 items-center gap-2">
+            <span className="flex size-5 shrink-0 items-center justify-center">
+                <StatusDot tone="info" active progress={jobProgress(chip)} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+                <Link href={chip.href} className="truncate text-primary hover:underline">
+                    {chip.subject}
+                </Link>
+                <span className="truncate text-sm text-muted-foreground">
+                    {`${kindNoun(chip.job.kind)} · job ${chip.job.id}`}
+                </span>
+            </span>
+            <span className="shrink-0 text-sm tabular-nums">{chip.done}</span>
+        </li>
+    );
+}
+
+function MoreRunning({
+    models,
+    jobs,
+    hidden,
+    host,
+}: {
+    models: Chip[];
+    jobs: JobChip[];
+    hidden: number;
+    host: string;
+}) {
     const [open, setOpen] = useState(false);
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger
                 openOnHover
                 delay={150}
-                data-more-models=""
-                aria-label={`${count(hidden)} more models on ${host}`}
+                data-more-running=""
+                aria-label={`${count(hidden)} more running on ${host}`}
                 className={MORE}
             >
                 {`+${count(hidden)}`}
             </PopoverTrigger>
             <PopoverContent align="end" className="w-80" initialFocus={false}>
                 <div className="flex flex-col gap-3">
-                    <span className="font-medium">{`${count(chips.length)} models on ${host}`}</span>
-                    <ModelList chips={chips} />
+                    <span className="font-medium">{`${runningText(models.length, jobs.length)} on ${host}`}</span>
+                    <ul className="flex flex-col gap-2">
+                        {models.map((chip) => (
+                            <ModelItem key={chip.key} chip={chip} />
+                        ))}
+                        {jobs.map((chip) => (
+                            <JobItem key={chip.key} chip={chip} />
+                        ))}
+                    </ul>
                 </div>
             </PopoverContent>
         </Popover>
     );
 }
 
-export function ModelChips({ chips, host }: { chips: Chip[]; host: string }) {
-    const key = chips.map((chip) => `${chip.key}:${chip.state.label}`).join("|");
-    const { box, probe, shown } = useFit(key, chips.length);
-    if (chips.length === 0) {
+export function RunningChips({
+    models,
+    jobs,
+    host,
+}: {
+    models: Chip[];
+    jobs: JobChip[];
+    host: string;
+}) {
+    const total = models.length + jobs.length;
+    const key = [
+        ...models.map((chip) => `${chip.key}:${chip.state.label}`),
+        ...jobs.map((chip) => `${chip.key}:${chip.done}`),
+    ].join("|");
+    const { box, probe, shown } = useFit(key, total);
+    if (total === 0) {
         return null;
     }
-    const visible = chips.slice(0, shown);
-    const hidden = chips.length - visible.length;
+    const visibleModels = models.slice(0, shown);
+    const visibleJobs = jobs.slice(0, Math.max(0, shown - models.length));
+    const lastIndex = shown - 1;
     return (
         <div ref={box} className="relative flex min-w-0 items-center gap-2 overflow-hidden">
             <div
@@ -250,64 +324,32 @@ export function ModelChips({ chips, host }: { chips: Chip[]; host: string }) {
                 aria-hidden="true"
                 className="invisible absolute top-0 left-0 flex w-max items-center"
             >
-                {chips.map((chip) => (
+                {models.map((chip) => (
                     <span key={chip.key} className={cn(CHIP, "shrink-0")}>
-                        <ChipBody chip={chip} />
+                        <ModelBody chip={chip} />
                     </span>
                 ))}
-                <span className="text-sm tabular-nums">{`+${count(chips.length)}`}</span>
+                {jobs.map((chip) => (
+                    <span key={chip.key} className={cn(CHIP, "shrink-0")}>
+                        <JobBody chip={chip} />
+                    </span>
+                ))}
+                <span className="text-sm tabular-nums">{`+${count(total)}`}</span>
             </div>
-            {visible.map((chip, index) => (
-                <ModelChip key={chip.key} chip={chip} last={index === visible.length - 1} />
+            {visibleModels.map((chip, index) => (
+                <ModelChip key={chip.key} chip={chip} last={index === lastIndex} />
             ))}
-            {hidden > 0 && <MoreModels chips={chips} hidden={hidden} host={host} />}
-        </div>
-    );
-}
-
-function jobText(chip: JobChip): string {
-    return `${kindNoun(chip.job.kind)} · ${chip.subject} · ${Math.round(chip.job.progress * 100)}%`;
-}
-
-export function JobsCell({ jobs }: { jobs: JobChip[] }) {
-    const [first, ...rest] = jobs;
-    if (!first) {
-        return null;
-    }
-    const done = Math.round(first.job.progress * 100);
-    return (
-        <span className="@container flex w-full min-w-0 items-center gap-2">
-            <Link
-                href={first.href}
-                title={`${jobText(first)} · job ${first.job.id}`}
-                className="flex min-w-0 items-center gap-1.5 overflow-hidden rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <StatusDot
-                    tone="info"
-                    active
-                    progress={first.job.progress > 0 ? percentOf(first.job.progress) : null}
-                    size="sm"
+            {visibleJobs.map((chip, index) => (
+                <JobChipLink
+                    key={chip.key}
+                    chip={chip}
+                    last={models.length + index === lastIndex}
                 />
-                <span className="shrink-0 @max-[12rem]:hidden">{kindNoun(first.job.kind)}</span>
-                <span className="shrink-0 text-muted-foreground @max-[12rem]:hidden">·</span>
-                <span className="min-w-0 truncate">{first.subject}</span>
-                <span className="shrink-0 text-muted-foreground">·</span>
-                <span className="shrink-0 tabular-nums">{`${done}%`}</span>
-            </Link>
-            {rest.length > 0 && (
-                <Tip
-                    tip={
-                        <TipList
-                            items={rest.map((chip) => ({ key: chip.key, text: jobText(chip) }))}
-                        />
-                    }
-                >
-                    <button type="button" className={MORE}>
-                        {`+${count(rest.length)}`}
-                    </button>
-                </Tip>
+            ))}
+            {shown < total && (
+                <MoreRunning models={models} jobs={jobs} hidden={total - shown} host={host} />
             )}
-        </span>
+        </div>
     );
 }
 
@@ -328,18 +370,18 @@ function fillOf(fraction: number): string {
     return fraction >= 0.85 ? "bg-warning" : "bg-primary";
 }
 
-function MeterBar({
-    used,
-    capacity,
-    label,
-    className,
-}: {
-    used: number;
-    capacity: number;
-    label: string;
-    className?: string;
-}) {
-    const fraction = shareOf(used, capacity);
+function barParts(memory: Memory): { key: string; fraction: number }[] {
+    if (memory.gpus.length > 1) {
+        return memory.gpus.map((gpu) => ({
+            key: `gpu-${gpu.index}`,
+            fraction: shareOf(gpu.used, gpu.capacity),
+        }));
+    }
+    return [{ key: "all", fraction: shareOf(memory.used, memory.capacity) }];
+}
+
+function MeterBar({ memory, label }: { memory: Memory; label: string }) {
+    const { used, capacity } = memory;
     return (
         <span
             role="meter"
@@ -347,50 +389,68 @@ function MeterBar({
             aria-valuemin={0}
             aria-valuemax={Math.max(capacity, 1)}
             aria-valuenow={Math.min(used, capacity)}
-            aria-valuetext={`${bytes(used)} of ${bytes(capacity)}`}
-            className={cn("block h-1.5 overflow-hidden rounded-sm bg-secondary", className)}
+            aria-valuetext={`${memoryPair(used, capacity, " of ")} in use`}
+            className="flex h-1.5 w-12 shrink-0 gap-0.5"
         >
-            <span
-                className={cn("block h-full", fillOf(fraction))}
-                style={{ width: `${Math.min(100, fraction * 100)}%` }}
-            />
+            {barParts(memory).map((part) => (
+                <span
+                    key={part.key}
+                    className="block h-full min-w-0 flex-1 overflow-hidden rounded-sm bg-secondary"
+                >
+                    <span
+                        className={cn("block h-full", fillOf(part.fraction))}
+                        style={{ width: `${Math.min(100, part.fraction * 100)}%` }}
+                    />
+                </span>
+            ))}
         </span>
     );
 }
 
-export function MemoryFigure({
-    used,
-    capacity,
-    basis,
-    host,
-}: {
-    used: number;
-    capacity: number;
-    basis: GaugeBasis;
-    host: string;
-}) {
+function MemoryTip({ memory }: { memory: Memory }) {
+    const { used, capacity, gpus, basis } = memory;
     return (
-        <Tip
-            tip={
-                <span className="flex flex-col gap-1">
-                    <span className="tabular-nums">{memoryText(used, capacity)}</span>
-                    {basis === "estimated" && (
-                        <span className="text-muted-foreground">{`Estimated. ${BASIS_HINTS.estimated}`}</span>
-                    )}
-                </span>
-            }
-        >
+        <span className="flex flex-col gap-1 tabular-nums">
+            <span>{`${memoryPair(used, capacity)} in use · ${percentText(shareOf(used, capacity))}`}</span>
+            {gpus.length > 1 &&
+                gpus.map((gpu) => (
+                    <span key={gpu.index}>
+                        {`GPU ${gpu.index} · ${memoryPair(gpu.used, gpu.capacity)} · ${percentText(shareOf(gpu.used, gpu.capacity))}`}
+                    </span>
+                ))}
+            {basis === "estimated" && <span>{`Estimated. ${BASIS_HINTS.estimated}`}</span>}
+        </span>
+    );
+}
+
+function MemoryFigure({ memory, label }: { memory: Memory; label: string }) {
+    return (
+        <Tip tip={<MemoryTip memory={memory} />}>
             <span className="flex min-w-0 cursor-default items-center gap-2">
-                <MeterBar
-                    used={used}
-                    capacity={capacity}
-                    label={`${host} memory`}
-                    className="w-12 shrink-0"
-                />
-                <span className="tabular-nums">{percentText(shareOf(used, capacity))}</span>
+                <MeterBar memory={memory} label={label} />
+                <span className="truncate tabular-nums">
+                    {memoryPair(memory.used, memory.capacity)}
+                </span>
             </span>
         </Tip>
     );
+}
+
+export function MemoryCell({
+    memory,
+    offline,
+    label,
+}: {
+    memory: Memory | null;
+    offline: number | null;
+    label: string;
+}) {
+    if (memory) {
+        return <MemoryFigure memory={memory} label={label} />;
+    }
+    return offline ? (
+        <span className="text-muted-foreground tabular-nums">{sizeText(offline)}</span>
+    ) : null;
 }
 
 export function SortHead({
