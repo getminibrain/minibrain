@@ -122,7 +122,7 @@ export function SplitDetail({
                 >
                     <section
                         aria-label="About"
-                        className="flex min-h-0 flex-1 flex-col divide-y px-6 py-1 @3xl/data:overflow-y-auto [&>*]:py-5"
+                        className="flex min-h-0 flex-1 flex-col gap-10 p-6 @3xl/data:overflow-y-auto"
                     >
                         {about}
                     </section>
