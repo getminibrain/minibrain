@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Button, SearchInput, cn } from "obp-ui";
+import { Button, SearchInput, SortButton, cn } from "obp-ui";
 import {
     type KeyboardEvent,
     type RefObject,
@@ -40,8 +40,10 @@ import {
     DEFAULT_COLUMNS,
     DEFAULT_SORT,
     type Filters,
+    HEADER_SORTS,
     type KindKey,
     NO_FILTERS,
+    type SortKey,
     activeCount,
     filterSearch,
     fitTable,
@@ -194,6 +196,32 @@ function GroupBand({ group }: { group: Group }) {
             <span className="font-medium">{group.label}</span>
             <span className="font-normal text-faint tabular-nums">{group.count}</span>
         </h2>
+    );
+}
+
+function HeaderLabel({
+    id,
+    label,
+    sort,
+    onSort,
+}: {
+    id: keyof typeof HEADER_SORTS;
+    label: string;
+    sort: SortKey;
+    onSort: (value: SortKey) => void;
+}) {
+    const header = HEADER_SORTS[id];
+    if (!header) {
+        return label;
+    }
+    const active = sort === header.key;
+    return (
+        <SortButton
+            direction={active && header.direction}
+            onClick={() => onSort(active ? DEFAULT_SORT : header.key)}
+        >
+            {label}
+        </SortButton>
     );
 }
 
@@ -497,6 +525,7 @@ export function ModelsList() {
             <FilterChipsRow models={models} filters={filters} onFilters={setFilters} />
         );
     const empty = rows.length === 0;
+    const chooseSort = (value: SortKey) => update({ sort: value === DEFAULT_SORT ? "" : value });
     const viewOptions = (
         <ViewOptions
             pool={pool}
@@ -504,7 +533,7 @@ export function ModelsList() {
             filters={filters}
             onFilters={setFilters}
             sort={sort}
-            onSort={(value) => update({ sort: value === DEFAULT_SORT ? "" : value })}
+            onSort={chooseSort}
             onReset={() => {
                 update({ ...filterSearch(NO_FILTERS), sort: "" });
                 setNested(false);
@@ -580,10 +609,17 @@ export function ModelsList() {
                         "sticky top-0 z-[15] h-10 border-b bg-secondary font-medium text-muted-foreground",
                     )}
                 >
-                    <span className={nested ? "pl-8" : undefined}>Model</span>
+                    <span className={nested ? "pl-8" : undefined}>
+                        <HeaderLabel id="model" label="Model" sort={sort} onSort={chooseSort} />
+                    </span>
                     {COLUMNS.filter((column) => shownColumns.includes(column.id)).map((column) => (
                         <span key={column.id} className="whitespace-nowrap">
-                            {column.label}
+                            <HeaderLabel
+                                id={column.id}
+                                label={column.label}
+                                sort={sort}
+                                onSort={chooseSort}
+                            />
                         </span>
                     ))}
                     <span>Status</span>

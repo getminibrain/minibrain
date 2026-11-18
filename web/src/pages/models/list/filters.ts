@@ -45,6 +45,14 @@ export const SORTS: { value: SortKey; label: string; detail?: string }[] = [
     { value: "recent", label: "Recently updated", detail: "Newest first" },
 ];
 
+export const HEADER_SORTS: Partial<
+    Record<"model" | Column, { key: SortKey; direction: "asc" | "desc" }>
+> = {
+    model: { key: "name", direction: "asc" },
+    quality: { key: "score", direction: "desc" },
+    requests: { key: "requests", direction: "desc" },
+};
+
 export const COLUMNS: { id: Column; label: string; min: number; roomy?: number }[] = [
     { id: "data", label: "Data", min: 6 },
     { id: "quality", label: "Quality", min: 9.5 },

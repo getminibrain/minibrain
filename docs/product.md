@@ -145,8 +145,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Custom and base models with data, score, traffic, cost and status.
   UI: Models · API: GET /api/models
 - **List view options** · shipped · product, ml
-  Filter, sort and pick columns; Cost is off by default.
-  UI: Models › View options
+  Filter, sort from menu or headers, pick columns; Cost off by default.
+  UI: Models › View options, Models › column headers
 - **Versions and variants in the list** · shipped · product, ml
   Show versions under models and installed formats under base models.
   UI: Models › View options › Show versions · API: GET /api/models
