@@ -299,6 +299,13 @@ function ComputeRow({ run, error }: { run: TrainRun; error: string | undefined }
                             disabled: !item.best && item.name !== run.compute,
                             separated: index === 0,
                         })),
+                        ...(run.info?.closed_pools ?? []).map((item, index) => ({
+                            value: item.name,
+                            label: item.name,
+                            meta: "Not used for training",
+                            disabled: true,
+                            separated: run.pools.length === 0 && index === 0,
+                        })),
                     ]}
                 />
                 <FieldError text={error} />

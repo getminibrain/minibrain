@@ -143,6 +143,8 @@ ROUTE_ROLES = {
     ("POST", "/api/compute/join-requests/{request_id}/approve"): "admin",
     ("POST", "/api/compute/join-requests/{request_id}/deny"): "admin",
     ("GET", "/api/compute/pools/{pool}/machines/{host}/metrics"): "viewer",
+    ("GET", "/api/compute/pools/{pool}/settings"): "admin",
+    ("PUT", "/api/compute/pools/{pool}/settings"): "admin",
     ("POST", "/api/compute/pools/{pool}/machines/{host}/drain"): "admin",
     ("POST", "/api/compute/pools/{pool}/machines/{host}/undrain"): "admin",
     ("DELETE", "/api/compute/pools/{pool}/machines/{host}"): "admin",

@@ -840,6 +840,15 @@ class Node(Base):
     state: Mapped[str] = mapped_column(default="active", server_default="active")
 
 
+class PoolSetting(Base):
+    __tablename__ = "pool_settings"
+
+    pool: Mapped[str] = mapped_column(primary_key=True)
+    workloads: Mapped[list[str]] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_by: Mapped[str]
+
+
 class EngineReplica(Base):
     __tablename__ = "engine_replicas"
 

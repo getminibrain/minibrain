@@ -56,6 +56,7 @@ const ACTIONS: Record<string, string> = {
     "machine.drain": "Machine drained",
     "machine.undrain": "Machine undrained",
     "machine.remove": "Machine removed from its pool",
+    "pool.workloads": "Pool use changed",
     "account.create": "Account created",
     "account.password": "Password set",
     "account.password_change": "Password changed",
@@ -214,6 +215,7 @@ const CATEGORIES: Record<string, string> = {
     machine: "Machines",
     model: "Models",
     policy: "Policies",
+    pool: "Pools",
     safety: "Safety",
     settings: "Settings",
     storage: "Storage",
@@ -443,6 +445,14 @@ function sessionCount(count: number): string {
     return count === 1 ? "1 other session" : `${plainValue(count)} other sessions`;
 }
 
+function usedFor(value: unknown): string {
+    const found = Array.isArray(value) ? value : [];
+    if (found.includes("serving") && found.includes("training")) {
+        return "anything";
+    }
+    return found.includes("serving") ? "serving" : "training";
+}
+
 const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "account.create": (detail) => `Role ${plainValue(detail.role, undefined, "role")}`,
     "account.password": (detail) =>
@@ -458,6 +468,7 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         Array.isArray(detail.sessions) ? sessionCount(detail.sessions.length) : "Other sessions",
     "account.reset": (detail) =>
         `Link expires ${plainValue(detail.link_expires_at, undefined, "link_expires_at")}`,
+    "pool.workloads": (detail) => `Pool ${plainValue(detail.pool)} used for ${usedFor(detail.to)}`,
     "auth.setup_link": () => "For the first admin; earlier links stop working",
     "auth.sign_in": (detail) => `With ${plainValue(detail.sign_in, undefined, "sign_in")}`,
     "auth.sign_in_failed": (detail) => plainValue(detail.reason),

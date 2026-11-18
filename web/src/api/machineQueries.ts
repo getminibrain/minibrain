@@ -42,3 +42,22 @@ export function useMachineMetrics(pool: string, host: string, enabled: boolean) 
         refetchInterval: METRICS_POLL_MS,
     });
 }
+
+export type Workload = "serving" | "training";
+
+export function usePoolWorkloads(pool: string) {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (workloads: Workload[]) =>
+            unwrap(
+                api.PUT("/api/compute/pools/{pool}/settings", {
+                    params: { path: { pool } },
+                    body: { workloads },
+                }),
+            ),
+        onSettled: async () => {
+            await client.invalidateQueries({ queryKey: ["compute", "pools"] });
+            await client.invalidateQueries({ queryKey: ["audit"] });
+        },
+    });
+}

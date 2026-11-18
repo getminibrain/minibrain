@@ -41,6 +41,7 @@ from minibrain.registry.models import (
     Worker,
 )
 from minibrain.registry.models import BaseModel as BaseModel_
+from minibrain.registry.pool_settings import ANY, Workload, all_workloads, listed, save_workloads, workloads_of
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
 from minibrain.tasks.service import live_version, serving_base
 
@@ -176,6 +177,18 @@ class PoolInfo(BaseModel):
     deployed: list[DeployedModel] = Field(
         default=[], description="Models deployed on this pool, whether or not an engine runs them yet."
     )
+    workloads: list[Workload] = Field(
+        default=["serving", "training"], description="What the pool is used for; both means any work."
+    )
+
+
+class PoolSettingsInfo(BaseModel):
+    pool: str
+    workloads: list[Workload] = Field(description="What the pool is used for; both means any work.")
+
+
+class PoolSettingsUpdate(BaseModel):
+    workloads: list[Workload] = Field(min_length=1, description="Serving, training (with scoring), or both.")
 
 
 def planned_peak(session: Session, job: Job) -> int | None:
@@ -395,6 +408,7 @@ def pool_info(
     served: dict[tuple[str, str], list[ServedModel]],
     metrics: MetricsHistory,
     approved: set[tuple[str, str]],
+    workloads: frozenset[str],
 ) -> PoolInfo:
     engines = [replica_info(session, replica, served) for replica in pool.engines]
     nodes: list[NodeInfo] = []
@@ -416,6 +430,7 @@ def pool_info(
         engines=engines,
         room=PoolRoom.model_validate(room.__dict__) if room is not None else None,
         deployed=deployed_on(pool.name, served),
+        workloads=listed(workloads),
     )
 
 
@@ -425,7 +440,31 @@ def list_pools(session: SessionDep, node: LocalNodeDep, metrics: MetricsDep) -> 
     recent = recent_jobs(session)
     served = served_models(session)
     approved = approved_machines(session)
-    return [pool_info(session, pool, jobs, recent, served, metrics, approved) for pool in pools(session, node)]
+    uses = all_workloads(session)
+    return [
+        pool_info(session, pool, jobs, recent, served, metrics, approved, uses.get(pool.name, ANY))
+        for pool in pools(session, node)
+    ]
+
+
+SETTINGS = "/pools/{pool}/settings"
+
+
+@router.get(SETTINGS, dependencies=[Depends(admin)], summary="Read a pool's settings")
+def read_pool_settings(pool: PoolName, session: SessionDep) -> PoolSettingsInfo:
+    return PoolSettingsInfo(pool=pool, workloads=listed(workloads_of(session, pool)))
+
+
+@router.put(SETTINGS, dependencies=[Depends(admin)], summary="Change what a pool is used for")
+def update_pool_settings(pool: PoolName, body: PoolSettingsUpdate, session: SessionDep) -> PoolSettingsInfo:
+    actor = current_actor()
+    before = workloads_of(session, pool)
+    after = save_workloads(session, pool, body.workloads, actor)
+    if after != before:
+        detail = {"pool": pool, "from": listed(before), "to": listed(after)}
+        session.add(AuditEvent(actor=actor, action="pool.workloads", target=pool, detail=detail))
+    session.commit()
+    return PoolSettingsInfo(pool=pool, workloads=listed(after))
 
 
 def machine_of(session: Session, local: str, pool: str, host: str) -> Node:

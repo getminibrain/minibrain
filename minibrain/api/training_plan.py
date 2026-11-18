@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import viewer
 from minibrain.api.deps import LocalNodeDep, SessionDep, SettingsDep
 from minibrain.api.schemas import (
+    ClosedPoolInfo,
     MachinePlanInfo,
     QueuedJobInfo,
     TrainFitInfo,
@@ -34,7 +35,7 @@ from minibrain.ml.planner import (
 )
 from minibrain.models.hardware import NodeReport
 from minibrain.models.train_facts import base_facts, catalogue_base, longest_example, trainer_machines
-from minibrain.registry.compute import pool_label, pools
+from minibrain.registry.compute import Pool, pool_label, pools
 from minibrain.registry.files import dataset_version_location, store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -46,6 +47,7 @@ from minibrain.registry.models import (
     JobStatus,
     Model,
 )
+from minibrain.registry.pool_settings import ANY, TRAINING, all_workloads, refusal, require
 from minibrain.registry.service import ConflictError, get_model
 from minibrain.settings import Settings as InstallSettings
 from minibrain.tasks.rebase import serve_only
@@ -105,12 +107,30 @@ def training_plan(
     chosen = planner_settings(body)
     location = dataset_version_location(session, store_for(settings), dataset_version)
     rows, longest = longest_example(location, chosen.max_rows)
-    machines = trainer_machines(pools(session, node))
+    if body.pool is not None:
+        require(session, body.pool, TRAINING)
+    machines = trainer_machines(training_pools(session, pools(session, node)))
     try:
         found = plan(model_base(session, settings, model), machines, chosen, longest, rows, body.machine, body.pool)
         return found, longest
     except PlanError as error:
         raise ConflictError(str(error)) from error
+
+
+def training_pools(session: Session, found: list[Pool]) -> list[Pool]:
+    uses = all_workloads(session)
+    return [pool for pool in found if TRAINING in uses.get(pool.name, ANY)]
+
+
+def closed_pools(session: Session, node: NodeReport) -> list[ClosedPoolInfo]:
+    uses = all_workloads(session)
+    found = pools(session, node)
+    trainers = {machine.pool for machine in trainer_machines(found)}
+    return [
+        ClosedPoolInfo(name=pool.name, label=pool.label, reason=refusal(pool.name, TRAINING, uses[pool.name]))
+        for pool in found
+        if pool.name in trainers and TRAINING not in uses.get(pool.name, ANY)
+    ]
 
 
 def refuse(found: Plan) -> None:
@@ -219,7 +239,14 @@ def held_out_rows(dataset_version: DatasetVersion) -> int:
     return int((dataset_version.counts or {}).get(HELD_OUT_SPLIT, 0))
 
 
-def plan_info(found: Plan, default: Plan, longest: int, held_out: int, queue: TrainingQueueInfo) -> TrainingPlanInfo:
+def plan_info(
+    found: Plan,
+    default: Plan,
+    longest: int,
+    held_out: int,
+    queue: TrainingQueueInfo,
+    closed: list[ClosedPoolInfo],
+) -> TrainingPlanInfo:
     machines = [machine_info(item, found.machine, held_out) for item in found.machines]
     return TrainingPlanInfo(
         level=plan_level(found),
@@ -242,6 +269,7 @@ def plan_info(found: Plan, default: Plan, longest: int, held_out: int, queue: Tr
         held_out_rows=held_out,
         loss_rows=loss_rows(held_out),
         machines=[item for item in machines if item is not None],
+        closed_pools=closed,
         queue=queue,
     )
 
@@ -261,7 +289,8 @@ def get_training_plan(
     if found.settings.overrides():
         plain = TrainingSettings(machine=query.machine, pool=query.pool)
         default, _ = training_plan(session, settings, node, model, dataset_version, plain)
-    return plan_info(found, default, longest, held_out_rows(dataset_version), queue_info(session))
+    held_out = held_out_rows(dataset_version)
+    return plan_info(found, default, longest, held_out, queue_info(session), closed_pools(session, node))
 
 
 def train_fit(entry: CatalogModel, variant: CatalogVariant, machines: list[Machine]) -> TrainFitInfo:

@@ -1676,6 +1676,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/compute/pools/{pool}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a pool's settings */
+        get: operations["read_pool_settings_api_compute_pools__pool__settings_get"];
+        /** Change what a pool is used for */
+        put: operations["update_pool_settings_api_compute_pools__pool__settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/compute/pools/{pool}/machines/{host}/metrics": {
         parameters: {
             query?: never;
@@ -4628,6 +4646,15 @@ export interface components {
             signature: string;
             /** Dismissed */
             dismissed: boolean;
+        };
+        /** ClosedPoolInfo */
+        ClosedPoolInfo: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Reason */
+            reason: string;
         };
         /** ColumnInfo */
         ColumnInfo: {
@@ -8390,6 +8417,15 @@ export interface components {
              * @default []
              */
             deployed?: components["schemas"]["DeployedModel"][];
+            /**
+             * Workloads
+             * @description What the pool is used for; both means any work.
+             * @default [
+             *       "serving",
+             *       "training"
+             *     ]
+             */
+            workloads?: ("serving" | "training")[];
         };
         /** PoolPlacement */
         PoolPlacement: {
@@ -8408,6 +8444,11 @@ export interface components {
              * @default 1
              */
             room?: number;
+            /**
+             * Refused
+             * @description Why nothing new deploys here: the pool is not used for serving.
+             */
+            refused?: string | null;
         };
         /** PoolPrice */
         PoolPrice: {
@@ -8440,6 +8481,24 @@ export interface components {
             measured: boolean;
             /** Basis */
             basis: string;
+        };
+        /** PoolSettingsInfo */
+        PoolSettingsInfo: {
+            /** Pool */
+            pool: string;
+            /**
+             * Workloads
+             * @description What the pool is used for; both means any work.
+             */
+            workloads: ("serving" | "training")[];
+        };
+        /** PoolSettingsUpdate */
+        PoolSettingsUpdate: {
+            /**
+             * Workloads
+             * @description Serving, training (with scoring), or both.
+             */
+            workloads: ("serving" | "training")[];
         };
         /** PoolToken */
         PoolToken: {
@@ -10378,6 +10437,12 @@ export interface components {
             loss_rows: number;
             /** Machines */
             machines: components["schemas"]["MachinePlanInfo"][];
+            /**
+             * Closed Pools
+             * @description Pools with training machines that are not used for training, and why.
+             * @default []
+             */
+            closed_pools?: components["schemas"]["ClosedPoolInfo"][];
             queue: components["schemas"]["TrainingQueueInfo"];
         };
         /** TrainingQueueInfo */
@@ -14592,6 +14657,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolInfo"][];
+                };
+            };
+        };
+    };
+    read_pool_settings_api_compute_pools__pool__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolSettingsInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pool_settings_api_compute_pools__pool__settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pool: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoolSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolSettingsInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

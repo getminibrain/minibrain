@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, fit, needed_bytes, pool_fit
 from minibrain.registry.compute import DRAINING, Pool, held_hosts, live_engines, node_id, node_state, pools
 from minibrain.registry.models import BaseModel, CatalogVariant, Model, Node, Worker, now
+from minibrain.registry.pool_settings import ANY, SERVING, all_workloads, refusal
 from minibrain.tasks.service import serving_base
 
 AUTO = "auto"
@@ -30,10 +31,11 @@ class PoolOption:
     free_bytes: int | None
     machines: int
     room: int = 1
+    refused: str | None = None
 
     @property
     def runs(self) -> bool:
-        return self.fit["level"] in RUNS
+        return self.fit["level"] in RUNS and self.refused is None
 
 
 def weights_of(session: Session, key: str) -> tuple[int, dict[str, Any]]:
@@ -78,17 +80,24 @@ def option_of(pool: Pool, weights: int, requires: dict[str, Any], placed: int) -
 def pool_options(session: Session, local: NodeReport, key: str, owner: str) -> list[PoolOption]:
     weights, requires = weights_of(session, key)
     placed = placed_bytes(session, owner)
+    uses = all_workloads(session)
     return [
         replace(
-            option_of(pool, weights, requires, placed.get(pool.name, 0)), room=replica_room(session, pool.name, key)
+            option_of(pool, weights, requires, placed.get(pool.name, 0)),
+            room=replica_room(session, pool.name, key),
+            refused=serving_refusal(pool.name, uses.get(pool.name, ANY)),
         )
         for pool in pools(session, local)
     ]
 
 
+def serving_refusal(pool: str, workloads: frozenset[str]) -> str | None:
+    return None if SERVING in workloads else refusal(pool, SERVING, workloads)
+
+
 def automatic(options: list[PoolOption]) -> PoolOption | None:
     local = next((option for option in options if option.name == LOCAL_POOL), None)
-    if local is not None and local.fit["level"] == "fits":
+    if local is not None and local.fit["level"] == "fits" and local.refused is None:
         return local
     running = [option for option in options if option.runs]
     if not running:
@@ -96,15 +105,17 @@ def automatic(options: list[PoolOption]) -> PoolOption | None:
     return max(running, key=lambda option: (option.fit["level"] == "fits", option.free_bytes or 0))
 
 
-def choose_pool(options: list[PoolOption], asked: str | None, name: str) -> str:
+def choose_pool(options: list[PoolOption], asked: str | None, name: str, current: str | None = None) -> str:
     if asked is None or asked == AUTO:
         found = automatic(options)
         if found is None:
-            raise PlacementError(f"{name} fits in no compute pool; add a machine with more memory or pick a pool")
+            raise PlacementError(f"{name} fits in no compute pool used for serving; add a machine or pick a pool")
         return found.name
     option = next((option for option in options if option.name == asked), None)
     if option is None:
         raise PlacementError(f"There is no compute pool named {asked}")
+    if option.refused is not None and option.name != current:
+        raise PlacementError(option.refused)
     if option.fit["level"] == "insufficient":
         raise PlacementError(f"{name} does not fit in pool {asked}: {option.fit['basis']}")
     return option.name
@@ -115,7 +126,7 @@ def resolve_pool(
 ) -> str:
     if asked is None and current is not None:
         return current
-    return choose_pool(pool_options(session, local, key, owner), asked, name)
+    return choose_pool(pool_options(session, local, key, owner), asked, name, current)
 
 
 @dataclass(frozen=True)

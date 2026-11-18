@@ -288,10 +288,13 @@ or removed.
 A deployment is a model's live version on one compute pool with N replicas (1 by default), kept true continuously.
 Deploy and Promote take `pool`: a pool name, or `auto` (the default for a model not deployed yet) for the pool where
 it fits, this machine first when it fits, then the pool with the most memory left after the deployments already on
-it. A pool that does not exist, or where the model does not fit, is a 422 with the reason. Deploying a deployed model
+it, among the pools used for serving ([Pool use](#pool-use)). A pool that does not exist, is not used for serving or
+where the model does not fit, is a 422 with the reason; a deployment already on a pool that stopped serving may stay
+there. Deploying a deployed model
 with another pool moves it; left out, it stays where it is. `GET /api/models/{name}/placement` lists each pool's fit
 for the model and the pool `auto` would pick; the Deploy dialog's Pool row reads it ("Automatic · gpu-a10", then each
-pool with "Runs · 2.2 of 24 GB" or "Too small"). The `model.deploy` audit event records the pool, the replicas and,
+pool with "Runs · 2.2 of 24 GB", "Too small" or, disabled, "Not used for serving"). The `model.deploy` audit event
+records the pool, the replicas and,
 on a move, `from_pool`.
 
 | Pool | Who starts the engine |
@@ -386,11 +389,37 @@ announces itself.
 | CPU, RAM | Cores, bytes |
 | Engines installed | `sglang`, `vllm`, `mlx`, `transformers`, `llamacpp` |
 
-- The Compute page lists pools, their machines (online if seen in the last 2 minutes) and the engines serving.
+- Infrastructure › Machines lists pools, their machines (online if seen in the last 2 minutes) and the engines
+  serving: one row per machine with its GPUs, memory, CPU, RAM, models and jobs, sortable by each, grouped under a row
+  per pool (machines online, GPUs, memory, engines, jobs, room, join token, use). Group by Model lists each deployed
+  model with the machines that serve it.
 - Discover judges hardware fit against the selected pool: the best machine in the pool decides. Multi-GPU (XL)
   models need a machine with two or more GPUs.
 - Machines unseen for 7 days and engines unseen for an hour are forgotten. An approved machine stays listed, offline,
   until it is removed, which revokes its approval.
+
+### Pool use
+
+Each pool is used for **Any** work (the default), **Serving** or **Training**. Admins set it in the pool row's menu
+under Machines (`GET`/`PUT /api/compute/pools/{pool}/settings`, `{"workloads": ["serving"]}`); `GET
+/api/compute/pools` returns `workloads` on each pool. A pool keeps the default until it is changed, so one machine
+works out of the box.
+
+| Use | Deployments | Training and scoring jobs (`train`, `eval`, `judge`) |
+|---|---|---|
+| Any | Placed here | Run here |
+| Serving | Placed here | Never start here |
+| Training | Never placed here | Run here |
+
+- Stored as a list of workloads per pool (`pool_settings`), so a new kind of work is one more value, not a schema
+  change. Any is no row at all, so it also takes kinds added later.
+- `auto` placement skips pools not used for serving; asking for one is a 422 with the reason. Engines already running
+  there keep serving until their model is undeployed or moved.
+- Workers in a pool not used for training claim no training or scoring job; a job asked for such a pool is refused
+  with the reason (422). Jobs running when the use changes finish; queued jobs held to that pool wait.
+- Downloads, imports, checks, repairs and exports run on any pool.
+- The Train page's Pool list and the Deploy dialogs show the other pools disabled, with why.
+- Each change writes a `pool.workloads` audit event with `from` and `to`.
 
 ## Flows
 

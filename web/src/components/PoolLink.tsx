@@ -40,17 +40,13 @@ function memoryOf(node: NodeInfo): string {
     return `${bytes(node.usable_bytes)} ${MEMORY_LABELS[node.accelerator] ?? "RAM"}`;
 }
 
-function usedFor(pool: PoolInfo): string | null {
-    const roles = new Set(pool.nodes.filter((node) => node.online).flatMap((node) => node.roles));
-    const serving = roles.has("engine") || roles.has("main") || pool.engines.length > 0;
-    const jobs = roles.has("worker");
-    if (serving && jobs) {
-        return "Serving and jobs";
+function usedFor(pool: PoolInfo): string {
+    const serving = pool.workloads?.includes("serving") ?? true;
+    const training = pool.workloads?.includes("training") ?? true;
+    if (serving && training) {
+        return "Serving and training";
     }
-    if (serving) {
-        return "Serving";
-    }
-    return jobs ? "Jobs" : null;
+    return serving ? "Serving only" : "Training only";
 }
 
 function engineText(pool: PoolInfo): string {

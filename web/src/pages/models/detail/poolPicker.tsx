@@ -19,7 +19,16 @@ function shareText(pool: PoolPlacement): string | null {
         : `${gigabytes(needed_bytes)} of ${gigabytes(available_bytes)} GB`;
 }
 
+export const NOT_SERVING = "Not used for serving";
+
+export function servesHere(pool: PoolPlacement, current?: string | null): boolean {
+    return !pool.refused || pool.name === current;
+}
+
 export function fitText(pool: PoolPlacement): string {
+    if (pool.refused) {
+        return NOT_SERVING;
+    }
     if (pool.fit.level === "insufficient") {
         return "Too small";
     }
@@ -65,7 +74,7 @@ function options(placement: Placement): PickOption[] {
             value: pool.name,
             label: pool.name,
             meta: fitText(pool),
-            disabled: pool.fit.level === "insufficient",
+            disabled: pool.fit.level === "insufficient" || !servesHere(pool, placement.pool),
             separated: index === 0,
         })),
     ];
@@ -83,7 +92,8 @@ export function PoolRow({
     newTab?: boolean;
 }) {
     const target = resolvedPool(placement, value);
-    const needs = needsText(placement?.pools.find((pool) => pool.name === target));
+    const chosen = placement?.pools.find((pool) => pool.name === target);
+    const needs = needsText(chosen);
     return (
         <FormRow id="deploy-pool" label="Pool" align="start">
             <PickSelect
@@ -106,6 +116,11 @@ export function PoolRow({
                             <PoolLink name={placement.pool} newTab={newTab} />
                         </>
                     )}
+                </span>
+            )}
+            {chosen?.refused && (
+                <span className="text-sm text-muted-foreground">
+                    {`${chosen.refused} It keeps serving here until it is undeployed or moved.`}
                 </span>
             )}
         </FormRow>

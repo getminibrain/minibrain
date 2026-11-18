@@ -335,14 +335,17 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - [x] Rolling pool moves (2026-11-14): moving a live deployment keeps the old pool serving until the new pool's
   engines are ready, then switches the route and stops the old ones; a failed engine or no machine for 5 minutes
   rolls it back and the model says why.
-- [ ] Pool use: each pool says what it runs, **Serving**, **Jobs** or **Both** (default Both, so one machine works
-  out of the box). The job scheduler only places jobs, and engine placement only places engines, on pools that allow
-  them, so a production pool set to Serving can never be starved by training. Pools stay one concept (capacity, like
-  Kubernetes node pools) rather than separate training and inference pools, because the same machine is often both.
+- [x] Pool use (2026-11-18): each pool is used for **Any** work, **Serving** or **Training** (default Any, so one
+  machine works out of the box), stored as a list of workloads so more kinds need no schema change. Deployments go
+  only to pools used for serving; training and scoring jobs only to pools used for training; downloads, imports,
+  checks and exports anywhere. A production pool set to Serving can never be starved by training. Pools stay one
+  concept (capacity, like Kubernetes node pools) rather than separate training and inference pools, because the same
+  machine is often both. Details: `docs/serving.md`, Pool use.
 - [ ] Serving first on Both pools: GPU leases prefer engines; a job takes only GPUs no engine needs and waits (or, for
   a long run, checkpoints and yields) when serving needs them back.
 - [ ] Infrastructure shows each pool's use and load, e.g. "gpu-a10 · Serving · 2 engines · 0 jobs", and the Train
-  dialog and Discover's fit check only offer pools that allow jobs or serving respectively.
+  page and Deploy dialogs only offer pools that allow jobs or serving respectively (done 2026-11-18); Discover's fit
+  check still judges every pool.
 - Engines pick their engine at start from the node and the weights: SGLang on Linux with NVIDIA or ROCm, MLX on Apple
   silicon, llama.cpp for GGUF, `transformers` otherwise. Remote engines (`minibrain engine --model --pool`) pull
   adapters from main and base weights from the bucket on links main signs (from main itself when Storage is the

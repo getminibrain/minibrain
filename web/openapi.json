@@ -5159,6 +5159,102 @@
         }
       }
     },
+    "/api/compute/pools/{pool}/settings": {
+      "get": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Read a pool's settings",
+        "operationId": "read_pool_settings_api_compute_pools__pool__settings_get",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Pool"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolSettingsInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Change what a pool is used for",
+        "operationId": "update_pool_settings_api_compute_pools__pool__settings_put",
+        "parameters": [
+          {
+            "name": "pool",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Pool"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PoolSettingsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolSettingsInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/pools/{pool}/machines/{host}/metrics": {
       "get": {
         "tags": [
@@ -15791,6 +15887,29 @@
           "dismissed"
         ],
         "title": "CheckInfo"
+      },
+      "ClosedPoolInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "reason"
+        ],
+        "title": "ClosedPoolInfo"
       },
       "ColumnInfo": {
         "properties": {
@@ -26959,6 +27078,22 @@
             "title": "Deployed",
             "description": "Models deployed on this pool, whether or not an engine runs them yet.",
             "default": []
+          },
+          "workloads": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "serving",
+                "training"
+              ]
+            },
+            "type": "array",
+            "title": "Workloads",
+            "description": "What the pool is used for; both means any work.",
+            "default": [
+              "serving",
+              "training"
+            ]
           }
         },
         "type": "object",
@@ -27003,6 +27138,18 @@
             "title": "Room",
             "description": "Replicas it can keep there: one per online machine where it fits.",
             "default": 1
+          },
+          "refused": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused",
+            "description": "Why nothing new deploys here: the pool is not used for serving."
           }
         },
         "type": "object",
@@ -27139,6 +27286,54 @@
           "basis"
         ],
         "title": "PoolRoom"
+      },
+      "PoolSettingsInfo": {
+        "properties": {
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
+          "workloads": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "serving",
+                "training"
+              ]
+            },
+            "type": "array",
+            "title": "Workloads",
+            "description": "What the pool is used for; both means any work."
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool",
+          "workloads"
+        ],
+        "title": "PoolSettingsInfo"
+      },
+      "PoolSettingsUpdate": {
+        "properties": {
+          "workloads": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "serving",
+                "training"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Workloads",
+            "description": "Serving, training (with scoring), or both."
+          }
+        },
+        "type": "object",
+        "required": [
+          "workloads"
+        ],
+        "title": "PoolSettingsUpdate"
       },
       "PoolToken": {
         "properties": {
@@ -32746,6 +32941,15 @@
             },
             "type": "array",
             "title": "Machines"
+          },
+          "closed_pools": {
+            "items": {
+              "$ref": "#/components/schemas/ClosedPoolInfo"
+            },
+            "type": "array",
+            "title": "Closed Pools",
+            "description": "Pools with training machines that are not used for training, and why.",
+            "default": []
           },
           "queue": {
             "$ref": "#/components/schemas/TrainingQueueInfo"

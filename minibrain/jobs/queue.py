@@ -26,6 +26,7 @@ from minibrain.registry.models import (
     Worker,
     now,
 )
+from minibrain.registry.pool_settings import TRAINING, TRAINING_KINDS, require, workload_of_job, workloads_of
 
 TERMINAL = tuple(str(status) for status in FINAL_JOB_STATUSES)
 
@@ -124,6 +125,9 @@ def enqueue(
         )
         if existing is not None:
             return existing
+    workload = workload_of_job(kind)
+    if pool is not None and workload is not None:
+        require(session, pool, workload)
     rules = policy(kind)
     owner = session.get(Model, model_id) if model_id is not None else None
     version = session.get(Version, version_id) if version_id is not None else None
@@ -254,6 +258,8 @@ class SqlJobQueue:
                 Job.kind.in_(worker.kinds),
                 or_(Job.pool.is_(None), Job.pool == worker.pool),
             )
+            if TRAINING not in workloads_of(session, worker.pool):
+                candidate = candidate.where(Job.kind.not_in(TRAINING_KINDS))
             if (busy or 0) >= worker.gpus:
                 candidate = candidate.where(Job.needs_gpu.is_(False))
             candidate = (

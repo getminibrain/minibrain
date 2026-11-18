@@ -1171,6 +1171,12 @@ class TrainingQueueInfo(BaseModel):
     jobs: list[QueuedJobInfo]
 
 
+class ClosedPoolInfo(BaseModel):
+    name: str
+    label: str
+    reason: str
+
+
 class TrainingPlanInfo(BaseModel):
     level: Literal["fits", "insufficient", "unknown"]
     basis: str
@@ -1192,6 +1198,9 @@ class TrainingPlanInfo(BaseModel):
     held_out_rows: int
     loss_rows: int = Field(description="Held-out rows the held-out loss is measured on during training.")
     machines: list[MachinePlanInfo]
+    closed_pools: list[ClosedPoolInfo] = Field(
+        default=[], description="Pools with training machines that are not used for training, and why."
+    )
     queue: TrainingQueueInfo
 
 
@@ -1811,6 +1820,9 @@ class PoolPlacement(BaseModel):
     machines: int
     free_bytes: int | None
     room: int = Field(default=1, description="Replicas it can keep there: one per online machine where it fits.")
+    refused: str | None = Field(
+        default=None, description="Why nothing new deploys here: the pool is not used for serving."
+    )
 
 
 class Placement(BaseModel):

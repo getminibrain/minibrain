@@ -195,6 +195,7 @@ def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
                 machines=option.machines,
                 free_bytes=option.free_bytes,
                 room=option.room,
+                refused=option.refused,
             )
             for option in options
         ],

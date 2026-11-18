@@ -18,7 +18,7 @@ import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine } from "~/components/Section";
 import { DeployBaseDialog } from "../detail/deploy";
 import { ModelAvatar } from "../detail/header";
-import { AUTO_POOL, fitText, resolvedPool } from "../detail/poolPicker";
+import { AUTO_POOL, NOT_SERVING, fitText, resolvedPool, servesHere } from "../detail/poolPicker";
 import { PartialOutcome } from "./PartialOutcome";
 import { PartialError, deployRows } from "./actions";
 import { plural } from "./model";
@@ -38,12 +38,14 @@ function fitOf(placement: Placement | undefined, value: string): Fit {
     if (!target || !pool) {
         return { target: null, text: "Fits in no pool", runs: false };
     }
-    return { target, text: fitText(pool), runs: pool.fit.level !== "insufficient" };
+    const runs = pool.fit.level !== "insufficient" && servesHere(pool, placement.pool);
+    return { target, text: fitText(pool), runs };
 }
 
 function poolOptions(placements: (Placement | undefined)[]): PickOption[] {
     const known = placements.filter((item): item is Placement => Boolean(item));
     const names = known[0]?.pools.map((pool) => pool.name) ?? [];
+    const closed = new Set(known[0]?.pools.filter((pool) => pool.refused).map((pool) => pool.name));
     const fitting = (name: string) => known.filter((item) => fitOf(item, name).runs).length;
     return [
         {
@@ -54,7 +56,7 @@ function poolOptions(placements: (Placement | undefined)[]): PickOption[] {
         ...names.map((name, index) => ({
             value: name,
             label: name,
-            meta: `${fitting(name)} of ${known.length} fit`,
+            meta: closed.has(name) ? NOT_SERVING : `${fitting(name)} of ${known.length} fit`,
             disabled: fitting(name) === 0,
             separated: index === 0,
         })),

@@ -309,7 +309,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
   UI: Models › model › Train › Pool · API: GET /api/models/{name}/training-plan
 - **Training pool** · shipped · ml, admin
-  Train on a chosen pool; only its workers claim the job.
+  Train on a pool used for training; only its workers claim it.
   UI: Models › model › Train › Pool, Models › model › Train › Training › Machine · API: GET /api/models/{name}/training-plan, POST /api/models/{name}/versions
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
@@ -397,7 +397,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Deploy a passing version, or an earlier one again.
   UI: Models › model › Deploy, Models › model › version › Deploy, Evaluations › Deploy, Models › model › Settings › Undeploy · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote
 - **Deploy to a pool** · shipped · engineer, admin
-  Pick the pool a model serves from; workers there run it.
+  Pick a pool used for serving; workers there run it.
   UI: Models › model › Deploy › Pool, Models › model › version › Deploy › Pool, Models › version › Deploy › Pool, Models › … › Deploy › Pool, Models › select › Deploy › Pool · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote, GET /api/models/{name}/placement · CLI: minibrain worker
 - **Replicas per deployment** · shipped · engineer, admin
   Keep several replicas, one per machine in the pool.
@@ -540,6 +540,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Room per pool** · shipped · admin
   See how many more models fit and the largest that trains.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
+- **Pool use** · shipped · admin
+  Use each pool for any work, serving only or training only.
+  UI: Infrastructure › Machines › pool menu › Used for · API: GET /api/compute/pools/{pool}/settings, PUT /api/compute/pools/{pool}/settings, GET /api/compute/pools
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools

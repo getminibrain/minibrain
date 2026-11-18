@@ -103,6 +103,7 @@ from minibrain.registry.compute import MachineRemovedError, forget_gateway, main
 from minibrain.registry.db import close_sessions, make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
+from minibrain.registry.pool_settings import WorkloadError
 from minibrain.registry.service import ConflictError, ModelNameError, NameTakenError, NotFoundError
 from minibrain.serve.backend import EngineUnavailableError, ServingBackend
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
@@ -139,6 +140,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     EngineUnavailableError: 503,
     PolicyError: 403,
     PlacementError: 422,
+    WorkloadError: 422,
     MachineRemovedError: 410,
     LockedError: 409,
     ConnectionProblem: 422,
