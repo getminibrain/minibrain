@@ -1,7 +1,9 @@
 import {
+    IconCheck,
     IconChevronLeft,
     IconChevronRight,
     IconExternalLink,
+    IconLink,
     IconPlus,
     IconX,
 } from "@tabler/icons-react";
@@ -830,6 +832,7 @@ export function DiscoverComparePage() {
                         <div className="flex flex-col items-end gap-1">
                             <div className="flex flex-wrap justify-end gap-2">
                                 <Button variant="outline" onClick={copyLink}>
+                                    {copy === "copied" ? <IconCheck /> : <IconLink />}
                                     {copy === "copied" ? "Link copied" : "Copy link"}
                                 </Button>
                                 {comparing && (

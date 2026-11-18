@@ -2,8 +2,11 @@ import {
     IconChevronDown,
     IconDots,
     IconDownload,
+    IconFileText,
     IconGitCompare,
+    IconHistory,
     IconPlayerPlay,
+    IconRocket,
     IconTrash,
 } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -200,6 +203,7 @@ function VersionPicker({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="outline" aria-label={`Version v${version.number}, pick another`}>
+                    <IconHistory aria-hidden="true" />
                     <span className="tabular-nums">{`v${version.number}`}</span>
                     <IconChevronDown aria-hidden="true" />
                 </Button>
@@ -268,6 +272,7 @@ function DeployButton({
         <>
             <Tip tip={blocked}>
                 <Button disabled={Boolean(blocked)} onClick={() => setOpen(true)}>
+                    <IconRocket />
                     {`Deploy v${version.number}`}
                 </Button>
             </Tip>
@@ -346,7 +351,10 @@ export function VersionView({ row, number }: { row: ModelRow; number: number | n
                     <>
                         <VersionPicker row={row} versions={list} version={version} />
                         <Button variant="outline" asChild>
-                            <Link href={modelCardHref(row.key, version.number)}>Model card</Link>
+                            <Link href={modelCardHref(row.key, version.number)}>
+                                <IconFileText />
+                                Model card
+                            </Link>
                         </Button>
                         <DeployButton
                             row={row}

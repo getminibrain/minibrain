@@ -1,8 +1,10 @@
 import {
     IconArrowsSort,
+    IconCircleX,
     IconCubePlus,
     IconExternalLink,
     IconKey,
+    IconRotate,
     IconX,
 } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
@@ -173,6 +175,7 @@ export function EntryAction({
                                 cancelJob(moving.availability.job_id ?? 0).then(on.refresh)
                             }
                         >
+                            <IconCircleX />
                             Cancel
                         </Button>
                     )}
@@ -222,6 +225,7 @@ export function EntryAction({
                     onClick={() => retry.mutate(failed.key)}
                     disabled={retry.isPending}
                 >
+                    <IconRotate />
                     Retry
                 </Button>
                 {failed.error && (

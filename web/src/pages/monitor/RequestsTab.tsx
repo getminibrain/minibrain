@@ -1,4 +1,4 @@
-import { IconThumbDown, IconThumbUp } from "@tabler/icons-react";
+import { IconPlayerPause, IconPlayerPlay, IconThumbDown, IconThumbUp } from "@tabler/icons-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
     Button,
@@ -250,6 +250,11 @@ export function LiveControl({
                 {paused ? "Paused" : (held ?? "Live")}
             </StatusText>
             <Button variant="outline" onClick={onToggle} aria-pressed={paused}>
+                {paused ? (
+                    <IconPlayerPlay aria-hidden="true" />
+                ) : (
+                    <IconPlayerPause aria-hidden="true" />
+                )}
                 {paused ? "Resume" : "Pause"}
             </Button>
         </div>

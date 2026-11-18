@@ -1,3 +1,4 @@
+import { IconPlayerPlay, IconRocket } from "@tabler/icons-react";
 import { useRouter } from "@tanstack/react-router";
 import {
     Button,
@@ -338,16 +339,17 @@ export function CompareView({ row }: { row: ModelRow }) {
                         />
                         {goal.status === "ready" && (
                             <Button variant="outline" asChild>
-                                <Link
-                                    href={versionPlaygroundHref(row.key, goal.number)}
-                                >{`Try ${row.key}@${goal.number}`}</Link>
+                                <Link href={versionPlaygroundHref(row.key, goal.number)}>
+                                    <IconPlayerPlay />
+                                    {`Try ${row.key}@${goal.number}`}
+                                </Link>
                             </Button>
                         )}
                         {liveable && (
-                            <Button
-                                variant="outline"
-                                onClick={() => setPromoting(goal.number)}
-                            >{`Deploy v${goal.number}`}</Button>
+                            <Button variant="outline" onClick={() => setPromoting(goal.number)}>
+                                <IconRocket />
+                                {`Deploy v${goal.number}`}
+                            </Button>
                         )}
                     </>
                 }

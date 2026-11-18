@@ -1,4 +1,10 @@
-import { IconAdjustmentsHorizontal, IconDots, IconTrash } from "@tabler/icons-react";
+import {
+    IconAdjustmentsHorizontal,
+    IconCircleX,
+    IconDots,
+    IconRotate,
+    IconTrash,
+} from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import {
@@ -227,11 +233,13 @@ function Actions({ job }: { job: JobDetail }) {
                     disabled={cancel.isPending}
                     onClick={() => cancel.mutate()}
                 >
+                    <IconCircleX />
                     Cancel
                 </Button>
             )}
             {canRetry(job) && (
                 <Button disabled={retry.isPending} onClick={() => retry.mutate()}>
+                    <IconRotate />
                     Retry
                 </Button>
             )}
