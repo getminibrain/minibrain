@@ -15,6 +15,9 @@ import {
     Field,
     Input,
     Link,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from "obp-ui";
 import { ChatBubble, type ChatRole } from "obp-ui/chat";
 import { type ReactNode, useState } from "react";
@@ -27,8 +30,9 @@ import {
     unwrap,
 } from "~/api/client";
 import { type DatasetVersionStats, useDatasetVersionStats } from "~/api/dataQueries";
-import { keys, useDatasetPreview, useDatasets } from "~/api/queries";
+import { keys, useAllModels, useDatasetPreview, useDatasets } from "~/api/queries";
 import { BlockedButton } from "~/components/BlockedButton";
+import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Section, Stat } from "~/components/Section";
 import { datasetDeleteNote } from "~/lib/datasetUse";
 import { asCode, count } from "~/lib/format";
@@ -323,15 +327,26 @@ function TestExampleNote({ count: total }: { count: number }) {
     if (total === 0) {
         return null;
     }
+    const examples = `${count(total)} test ${total === 1 ? "example" : "examples"}`;
     return (
-        <span className="text-sm text-muted-foreground tabular-nums">
-            {`Adds ${count(total)} test ${total === 1 ? "example" : "examples"} from the Playground to the held-out rows of its next version`}
-        </span>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span className="shrink-0 cursor-default text-sm text-muted-foreground tabular-nums">
+                    {`+${examples}`}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal">
+                {`Adds ${examples} from the Playground to the held-out rows of its next version.`}
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const nameOf = useModelNames();
+    const models = useAllModels();
+    const avatarOf = (slug: string) =>
+        (models.data ?? []).find((row) => row.key === slug)?.avatar ?? null;
     return (
         <AboutPart title="Used by" tip="Models that train on this dataset.">
             {dataset.models.length === 0 ? (
@@ -339,8 +354,17 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
             ) : (
                 <ul className="flex flex-col divide-y rounded-lg border">
                     {dataset.models.map((slug) => (
-                        <li key={slug} className="flex min-h-8 flex-col justify-center px-3 py-1">
-                            <Link href={modelHref(slug)} className="truncate text-primary">
+                        <li key={slug} className="flex min-h-10 items-center gap-2 px-3 py-1.5">
+                            <PublisherLogo
+                                name={nameOf(slug)}
+                                custom
+                                avatar={avatarOf(slug)}
+                                size="sm"
+                            />
+                            <Link
+                                href={modelHref(slug)}
+                                className="min-w-0 flex-1 truncate text-primary hover:underline"
+                            >
                                 {nameOf(slug)}
                             </Link>
                             <TestExampleNote count={dataset.test_examples?.[slug] ?? 0} />
