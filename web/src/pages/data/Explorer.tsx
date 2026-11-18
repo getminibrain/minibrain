@@ -67,8 +67,8 @@ import {
 } from "./AddSource";
 import { AddDatabaseDialog, AddS3Dialog, ConnectedGroup } from "./Connected";
 import { DatasetDetail } from "./DatasetDetail";
+import { EditDatasetPage, NewDatasetPage } from "./DatasetEditPage";
 import { DatasetsRoot, FolderDetail, folderOf, useMoveItem } from "./DatasetFolders";
-import { EditQueryPage, NewDatasetPage } from "./DatasetQueryPage";
 import { DatasetVersionDetail } from "./DatasetVersionDetail";
 import { FileDetail } from "./FileDetail";
 import { AddFolderDialog, FoldersGroup } from "./Folders";
@@ -85,10 +85,12 @@ import {
     SOURCE_GROUPS,
     type SourceGroupId,
     TABLE_FORMATS,
+    datasetEditHref,
     datasetNamed,
     datasetText,
     datasetVersionOf,
     datasetsInside,
+    editPageOf,
     folderIndex,
     groupOf,
     inGroup,
@@ -96,7 +98,6 @@ import {
     newDatasetHref,
     newDatasetPrefill,
     parseItem,
-    queryPageOf,
     siblingNamed,
     sourceRef,
     sourceText,
@@ -429,7 +430,7 @@ export function DataExplorer() {
     const router = useRouter();
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const searchStr = useRouterState({ select: (state) => state.location.searchStr });
-    const queryPage = queryPageOf(pathname);
+    const queryPage = editPageOf(pathname);
     const requested = parseItem(pathname);
     const version = datasetVersionOf(pathname);
     const unknownPath = requested === null && pathname.replace(/\/+$/, "") !== DATA_PATH;
@@ -684,11 +685,9 @@ export function DataExplorer() {
             return (
                 <TreeRowMenu label={label}>
                     {open}
-                    <DropdownMenuItem
-                        onSelect={() => setAction({ kind: "rename-dataset", dataset })}
-                    >
+                    <DropdownMenuItem onSelect={() => go(datasetEditHref(dataset.slug))}>
                         <IconPencil />
-                        Rename
+                        Edit dataset
                     </DropdownMenuItem>
                     <DropdownMenuItem
                         onSelect={() =>
@@ -779,7 +778,13 @@ export function DataExplorer() {
     } else if (queryPage?.kind === "edit") {
         split = Boolean(editing);
         detail = editing ? (
-            <EditQueryPage key={editing.slug} dataset={editing} sources={sourceList} />
+            <EditDatasetPage
+                key={editing.slug}
+                dataset={editing}
+                sources={sourceList}
+                index={index}
+                focusQuery={prefill.focus === "query"}
+            />
         ) : (
             <Missing item={selected} />
         );

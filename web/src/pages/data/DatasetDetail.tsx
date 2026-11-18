@@ -1,4 +1,4 @@
-import { IconFolderDown, IconPencil, IconSchool, IconSql, IconTags } from "@tabler/icons-react";
+import { IconFolderDown, IconPencil, IconSchool } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -21,7 +21,6 @@ import {
     type SourceSummary,
     api,
     succeed,
-    unwrap,
 } from "~/api/client";
 import {
     type DatasetVersionInfo,
@@ -52,19 +51,10 @@ import {
 } from "./DatasetVersions";
 import { Clamp, QUERY_HELP } from "./QueryEditor";
 import { RowsPreview } from "./RowsPreview";
-import {
-    type FolderIndex,
-    type ItemRef,
-    datasetNameProblem,
-    datasetQueryHref,
-    itemHref,
-    sourceRef,
-} from "./catalogue";
+import { type FolderIndex, type ItemRef, datasetEditHref, itemHref, sourceRef } from "./catalogue";
 import {
     AboutPart,
     DeleteMenuItem,
-    EditDialog,
-    type EditFocus,
     Fact,
     Facts,
     ItemHeader,
@@ -119,7 +109,7 @@ function QueryPart({
             <p className="text-muted-foreground">
                 No query yet.{" "}
                 <Link
-                    href={datasetQueryHref(dataset.slug)}
+                    href={datasetEditHref(dataset.slug, "query")}
                     className="text-primary hover:underline"
                 >
                     Edit the query
@@ -425,9 +415,8 @@ export function DatasetDetail({
     onSelect: (item: ItemRef) => void;
 }) {
     const refresh = useDataRefresh();
-    const [editing, setEditing] = useState<EditFocus | null>(null);
     const router = useRouter();
-    const editQuery = () => router.history.push(datasetQueryHref(dataset.slug));
+    const editQuery = () => router.history.push(datasetEditHref(dataset.slug, "query"));
     const [deleting, setDeleting] = useState(false);
     const [moving, setMoving] = useState<MoveTarget | null>(null);
     const folderId = dataset.folder_id ?? null;
@@ -480,17 +469,11 @@ export function DatasetDetail({
                         </Button>
                     )}
                     <ItemMenu name={dataset.name}>
-                        <DropdownMenuItem onSelect={() => setEditing("name")}>
+                        <DropdownMenuItem
+                            onSelect={() => router.history.push(datasetEditHref(dataset.slug))}
+                        >
                             <IconPencil />
-                            Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setEditing("description")}>
-                            <IconTags />
-                            Edit description and tags
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={editQuery}>
-                            <IconSql />
-                            Edit query
+                            Edit dataset
                         </DropdownMenuItem>
                         <FullVersionItem dataset={dataset} save={save} />
                         <DropdownMenuItem
@@ -560,18 +543,6 @@ export function DatasetDetail({
                 targets={moving ? [moving] : null}
                 index={index}
                 onOpenChange={(open) => !open && setMoving(null)}
-            />
-            <EditDialog
-                item={dataset}
-                noun="dataset"
-                problem={(name) =>
-                    datasetNameProblem(index.datasets.get(folderId) ?? [], name, dataset.slug)
-                }
-                focus={editing}
-                onFocusChange={setEditing}
-                onSave={(body) =>
-                    unwrap(api.PATCH("/api/datasets/{slug}", { ...path, body })).then(refresh)
-                }
             />
             <ConfirmDialog
                 open={deleting}

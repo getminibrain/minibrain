@@ -98,11 +98,11 @@ export function newDatasetHref({
     return `${DATA_PATH}/datasets/${NEW_DATASET}${search ? `?${search}` : ""}`;
 }
 
-export function datasetQueryHref(slug: string): string {
-    return `${datasetHref(slug)}/query`;
+export function datasetEditHref(slug: string, focus?: "query"): string {
+    return `${datasetHref(slug)}/edit${focus ? `?focus=${focus}` : ""}`;
 }
 
-export type QueryPage = { kind: "new" } | { kind: "edit"; slug: string };
+export type EditPage = { kind: "new" } | { kind: "edit"; slug: string };
 
 export function datasetVersionHref(slug: string, number: number): string {
     return `${datasetHref(slug)}/versions/${number}`;
@@ -168,7 +168,7 @@ export function datasetVersionOf(path: string): number | null {
     return segments && segments[0] === "datasets" ? versionIn(segments.slice(1)) : null;
 }
 
-export function queryPageOf(path: string): QueryPage | null {
+export function editPageOf(path: string): EditPage | null {
     const segments = segmentsOf(path);
     if (!segments || segments[0] !== "datasets") {
         return null;
@@ -176,7 +176,7 @@ export function queryPageOf(path: string): QueryPage | null {
     if (segments.length === 2 && segments[1] === NEW_DATASET) {
         return { kind: "new" };
     }
-    return segments.length === 3 && segments[2] === "query"
+    return segments.length === 3 && segments[2] === "edit"
         ? { kind: "edit", slug: segments[1] }
         : null;
 }
@@ -185,11 +185,19 @@ function wholeNumbers(values: string[]): number[] {
     return values.filter((value) => WHOLE_NUMBER.test(value)).map(Number);
 }
 
-export function newDatasetPrefill(search: string): { sources: number[]; folder: number | null } {
+export function newDatasetPrefill(search: string): {
+    sources: number[];
+    folder: number | null;
+    focus: string | null;
+} {
     const params = new URLSearchParams(search);
     const [folder] = wholeNumbers(params.getAll("folder"));
     const sources = params.getAll("source").flatMap((value) => value.split(","));
-    return { sources: [...new Set(wholeNumbers(sources))], folder: folder ?? null };
+    return {
+        sources: [...new Set(wholeNumbers(sources))],
+        folder: folder ?? null,
+        focus: params.get("focus"),
+    };
 }
 
 export function parseItem(path: string | null | undefined): ItemRef | null {
@@ -202,7 +210,7 @@ export function parseItem(path: string | null | undefined): ItemRef | null {
         if (rest.length === 0 || (rest.length === 1 && rest[0] === NEW_DATASET)) {
             return DATASETS_GROUP;
         }
-        return rest.length === 1 || versionIn(rest) !== null || queryPageOf(path ?? "") !== null
+        return rest.length === 1 || versionIn(rest) !== null || editPageOf(path ?? "") !== null
             ? { kind: "dataset", id: rest[0] }
             : null;
     }

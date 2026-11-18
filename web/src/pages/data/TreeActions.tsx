@@ -12,21 +12,12 @@ import {
     folderRef,
     removalText,
 } from "./DatasetFolders";
-import {
-    type FolderIndex,
-    type ItemRef,
-    datasetNameProblem,
-    folderPath,
-    groupOf,
-    sourceNameProblem,
-    sourceRef,
-} from "./catalogue";
+import { type FolderIndex, type ItemRef, groupOf, sourceNameProblem, sourceRef } from "./catalogue";
 import { useDataRefresh } from "./parts";
 
 export type TreeAction =
     | { kind: "new-folder"; parentId: number | null }
     | { kind: "rename-folder"; folder: DatasetFolder }
-    | { kind: "rename-dataset"; dataset: DatasetSummary }
     | { kind: "rename-source"; source: SourceSummary }
     | { kind: "move"; target: MoveTarget }
     | { kind: "delete-folder"; folder: DatasetFolder }
@@ -148,7 +139,6 @@ export function TreeActionDialogs({
         }
     };
     const removal = action ? removalCopy(action, index) : null;
-    const renaming = action?.kind === "rename-dataset" ? action.dataset : null;
     const renamingSource = action?.kind === "rename-source" ? action.source : null;
     return (
         <>
@@ -167,38 +157,6 @@ export function TreeActionDialogs({
                     onOpenChange={close}
                 />
             )}
-            <NameDialog
-                open={renaming !== null}
-                title="Rename dataset"
-                description={
-                    renaming
-                        ? `In ${folderPath(index, renaming.folder_id ?? null)}. Models that use it keep using it.`
-                        : ""
-                }
-                initial={renaming?.name ?? ""}
-                submitLabel="Rename"
-                problem={(name) =>
-                    renaming
-                        ? datasetNameProblem(
-                              index.datasets.get(renaming.folder_id ?? null) ?? [],
-                              name,
-                              renaming.slug,
-                          )
-                        : null
-                }
-                onOpenChange={close}
-                onSubmit={async (name) => {
-                    if (renaming) {
-                        await unwrap(
-                            api.PATCH("/api/datasets/{slug}", {
-                                params: { path: { slug: renaming.slug } },
-                                body: { name },
-                            }),
-                        );
-                        await refresh();
-                    }
-                }}
-            />
             <NameDialog
                 open={renamingSource !== null}
                 title="Rename source"

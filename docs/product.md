@@ -45,13 +45,16 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › source › Preview, Data › dataset › Preview, Data › dataset › version › Preview · API: GET /api/sources/{source_id}/rows, GET /api/datasets/{slug}/preview, GET /api/dataset-versions/{dataset_version_id}/rows
 - **Datasets** · shipped · product, ml
   Turn sources into chat examples that models share.
-  UI: Data › Add › New dataset, Data › Add › From sources, Data › source › Create dataset, Data › Datasets, Data › dataset › … › Rename · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
+  UI: Data › Add › New dataset, Data › Add › From sources, Data › source › Create dataset, Data › Datasets, Data › dataset › … › Edit dataset · API: GET /api/datasets, POST /api/datasets, GET /api/datasets/{slug}, PATCH /api/datasets/{slug}, DELETE /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping, GET /api/datasets/{slug}/preview
 - **Dataset SQL** · shipped · ml
   Join, filter and clean several sources in locked-down DuckDB SQL.
-  UI: Data › dataset › Edit query › Write SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
+  UI: Data › dataset › … › Edit dataset › Write SQL · API: POST /api/query, POST /api/sources/{source_id}/query, POST /api/datasets/{slug}/query
+- **Dataset editor** · shipped · product, ml
+  Name, describe, tag and query a dataset on one page.
+  UI: Data › Add › New dataset, Data › dataset › … › Edit dataset, Data › dataset › Query › Edit · API: POST /api/datasets, PATCH /api/datasets/{slug}, PUT /api/datasets/{slug}/mapping
 - **Live query preview** · shipped · product, ml
   See rows, labels and quick checks while writing a dataset query.
-  UI: Data › Add › New dataset, Data › dataset › Edit query · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape
+  UI: Data › Add › New dataset, Data › dataset › … › Edit dataset · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder, Data › folder › New dataset, Data › folder › … › Rename, Data › dataset › … › Move to · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder
@@ -69,7 +72,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › dataset › Version › version, Data › dataset › version › Train from · API: GET /api/datasets/{slug}/versions, GET /api/dataset-versions/{dataset_version_id}/rows, GET /api/dataset-versions/{dataset_version_id}/stats
 - **Sampled versions** · shipped · product, ml
   Sample over the row limit; save in full once the limit allows.
-  UI: Data › dataset, Data › dataset › Edit query, Data › dataset › … › Save full version, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
+  UI: Data › dataset, Data › dataset › … › Edit dataset, Data › dataset › … › Save full version, Models › Add model › Dataset, Models › Add model › Dataset › Upload new · API: POST /api/datasets/{slug}/versions, POST /api/datasets, PUT /api/datasets/{slug}/mapping, POST /api/models · Config: data.row_limit
 - **Version diff** · shipped · product, ml
   See rows added, removed and relabelled between two versions.
   UI: Data › dataset › Version › Compare versions, Data › dataset › version › … › Compare with latest · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
@@ -87,7 +90,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add › Upload file · API: POST /api/sources, PUT /api/models/{name}/dataset
 - **Mapping templates** · shipped · product, ml
   Turn columns or chat JSONL into chat examples, compiled to SQL.
-  UI: Data › dataset › Edit query › Pick columns · API: PUT /api/datasets/{slug}/mapping
+  UI: Data › dataset › … › Edit dataset › Pick columns · API: PUT /api/datasets/{slug}/mapping
 - **Mapping editor** · planned · product, ml
   Edit message templates in the UI, proposed by a model.
   Roadmap: Transforms
@@ -676,7 +679,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Monitoring › Requests · API: GET /api/requests, GET /api/requests/facets, GET /api/requests/summary, GET /api/requests/{request_id} · Policy: log_retention_days
 - **Sortable tables** · shipped · product, ml, engineer, admin
   Sort any table; previews sort by column type, long lists server-side.
-  UI: Jobs, Training, Monitoring › Requests, Settings › Audit log, Data › source › Preview › Table, Data › dataset › Edit query › Write SQL · API: GET /api/jobs, GET /api/requests, GET /api/audit, GET /api/sources/{source_id}/rows, POST /api/query
+  UI: Jobs, Training, Monitoring › Requests, Settings › Audit log, Data › source › Preview › Table, Data › dataset › … › Edit dataset › Write SQL · API: GET /api/jobs, GET /api/requests, GET /api/audit, GET /api/sources/{source_id}/rows, POST /api/query
 - **Jobs** · shipped · ml, admin
   Every job by status and pool; cancel, retry or delete.
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
