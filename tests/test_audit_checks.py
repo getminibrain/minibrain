@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy import select, update
 
 from minibrain import maintenance
@@ -11,7 +12,7 @@ from minibrain.auth.roles import Role
 from minibrain.maintenance import purge_audit_events
 from minibrain.registry.audit_chain import GENESIS, ChainReport, head_of, seal_all
 from minibrain.registry.audit_checks import BROKEN_ACTION, check_chain, check_on_schedule, full_due
-from minibrain.registry.models import AuditChain, AuditEvent, now
+from minibrain.registry.models import AuditChain, AuditChainBreak, AuditEvent, now
 from minibrain.siem import Forwarder
 from tests.conftest import Harness
 from tests.test_audit import add_events
@@ -141,11 +142,23 @@ def siem() -> Iterator[Listener]:
     found.close()
 
 
-def test_a_broken_chain_is_recorded_once_and_raised_until_a_full_check_passes(harness: Harness, siem: Listener) -> None:
+def chain_breaks(harness: Harness) -> list[AuditChainBreak]:
+    with harness.sessions() as session:
+        return list(session.scalars(select(AuditChainBreak).order_by(AuditChainBreak.id)))
+
+
+def acknowledge(client: TestClient, break_id: int, note: Any = "Restored from the SIEM copy") -> Response:
+    return client.post(f"/api/audit/chain/breaks/{break_id}/acknowledge", json={"note": note})
+
+
+def tampered(harness: Harness, seq: int = 5) -> None:
+    verified_up_to(harness, 5)
+    run_sql(harness, "UPDATE audit_events SET target = 'changed' WHERE seq = :seq", seq=seq)
+
+
+def test_a_broken_chain_is_recorded_once_and_raised_until_acknowledged(harness: Harness, siem: Listener) -> None:
     configure(harness, protocol="tcp", host="127.0.0.1", port=siem.port)
-    verified_up_to(harness, 4)
-    original = chain_head(harness)
-    run_sql(harness, "UPDATE audit_events SET target = 'changed' WHERE seq = 5")
+    tampered(harness)
     assert problems_of(harness.client, "audit_chain_broken") == []
     check(harness, full=True)
     check(harness, full=True)
@@ -158,26 +171,83 @@ def test_a_broken_chain_is_recorded_once_and_raised_until_a_full_check_passes(ha
         "reason": "its contents changed after it was sealed",
         "check": "full",
     }
+    [found] = chain_breaks(harness)
+    assert (found.seq, found.event_id, found.found_by, found.acknowledged_at) == (5, 5, "full", None)
     [problem] = problems_of(harness.client, "audit_chain_broken")
     assert (problem["severity"], problem["scope"], problem["href"]) == ("critical", "system", "/settings/audit")
     assert problem["text"] == "Audit log integrity broken at #5"
     assert problem["since"] is not None
     assert problems_of(harness.person(Role.VIEWER), "audit_chain_broken") == []
-    automatic = harness.client.get("/api/audit/chain").json()["automatic"]
-    assert (automatic["broken_seq"], automatic["broken_reason"]) == (5, "its contents changed after it was sealed")
+    [listed] = harness.client.get("/api/audit/chain").json()["breaks"]
+    assert (listed["id"], listed["seq"], listed["reason"]) == (found.id, 5, "its contents changed after it was sealed")
+    assert (listed["acknowledged_at"], listed["note"]) == (None, None)
     with harness.sessions() as session:
         seal_all(session)
     assert broken_events(harness)[0].seq is not None
     Forwarder(harness.sessions, hostname="mb-host").drain()
     assert b"audit.chain_broken" in bytes(siem.received)
-    run_sql(harness, "UPDATE audit_events SET target = 'mb_0001' WHERE seq = 5")
-    check(harness)
-    assert len(problems_of(harness.client, "audit_chain_broken")) == 1
+
+
+def test_a_passing_full_check_never_clears_a_break(harness: Harness) -> None:
+    tampered(harness)
+    check(harness, full=True)
+    run_sql(harness, "UPDATE audit_events SET target = 'mb_0004' WHERE seq = 5")
     assert check(harness, full=True).verified
+    [found] = chain_breaks(harness)
+    assert found.acknowledged_at is None
+    assert len(problems_of(harness.client, "audit_chain_broken")) == 1
+    info = harness.client.get("/api/audit/chain").json()
+    assert (info["verified"], len(info["breaks"])) == (True, 1)
+    assert info["automatic"]["verified_seq"] == chain_head(harness).seq
+
+
+def test_a_break_at_a_new_spot_is_recorded_and_raised_on_its_own(harness: Harness) -> None:
+    tampered(harness)
+    check(harness, full=True)
+    assert acknowledge(harness.client, chain_breaks(harness)[0].id).status_code == 200
     assert problems_of(harness.client, "audit_chain_broken") == []
-    cleared = harness.client.get("/api/audit/chain").json()["automatic"]
-    assert (cleared["broken_seq"], cleared["verified_seq"]) == (None, chain_head(harness).seq)
-    assert cleared["verified_seq"] > original.seq
+    check(harness, full=True)
+    assert len(chain_breaks(harness)) == 1
+    run_sql(harness, "UPDATE audit_events SET target = 'changed' WHERE seq = 2")
+    check(harness, full=True)
+    first, second = chain_breaks(harness)
+    assert (first.seq, second.seq, second.acknowledged_at) == (5, 2, None)
+    assert [event.detail["seq"] for event in broken_events(harness)] == [5, 2]
+    [problem] = problems_of(harness.client, "audit_chain_broken")
+    assert problem["id"] == f"audit_chain_broken:{second.id}"
+    assert [row["seq"] for row in harness.client.get("/api/audit/chain").json()["breaks"]] == [2, 5]
+
+
+def test_acknowledging_a_break_needs_an_admin_and_a_note(harness: Harness) -> None:
+    tampered(harness)
+    check(harness, full=True)
+    [found] = chain_breaks(harness)
+    assert acknowledge(harness.person(Role.BUILDER), found.id).status_code == 403
+    for note in ("", "   ", "x" * 501, None):
+        assert acknowledge(harness.client, found.id, note).status_code == 422, note
+    assert acknowledge(harness.client, 999).status_code == 404
+    assert len(problems_of(harness.client, "audit_chain_broken")) == 1
+    response = acknowledge(harness.client, found.id, "  Restored from the SIEM copy  ")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert (body["acknowledged_by"], body["note"]) == (ADMIN, "Restored from the SIEM copy")
+    assert body["acknowledged_at"] is not None
+    assert problems_of(harness.client, "audit_chain_broken") == []
+    assert acknowledge(harness.client, found.id, "Again").status_code == 409
+    [event] = audit_events(harness, "audit.chain_break_acknowledged")
+    assert (event.actor, event.target) == (ADMIN, "audit_events")
+    assert event.detail == {
+        "break_id": found.id,
+        "seq": 5,
+        "reason": "its contents changed after it was sealed",
+        "note": "Restored from the SIEM copy",
+        "sign_in": "local",
+    }
+    [listed] = harness.client.get("/api/audit/chain").json()["breaks"]
+    assert (listed["acknowledged_by"], listed["note"]) == (ADMIN, "Restored from the SIEM copy")
+    check(harness, full=True)
+    assert len(chain_breaks(harness)) == 1
+    assert len(broken_events(harness)) == 1
 
 
 def test_the_full_walk_runs_at_night_and_never_waits_more_than_a_day_and_a_half() -> None:

@@ -22,7 +22,17 @@ from minibrain.models.machine_metrics import DiskSample, MetricsHistory
 from minibrain.policy import load as load_policy
 from minibrain.registry.audit_chain import head_of
 from minibrain.registry.compute import DRAINING, Pool, PoolNode, live_engines, pools, replica_host
-from minibrain.registry.models import AuditEvent, BaseModelStatus, EngineReplica, Job, JobKind, JobStatus, Model, now
+from minibrain.registry.models import (
+    AuditChainBreak,
+    AuditEvent,
+    BaseModelStatus,
+    EngineReplica,
+    Job,
+    JobKind,
+    JobStatus,
+    Model,
+    now,
+)
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.siem import target_of, waiting
 from minibrain.tasks.service import serving_base
@@ -331,20 +341,19 @@ def failed_training(session: Session, moment: datetime) -> list[Problem]:
 
 
 def broken_chain(session: Session) -> list[Problem]:
-    head = head_of(session)
-    if head.broken_seq is None:
-        return []
+    query = select(AuditChainBreak).where(AuditChainBreak.acknowledged_at.is_(None))
     return [
         Problem(
-            id=f"audit_chain_broken:{head.broken_seq}",
+            id=f"audit_chain_broken:{found.id}",
             kind="audit_chain_broken",
             severity="critical",
             scope="system",
             subject="Audit log",
-            text=f"Audit log integrity broken at #{head.broken_seq}",
+            text=f"Audit log integrity broken at #{found.seq}",
             href=AUDIT_HREF,
-            since=head.broken_at,
+            since=found.found_at,
         )
+        for found in session.scalars(query.order_by(AuditChainBreak.id.desc()))
     ]
 
 

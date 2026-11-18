@@ -8,22 +8,23 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from sqlalchemy import ColumnElement, SQLColumnExpression, String, cast, func, or_, select
+from pydantic import BaseModel, StringConstraints
+from sqlalchemy import ColumnElement, SQLColumnExpression, String, cast, func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.api.access import admin
 from minibrain.api.audit_targets import ActorKind, AuditTarget, actor_kind, actor_names, category_of, targets_of
 from minibrain.api.deps import SessionDep
+from minibrain.api.model_activity import display_names
 from minibrain.api.sort_labels import ACTION_LABELS, label_rank
 from minibrain.api.sorting import CURSOR_PATTERN, Keyset, KeysetPage, Order, keyset_rows
 from minibrain.auth.identity import current_actor
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
 from minibrain.registry.audit_chain import ChainReport, head_of, verify
-from minibrain.registry.models import PEER_ADDRESS, AuditChain, AuditEvent, now
-from minibrain.registry.service import NotFoundError
+from minibrain.registry.models import PEER_ADDRESS, AuditChain, AuditChainBreak, AuditEvent, now
+from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.siem import target_of, waiting
 
 router = APIRouter(prefix="/api/audit")
@@ -39,6 +40,9 @@ MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"
 VIEW_ACTION = "audit.view"
 EXPORT_ACTION = "audit.export"
 VIEW_EVERY = timedelta(hours=1)
+ACKNOWLEDGE_ACTION = "audit.chain_break_acknowledged"
+NOTE_MAX = 500
+Note = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=NOTE_MAX)]
 
 
 class PeerAddress:
@@ -108,9 +112,23 @@ class AutomaticCheck(BaseModel):
     verified_seq: int | None
     verified_at: datetime | None
     full_checked_at: datetime | None
-    broken_seq: int | None
-    broken_reason: str | None
-    broken_at: datetime | None
+
+
+class ChainBreakRecord(BaseModel):
+    id: int
+    seq: int
+    event_id: int | None
+    reason: str
+    found_by: Literal["hourly", "full"]
+    found_at: datetime
+    acknowledged_at: datetime | None
+    acknowledged_by: str | None
+    acknowledged_by_name: str | None
+    note: str | None
+
+
+class AcknowledgeBreak(BaseModel):
+    note: Note
 
 
 class AuditChainInfo(BaseModel):
@@ -124,6 +142,7 @@ class AuditChainInfo(BaseModel):
     checked_at: datetime
     siem: SiemInfo
     automatic: AutomaticCheck
+    breaks: list[ChainBreakRecord]
 
 
 @dataclass(frozen=True)
@@ -390,13 +409,36 @@ def automatic_of(head: AuditChain) -> AutomaticCheck:
         verified_seq=head.verified_seq,
         verified_at=head.verified_at,
         full_checked_at=head.full_checked_at,
-        broken_seq=head.broken_seq,
-        broken_reason=head.broken_reason,
-        broken_at=head.broken_at,
     )
 
 
-def chain_info(report: ChainReport, siem: SiemInfo, automatic: AutomaticCheck) -> AuditChainInfo:
+def break_records(session: Session, found: list[AuditChainBreak]) -> list[ChainBreakRecord]:
+    names = display_names(session, {row.acknowledged_by for row in found if row.acknowledged_by})
+    return [
+        ChainBreakRecord(
+            id=row.id,
+            seq=row.seq,
+            event_id=row.event_id,
+            reason=row.reason,
+            found_by="full" if row.found_by == "full" else "hourly",
+            found_at=row.found_at,
+            acknowledged_at=row.acknowledged_at,
+            acknowledged_by=row.acknowledged_by,
+            acknowledged_by_name=names.get(row.acknowledged_by) if row.acknowledged_by else None,
+            note=row.note,
+        )
+        for row in found
+    ]
+
+
+def break_history(session: Session) -> list[ChainBreakRecord]:
+    query = select(AuditChainBreak).order_by(AuditChainBreak.found_at.desc(), AuditChainBreak.id.desc())
+    return break_records(session, list(session.scalars(query)))
+
+
+def chain_info(
+    report: ChainReport, siem: SiemInfo, automatic: AutomaticCheck, breaks: list[ChainBreakRecord]
+) -> AuditChainInfo:
     broken = report.broken
     return AuditChainInfo(
         verified=report.verified,
@@ -409,6 +451,7 @@ def chain_info(report: ChainReport, siem: SiemInfo, automatic: AutomaticCheck) -
         checked_at=now(),
         siem=siem,
         automatic=automatic,
+        breaks=breaks,
     )
 
 
@@ -426,7 +469,28 @@ def siem_info(session: Session) -> SiemInfo:
 
 @router.get("/chain", dependencies=[Depends(admin)], summary="Check the audit hash chain")
 def chain(session: SessionDep) -> AuditChainInfo:
-    return chain_info(verify(session), siem_info(session), automatic_of(head_of(session)))
+    return chain_info(verify(session), siem_info(session), automatic_of(head_of(session)), break_history(session))
+
+
+@router.post(
+    "/chain/breaks/{break_id}/acknowledge", dependencies=[Depends(admin)], summary="Acknowledge an audit chain break"
+)
+def acknowledge(break_id: int, body: AcknowledgeBreak, session: SessionDep) -> ChainBreakRecord:
+    found = session.get(AuditChainBreak, break_id)
+    if found is None:
+        raise NotFoundError(f"No audit chain break {break_id}")
+    actor, moment = current_actor(), now()
+    unacknowledged = (AuditChainBreak.id == break_id, AuditChainBreak.acknowledged_at.is_(None))
+    values = {"acknowledged_at": moment, "acknowledged_by": actor, "note": body.note}
+    result = session.execute(update(AuditChainBreak).where(*unacknowledged).values(**values))
+    if not getattr(result, "rowcount", 0):
+        session.rollback()
+        raise ConflictError(f"The break at seq {found.seq} is already acknowledged")
+    detail = {"break_id": found.id, "seq": found.seq, "reason": found.reason, "note": body.note}
+    session.add(AuditEvent(actor=actor, action=ACKNOWLEDGE_ACTION, target="audit_events", detail=detail))
+    session.commit()
+    session.refresh(found)
+    return break_records(session, [found])[0]
 
 
 @router.get("/{event_id}", dependencies=[Depends(admin)], summary="Read an audit event")

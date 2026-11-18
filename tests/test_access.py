@@ -161,6 +161,7 @@ ROUTE_ROLES = {
     ("GET", "/api/audit/facets"): "admin",
     ("GET", "/api/audit/export"): "admin",
     ("GET", "/api/audit/chain"): "admin",
+    ("POST", "/api/audit/chain/breaks/{break_id}/acknowledge"): "admin",
     ("GET", "/api/audit/{event_id}"): "admin",
     ("GET", "/api/models/{name}/versions"): "viewer",
     ("POST", "/api/models/{name}/versions"): "builder",

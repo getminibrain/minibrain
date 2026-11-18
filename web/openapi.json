@@ -6533,6 +6533,58 @@
         }
       }
     },
+    "/api/audit/chain/breaks/{break_id}/acknowledge": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Acknowledge an audit chain break",
+        "operationId": "acknowledge_api_audit_chain_breaks__break_id__acknowledge_post",
+        "parameters": [
+          {
+            "name": "break_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Break Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeBreak"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainBreakRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audit/{event_id}": {
       "get": {
         "tags": [
@@ -11906,6 +11958,21 @@
         ],
         "title": "AccountsInfo"
       },
+      "AcknowledgeBreak": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "AcknowledgeBreak"
+      },
       "Activity": {
         "properties": {
           "state": {
@@ -12335,6 +12402,13 @@
           },
           "automatic": {
             "$ref": "#/components/schemas/AutomaticCheck"
+          },
+          "breaks": {
+            "items": {
+              "$ref": "#/components/schemas/ChainBreakRecord"
+            },
+            "type": "array",
+            "title": "Breaks"
           }
         },
         "type": "object",
@@ -12348,7 +12422,8 @@
           "broken",
           "checked_at",
           "siem",
-          "automatic"
+          "automatic",
+          "breaks"
         ],
         "title": "AuditChainInfo"
       },
@@ -12655,50 +12730,13 @@
               }
             ],
             "title": "Full Checked At"
-          },
-          "broken_seq": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Broken Seq"
-          },
-          "broken_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Broken Reason"
-          },
-          "broken_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Broken At"
           }
         },
         "type": "object",
         "required": [
           "verified_seq",
           "verified_at",
-          "full_checked_at",
-          "broken_seq",
-          "broken_reason",
-          "broken_at"
+          "full_checked_at"
         ],
         "title": "AutomaticCheck"
       },
@@ -15448,6 +15486,105 @@
           "reason"
         ],
         "title": "ChainBreakInfo"
+      },
+      "ChainBreakRecord": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "found_by": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "full"
+            ],
+            "title": "Found By"
+          },
+          "found_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Found At"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "acknowledged_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "seq",
+          "event_id",
+          "reason",
+          "found_by",
+          "found_at",
+          "acknowledged_at",
+          "acknowledged_by",
+          "acknowledged_by_name",
+          "note"
+        ],
+        "title": "ChainBreakRecord"
       },
       "ChangeInfo": {
         "properties": {

@@ -2098,6 +2098,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit/chain/breaks/{break_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge an audit chain break */
+        post: operations["acknowledge_api_audit_chain_breaks__break_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit/{event_id}": {
         parameters: {
             query?: never;
@@ -3466,6 +3483,11 @@ export interface components {
             /** Oidc Issuer */
             oidc_issuer: string | null;
         };
+        /** AcknowledgeBreak */
+        AcknowledgeBreak: {
+            /** Note */
+            note: string;
+        };
         /** Activity */
         Activity: {
             /**
@@ -3605,6 +3627,8 @@ export interface components {
             checked_at: string;
             siem: components["schemas"]["SiemInfo"];
             automatic: components["schemas"]["AutomaticCheck"];
+            /** Breaks */
+            breaks: components["schemas"]["ChainBreakRecord"][];
         };
         /** AuditFacet */
         AuditFacet: {
@@ -3693,12 +3717,6 @@ export interface components {
             verified_at: string | null;
             /** Full Checked At */
             full_checked_at: string | null;
-            /** Broken Seq */
-            broken_seq: number | null;
-            /** Broken Reason */
-            broken_reason: string | null;
-            /** Broken At */
-            broken_at: string | null;
         };
         /** Availability */
         Availability: {
@@ -4471,6 +4489,35 @@ export interface components {
             event_id: number | null;
             /** Reason */
             reason: string;
+        };
+        /** ChainBreakRecord */
+        ChainBreakRecord: {
+            /** Id */
+            id: number;
+            /** Seq */
+            seq: number;
+            /** Event Id */
+            event_id: number | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Found By
+             * @enum {string}
+             */
+            found_by: "hourly" | "full";
+            /**
+             * Found At
+             * Format: date-time
+             */
+            found_at: string;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Acknowledged By */
+            acknowledged_by: string | null;
+            /** Acknowledged By Name */
+            acknowledged_by_name: string | null;
+            /** Note */
+            note: string | null;
         };
         /** ChangeInfo */
         ChangeInfo: {
@@ -15652,6 +15699,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditChainInfo"];
+                };
+            };
+        };
+    };
+    acknowledge_api_audit_chain_breaks__break_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                break_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcknowledgeBreak"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainBreakRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

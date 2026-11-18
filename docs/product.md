@@ -644,6 +644,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Automatic audit checks** · shipped · admin
   Verify the chain hourly and in full nightly; raise a break.
   UI: Home › Needs attention, Settings › Audit log · API: GET /api/problems, GET /api/audit/chain
+- **Audit break history** · shipped · admin
+  Keep every chain break until an admin acknowledges it with a note.
+  UI: Home › Needs attention, Settings › Security › Audit integrity · API: GET /api/audit/chain, POST /api/audit/chain/breaks/{break_id}/acknowledge
 - **Audit access record** · shipped · admin
   Record every audit export and who viewed the log, hourly.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/{event_id}, GET /api/audit/export

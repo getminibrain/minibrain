@@ -58,6 +58,7 @@ def test_sealing_links_each_event_to_the_one_before(harness: Harness) -> None:
         "checked_at": None,
         "siem": None,
         "automatic": None,
+        "breaks": [],
     }
     events = sealed(harness)
     assert [event.seq for event in events] == [1, 2, 3]

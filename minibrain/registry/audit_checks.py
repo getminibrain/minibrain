@@ -3,11 +3,11 @@ from collections.abc import Iterable, Iterator
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from minibrain.registry.audit_chain import HEAD, ChainBreak, ChainReport, Sealed, head_of, verify, verify_after
-from minibrain.registry.models import SYSTEM_ACTOR, AuditChain, AuditEvent, now
+from minibrain.registry.models import SYSTEM_ACTOR, AuditChain, AuditChainBreak, AuditEvent, now
 
 BROKEN_ACTION = "audit.chain_broken"
 FULL_HOUR = 3
@@ -31,34 +31,26 @@ def full_due(last: datetime | None, moment: datetime) -> bool:
     return since >= FULL_LATEST or (since >= FULL_AFTER and moment.astimezone().hour == FULL_HOUR)
 
 
-def recorded(head: AuditChain, broken: ChainBreak, full: bool) -> bool:
-    if (head.broken_seq, head.broken_reason) == (broken.seq, broken.reason):
-        return True
-    return not full and head.broken_seq is not None
+def known(session: Session, broken: ChainBreak) -> bool:
+    query = select(AuditChainBreak.id).where(AuditChainBreak.seq == broken.seq, AuditChainBreak.reason == broken.reason)
+    return session.scalar(query.limit(1)) is not None
 
 
 def record_break(session: Session, broken: ChainBreak, full: bool) -> None:
-    detail = {
-        "seq": broken.seq,
-        "event_id": broken.event_id,
-        "reason": broken.reason,
-        "check": "full" if full else "hourly",
-    }
+    found_by = "full" if full else "hourly"
+    detail = {"seq": broken.seq, "event_id": broken.event_id, "reason": broken.reason, "check": found_by}
+    session.add(AuditChainBreak(seq=broken.seq, event_id=broken.event_id, reason=broken.reason, found_by=found_by))
     session.add(AuditEvent(actor=SYSTEM_ACTOR, action=BROKEN_ACTION, target="audit_events", detail=detail))
 
 
 def settle(session: Session, report: ChainReport, full: bool) -> None:
     session.commit()
     moment = now()
-    head = head_of(session)
     values: dict[str, Any] = {"full_checked_at": moment} if full else {}
     broken = report.broken
     if broken is None:
         values |= {"verified_seq": report.last_seq, "verified_hash": report.last_hash, "verified_at": moment}
-        if full:
-            values |= {"broken_seq": None, "broken_reason": None, "broken_at": None}
-    elif not recorded(head, broken, full):
-        values |= {"broken_seq": broken.seq, "broken_reason": broken.reason, "broken_at": moment}
+    elif not known(session, broken):
         record_break(session, broken, full)
     if values:
         session.execute(update(AuditChain).where(AuditChain.id == HEAD).values(**values))

@@ -66,6 +66,7 @@ const ACTIONS: Record<string, string> = {
     "account.sessions_end": "Other sessions ended",
     "account.reset": "Password link created",
     "account.update": "Account changed",
+    "audit.chain_break_acknowledged": "Audit chain break acknowledged",
     "audit.chain_broken": "Audit chain broken",
     "audit.export": "Audit log exported",
     "audit.prune": "Audit events deleted",
@@ -486,6 +487,8 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
     "auth.sign_out": () => "Session ended",
     "audit.chain_broken": (detail) =>
         `At seq ${plainValue(detail.seq)}: ${plainValue(detail.reason)}`,
+    "audit.chain_break_acknowledged": (detail) =>
+        `Break at seq ${plainValue(detail.seq)}: ${plainValue(detail.note)}`,
     "audit.export": (detail) =>
         `${String(detail.format ?? "").toUpperCase()}, ${
             isRecord(detail.filters) && Object.keys(detail.filters).length > 0

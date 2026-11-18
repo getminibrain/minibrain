@@ -455,6 +455,11 @@ export const SECURITY = {
             "Every event carries a SHA-256 hash of its fields and of the event before it.",
             ["tamper", "verify", "sha-256", "immutable", "worm", "audit log"],
         ),
+        breaks: setting(
+            "Breaks",
+            "Every chain break found, kept until an admin acknowledges it with a note.",
+            ["tamper", "acknowledge", "break", "integrity"],
+        ),
         siemStatus: setting("SIEM status", "Whether your SIEM is keeping up with sealed events.", [
             "syslog",
             "forwarding",

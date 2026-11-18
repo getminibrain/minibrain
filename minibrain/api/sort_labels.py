@@ -23,6 +23,7 @@ ACTION_LABELS = {
     "account.session_end": "Session ended",
     "account.sessions_end": "Other sessions ended",
     "account.update": "Account changed",
+    "audit.chain_break_acknowledged": "Audit chain break acknowledged",
     "audit.chain_broken": "Audit chain broken",
     "audit.export": "Audit log exported",
     "audit.prune": "Audit events deleted",

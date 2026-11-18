@@ -738,9 +738,24 @@ class AuditChain(Base):
     verified_hash: Mapped[str | None] = mapped_column(default=None)
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     full_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    broken_seq: Mapped[int | None] = mapped_column(BigInteger, default=None)
-    broken_reason: Mapped[str | None] = mapped_column(default=None)
-    broken_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+
+
+class AuditChainBreak(Base):
+    __tablename__ = "audit_chain_breaks"
+    __table_args__ = (
+        UniqueConstraint("seq", "reason"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger)
+    event_id: Mapped[int | None] = mapped_column(default=None)
+    reason: Mapped[str]
+    found_by: Mapped[str]
+    found_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    acknowledged_by: Mapped[str | None] = mapped_column(default=None)
+    note: Mapped[str | None] = mapped_column(default=None)
 
 
 class User(Base):

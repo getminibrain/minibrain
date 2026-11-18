@@ -3,6 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     Badge,
     Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Field,
     Link,
     Select,
     SelectContent,
@@ -11,13 +18,16 @@ import {
     SelectValue,
     SettingsGroup,
     SettingsRow,
+    Textarea,
 } from "obp-ui";
-import { type ComponentProps, Fragment, useMemo } from "react";
+import { type ComponentProps, type FormEvent, Fragment, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
+import { PROBLEMS_KEY } from "~/api/problemQueries";
 import type { components } from "~/api/schema";
-import { errorMessage } from "~/components/Section";
+import { ErrorLine, errorMessage } from "~/components/Section";
 import { SettingsSection } from "~/components/SettingsSection";
 import { StatusText, type Tone } from "~/components/models/StatusText";
+import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import { SECURITY } from "~/pages/settings/settingsIndex";
@@ -25,11 +35,13 @@ import { SECURITY } from "~/pages/settings/settingsIndex";
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type ChainInfo = components["schemas"]["AuditChainInfo"];
 type SiemInfo = components["schemas"]["SiemInfo"];
+type ChainBreak = components["schemas"]["ChainBreakRecord"];
 
 export const RETENTION = "audit_retention_days";
 const EXPORT_HREF = `/settings/security#${SECURITY.auditExport.anchor}`;
 const SETTINGS_HREF = `/settings/security#${SECURITY.auditIntegrity.anchor}`;
 const DAY_MS = 24 * 3600 * 1000;
+const NOTE_MAX = 500;
 const STANDARD_DAYS = 365;
 const RETENTION_CHOICES: [number, string][] = [
     [0, "Keep forever"],
@@ -59,26 +71,72 @@ function queued(total: number): string {
     return total === 1 ? "1 event waits" : `${count(total)} events wait`;
 }
 
+function openBreaks(chain: ChainInfo): ChainBreak[] {
+    return chain.breaks.filter((found) => found.acknowledged_at === null);
+}
+
+function liveAcknowledged(chain: ChainInfo): boolean {
+    const live = chain.broken;
+    return (
+        live !== null &&
+        chain.breaks.some(
+            (found) =>
+                found.acknowledged_at !== null &&
+                found.seq === live.seq &&
+                found.reason === live.reason,
+        )
+    );
+}
+
+function unacknowledgedSeq(chain: ChainInfo): number | null {
+    if (chain.broken && !liveAcknowledged(chain)) {
+        return chain.broken.seq;
+    }
+    return openBreaks(chain)[0]?.seq ?? null;
+}
+
+function earlierBreaks(chain: ChainInfo): string | null {
+    const open = openBreaks(chain).filter(
+        (found) => found.seq !== chain.broken?.seq || found.reason !== chain.broken?.reason,
+    ).length;
+    if (open === 0) {
+        return null;
+    }
+    return open === 1
+        ? "A break found earlier is not acknowledged yet; it stays open until an admin acknowledges it."
+        : `${count(open)} breaks found earlier are not acknowledged yet; they stay open until an admin acknowledges them.`;
+}
+
 function chainText(chain: ChainInfo): string {
+    const parts: string[] = [];
     if (chain.broken) {
         const intact =
             chain.events > 0 ? ` Events up to seq ${count(chain.last_seq)} are intact.` : "";
-        return `Seq ${count(chain.broken.seq)}: ${chain.broken.reason}.${intact} Compare it with your SIEM's copy or an earlier export to see what changed.`;
-    }
-    const parts: string[] = [];
-    if (chain.events > 0 && chain.first_seq !== null) {
+        parts.push(
+            `Seq ${count(chain.broken.seq)}: ${chain.broken.reason}.${intact} Compare it with your SIEM's copy or an earlier export to see what changed.`,
+        );
+        parts.push(
+            liveAcknowledged(chain)
+                ? "This break is acknowledged and kept in the history below."
+                : "The break stays recorded until an admin acknowledges it.",
+        );
+    } else if (chain.events > 0 && chain.first_seq !== null) {
         parts.push(
             `${events(chain.events)}, ${seqRange(chain.first_seq, chain.last_seq)}, match their hashes and link to the one before.`,
         );
     } else {
         parts.push("Each event is sealed into the chain within seconds of being recorded.");
     }
-    if (chain.anchor_seq > 0) {
+    const earlier = earlierBreaks(chain);
+    if (earlier) {
+        parts.push(earlier);
+    }
+    if (!chain.broken && chain.anchor_seq > 0) {
         parts.push(
             `The chain starts where the last prune cut it, after seq ${count(chain.anchor_seq)}.`,
         );
     }
-    if (chain.pending > 0) {
+    if (!chain.broken && chain.pending > 0) {
         parts.push(`${events(chain.pending)} not sealed yet.`);
     }
     return parts.join(" ");
@@ -88,10 +146,166 @@ function ChainBadge({ chain }: { chain: ChainInfo | undefined }) {
     if (!chain) {
         return <Badge variant="neutral">Checking</Badge>;
     }
+    const seq = unacknowledgedSeq(chain);
+    if (seq !== null) {
+        return <Badge variant="destructive">{`Broken at seq ${count(seq)}`}</Badge>;
+    }
     return chain.broken ? (
-        <Badge variant="destructive">{`Broken at seq ${count(chain.broken.seq)}`}</Badge>
+        <Badge variant="warning">Broken, acknowledged</Badge>
     ) : (
         <Badge variant="success">Verified</Badge>
+    );
+}
+
+function sentence(text: string): string {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function AcknowledgeDialog({ found, onClose }: { found: ChainBreak | null; onClose: () => void }) {
+    const client = useQueryClient();
+    const [note, setNote] = useState("");
+    const acknowledge = useMutation({
+        mutationFn: ({ id, text }: { id: number; text: string }) =>
+            unwrap(
+                api.POST("/api/audit/chain/breaks/{break_id}/acknowledge", {
+                    params: { path: { break_id: id } },
+                    body: { note: text },
+                }),
+            ),
+        onSuccess: async () => {
+            close();
+            await Promise.all([
+                client.invalidateQueries({ queryKey: ["audit"] }),
+                client.invalidateQueries({ queryKey: PROBLEMS_KEY }),
+            ]);
+        },
+    });
+    const close = () => {
+        setNote("");
+        acknowledge.reset();
+        onClose();
+    };
+    const text = note.trim();
+    const submit = (event: FormEvent) => {
+        event.preventDefault();
+        if (found && text) {
+            acknowledge.mutate({ id: found.id, text });
+        }
+    };
+    return (
+        <Dialog open={found !== null} onOpenChange={(open) => !open && close()}>
+            <DialogContent>
+                <form onSubmit={submit} className="flex flex-col gap-6">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {found ? `Acknowledge the break at seq ${count(found.seq)}` : ""}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {found
+                                ? `${sentence(found.reason)}. Acknowledging clears the alert; the break stays in the history and the audit log records your note.`
+                                : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Field
+                        id="break-note"
+                        label="Note"
+                        hint="What you found and what you did about it."
+                    >
+                        <Textarea
+                            id="break-note"
+                            rows={4}
+                            maxLength={NOTE_MAX}
+                            value={note}
+                            onChange={(event) => setNote(event.target.value)}
+                        />
+                    </Field>
+                    <ErrorLine error={acknowledge.error} />
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={close}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={acknowledge.isPending || !text}>
+                            {acknowledge.isPending ? "Acknowledging…" : "Acknowledge"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function acknowledgement(found: ChainBreak): string {
+    const who = found.acknowledged_by_name ?? found.acknowledged_by ?? "an admin";
+    const when = found.acknowledged_at ? relativeTime(found.acknowledged_at) : "";
+    return `Acknowledged by ${who}, ${when}: ${found.note ?? ""}`;
+}
+
+function BreakItem({
+    found,
+    canAcknowledge,
+    onAcknowledge,
+}: {
+    found: ChainBreak;
+    canAcknowledge: boolean;
+    onAcknowledge: () => void;
+}) {
+    return (
+        <li className="flex items-start justify-between gap-4 px-3 py-2">
+            <div className="flex min-w-0 flex-col gap-0.5">
+                <p className="tabular-nums">
+                    <span className="font-medium">{`Seq ${count(found.seq)}`}</span>
+                    {`: ${found.reason}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                    {`Found ${relativeTime(found.found_at)} by the ${found.found_by} check`}
+                </p>
+                {found.acknowledged_at ? (
+                    <p className="text-sm break-words text-muted-foreground">
+                        {acknowledgement(found)}
+                    </p>
+                ) : (
+                    <p className="text-sm text-destructive">Not acknowledged</p>
+                )}
+            </div>
+            {canAcknowledge && !found.acknowledged_at && (
+                <Button variant="outline" onClick={onAcknowledge}>
+                    Acknowledge…
+                </Button>
+            )}
+        </li>
+    );
+}
+
+function BreaksRow({ breaks }: { breaks: ChainBreak[] }) {
+    const can = useCan();
+    const [acknowledging, setAcknowledging] = useState<ChainBreak | null>(null);
+    if (breaks.length === 0) {
+        return null;
+    }
+    const open = breaks.filter((found) => found.acknowledged_at === null).length;
+    return (
+        <SettingsRow
+            anchor={SECURITY.auditIntegrity.settings.breaks.anchor}
+            label={SECURITY.auditIntegrity.settings.breaks.label}
+            description={
+                open > 0
+                    ? `${count(open)} not acknowledged. Every break stays here for good.`
+                    : "All acknowledged. Every break stays here for good."
+            }
+            control={null}
+        >
+            <ul className="mb-3 flex flex-col divide-y rounded-lg border">
+                {breaks.map((found) => (
+                    <BreakItem
+                        key={found.id}
+                        found={found}
+                        canAcknowledge={can.admin}
+                        onAcknowledge={() => setAcknowledging(found)}
+                    />
+                ))}
+            </ul>
+            <AcknowledgeDialog found={acknowledging} onClose={() => setAcknowledging(null)} />
+        </SettingsRow>
     );
 }
 
@@ -187,6 +401,7 @@ export function AuditIntegrity() {
                     error={errorMessage(chain.error)}
                     control={<ChainBadge chain={chain.data} />}
                 />
+                <BreaksRow breaks={chain.data?.breaks ?? []} />
                 <SiemRow siem={chain.data?.siem} />
             </SettingsGroup>
         </SettingsSection>
@@ -299,9 +514,11 @@ function chainStatus(chain: ChainInfo | undefined, failed: boolean): [Tone, stri
     if (!chain) {
         return ["neutral", "Checking the chain"];
     }
-    return chain.broken
-        ? ["destructive", `Chain broken at seq ${count(chain.broken.seq)}`]
-        : ["success", "Chain verified"];
+    const seq = unacknowledgedSeq(chain);
+    if (seq !== null) {
+        return ["destructive", `Chain broken at seq ${count(seq)}, not acknowledged`];
+    }
+    return chain.broken ? ["warning", "Chain broken, acknowledged"] : ["success", "Chain verified"];
 }
 
 function siemStatus(siem: SiemInfo | undefined): string | null {
