@@ -1,4 +1,4 @@
-import { InfoTip, cn } from "obp-ui";
+import { CheckboxField, InfoTip, cn } from "obp-ui";
 import { type ReactNode, useId } from "react";
 
 export const FORM_ROW_GAP = "gap-y-6";
@@ -70,6 +70,7 @@ export function FormRow({
     detail,
     tip,
     align = "center",
+    check,
     children,
 }: {
     id?: string;
@@ -77,6 +78,7 @@ export function FormRow({
     detail?: ReactNode;
     tip?: ReactNode;
     align?: "center" | "start";
+    check?: { checked: boolean; onCheckedChange: (checked: boolean) => void };
     children: ReactNode;
 }) {
     return (
@@ -88,7 +90,18 @@ export function FormRow({
                 )}
             >
                 <span className="flex items-center gap-1.5">
-                    {id ? <label htmlFor={id}>{label}</label> : <span>{label}</span>}
+                    {check ? (
+                        <CheckboxField
+                            id={id}
+                            label={label}
+                            checked={check.checked}
+                            onCheckedChange={(checked) => check.onCheckedChange(checked === true)}
+                        />
+                    ) : id ? (
+                        <label htmlFor={id}>{label}</label>
+                    ) : (
+                        <span>{label}</span>
+                    )}
                     {tip && <InfoTip label={`About ${label.toLowerCase()}`}>{tip}</InfoTip>}
                 </span>
                 {detail && <span className="truncate text-sm text-muted-foreground">{detail}</span>}

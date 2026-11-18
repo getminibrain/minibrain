@@ -3,12 +3,13 @@ import { type ReactNode, useState } from "react";
 import { ErrorLine, FLUSH_GRID } from "~/components/Section";
 import { count } from "~/lib/format";
 
-type View = "records" | "table" | "example";
+export type View = "records" | "table" | "example" | "quality";
 
 const VIEWS: { key: View; label: string }[] = [
     { key: "records", label: "Records" },
     { key: "table", label: "Table" },
     { key: "example", label: "Example" },
+    { key: "quality", label: "Quality" },
 ];
 
 export function RowsPreview({
@@ -27,6 +28,11 @@ export function RowsPreview({
     counting = false,
     strip,
     idle = false,
+    quality,
+    qualityBadge,
+    view: shownView,
+    onView,
+    bar,
 }: {
     records: unknown[];
     total: number | null | undefined;
@@ -43,11 +49,25 @@ export function RowsPreview({
     counting?: boolean;
     strip?: ReactNode;
     idle?: boolean;
+    quality?: ReactNode;
+    qualityBadge?: number;
+    view?: View;
+    onView?: (view: View) => void;
+    bar?: ReactNode;
 }) {
-    const [view, setView] = useState<View>("records");
+    const [ownView, setOwnView] = useState<View>("records");
+    const view = shownView ?? ownView;
+    const setView = onView ?? setOwnView;
     const [open, setOpen] = useState<number[]>([0]);
-    const views = VIEWS.filter((item) => item.key !== "example" || example !== undefined);
-    const active = view === "example" && !example ? "records" : view;
+    const views = VIEWS.filter(
+        (item) =>
+            (item.key !== "example" || example !== undefined) &&
+            (item.key !== "quality" || quality !== undefined),
+    ).map((item) =>
+        item.key === "quality" && qualityBadge ? { ...item, badge: qualityBadge } : item,
+    );
+    const active =
+        (view === "example" && !example) || (view === "quality" && !quality) ? "records" : view;
     const whole = total === null || total === undefined || total <= records.length;
     const shown = `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`;
     const status = idle
@@ -83,7 +103,12 @@ export function RowsPreview({
                     </span>
                 )}
             </div>
-            {Boolean(error) && (
+            {bar && (active === "records" || active === "table") && (
+                <div className="flex min-h-9 shrink-0 items-center gap-3 border-b bg-secondary px-3 text-sm">
+                    {bar}
+                </div>
+            )}
+            {Boolean(error) && active !== "quality" && (
                 <div className="border-b px-3 py-2">
                     <ErrorLine error={error} onRetry={onRetry} />
                 </div>
@@ -92,7 +117,9 @@ export function RowsPreview({
                 <div className={`flex min-h-0 flex-1 flex-col ${FLUSH_GRID}`}>{table}</div>
             ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    {active === "example" ? (
+                    {active === "quality" ? (
+                        quality
+                    ) : active === "example" ? (
                         example
                     ) : loading ? (
                         <p className="px-3 py-2 text-muted-foreground">Loading rows…</p>

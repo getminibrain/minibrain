@@ -2584,7 +2584,7 @@
           "Data"
         ],
         "summary": "Count a query's rows and run the quick checks",
-        "description": "The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks run up to 50,000 rows. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
+        "description": "The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks read every row up to 50,000, and a random 50,000 of a larger result. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.",
         "operationId": "any_query_shape_api_query_shape_post",
         "requestBody": {
           "content": {
@@ -16232,6 +16232,37 @@
           "dismissed": {
             "type": "boolean",
             "title": "Dismissed"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows",
+            "description": "Rows the finding is about.",
+            "default": 0
+          },
+          "handled": {
+            "type": "boolean",
+            "title": "Handled",
+            "description": "Training already handles it: repeated or empty inputs.",
+            "default": false
+          },
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns",
+            "description": "Headings of the examples table."
+          },
+          "table": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Table",
+            "description": "Examples, one list of cells per row."
           }
         },
         "type": "object",
@@ -16246,6 +16277,86 @@
           "dismissed"
         ],
         "title": "CheckInfo"
+      },
+      "Cleanup": {
+        "properties": {
+          "personal_data": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "mask",
+                  "drop"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Personal Data",
+            "description": "Mask emails, phone numbers, card numbers and IBANs in the input, or drop those rows."
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens",
+            "description": "Drop rows whose input runs past this many tokens."
+          },
+          "conflicts": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "common",
+                  "drop"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflicts",
+            "description": "For inputs with more than one label: keep the most common label, or drop those inputs."
+          },
+          "rare": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 2.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rare",
+            "description": "Drop labels with fewer rows than this."
+          },
+          "per_label": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50000000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Label",
+            "description": "Keep at most this many rows a label."
+          }
+        },
+        "type": "object",
+        "title": "Cleanup"
       },
       "ClosedPoolInfo": {
         "properties": {
@@ -17044,6 +17155,18 @@
             },
             "type": "object",
             "title": "Locked"
+          },
+          "long_tokens": {
+            "type": "integer",
+            "title": "Long Tokens",
+            "description": "Inputs past this many tokens are long; not editable.",
+            "default": 2048
+          },
+          "chars_per_token": {
+            "type": "integer",
+            "title": "Chars Per Token",
+            "description": "Characters a token, to estimate input length.",
+            "default": 4
           }
         },
         "type": "object",
@@ -17290,6 +17413,17 @@
             "title": "Skip Empty",
             "description": "Leave out rows whose answer column is empty, when columns are picked.",
             "default": false
+          },
+          "cleanup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cleanup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clean-up steps compiled into the query, when columns are picked."
           },
           "sql": {
             "anyOf": [
@@ -24103,6 +24237,9 @@
             "title": "Skip Empty",
             "default": false
           },
+          "cleanup": {
+            "$ref": "#/components/schemas/Cleanup"
+          },
           "sql": {
             "anyOf": [
               {
@@ -24193,6 +24330,17 @@
             "title": "Skip Empty",
             "description": "Leave out rows whose answer column is empty, when columns are picked.",
             "default": false
+          },
+          "cleanup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cleanup"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Clean-up steps compiled into the query, when columns are picked."
           },
           "sql": {
             "anyOf": [
@@ -28721,6 +28869,18 @@
             },
             "type": "array",
             "title": "Example"
+          },
+          "checked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked",
+            "description": "Rows the quick checks read: every row, or a random sample of a larger result."
           }
         },
         "type": "object",

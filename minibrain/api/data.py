@@ -65,7 +65,7 @@ from minibrain.api.views import (
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
-from minibrain.data.checks import QUICK_CHECKS, run_checks
+from minibrain.data.checks import QUICK_CHECKS, QUICK_TEXT_CHARS, run_checks
 from minibrain.data.dataset_folders import folder_or_root, require_free_dataset_name
 from minibrain.data.dataset_versions import (
     changes_since,
@@ -128,7 +128,7 @@ from minibrain.data.sources import (
     to_text,
 )
 from minibrain.data.splits import answer_labels, clean, pairs
-from minibrain.data.templates import Template, pair_template, skipping_empty, template_sql
+from minibrain.data.templates import Template, cleaning, pair_template, skipping_empty, template_sql
 from minibrain.data.transcoded import drop_fallbacks
 from minibrain.policy import PolicyError, locked_sources
 from minibrain.registry.files import dataset_version_location
@@ -357,10 +357,15 @@ def check_mapping(tables: Sequence[Table], aliases: dict[str, str], sql: str) ->
 
 def requested_template(body: MappingUpdate) -> Template | None:
     if body.template is not None:
-        return skipping_empty(dict(body.template), body.skip_empty)
-    if body.input_column and body.label_column:
-        return skipping_empty(pair_template(body.input_column, body.label_column), body.skip_empty)
-    return None
+        found = skipping_empty(dict(body.template), body.skip_empty)
+    elif body.input_column and body.label_column:
+        found = skipping_empty(pair_template(body.input_column, body.label_column), body.skip_empty)
+    else:
+        return None
+    if body.cleanup is None:
+        return found
+    steps = body.cleanup.model_dump(exclude_none=True)
+    return cleaning(found, {key: str(value) for key, value in steps.items()})
 
 
 def apply_mapping(
@@ -402,15 +407,18 @@ def first_example(rows: Sequence[ExampleRow]) -> list[ChatMessage]:
     return chat_example(*found)
 
 
-def quick_checks(rows: Sequence[ExampleRow], session: Session, dismissed: dict[str, str]) -> list[CheckInfo]:
+def quick_checks(
+    rows: Sequence[ExampleRow], session: Session, dismissed: dict[str, str], kept: int | None = None
+) -> list[CheckInfo]:
     examples = clean(rows)
     findings = run_checks(
         pairs(rows),
         None,
         load_limits(session).checks(),
         labelled=bool(answer_labels(examples)),
-        examples=len(examples),
+        examples=len(examples) if kept is None else kept,
         only=QUICK_CHECKS,
+        text_budget=QUICK_TEXT_CHARS,
     )
     return [
         CheckInfo.model_validate(item | {"dismissed": dismissed.get(str(item["check"])) == item["signature"]})
@@ -432,13 +440,16 @@ def shape_of_query(
             rows=found.rows, missing=found.missing, quality=None, largest_share=None, checks=None, example=[]
         )
     usable = quality.rows - quality.empty
+    sampled = rows is not None and len(rows) < quality.rows
+    kept = usable - quality.duplicates if sampled else None
     return QueryShapeInfo(
         rows=found.rows,
         missing=[],
         quality=QualityInfo.model_validate(quality, from_attributes=True),
         largest_share=quality.largest_label / usable if usable else None,
-        checks=quick_checks(rows, session, dismissed or {}) if rows is not None else None,
+        checks=quick_checks(rows, session, dismissed or {}, kept) if rows is not None else None,
         example=first_example(rows if rows is not None else example_rows(tables, sql, aliases, PREVIEW_ROWS)),
+        checked=len(rows) if rows is not None else None,
     )
 
 
@@ -647,7 +658,8 @@ def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, st
     dependencies=[Depends(builder)],
     summary="Count a query's rows and run the quick checks",
     description="The row count, labels, empty and repeated inputs and the quick data checks of what the query would "
-    f"save, without saving it. Checks run up to {QUICK_CHECK_ROWS:,} rows. {RUN_DESCRIPTION}",
+    f"save, without saving it. Checks read every row up to {QUICK_CHECK_ROWS:,}, and a random {QUICK_CHECK_ROWS:,} "
+    f"of a larger result. {RUN_DESCRIPTION}",
 )
 def any_query_shape(
     body: QueryShapeRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
@@ -711,6 +723,7 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
         label_column=body.label_column,
         template=body.template,
         skip_empty=body.skip_empty,
+        cleanup=body.cleanup,
         sql=body.sql,
     )
     if mapping.sql is not None or requested_template(mapping) is not None:

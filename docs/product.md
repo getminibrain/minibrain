@@ -61,6 +61,12 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Live query preview** · shipped · product, ml
   See rows and quick checks as you type; large sources on Run.
   UI: Data › Add › New dataset, Data › dataset › … › Edit dataset · API: POST /api/query, POST /api/query/shape, DELETE /api/query/runs/{run}, POST /api/datasets/{slug}/query, POST /api/datasets/{slug}/query/shape
+- **Quality in the editor** · shipped · product, ml
+  See each finding's rows and examples, show them and fix them.
+  UI: Data › Add › New dataset › Preview › Quality, Data › dataset › … › Edit dataset › Preview › Quality · API: POST /api/query/shape, POST /api/datasets/{slug}/query/shape, PUT /api/datasets/{slug}/checks/{check}/dismissal
+- **Clean-up steps** · shipped · product, ml
+  Drop conflicts, rare labels and long inputs, cap labels, mask personal data.
+  UI: Data › Add › New dataset › Pick columns › Clean up, Data › dataset › … › Edit dataset › Pick columns › Clean up · API: POST /api/datasets, PUT /api/datasets/{slug}/mapping
 - **Dataset folders** · shipped · product, ml
   Organise datasets in nested folders by drag and drop.
   UI: Data › Add › New folder, Data › folder › New dataset, Data › folder › … › Rename, Data › dataset › … › Move to · API: GET /api/dataset-folders, POST /api/dataset-folders, PATCH /api/dataset-folders/{folder_id}, PUT /api/dataset-folders/{folder_id}/parent, DELETE /api/dataset-folders/{folder_id}, PUT /api/datasets/{slug}/folder

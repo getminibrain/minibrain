@@ -1,9 +1,10 @@
 import { IconDeviceFloppy, IconPlayerPlay, IconPlus, IconX } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useBlocker, useRouter } from "@tanstack/react-router";
-import { Button, ConfirmDialog, Input, Kbd, Textarea } from "obp-ui";
+import { Button, ConfirmDialog, Input, Kbd, type SqlEditorHandle, Textarea } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, unwrap } from "~/api/client";
+import { useDataSettings } from "~/api/dataQueries";
 import {
     FORM_GROUP_GAP,
     FORM_ROW_GAP,
@@ -16,6 +17,7 @@ import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { sqlProblem } from "~/lib/sqlError";
 import { splitTags } from "../models/dialogs";
 import { useDatasetRefresh } from "./DatasetDetail";
+import { type Fix, type FixContext, type Limits, limitsOf } from "./QualityTab";
 import {
     type Draft,
     type MappingBody,
@@ -30,7 +32,9 @@ import {
 } from "./QueryEditor";
 import {
     AUTO_RUN_ROWS,
+    type Focus,
     QueryPreviewPanel,
+    type QueryShape,
     shapeSummary,
     useLivePreview,
     useSettled,
@@ -48,6 +52,7 @@ import {
     itemHref,
     sourceRef,
 } from "./catalogue";
+import { NO_CLEANUP, affectedStep, wrappedSql } from "./cleanup";
 import { type Described, ItemHeader, SplitDetail, type SplitSide, useDataRefresh } from "./parts";
 import { defaultName, mentions, sharedColumns, unionSql } from "./sql";
 
@@ -64,6 +69,7 @@ const EMPTY_DRAFT: Draft = {
     input: "",
     label: "",
     skipEmpty: true,
+    cleanup: NO_CLEANUP,
     sql: "",
     guessed: [],
 };
@@ -146,6 +152,27 @@ function useRunKey(run: () => void) {
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, []);
+}
+
+type Fixed = { done: string; before: number; live: string | null };
+
+function fixContext(shape: QueryShape | undefined, limits: Limits | null): FixContext {
+    const quality = shape?.quality;
+    const usable = quality ? quality.rows - quality.empty : 0;
+    const average = quality && quality.labels > 0 ? Math.ceil(usable / quality.labels) : 0;
+    return {
+        limits,
+        perLabel: Math.max(limits?.minLabelRows ?? 1, average, 1),
+        rare: Boolean(quality && limits && quality.smallest_label < limits.minLabelRows),
+    };
+}
+
+function focusedSql(focus: Focus | null, settled: string | null, limits: Limits | null) {
+    if (!focus || !settled || !limits) {
+        return null;
+    }
+    const step = affectedStep(focus.check, limits, focus.majority);
+    return step ? wrappedSql(settled, step) : null;
 }
 
 function useLeaveGuard(dirty: boolean) {
@@ -285,12 +312,48 @@ function DatasetWorkbench({
     const router = useRouter();
     const [draft, setDraft] = useState(initialDraft);
     const [details, setDetails] = useState(initialDetails);
-    const live = previewSql(draft, sources);
+    const limits = limitsOf(useDataSettings().data);
+    const chars = limits?.charsPerToken ?? null;
+    const sqlEditor = useRef<SqlEditorHandle>(null);
+    const live = previewSql(draft, sources, chars);
     const reading = rowsToRead(queriedSources(draft, sources, alias));
     const auto = reading !== null && reading < AUTO_RUN_ROWS;
     const { settled, stale, runNow } = useSettled(live, draft.mode === "columns", auto);
-    const preview = useLivePreview(settled, dataset);
+    const [focus, setFocus] = useState<Focus | null>(null);
+    const [fixed, setFixed] = useState<Fixed | null>(null);
+    const preview = useLivePreview(settled, dataset, focusedSql(focus, settled, limits));
     const waiting = waitingText(settled, stale);
+    const context = fixContext(preview.counted, limits);
+    const effect =
+        fixed && fixed.live === live
+            ? {
+                  done: fixed.done,
+                  before: fixed.before,
+                  after: settled === fixed.live && preview.counted ? preview.counted.rows : null,
+              }
+            : null;
+    const applyFix = async (fix: Fix) => {
+        const before = preview.counted?.rows;
+        if (before === undefined) {
+            return;
+        }
+        setFocus(null);
+        let next: string | null = null;
+        if (draft.mode === "columns") {
+            const changed = { ...draft, cleanup: { ...draft.cleanup, ...fix.cleanup } };
+            setDraft(changed);
+            next = previewSql(changed, sources, chars);
+        } else {
+            const text = await sqlEditor.current?.replace(wrappedSql(draft.sql, fix.step), {
+                format: true,
+            });
+            next = text?.trim() || null;
+        }
+        setFixed({ done: fix.done, before, live: next });
+        if (!auto && next) {
+            runNow(next);
+        }
+    };
     const run = () => {
         if (live === null) {
             return;
@@ -375,6 +438,13 @@ function DatasetWorkbench({
                     draft={draft}
                     sources={sources}
                     problem={draft.mode === "sql" ? (runProblem ?? saveProblem) : null}
+                    chars={chars}
+                    cleanupDefaults={{
+                        rare: limits?.minLabelRows ?? 10,
+                        maxTokens: limits?.longTokens ?? 2048,
+                        perLabel: context.perLabel,
+                    }}
+                    editor={sqlEditor}
                     onChange={setDraft}
                     onRun={(text) => runNow(text, live)}
                 />
@@ -419,6 +489,25 @@ function DatasetWorkbench({
                                 : undefined
                         }
                         onPick={(column, role) => setDraft(withRole(draft, column, role))}
+                        quality={{
+                            dataset,
+                            context,
+                            effect,
+                            focus,
+                            canFix: draft.mode === "columns" || Boolean(draft.sql.trim()),
+                            onShowRows: (check) =>
+                                setFocus({
+                                    check: check.check,
+                                    title: check.title,
+                                    rows: check.rows,
+                                    majority:
+                                        check.check === "balance" && !context.rare
+                                            ? (check.table[0]?.[0] ?? null)
+                                            : null,
+                                }),
+                            onShowAll: () => setFocus(null),
+                            onFix: (fix) => void applyFix(fix),
+                        }}
                     />
                 }
             />

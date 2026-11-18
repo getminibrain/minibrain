@@ -1,37 +1,39 @@
 import { IconChevronDown, IconMessage, IconTag } from "@tabler/icons-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
+    Button,
     DataGrid,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
     cn,
 } from "obp-ui";
 import { useEffect, useState } from "react";
 import { type QueryResponse, api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { TrainingExample, rowSummary } from "./DatasetDetail";
-import { RowsPreview } from "./RowsPreview";
+import {
+    type Finding,
+    type Fix,
+    type FixContext,
+    type FixEffect,
+    QualityTab,
+    toLookAt,
+    verdictOf,
+} from "./QualityTab";
+import { RowsPreview, type View } from "./RowsPreview";
 import { resultColumns } from "./resultColumns";
 
 export type QueryShape = components["schemas"]["QueryShapeInfo"];
-type CheckInfo = components["schemas"]["CheckInfo"];
 type PairColumn = QueryShape["missing"][number];
 
 const PREVIEW_ROWS = 50;
 const SETTLE_MS = 500;
 export const AUTO_RUN_ROWS = 1_000_000;
 const PAIR: PairColumn[] = ["input", "label"];
-const WARNING_TONES: Partial<Record<CheckInfo["status"], Tone>> = {
-    warning: "warning",
-    blocked: "destructive",
-};
 
 function runName(): string {
     return `editor-${Math.random().toString(36).slice(2, 12)}`;
@@ -91,13 +93,18 @@ export function useSettled(live: string | null, immediate: boolean, auto: boolea
     };
 }
 
-export function useLivePreview(sql: string | null, dataset: string | null) {
+export function useLivePreview(
+    sql: string | null,
+    dataset: string | null,
+    filtered: string | null = null,
+) {
     const [run] = useState(runName);
     const rowsRun = `${run}.rows`;
     const shapeRun = `${run}.shape`;
+    const rowsSql = filtered ?? sql;
     const rows = useQuery({
-        queryKey: ["query-preview", dataset, sql, "rows"],
-        queryFn: ({ signal }) => fetchRows(dataset, sql ?? "", rowsRun, signal),
+        queryKey: ["query-preview", dataset, rowsSql, "rows"],
+        queryFn: ({ signal }) => fetchRows(dataset, rowsSql ?? "", rowsRun, signal),
         enabled: sql !== null,
         placeholderData: keepPreviousData,
         retry: false,
@@ -131,6 +138,7 @@ export function useLivePreview(sql: string | null, dataset: string | null) {
     const counted = current && !shape.isPlaceholderData ? shape.data : undefined;
     return {
         sql,
+        filtered: current && filtered !== null,
         rerun: () => {
             rows.refetch();
             shape.refetch();
@@ -166,38 +174,19 @@ export function shapeSummary(shape: QueryShape | undefined): string | null {
     return `${plain(shape.rows, "row")} · ${plain(shape.quality.labels, "label")}`;
 }
 
-function Warning({ check }: { check: CheckInfo }) {
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <span className="shrink-0 cursor-default">
-                    <StatusText tone={WARNING_TONES[check.status] ?? "warning"}>
-                        {check.title}
-                    </StatusText>
-                </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-sm whitespace-normal">{check.detail}</TooltipContent>
-        </Tooltip>
-    );
-}
-
 function plain(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
-function shapeFacts(shape: QueryShape, quality: NonNullable<QueryShape["quality"]>): string {
-    return [
-        plain(shape.rows, "row"),
-        plain(quality.labels, "label"),
-        shape.largest_share === null ? null : `largest ${Math.round(shape.largest_share * 100)}%`,
-        `${count(quality.empty)} empty`,
-        `${count(quality.duplicates)} repeated`,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-}
-
-function ShapeStrip({ preview, waiting }: { preview: LivePreview; waiting: string | null }) {
+function ShapeStrip({
+    preview,
+    waiting,
+    onQuality,
+}: {
+    preview: LivePreview;
+    waiting: string | null;
+    onQuality: () => void;
+}) {
     const { shape, missing } = preview;
     if (waiting) {
         return <span className="text-muted-foreground">{waiting}</span>;
@@ -213,31 +202,32 @@ function ShapeStrip({ preview, waiting }: { preview: LivePreview; waiting: strin
             <span className="text-muted-foreground">Counting rows…</span>
         ) : null;
     }
-    const { quality } = shape;
-    const warnings = (shape.checks ?? []).filter(
-        (check) => WARNING_TONES[check.status] && !check.dismissed,
-    );
+    const verdict = shape.checks ? verdictOf(shape.checks) : null;
     return (
-        <>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span
-                        className={cn(
-                            "min-w-0 cursor-default truncate tabular-nums",
-                            preview.counting && "text-muted-foreground",
-                        )}
-                    >
-                        {shapeFacts(shape, quality)}
+        <span
+            className={cn(
+                "flex min-w-0 items-center gap-2 tabular-nums",
+                preview.counting && "text-muted-foreground",
+            )}
+        >
+            <span className="shrink-0">{shapeSummary(shape)}</span>
+            {verdict && (
+                <>
+                    <span aria-hidden="true" className="text-muted-foreground">
+                        ·
                     </span>
-                </TooltipTrigger>
-                <TooltipContent className="tabular-nums">
-                    {`${shapeFacts(shape, quality)}. Empty and repeated inputs are left out when the version is saved.`}
-                </TooltipContent>
-            </Tooltip>
-            {warnings.map((check) => (
-                <Warning key={check.check} check={check} />
-            ))}
-        </>
+                    <button
+                        type="button"
+                        onClick={onQuality}
+                        className="min-w-0 rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                        <StatusText tone={verdict.tone} className="min-w-0">
+                            <span className="truncate">{verdict.text}</span>
+                        </StatusText>
+                    </button>
+                </>
+            )}
+        </span>
     );
 }
 
@@ -282,28 +272,68 @@ function RoleMenu({
     );
 }
 
+export type Focus = { check: string; title: string; rows: number; majority: string | null };
+
+export type QualityProps = {
+    dataset: string | null;
+    context: FixContext;
+    effect: FixEffect | null;
+    focus: Focus | null;
+    canFix: boolean;
+    onShowRows: (check: Finding) => void;
+    onShowAll: () => void;
+    onFix: (fix: Fix) => void;
+};
+
+function FocusBar({ focus, onShowAll }: { focus: Focus; onShowAll: () => void }) {
+    return (
+        <>
+            <span className="min-w-0 truncate tabular-nums">
+                {`Showing ${plain(focus.rows, "row")} with ${focus.title.toLowerCase()}`}
+            </span>
+            <Button variant="link" size="sm" className="h-auto px-0" onClick={onShowAll}>
+                Show all
+            </Button>
+        </>
+    );
+}
+
 export function QueryPreviewPanel({
     preview,
     idle,
     waiting,
     pickable,
     onPick,
+    quality,
 }: {
     preview: LivePreview;
     idle: string;
     waiting: string | null;
     pickable?: string[];
     onPick?: (column: string, role: Role) => void;
+    quality: QualityProps;
 }) {
+    const [view, setView] = useState<View>("records");
+    const [rowsView, setRowsView] = useState<View>("records");
+    const choose = (next: View) => {
+        setView(next);
+        if (next === "records" || next === "table") {
+            setRowsView(next);
+        }
+    };
     const { result } = preview;
     const records = recordsOf(result);
     const paired = preview.missing.length === 0 && Boolean(result?.columns.includes("input"));
+    const actionable =
+        paired && Boolean(result?.columns.includes("label")) && quality.canFix && !preview.filtered;
     const empty = preview.sql === null ? (waiting ?? idle) : "The query returned no rows.";
     const loading = preview.sql !== null && !result && preview.running;
+    const focus = preview.filtered ? quality.focus : null;
+    const badge = preview.counted?.checks ? toLookAt(preview.counted.checks).length : 0;
     return (
         <RowsPreview
             records={records}
-            total={preview.counted?.rows}
+            total={focus ? focus.rows : preview.counted?.rows}
             counting={preview.counting && !preview.counted}
             idle={preview.sql === null}
             loading={loading}
@@ -311,7 +341,32 @@ export function QueryPreviewPanel({
             marked={["label"]}
             summary={paired ? rowSummary : undefined}
             empty={empty}
-            strip={<ShapeStrip preview={preview} waiting={waiting} />}
+            view={view}
+            onView={choose}
+            strip={
+                <ShapeStrip
+                    preview={preview}
+                    waiting={waiting}
+                    onQuality={() => choose("quality")}
+                />
+            }
+            bar={focus ? <FocusBar focus={focus} onShowAll={quality.onShowAll} /> : undefined}
+            qualityBadge={badge}
+            quality={
+                <QualityTab
+                    shape={preview.counted}
+                    counting={preview.counting}
+                    dataset={quality.dataset}
+                    actionable={actionable}
+                    context={quality.context}
+                    effect={quality.effect}
+                    onShowRows={(check) => {
+                        quality.onShowRows(check);
+                        choose(rowsView);
+                    }}
+                    onFix={quality.onFix}
+                />
+            }
             table={
                 result ? (
                     <DataGrid

@@ -31,12 +31,13 @@ const TONES: Record<CheckInfo["status"], Tone> = {
 
 const ORDER: CheckInfo["status"][] = ["blocked", "warning", "skipped", "off", "ok"];
 
-function useDismiss(dataset: string) {
+export function useDismiss(dataset: string) {
     const client = useQueryClient();
     const refresh = () =>
         Promise.all([
             client.invalidateQueries({ queryKey: ["datasets"] }),
             client.invalidateQueries({ queryKey: ["model"] }),
+            client.invalidateQueries({ queryKey: ["query-preview"] }),
         ]);
     const dismiss = useMutation({
         mutationFn: (check: CheckInfo) =>

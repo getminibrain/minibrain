@@ -55,10 +55,26 @@ def test_the_shape_counts_rows_labels_and_runs_the_quick_checks(harness: Harness
     assert found["quality"]["duplicates"] == 2
     assert found["largest_share"] == pytest.approx(22 / 43)
     checks = {check["check"]: check for check in found["checks"]}
-    assert set(checks) == {"empty", "single_label", "duplicates", "conflicts", "balance", "length"}
+    assert set(checks) == {"empty", "single_label", "duplicates", "conflicts", "balance", "length", "personal_data"}
     assert checks["duplicates"]["status"] == "warning"
     assert checks["conflicts"]["status"] == "warning"
     assert found["example"][-1] == {"role": "assistant", "content": "billing"}
+    assert found["checked"] == 43
+    settings = harness.client.get("/api/settings/data").json()
+    assert (settings["long_tokens"], settings["chars_per_token"], settings["min_label_rows"]) == (2048, 4, 10)
+    duplicates, conflicts = checks["duplicates"], checks["conflicts"]
+    assert (duplicates["rows"], duplicates["handled"], duplicates["columns"]) == (3, True, ["Input", "Rows"])
+    assert duplicates["table"] == [["same words", "3"]]
+    assert (conflicts["rows"], conflicts["handled"], conflicts["table"]) == (3, False, [["same words", "billing, bug"]])
+
+
+def test_a_large_result_runs_the_quick_checks_on_a_sample(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.api.data.QUICK_CHECK_ROWS", 20)
+    upload(harness, "tickets.csv", repeated_csv())
+    found = harness.client.post("/api/query/shape", json={"sql": PAIRS}).json()
+    assert (found["rows"], found["checked"], found["quality"]["rows"]) == (43, 20, 43)
+    checks = {check["check"]: check for check in found["checks"]}
+    assert checks["empty"]["detail"].startswith("41 rows")
 
 
 def test_the_shape_names_the_missing_column_instead_of_failing(harness: Harness) -> None:

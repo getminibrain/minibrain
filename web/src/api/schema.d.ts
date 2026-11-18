@@ -902,7 +902,7 @@ export interface paths {
         put?: never;
         /**
          * Count a query's rows and run the quick checks
-         * @description The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks run up to 50,000 rows. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
+         * @description The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks read every row up to 50,000, and a random 50,000 of a larger result. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409.
          */
         post: operations["any_query_shape_api_query_shape_post"];
         delete?: never;
@@ -4775,6 +4775,56 @@ export interface components {
             signature: string;
             /** Dismissed */
             dismissed: boolean;
+            /**
+             * Rows
+             * @description Rows the finding is about.
+             * @default 0
+             */
+            rows?: number;
+            /**
+             * Handled
+             * @description Training already handles it: repeated or empty inputs.
+             * @default false
+             */
+            handled?: boolean;
+            /**
+             * Columns
+             * @description Headings of the examples table.
+             */
+            columns?: string[];
+            /**
+             * Table
+             * @description Examples, one list of cells per row.
+             */
+            table?: string[][];
+        };
+        /** Cleanup */
+        Cleanup: {
+            /**
+             * Personal Data
+             * @description Mask emails, phone numbers, card numbers and IBANs in the input, or drop those rows.
+             */
+            personal_data?: ("mask" | "drop") | null;
+            /**
+             * Max Tokens
+             * @description Drop rows whose input runs past this many tokens.
+             */
+            max_tokens?: number | null;
+            /**
+             * Conflicts
+             * @description For inputs with more than one label: keep the most common label, or drop those inputs.
+             */
+            conflicts?: ("common" | "drop") | null;
+            /**
+             * Rare
+             * @description Drop labels with fewer rows than this.
+             */
+            rare?: number | null;
+            /**
+             * Per Label
+             * @description Keep at most this many rows a label.
+             */
+            per_label?: number | null;
         };
         /** ClosedPoolInfo */
         ClosedPoolInfo: {
@@ -5110,6 +5160,18 @@ export interface components {
             locked?: {
                 [key: string]: string;
             };
+            /**
+             * Long Tokens
+             * @description Inputs past this many tokens are long; not editable.
+             * @default 2048
+             */
+            long_tokens?: number;
+            /**
+             * Chars Per Token
+             * @description Characters a token, to estimate input length.
+             * @default 4
+             */
+            chars_per_token?: number;
         };
         /** DataSettingsUpdate */
         DataSettingsUpdate: {
@@ -5167,6 +5229,8 @@ export interface components {
              * @default false
              */
             skip_empty?: boolean;
+            /** @description Clean-up steps compiled into the query, when columns are picked. */
+            cleanup?: components["schemas"]["Cleanup"] | null;
             /** Sql */
             sql?: string | null;
             /** Folder Id */
@@ -7449,6 +7513,7 @@ export interface components {
              * @default false
              */
             skip_empty?: boolean;
+            cleanup?: components["schemas"]["Cleanup"];
             /** Sql */
             sql: string | null;
         };
@@ -7475,6 +7540,8 @@ export interface components {
              * @default false
              */
             skip_empty?: boolean;
+            /** @description Clean-up steps compiled into the query, when columns are picked. */
+            cleanup?: components["schemas"]["Cleanup"] | null;
             /** Sql */
             sql?: string | null;
             sample?: components["schemas"]["SampleRequest"] | null;
@@ -9026,6 +9093,11 @@ export interface components {
             checks: components["schemas"]["CheckInfo"][] | null;
             /** Example */
             example: components["schemas"]["ChatMessage"][];
+            /**
+             * Checked
+             * @description Rows the quick checks read: every row, or a random sample of a larger result.
+             */
+            checked?: number | null;
         };
         /** QueryShapeRequest */
         QueryShapeRequest: {

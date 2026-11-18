@@ -1,4 +1,4 @@
-from minibrain.data.checks import CheckLimits, Finding, blocking, run_checks
+from minibrain.data.checks import TOO_MUCH_TEXT, CheckLimits, Finding, blocking, run_checks
 from minibrain.data.splits import Row, clean, split
 from minibrain.tasks.examples import Example, Turn, encode_turns, single
 from tests.conftest import Harness, tickets_csv
@@ -182,3 +182,50 @@ def test_free_text_answers_skip_the_label_checks() -> None:
     found = by_check(run_checks(rows, None, CheckLimits(), labelled=False))
     assert "single_label" not in found
     assert found["balance"].status == "skipped"
+
+
+def test_findings_say_how_many_rows_they_touch_and_list_them_as_a_table() -> None:
+    extra: list[tuple[str | None, str | None]] = [
+        ("message number 1", "label 1"),
+        ("message number 2", "label 0"),
+        ("", "label 3"),
+        ("x" * 9000, "label 2"),
+        ("write to jane.doe@example.com please", "label 1"),
+    ]
+    found = by_check(run_checks(labelled(120) + extra, None, CheckLimits()))
+    duplicates, conflicts, length = found["duplicates"], found["conflicts"], found["length"]
+    assert (duplicates.rows, duplicates.handled, duplicates.columns) == (4, True, ("Input", "Rows"))
+    assert duplicates.table == (("message number 1", "2"), ("message number 2", "2"))
+    assert (conflicts.rows, conflicts.handled) == (2, False)
+    assert conflicts.table == (("message number 2", "label 0, label 2"),)
+    assert (length.title, length.rows, length.handled, length.columns) == (
+        "Empty or long inputs",
+        2,
+        False,
+        ("Input", "Tokens"),
+    )
+    assert length.table[0][1] == "~2,250"
+    personal = found["personal_data"]
+    assert (personal.rows, personal.table) == (1, (("write to [email address] please", "email address"),))
+    assert personal.as_dict()["table"] == [["write to [email address] please", "email address"]]
+
+
+def test_empty_inputs_alone_are_handled_by_training() -> None:
+    found = by_check(run_checks([*labelled(120), ("", "label 3"), (None, "label 1")], None, CheckLimits()))["length"]
+    assert (found.status, found.title, found.rows, found.handled) == ("warning", "Empty inputs", 2, True)
+
+
+def test_balance_lists_rare_labels_smallest_first_and_the_majority_label() -> None:
+    rows = [(f"common {index}", "common") for index in range(190)]
+    rows += [(f"rare {index}", "rare") for index in range(5)] + [("odd one", "odd")]
+    found = by_check(run_checks(rows, None, CheckLimits()))["balance"]
+    assert found.columns == ("Label", "Rows")
+    assert found.table == (("common", "190"), ("odd", "1"), ("rare", "5"))
+    assert found.rows == 6
+
+
+def test_quick_checks_skip_personal_data_over_the_text_budget() -> None:
+    rows = labelled(120)
+    found = by_check(run_checks(rows, None, CheckLimits(), text_budget=100))["personal_data"]
+    assert (found.status, found.detail) == ("skipped", TOO_MUCH_TEXT)
+    assert by_check(run_checks(rows, None, CheckLimits(), text_budget=10**6))["personal_data"].status == "ok"

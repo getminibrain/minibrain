@@ -9,6 +9,7 @@ from minibrain.api.schemas import (
     BaseTargetInfo,
     ChangeInfo,
     CheckInfo,
+    Cleanup,
     ColumnInfo,
     ConfusionInfo,
     ContractInfo,
@@ -48,7 +49,7 @@ from minibrain.api.schemas import (
 from minibrain.data.dataset_versions import Changes, Sample, changes_since, too_few_rows, version_number
 from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
-from minibrain.data.templates import plain_columns, skips_empty
+from minibrain.data.templates import cleanup_of, plain_columns, skips_empty
 from minibrain.jobs.removal import kept_by
 from minibrain.models.safety import model_safety
 from minibrain.policy import bodies_choice
@@ -176,6 +177,7 @@ def mapping_info(dataset: Dataset | None) -> MappingInfo:
         label_column=label_column,
         template=dataset.template,
         skip_empty=skips_empty(dataset.template),
+        cleanup=Cleanup.model_validate(cleanup_of(dataset.template)),
         sql=dataset.sql,
     )
 

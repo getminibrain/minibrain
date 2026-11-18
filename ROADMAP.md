@@ -598,6 +598,16 @@ dataset and on the Training page before a run starts:
   IBANs (mod-97-checked). The report says plainly that the patterns can miss names and addresses.
 - "Dismiss for this dataset" stores the check and a signature of its result on the dataset; the warning shows again
   when a later version's result for that check differs.
+- The dataset editor runs the quick checks (all but train/test overlap, which needs the split) on every row up to
+  50,000 and on a random 50,000 of a larger result, personal data only while those rows hold under 10 million
+  characters. Each finding says how many rows it touches and lists them as a small table (input and labels,
+  label and rows, input and tokens, input and what was found); repeated and empty inputs show as info, since training
+  already drops them. The preview's Quality tab gives the verdict (ready to train, N to look at, or why it cannot
+  train), the thresholds with a link to Settings › Data, Show rows (the current query wrapped in SQL that keeps the
+  affected rows) and Fix: keep the most common label of an input or drop it, keep at most N rows a label, drop labels
+  under the rare threshold, drop inputs over the long threshold, mask or drop personal data. In Pick columns mode a fix
+  ticks a Clean up option saved with the mapping (`cleanup`, compiled into the dataset's SQL as CTE steps, in that
+  order); in Write SQL mode it wraps the query in `WITH base AS (...)` as one undoable edit.
 
 ### PII
 

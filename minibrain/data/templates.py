@@ -1,6 +1,7 @@
 import re
 from collections.abc import Sequence
 
+from minibrain.data.cleanup import CLEANUP_KEYS, checked_cleanup, cleaned_sql
 from minibrain.data.sources import SourceError, filled, quote_identifier, quote_literal, select_from
 
 PLACEHOLDER = re.compile(r"\{([^{}\n]+)\}")
@@ -31,6 +32,17 @@ def skips_empty(template: Template | None) -> bool:
 def skipping_empty(template: Template, skip: bool) -> Template:
     found = {key: value for key, value in template.items() if key != SKIP_EMPTY}
     return {**found, SKIP_EMPTY: "true"} if skip and not is_chat(found) else found
+
+
+def cleanup_of(template: Template | None) -> dict[str, str]:
+    if not template or is_chat(template):
+        return {}
+    return {key: template[key] for key in CLEANUP_KEYS if key in template}
+
+
+def cleaning(template: Template, cleanup: dict[str, str]) -> Template:
+    found = {key: value for key, value in template.items() if key not in CLEANUP_KEYS}
+    return found if is_chat(found) else {**found, **checked_cleanup(cleanup)}
 
 
 def columns_in(text: str) -> list[str]:
@@ -83,12 +95,12 @@ def checked(template: Template) -> Template:
         if set(template) != {MESSAGES} or not template[MESSAGES].strip():
             raise SourceError("a chat mapping names the column that holds the messages")
         return {MESSAGES: template[MESSAGES].strip()}
-    if set(template) - {SKIP_EMPTY} != {USER, ASSISTANT}:
+    if set(template) - {SKIP_EMPTY, *CLEANUP_KEYS} != {USER, ASSISTANT}:
         raise SourceError("a mapping fills the user and assistant messages, or names a messages column")
     for slot in (USER, ASSISTANT):
         if not columns_in(template[slot]):
             raise SourceError(f"the {slot} message names at least one column, such as {{text}}")
-    return skipping_empty(template, skips_empty(template))
+    return cleaning(skipping_empty(template, skips_empty(template)), cleanup_of(template))
 
 
 def template_sql(template: Template, tables: Sequence[str]) -> str:
@@ -97,7 +109,8 @@ def template_sql(template: Template, tables: Sequence[str]) -> str:
         return select_from([(quote_identifier(found[MESSAGES]), MESSAGES)], tables)
     label = slot_sql(found[ASSISTANT])
     where = filled(label) if skips_empty(found) else None
-    return select_from([(slot_sql(found[USER]), "input"), (label, "label")], tables, where)
+    sql = select_from([(slot_sql(found[USER]), "input"), (label, "label")], tables, where)
+    return cleaned_sql(sql, cleanup_of(found))
 
 
 def missing_columns(template: Template, columns: Sequence[str]) -> list[str]:

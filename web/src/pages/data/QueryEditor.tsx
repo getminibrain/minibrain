@@ -13,13 +13,15 @@ import {
     type SqlEditorHandle,
     type SqlSchema,
 } from "obp-ui";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 import type { DatasetSummary, MappingInfo, SourceStats, SourceSummary } from "~/api/client";
 import { useSourceRows, useSourcesStats } from "~/api/queries";
 import { FORM_ROW_GAP, FormControl, FormRow, FormRows } from "~/components/FormRows";
 import { count } from "~/lib/format";
 import type { SqlProblem } from "~/lib/sqlError";
+import { type CleanupDefaults, CleanupGroup } from "./CleanupGroup";
 import type { SampleRequest } from "./SampleOffer";
+import { type Cleanup, NO_CLEANUP, cleanedSql, sameCleanup } from "./cleanup";
 import {
     type ColumnFacts,
     type Suggestion,
@@ -36,6 +38,7 @@ export type MappingBody = {
     input_column?: string;
     label_column?: string;
     skip_empty?: boolean;
+    cleanup?: Cleanup;
     sql?: string;
     sample?: SampleRequest;
 };
@@ -50,6 +53,7 @@ export type Draft = {
     input: string;
     label: string;
     skipEmpty: boolean;
+    cleanup: Cleanup;
     sql: string;
     guessed: Role[];
 };
@@ -99,15 +103,30 @@ function picksOf(draft: Draft, sources: SourceSummary[]): Picks | null {
     };
 }
 
-export function draftSql(draft: Draft, sources: SourceSummary[]): string | null {
+function compiled(sql: string, draft: Draft, chars: number | null): string | null {
+    if (draft.cleanup.max_tokens && chars === null) {
+        return null;
+    }
+    return cleanedSql(sql, draft.cleanup, chars ?? 0);
+}
+
+export function draftSql(
+    draft: Draft,
+    sources: SourceSummary[],
+    chars: number | null,
+): string | null {
     if (draft.mode === "sql") {
         return draft.sql.trim() || null;
     }
     const picks = picksOf(draft, sources);
-    return picks ? columnsSql(picks) : null;
+    return picks ? compiled(columnsSql(picks), draft, chars) : null;
 }
 
-export function previewSql(draft: Draft, sources: SourceSummary[]): string | null {
+export function previewSql(
+    draft: Draft,
+    sources: SourceSummary[],
+    chars: number | null,
+): string | null {
     if (draft.mode === "sql") {
         return draft.sql.trim() || null;
     }
@@ -117,7 +136,9 @@ export function previewSql(draft: Draft, sources: SourceSummary[]): string | nul
         return null;
     }
     const picks = picksOf(draft, sources);
-    return picks ? columnsSql(picks, columns) : everythingSql(chosen.map((item) => item.table));
+    return picks
+        ? compiled(columnsSql(picks, columns), draft, chars)
+        : everythingSql(chosen.map((item) => item.table));
 }
 
 export function draftBody(draft: Draft, sources: SourceSummary[]): MappingBody | null {
@@ -134,6 +155,7 @@ export function draftBody(draft: Draft, sources: SourceSummary[]): MappingBody |
         input_column: picks.input,
         label_column: picks.label,
         skip_empty: picks.skipEmpty,
+        cleanup: draft.cleanup,
     };
 }
 
@@ -146,7 +168,8 @@ export function sameDraft(left: Draft, right: Draft): boolean {
         : left.sources.join() === right.sources.join() &&
               left.input === right.input &&
               left.label === right.label &&
-              left.skipEmpty === right.skipEmpty;
+              left.skipEmpty === right.skipEmpty &&
+              sameCleanup(left.cleanup, right.cleanup);
 }
 
 export function savedDraft(
@@ -163,6 +186,7 @@ export function savedDraft(
         input: mapping.input_column ?? "",
         label: mapping.label_column ?? "",
         skipEmpty: mode === "columns" ? Boolean(mapping.skip_empty) : true,
+        cleanup: mode === "columns" ? { ...NO_CLEANUP, ...mapping.cleanup } : NO_CLEANUP,
         sql: mapping.sql ?? "",
         guessed: [],
     };
@@ -183,6 +207,7 @@ export function pickedDraft(chosen: SourceSummary[]): Draft {
         input,
         label,
         skipEmpty: true,
+        cleanup: NO_CLEANUP,
         sql: "",
         guessed,
     };
@@ -487,11 +512,13 @@ function ColumnList({
 function ColumnsMode({
     draft,
     sources,
+    cleanupDefaults,
     onChange,
     onSwitch,
 }: {
     draft: Draft;
     sources: SourceSummary[];
+    cleanupDefaults: CleanupDefaults;
     onChange: (draft: Draft) => void;
     onSwitch: () => void;
 }) {
@@ -519,6 +546,7 @@ function ColumnsMode({
         onChange({
             ...pickedDraft(ids.flatMap((id) => sources.filter((item) => String(item.id) === id))),
             skipEmpty: draft.skipEmpty,
+            cleanup: draft.cleanup,
             sql: draft.sql,
         });
     return (
@@ -565,6 +593,11 @@ function ColumnsMode({
                         onCheckedChange={(checked) =>
                             onChange({ ...draft, skipEmpty: checked === true })
                         }
+                    />
+                    <CleanupGroup
+                        cleanup={draft.cleanup}
+                        defaults={cleanupDefaults}
+                        onChange={(cleanup) => onChange({ ...draft, cleanup })}
                     />
                 </>
             ) : null}
@@ -644,16 +677,17 @@ function SqlMode({
     draft,
     sources,
     problem,
+    editor,
     onChange,
     onRun,
 }: {
     draft: Draft;
     sources: SourceSummary[];
     problem: SqlProblem | null;
+    editor: RefObject<SqlEditorHandle | null>;
     onChange: (draft: Draft) => void;
     onRun: (sql: string) => void;
 }) {
-    const editor = useRef<SqlEditorHandle>(null);
     const stats = useSourcesStats(sources.map((item) => item.id)).map((item) => item.data);
     return (
         <div className="@container flex flex-col gap-3">
@@ -690,17 +724,23 @@ export function QueryEditor({
     draft,
     sources,
     problem,
+    chars,
+    cleanupDefaults,
+    editor,
     onChange,
     onRun,
 }: {
     draft: Draft;
     sources: SourceSummary[];
     problem: SqlProblem | null;
+    chars: number | null;
+    cleanupDefaults: CleanupDefaults;
+    editor: RefObject<SqlEditorHandle | null>;
     onChange: (draft: Draft) => void;
     onRun: (sql: string) => void;
 }) {
     const switchMode = (next: string) => {
-        const seeded = next === "sql" && !draft.sql.trim() ? draftSql(draft, sources) : null;
+        const seeded = next === "sql" && !draft.sql.trim() ? draftSql(draft, sources, chars) : null;
         onChange({ ...draft, mode: next as Mode, sql: seeded ?? draft.sql });
     };
     return (
@@ -711,6 +751,7 @@ export function QueryEditor({
                     draft={draft}
                     sources={sources}
                     problem={problem}
+                    editor={editor}
                     onChange={onChange}
                     onRun={onRun}
                 />
@@ -718,6 +759,7 @@ export function QueryEditor({
                 <ColumnsMode
                     draft={draft}
                     sources={sources}
+                    cleanupDefaults={cleanupDefaults}
                     onChange={onChange}
                     onSwitch={() => switchMode("sql")}
                 />

@@ -577,6 +577,7 @@ def example_rows(
     return [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found]
 
 
+SAMPLE_SEED = 7
 PairColumn = Literal["input", "label"]
 PAIR_COLUMNS: tuple[PairColumn, ...] = ("input", "label")
 
@@ -607,8 +608,10 @@ def query_shape(tables: Sequence[Table], sql: str, aliases: dict[str, str] | Non
         examples = examples_query(sql, columns)
         quality = quality_of(connection, examples)
         rows: list[ExampleRow] | None = None
-        if quality.rows <= cap:
-            fetched = connection.execute(f"SELECT messages, input, expected FROM ({examples})").fetchall()
+        if cap > 0:
+            sample = f" USING SAMPLE reservoir({int(cap)} ROWS) REPEATABLE ({SAMPLE_SEED})"
+            sample = sample if quality.rows > cap else ""
+            fetched = connection.execute(f"SELECT messages, input, expected FROM ({examples}){sample}").fetchall()
             rows = [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in fetched]
     return QueryShape(rows=quality.rows, missing=[], quality=quality, examples=rows)
 

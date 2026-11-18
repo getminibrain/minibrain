@@ -3,6 +3,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
+from minibrain.data.checks import CHARS_PER_TOKEN, LONG_TOKENS
 from minibrain.ml.planner import MAX_RANK
 from minibrain.models.rules import LicenceUse
 
@@ -187,11 +188,30 @@ class SourceInfo(BaseModel):
     rows: int
 
 
+class Cleanup(BaseModel):
+    personal_data: Literal["mask", "drop"] | None = Field(
+        default=None, description="Mask emails, phone numbers, card numbers and IBANs in the input, or drop those rows."
+    )
+    max_tokens: int | None = Field(
+        default=None, ge=1, le=1_000_000, description="Drop rows whose input runs past this many tokens."
+    )
+    conflicts: Literal["common", "drop"] | None = Field(
+        default=None,
+        description="For inputs with more than one label: keep the most common label, or drop those inputs.",
+    )
+    rare: int | None = Field(default=None, ge=2, le=100_000, description="Drop labels with fewer rows than this.")
+    per_label: int | None = Field(default=None, ge=1, le=50_000_000, description="Keep at most this many rows a label.")
+
+
+CLEANUP_HELP = "Clean-up steps compiled into the query, when columns are picked."
+
+
 class MappingInfo(BaseModel):
     input_column: str | None
     label_column: str | None
     template: dict[str, str] | None = None
     skip_empty: bool = False
+    cleanup: Cleanup = Field(default_factory=Cleanup)
     sql: str | None
 
 
@@ -307,6 +327,10 @@ class CheckInfo(BaseModel):
     examples: list[str]
     signature: str
     dismissed: bool
+    rows: int = Field(default=0, description="Rows the finding is about.")
+    handled: bool = Field(default=False, description="Training already handles it: repeated or empty inputs.")
+    columns: list[str] = Field(default_factory=list, description="Headings of the examples table.")
+    table: list[list[str]] = Field(default_factory=list, description="Examples, one list of cells per row.")
 
 
 class SampleInfo(BaseModel):
@@ -437,6 +461,7 @@ class DatasetCreate(BaseModel):
     skip_empty: bool = Field(
         default=False, description="Leave out rows whose answer column is empty, when columns are picked."
     )
+    cleanup: Cleanup | None = Field(default=None, description=CLEANUP_HELP)
     sql: str | None = None
     folder_id: int | None = None
     sample: SampleRequest | None = None
@@ -513,6 +538,7 @@ class MappingUpdate(BaseModel):
     skip_empty: bool = Field(
         default=False, description="Leave out rows whose answer column is empty, when columns are picked."
     )
+    cleanup: Cleanup | None = Field(default=None, description=CLEANUP_HELP)
     sql: str | None = None
     sample: SampleRequest | None = None
 
@@ -527,6 +553,8 @@ class DataSettings(BaseModel):
     majority_share: float = Field(default=0.9, ge=0.5, le=1.0)
     min_label_rows: int = Field(default=10, ge=1, le=100_000)
     locked: dict[str, str] = Field(default_factory=dict)
+    long_tokens: int = Field(default=LONG_TOKENS, description="Inputs past this many tokens are long; not editable.")
+    chars_per_token: int = Field(default=CHARS_PER_TOKEN, description="Characters a token, to estimate input length.")
 
 
 class DataSettingsUpdate(BaseModel):
@@ -1082,6 +1110,9 @@ class QueryShapeInfo(BaseModel):
     largest_share: float | None
     checks: list[CheckInfo] | None
     example: list[ChatMessage]
+    checked: int | None = Field(
+        default=None, description="Rows the quick checks read: every row, or a random sample of a larger result."
+    )
 
 
 class DatasetVersionRows(BaseModel):
