@@ -1,21 +1,28 @@
 import {
     IconArrowRight,
+    IconChevronDown,
     IconFileImport,
     IconFolder,
     IconFolderDown,
     IconFolderPlus,
     IconLayoutGridAdd,
     IconPencil,
+    IconPlus,
     IconStack2,
     IconTable,
     IconTrash,
+    IconUpload,
 } from "@tabler/icons-react";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
     Badge,
+    Button,
     DropZone,
+    DropdownMenu,
+    DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuTrigger,
     FileName,
     SearchInput,
     Tooltip,
@@ -39,16 +46,18 @@ import {
 import type { DatasetSummary, SourceAdded, SourceSummary } from "~/api/client";
 import { type DatasetFolder, useDatasetFolders, useFolderRoots } from "~/api/dataQueries";
 import { useDatasets, useSources } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat, pageFrame } from "~/components/Section";
+import { useCan } from "~/lib/access";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { bytes } from "~/lib/time";
 import { useResizableWidth } from "~/lib/useResizableWidth";
 import { useStoredList } from "~/lib/useStoredList";
-import { AddMenu, SourceChoices, useSourceBlocks } from "./AddMenu";
+import { AddMenu, type SourceBlocks, SourceChoices, useSourceBlocks } from "./AddMenu";
 import {
     type AddKind,
     AlreadyAddedDialog,
@@ -201,6 +210,68 @@ function allBranches(nodes: TreeNode[]): string[] {
     );
 }
 
+const GROUP_ADD: Record<SourceGroupId, string> = {
+    upload: "Upload file",
+    folder: "Add folder",
+    s3: "Add S3 path",
+    database: "Add database table",
+    lakehouse: "Add lakehouse table",
+};
+
+function GroupAddButton({
+    kind,
+    blocks,
+    busy,
+    onAdd,
+}: {
+    kind: SourceGroupId;
+    blocks: SourceBlocks;
+    busy: boolean;
+    onAdd: (kind: SourceGroupId) => void;
+}) {
+    const icon = kind === "upload" ? <IconUpload /> : <IconPlus />;
+    const block = blocks[kind];
+    if (block) {
+        return (
+            <BlockedButton reason={block.why}>
+                {icon}
+                {GROUP_ADD[kind]}
+            </BlockedButton>
+        );
+    }
+    return (
+        <Button className="shrink-0" disabled={busy} onClick={() => onAdd(kind)}>
+            {icon}
+            {GROUP_ADD[kind]}
+        </Button>
+    );
+}
+
+function AddSourceButton({
+    blocks,
+    busy,
+    onAdd,
+}: {
+    blocks: SourceBlocks;
+    busy: boolean;
+    onAdd: (kind: SourceGroupId) => void;
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button className="shrink-0" disabled={busy}>
+                    <IconPlus />
+                    Add source
+                    <IconChevronDown />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+                <SourceChoices blocks={blocks} detailed onPick={onAdd} />
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function GroupDetail({
     kind,
     sources,
@@ -210,6 +281,7 @@ function GroupDetail({
     onPick,
     onMake,
     onSelect,
+    action,
 }: {
     kind: SourceGroupId;
     sources: SourceSummary[];
@@ -219,6 +291,7 @@ function GroupDetail({
     onPick: (ids: string[]) => void;
     onMake: (sources: SourceSummary[]) => void;
     onSelect: (item: ItemRef) => void;
+    action: ReactNode;
 }) {
     const grouped = sources.filter((source) => groupOf(source.kind).id === kind);
     const table = grouped.length > 0 && (
@@ -234,11 +307,16 @@ function GroupDetail({
         return (
             <div className={`${FILL} gap-6`}>
                 {kind === "folder" ? (
-                    <FoldersGroup sources={sources} datasets={datasets} />
+                    <FoldersGroup sources={sources} datasets={datasets} action={action} />
                 ) : kind === "lakehouse" ? (
-                    <LakehouseGroup sources={sources} datasets={datasets} />
+                    <LakehouseGroup sources={sources} datasets={datasets} action={action} />
                 ) : (
-                    <ConnectedGroup kind={kind} sources={sources} datasets={datasets} />
+                    <ConnectedGroup
+                        kind={kind}
+                        sources={sources}
+                        datasets={datasets}
+                        action={action}
+                    />
                 )}
                 {table}
             </div>
@@ -251,13 +329,14 @@ function GroupDetail({
     );
     return (
         <div className={`${FILL} gap-6`}>
-            <header className="flex flex-wrap items-start justify-between gap-3">
+            <header className="flex items-start justify-between gap-6">
                 <div className="flex min-w-0 flex-col gap-0.5">
                     <h2 className="text-2xl font-semibold">Uploads</h2>
                     <p className="text-muted-foreground">
                         Files copied into this install, stored once and shared by every model.
                     </p>
                 </div>
+                {action}
             </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Files" value={count(members.length)} />
@@ -444,6 +523,7 @@ export function DataExplorer() {
     const adder = useSourceAdder(onUploaded);
     const addKind = addSourceKind(adder, add);
     const blocks = useSourceBlocks();
+    const can = useCan();
     const pickedIds = picked.scope === selectedKey ? picked.ids : [];
     const pickedSources = sourceList.filter((source) => pickedIds.includes(String(source.id)));
     const [action, setAction] = useState<TreeAction | null>(null);
@@ -683,7 +763,20 @@ export function DataExplorer() {
             );
         } else if (selected.kind === "group" && selected.id === "sources") {
             detail = (
-                <SourcesOverview sources={sourceList} datasets={datasetList} onSelect={select} />
+                <SourcesOverview
+                    sources={sourceList}
+                    datasets={datasetList}
+                    onSelect={select}
+                    action={
+                        can.build && (
+                            <AddSourceButton
+                                blocks={blocks}
+                                busy={adder.pending !== null}
+                                onAdd={addKind}
+                            />
+                        )
+                    }
+                />
             );
         } else if (selected.kind === "group") {
             detail = (
@@ -696,6 +789,16 @@ export function DataExplorer() {
                     onPick={(ids) => setPicked({ scope: selectedKey, ids })}
                     onMake={setMaking}
                     onSelect={select}
+                    action={
+                        can.build && (
+                            <GroupAddButton
+                                kind={selected.id as SourceGroupId}
+                                blocks={blocks}
+                                busy={adder.pending !== null}
+                                onAdd={addKind}
+                            />
+                        )
+                    }
                 />
             );
         } else if (selected.kind === "source") {

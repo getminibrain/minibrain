@@ -1,5 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, EmptyState, Link } from "obp-ui";
+import type { ReactNode } from "react";
 import type { DatasetSummary, SourceSummary } from "~/api/client";
 import { Stat } from "~/components/Section";
 import { count } from "~/lib/format";
@@ -54,10 +55,12 @@ export function SourcesOverview({
     sources,
     datasets,
     onSelect,
+    action,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
     onSelect: (item: ItemRef) => void;
+    action?: ReactNode;
 }) {
     const rows = SOURCE_GROUPS.map((group) => {
         const members = sources.filter((source) => inGroup(source, group));
@@ -77,12 +80,15 @@ export function SourcesOverview({
         .reduce((sum, source) => sum + source.size, 0);
     return (
         <div className={`${FILL} gap-6`}>
-            <header className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-2xl font-semibold">Sources</h2>
-                <p className="text-muted-foreground">
-                    Files, folders, buckets and tables minibrain reads. Each one is a table that
-                    dataset SQL reads by name.
-                </p>
+            <header className="flex items-start justify-between gap-6">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">Sources</h2>
+                    <p className="text-muted-foreground">
+                        Files, folders, buckets and tables minibrain reads. Each one is a table that
+                        dataset SQL reads by name.
+                    </p>
+                </div>
+                {action}
             </header>
             {sources.length === 0 ? (
                 <EmptyState variant="panel" title="No sources yet" className="mx-0 mt-0">

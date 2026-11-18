@@ -8,7 +8,7 @@ import {
     RadioGroup,
     RadioGroupItem,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
     type DatasetSummary,
     type SourceAdded,
@@ -214,9 +214,11 @@ export function AddLakehouseDialog({
 export function LakehouseGroup({
     sources,
     datasets,
+    action,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
+    action?: ReactNode;
 }) {
     const members = sources.filter((source) => tableFormat(source.kind) !== null);
     const built = datasets.filter((dataset) =>
@@ -225,13 +227,16 @@ export function LakehouseGroup({
     const used = FORMAT_ORDER.filter((format) => members.some((source) => source.kind === format));
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-2xl font-semibold">Lakehouse</h2>
-                <p className="text-muted-foreground">
-                    Iceberg and Delta Lake tables, read in place at their current snapshot or
-                    version. Iceberg tables come from S3 through a connection, Delta tables from
-                    folders on this server.
-                </p>
+            <header className="flex items-start justify-between gap-6">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">Lakehouse</h2>
+                    <p className="text-muted-foreground">
+                        Iceberg and Delta Lake tables, read in place at their current snapshot or
+                        version. Iceberg tables come from S3 through a connection, Delta tables from
+                        folders on this server.
+                    </p>
+                </div>
+                {action}
             </header>
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Tables" value={count(members.length)} />

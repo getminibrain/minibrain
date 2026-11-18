@@ -476,10 +476,12 @@ export function ConnectedGroup({
     kind,
     sources,
     datasets,
+    action,
 }: {
     kind: ConnectedKind;
     sources: SourceSummary[];
     datasets: DatasetSummary[];
+    action?: ReactNode;
 }) {
     const connections = useConnections();
     const options = usable(connections.data, kind);
@@ -496,9 +498,12 @@ export function ConnectedGroup({
             : EXTENSIONS_FOR[kind];
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-2xl font-semibold">{group.title}</h2>
-                <p className="text-muted-foreground">{group.body}</p>
+            <header className="flex items-start justify-between gap-6">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">{group.title}</h2>
+                    <p className="text-muted-foreground">{group.body}</p>
+                </div>
+                {action}
             </header>
             <ErrorLine error={connections.error} onRetry={connections.refetch} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">

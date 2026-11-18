@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
     type DatasetSummary,
     type SourceAdded,
@@ -199,9 +199,11 @@ export function AddFolderDialog({
 export function FoldersGroup({
     sources,
     datasets,
+    action,
 }: {
     sources: SourceSummary[];
     datasets: DatasetSummary[];
+    action?: ReactNode;
 }) {
     const roots = useFolderRoots();
     const members = sources.filter((source) => source.kind === "folder");
@@ -211,12 +213,15 @@ export function FoldersGroup({
     const allowed = roots.data?.roots ?? [];
     return (
         <div className="flex flex-col gap-6">
-            <header className="flex min-w-0 flex-col gap-0.5">
-                <h2 className="text-2xl font-semibold">Folders</h2>
-                <p className="text-muted-foreground">
-                    Directories on this server, read in place. Every CSV, TSV, JSON, JSON Lines or
-                    Parquet file of one format in a folder and its subfolders is one table.
-                </p>
+            <header className="flex items-start justify-between gap-6">
+                <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="text-2xl font-semibold">Folders</h2>
+                    <p className="text-muted-foreground">
+                        Directories on this server, read in place. Every CSV, TSV, JSON, JSON Lines
+                        or Parquet file of one format in a folder and its subfolders is one table.
+                    </p>
+                </div>
+                {action}
             </header>
             <ErrorLine error={roots.error} onRetry={roots.refetch} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
