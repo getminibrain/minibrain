@@ -1,4 +1,4 @@
-import { IconEraser } from "@tabler/icons-react";
+import { IconEraser, IconTrash } from "@tabler/icons-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, ConfirmDialog } from "obp-ui";
 import type { ReactNode } from "react";
@@ -40,7 +40,8 @@ function PurgeLogs({
     return (
         <ConfirmDialog
             trigger={
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="destructive">
+                    <IconTrash />
                     Delete logs
                 </Button>
             }
