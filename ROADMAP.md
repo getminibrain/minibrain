@@ -547,6 +547,13 @@ COPY (
 ```
 
 - With a task type, SQL returns the task's columns (`input`, `label` or fields); the task type builds the messages.
+- The SQL editor completes table and column names and the DuckDB functions and keywords people shape text with
+  (string, regexp, list, struct, date, aggregate and window functions, `QUALIFY`, `USING SAMPLE`, `EXCLUDE`,
+  `REPLACE`…), each with its signature and one line, from a static list that ships with the UI. Its Examples menu
+  rewrites the query with a recipe over the current one (or a starter over the first table): drop empty rows, remove
+  duplicates, one label an input, relabel with `CASE`, trim and lowercase, combine sources (`UNION ALL BY NAME`), N
+  rows a label, a random sample; the same SQL steps as the editor's fixes, one undoable edit. The tables box inserts
+  a table or column name on click, quoting a name that needs it.
 - User SQL runs on a locked-down connection: only attached sources, no other file or network access, timeout.
 - Arbitrary Python is v2: admin-only, sandboxed subprocess, no network.
 - Auto-mapping: the pool's base model proposes a mapping from sampled rows; the user edits it.

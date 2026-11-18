@@ -15,9 +15,9 @@ export const NO_CLEANUP: Cleanup = {
 const ORDER: CleanupKey[] = ["personal_data", "max_tokens", "conflicts", "rare", "per_label"];
 
 const TEXT = "CAST(input AS VARCHAR)";
-const INPUT = `trim(${TEXT})`;
-const LABEL = "trim(CAST(label AS VARCHAR))";
-const USABLE = `coalesce(${INPUT}, '') <> '' AND coalesce(${LABEL}, '') <> ''`;
+export const INPUT = `trim(${TEXT})`;
+export const LABEL = "trim(CAST(label AS VARCHAR))";
+export const USABLE = `coalesce(${INPUT}, '') <> '' AND coalesce(${LABEL}, '') <> ''`;
 
 const PERSONAL_PATTERNS: [string, string][] = [
     ["email address", String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`],
@@ -31,7 +31,7 @@ const PERSONAL_PATTERNS: [string, string][] = [
     ],
 ];
 
-function literal(value: string): string {
+export function literal(value: string): string {
     return `'${value.replaceAll("'", "''")}'`;
 }
 

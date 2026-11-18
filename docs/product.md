@@ -56,7 +56,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Pick text and answer columns by type, sample values and suggestions.
   UI: Data › Add › New dataset › Pick columns, Data › dataset › … › Edit dataset › Pick columns, Data › dataset › … › Edit dataset › Preview › Table · API: GET /api/sources/{source_id}/stats, POST /api/datasets, PUT /api/datasets/{slug}/mapping
 - **SQL editor** · shipped · product, ml
-  Format, fold, multiple cursors, run a selection, column values on hover.
+  DuckDB function help, example recipes, format, run a selection, column values.
   UI: Data › Add › New dataset › Write SQL, Data › dataset › … › Edit dataset › Write SQL · API: GET /api/sources/{source_id}/stats
 - **Live query preview** · shipped · product, ml
   See rows and quick checks as you type; large sources on Run.

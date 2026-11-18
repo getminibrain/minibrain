@@ -1,8 +1,12 @@
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconBook2, IconChevronDown, IconPlus, IconX } from "@tabler/icons-react";
 import {
     Badge,
     Button,
     CheckboxField,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     SegmentedTabs,
     Select,
     SelectContent,
@@ -30,7 +34,18 @@ import {
     statsSuggestion,
 } from "./columnFacts";
 import { typeWord } from "./columnTypes";
-import { type Picks, columnsSql, everythingSql, guessPair, sharedColumns, starterSql } from "./sql";
+import { DUCKDB_WORDS } from "./duckdbWords";
+import { RECIPES, type RecipeSource, recipeSql } from "./recipes";
+import {
+    type Picks,
+    columnsSql,
+    everythingSql,
+    guessPair,
+    mentions,
+    quoted,
+    sharedColumns,
+    starterSql,
+} from "./sql";
 
 export type MappingBody = {
     source_id?: number;
@@ -605,6 +620,12 @@ function ColumnsMode({
     );
 }
 
+const PLAIN_NAME = /^[a-z_][a-z0-9_]*$/;
+
+function columnName(name: string): string {
+    return PLAIN_NAME.test(name) ? name : quoted(name);
+}
+
 function TableList({
     sources,
     onInsert,
@@ -612,10 +633,12 @@ function TableList({
     sources: SourceSummary[];
     onInsert: (name: string) => void;
 }) {
+    const insertable =
+        "rounded-sm outline-none hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring";
     return (
         <div className="flex min-w-0 flex-col rounded-lg border">
             <div className="border-b px-3 py-1.5 text-sm text-muted-foreground">
-                Tables: click one to insert its name
+                Tables you can query
             </div>
             {sources.length === 0 ? (
                 <p className="px-3 py-2 text-muted-foreground">No sources yet.</p>
@@ -624,22 +647,96 @@ function TableList({
                     {[...sources]
                         .sort((left, right) => left.table.localeCompare(right.table))
                         .map((source) => (
-                            <li key={source.id}>
+                            <li
+                                key={source.id}
+                                className="flex flex-col items-start gap-1 px-2 py-1.5"
+                            >
                                 <button
                                     type="button"
+                                    title={`Insert ${source.table}`}
                                     onClick={() => onInsert(source.table)}
-                                    className="flex w-full flex-col items-start gap-0.5 px-3 py-1.5 text-left outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                                    className={`px-1 font-mono ${insertable}`}
                                 >
-                                    <span className="font-mono">{source.table}</span>
-                                    <span className="w-full truncate text-sm text-muted-foreground">
-                                        {source.columns.map((column) => column.name).join(", ")}
-                                    </span>
+                                    {source.table}
                                 </button>
+                                <span className="flex flex-wrap gap-x-1 gap-y-0.5">
+                                    {source.columns.map((column) => (
+                                        <button
+                                            key={column.name}
+                                            type="button"
+                                            title={`Insert ${columnName(column.name)}`}
+                                            onClick={() => onInsert(columnName(column.name))}
+                                            className={`px-1 font-mono text-sm text-muted-foreground ${insertable}`}
+                                        >
+                                            {column.name}
+                                        </button>
+                                    ))}
+                                </span>
                             </li>
                         ))}
                 </ul>
             )}
         </div>
+    );
+}
+
+function recipeSources(
+    sources: SourceSummary[],
+    stats: (SourceStats | undefined)[],
+): (RecipeSource & { id: number })[] {
+    return sources.flatMap((source, index) => {
+        const names = source.columns.map((column) => column.name);
+        const suggestion = statsSuggestion(stats[index], names);
+        const [input, label] = guessPair(names);
+        const text = suggestion?.input || input;
+        const answer = suggestion?.label || label;
+        return text && answer
+            ? [{ id: source.id, table: source.table, input: text, label: answer }]
+            : [];
+    });
+}
+
+function ExamplesMenu({
+    base,
+    others,
+    onPick,
+}: {
+    base: string | null;
+    others: RecipeSource[];
+    onPick: (sql: string) => void;
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={base === null}>
+                    <IconBook2 />
+                    Examples
+                    <IconChevronDown />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-80">
+                {RECIPES.map((recipe) => {
+                    const sql = base === null ? null : recipeSql(recipe, base, others);
+                    const Icon = recipe.icon;
+                    return (
+                        <DropdownMenuItem
+                            key={recipe.key}
+                            disabled={sql === null}
+                            onSelect={() => sql && onPick(sql)}
+                            className="items-start"
+                        >
+                            <Icon className="mt-0.5" />
+                            <span className="flex min-w-0 flex-col">
+                                <span>{recipe.label}</span>
+                                <span className="text-sm text-muted-foreground">
+                                    {recipe.detail}
+                                </span>
+                            </span>
+                        </DropdownMenuItem>
+                    );
+                })}
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -689,8 +786,22 @@ function SqlMode({
     onRun: (sql: string) => void;
 }) {
     const stats = useSourcesStats(sources.map((item) => item.id)).map((item) => item.data);
+    const starter = starterFor(draft, sources, stats);
+    const known = recipeSources(sources, stats);
+    const current =
+        known.find((item) => mentions(draft.sql, item.table)) ??
+        known.find((item) => String(item.id) === draft.sources[0]) ??
+        known[0];
+    const base = draft.sql.trim() ? draft.sql : (starter ?? null);
     return (
         <div className="@container flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+                <ExamplesMenu
+                    base={base}
+                    others={known.filter((item) => item !== current)}
+                    onPick={(sql) => void editor.current?.replace(sql, { format: true })}
+                />
+            </div>
             <div className="grid gap-3 @2xl:grid-cols-[minmax(0,1fr)_14rem]">
                 <SqlEditor
                     ref={editor}
@@ -698,11 +809,12 @@ function SqlMode({
                     onValueChange={(sql) => onChange({ ...draft, sql })}
                     onRun={onRun}
                     schema={editorSchema(sources, stats)}
+                    completions={DUCKDB_WORDS}
                     diagnostics={problem?.diagnostics}
                     minLines={12}
                     maxLines={32}
                     aria-label="SQL"
-                    starter={starterFor(draft, sources, stats)}
+                    starter={starter}
                     placeholder="SELECT text AS input, category AS label FROM tickets"
                 />
                 <TableList sources={sources} onInsert={(name) => editor.current?.insert(name)} />
