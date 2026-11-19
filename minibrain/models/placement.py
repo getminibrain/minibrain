@@ -198,6 +198,7 @@ def desired_engines(
 
 def kept_while_draining(session: Session, placements: dict[str, dict[str, int]], pool: str, host: str) -> list[str]:
     here = node_id(pool, host)
+    held = {node_id(pool, other) for other in held_hosts(session, pool)}
     running: set[str] = set()
     ready_elsewhere: set[str] = set()
     for replica in live_engines(session):
@@ -205,7 +206,7 @@ def kept_while_draining(session: Session, placements: dict[str, dict[str, int]],
             continue
         if replica.node_id == here:
             running.add(replica.base_model)
-        elif replica.state == "ready":
+        elif replica.state == "ready" and replica.node_id not in held:
             ready_elsewhere.add(replica.base_model)
     wanted = [key for key, pools_of in placements.items() if pools_of.get(pool)]
     return sorted(key for key in wanted if key in running and key not in ready_elsewhere)

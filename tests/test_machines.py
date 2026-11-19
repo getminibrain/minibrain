@@ -154,6 +154,21 @@ def test_a_draining_machine_keeps_its_engine_until_another_is_ready(harness: Har
         assert kept_while_draining(session, placements, "rack", "gpu-01") == []
 
 
+def test_two_draining_machines_keep_their_engines_until_an_active_one_is_ready(harness: Harness) -> None:
+    placements = {"qwen3-0.6b": {"rack": 2}}
+    with harness.sessions() as session:
+        for host in ("gpu-01", "gpu-02"):
+            node = Node(id=f"rack/{host}", pool="rack", host=host, roles=["worker"], hardware={}, state="draining")
+            session.add(node)
+            replica(session, f"e-{host}", host)
+        session.commit()
+        assert kept_while_draining(session, placements, "rack", "gpu-01") == ["qwen3-0.6b"]
+        assert kept_while_draining(session, placements, "rack", "gpu-02") == ["qwen3-0.6b"]
+        replica(session, "e-gpu-03", "gpu-03")
+        session.commit()
+        assert kept_while_draining(session, placements, "rack", "gpu-01") == []
+
+
 def test_room_counts_models_from_measured_free_memory(harness: Harness) -> None:
     join(harness, busy_rack())
     room = by_name(harness)["rack"]["room"]
