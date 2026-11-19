@@ -83,7 +83,7 @@ from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.remote import REMOTE_KINDS
-from minibrain.data.runs import PREVIEW_SLOTS, PREVIEW_WAIT_SECONDS, PreviewsBusy, cancel, running
+from minibrain.data.runs import PREVIEW_SLOTS, PREVIEW_WAIT_SECONDS, RUNS_PER_PAGE, PreviewsBusy, cancel, running
 from minibrain.data.shared import (
     FOLDER,
     Added,
@@ -645,9 +645,11 @@ def source_query(
 
 RUN_DESCRIPTION = (
     "Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues "
-    f"work. A stopped run answers 409. At most {PREVIEW_SLOTS} previews run on the server at once, the rows and "
-    f"the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to "
-    f"{PREVIEW_WAIT_SECONDS:g} seconds for a turn, then answers 503."
+    f"work. A stopped run answers 409. At most {PREVIEW_SLOTS} previews run on the server at once, the rows, shape "
+    f"and count of one page (runs named page.rows, page.shape and page.count, up to {RUNS_PER_PAGE}) counting as one; "
+    f"another waits up to {PREVIEW_WAIT_SECONDS:g} seconds for a turn, then answers 503. All previews together use "
+    "at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at "
+    "once; a run that needs more spills to disk, then answers 422."
 )
 
 

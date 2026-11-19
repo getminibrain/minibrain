@@ -74,7 +74,7 @@ from minibrain.connections.store import sync_declared
 from minibrain.data.dataset_versions import OverLimitError
 from minibrain.data.extensions import configure as configure_extensions
 from minibrain.data.feedback import FeedbackError, database_feedback
-from minibrain.data.runs import QueryCancelled
+from minibrain.data.runs import QueryCancelled, clear_spills
 from minibrain.data.sources import SourceError
 from minibrain.data.splits import DatasetVersionError
 from minibrain.encryption.envelope import EnvelopeError
@@ -256,6 +256,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or load_settings()
     configure_extensions(settings.home)
+    clear_spills()
     configure_logging()
     check_config()
     capture()

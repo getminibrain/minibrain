@@ -452,12 +452,18 @@ Data is shared across models:
   dataset SQL cannot reach past its sources into the rest of an attached database.
 - The dataset editor's preview (first rows, then the full count and quick checks) runs as you type only when the
   sources it reads hold under 1,000,000 rows by their known counts; larger or uncounted sources run when Run (⌘↵ /
-  Ctrl+↵) is pressed, one action for both. A preview connection takes at most a quarter of the machine's memory and
-  half its cores (`SET memory_limit`, `SET threads`, `minibrain/data/runs.py`) and keeps the 30-second stop. A new
-  preview stops only the previous one from the same page (its rows and its shape still run side by side), so two
-  tabs never cancel each other. At most two previews run on the server at once (`PREVIEW_SLOTS`, a page's rows and
-  shape counting as one); another waits up to 5 seconds for a turn, then answers 503 "Previews are busy. Press Run
-  to try again."
+  Ctrl+↵) is pressed, one action for both. All previews together take at most a quarter of the machine's memory and
+  half its cores: the budget is split evenly over every run that can be going at once (`PREVIEW_SLOTS` × a page's
+  rows, shape and count = 6), each run at least 256 MiB and one thread (`SET memory_limit`, `SET threads`,
+  `minibrain/data/runs.py`), so a 64 GB, 16-core server gives each run 2.7 GiB and one thread. A run that outgrows
+  its share spills to a folder of its own under `<home>/tmp/previews` (all runs together at most the machine's
+  memory on disk, removed when the run ends, never readable by another run's SQL); past that it answers 422 "This
+  preview needs more memory than previews are allowed; press Run on a smaller query, or save the dataset to check
+  the full data". Saves and training-data builds keep DuckDB's own limits. Each run keeps the 30-second stop. A new
+  preview stops only the previous one from the same page (its rows, shape and count still run side by side), so two
+  tabs never cancel each other. At most two previews run on the server at once (`PREVIEW_SLOTS`, a page's runs
+  counting as one); another waits up to 5 seconds for a turn, then answers 503 "Previews are busy. Press Run to try
+  again."
 - The editor (`/data/datasets/new`, `/data/datasets/<slug>/edit`) is a page of its own beside the app's menu, without
   the Data tree and header: a title bar (back, the name as an editable title, Details for description and tags, Pick
   columns / Write SQL, Run, Cancel, Save) over the query and the preview side by side at full height, split by a

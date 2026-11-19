@@ -1,22 +1,30 @@
 import os
+import shutil
 import threading
 import time
+from pathlib import Path
 
 import duckdb
 import psutil
 import pytest
 
 from minibrain.data.runs import (
+    MIB,
+    MIN_RUN_MEMORY_MIB,
     PREVIEW_MEMORY_SHARE,
+    PREVIEW_RUNS,
     PREVIEW_THREAD_SHARE,
     SLOTS,
+    PreviewCaps,
     PreviewsBusy,
     QueryCancelled,
     cancel,
+    caps_for,
     preview_caps,
     running,
+    spill_root,
 )
-from minibrain.data.sources import ShapeLimits, SourceError, run_query
+from minibrain.data.sources import PREVIEW_OUT_OF_MEMORY, ShapeLimits, SourceError, run_query
 from tests.conftest import Harness, tickets_csv
 
 SLOW = "SELECT count(*) AS n FROM range(200000) a, range(200000) b"
@@ -182,7 +190,14 @@ def test_new_is_never_a_dataset_slug(harness: Harness) -> None:
     assert created.json()["slug"] == "new-2"
 
 
-SETTINGS = "SELECT current_setting('threads') AS threads, current_setting('memory_limit') AS memory"
+SETTINGS = (
+    "SELECT current_setting('threads') AS threads, current_setting('memory_limit') AS memory, "
+    "current_setting('temp_directory') AS spill"
+)
+BIG_AGGREGATE = (
+    "SELECT count(*) AS n FROM (SELECT i % 1000000 AS k, string_agg(i::VARCHAR, ',') AS s FROM range(6000000) t(i) "
+    "GROUP BY k)"
+)
 
 
 def formatted_memory(limit: str) -> str:
@@ -192,17 +207,76 @@ def formatted_memory(limit: str) -> str:
     return str(found[0]) if found else ""
 
 
-def test_a_preview_takes_at_most_a_quarter_of_memory_and_half_the_cores() -> None:
+GIB = 1024**3
+
+
+@pytest.mark.parametrize(
+    ("memory", "cores", "expected"),
+    [
+        (4 * GIB, 2, PreviewCaps(memory_mib=256, threads=1, spill_mib=682)),
+        (16 * GIB, 8, PreviewCaps(memory_mib=682, threads=1, spill_mib=2730)),
+        (64 * GIB, 16, PreviewCaps(memory_mib=2730, threads=1, spill_mib=10922)),
+        (256 * GIB, 64, PreviewCaps(memory_mib=10922, threads=5, spill_mib=43690)),
+    ],
+)
+def test_all_previews_together_share_one_budget(memory: int, cores: int, expected: PreviewCaps) -> None:
+    caps = caps_for(memory, cores)
+    assert caps == expected
+    if caps.memory_mib > MIN_RUN_MEMORY_MIB:
+        assert caps.memory_mib * PREVIEW_RUNS * MIB <= memory * PREVIEW_MEMORY_SHARE
+    if caps.threads > 1:
+        assert caps.threads * PREVIEW_RUNS <= cores * PREVIEW_THREAD_SHARE
+
+
+def test_a_preview_run_takes_its_share_and_spills_into_its_own_folder() -> None:
     caps = preview_caps()
-    assert caps.threads == max(int((os.cpu_count() or 1) * PREVIEW_THREAD_SHARE), 1)
-    megabytes = int(caps.memory.removesuffix("MB"))
-    assert megabytes <= max(psutil.virtual_memory().total * PREVIEW_MEMORY_SHARE / (1024 * 1024), 256)
+    assert caps == caps_for(psutil.virtual_memory().total, os.cpu_count() or 1)
     with running("ana", "editor.rows"):
         capped = run_query([], SETTINGS, None).rows
-    assert capped == [[caps.threads, formatted_memory(caps.memory)]]
+    assert capped[0][:2] == [caps.threads, formatted_memory(caps.memory)]
+    spill = Path(capped[0][2])
+    assert spill.parent == spill_root()
+    assert not spill.exists()
     with running("ana", None):
-        assert run_query([], SETTINGS, None).rows == capped
-    assert run_query([], SETTINGS, None).rows != capped
+        assert run_query([], SETTINGS, None).rows[0][:2] == capped[0][:2]
+    assert run_query([], SETTINGS, None).rows[0][:2] != capped[0][:2]
+
+
+def test_a_preview_reads_no_other_preview_spill() -> None:
+    other = spill_root() / "1-other"
+    other.mkdir(parents=True)
+    (other / "secret.tmp").write_text("x")
+    try:
+        with pytest.raises(SourceError), running("ana", "editor.rows"):
+            run_query([], f"SELECT * FROM read_text('{other}/secret.tmp')", None)
+    finally:
+        shutil.rmtree(other)
+
+
+def test_a_preview_that_outgrows_its_memory_spills_or_says_what_to_do(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "minibrain.data.runs.preview_caps", lambda: PreviewCaps(memory_mib=64, threads=1, spill_mib=1024)
+    )
+    with running("ana", "editor.shape"):
+        assert run_query([], BIG_AGGREGATE, None).rows == [[1_000_000]]
+    monkeypatch.setattr("minibrain.data.runs.preview_caps", lambda: PreviewCaps(memory_mib=64, threads=1, spill_mib=1))
+    with pytest.raises(SourceError) as raised, running("ana", "editor.shape"):
+        run_query([], BIG_AGGREGATE, None)
+    assert str(raised.value) == PREVIEW_OUT_OF_MEMORY
+    assert not SLOTS
+
+
+def test_a_page_runs_at_most_its_rows_shape_and_count_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.data.runs.PREVIEW_WAIT_SECONDS", 0.3)
+    outcome: list[BaseException | None] = []
+    names = [f"editor.{part}" for part in ("rows", "shape", "count")]
+    threads = [slow_run("ana", name, outcome) for name in names]
+    try:
+        with pytest.raises(PreviewsBusy), running("ana", "editor.extra"):
+            pass
+    finally:
+        stopped(*(("ana", name, thread) for name, thread in zip(names, threads, strict=True)))
+    assert not SLOTS
 
 
 def stopped(*runs: tuple[str, str, threading.Thread]) -> None:

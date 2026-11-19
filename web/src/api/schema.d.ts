@@ -882,7 +882,7 @@ export interface paths {
         put?: never;
         /**
          * Run SQL over any sources
-         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows and the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to 5 seconds for a turn, then answers 503.
+         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows, shape and count of one page (runs named page.rows, page.shape and page.count, up to 3) counting as one; another waits up to 5 seconds for a turn, then answers 503. All previews together use at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at once; a run that needs more spills to disk, then answers 422.
          */
         post: operations["any_query_api_query_post"];
         delete?: never;
@@ -902,7 +902,7 @@ export interface paths {
         put?: never;
         /**
          * Count a query's rows and run the quick checks
-         * @description The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks read every row up to 50,000 and a random sample of a larger result, fewer rows when inputs are long so the sample holds about 5,000,000 characters; label balance and the single-label stop count every row. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows and the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to 5 seconds for a turn, then answers 503.
+         * @description The row count, labels, empty and repeated inputs and the quick data checks of what the query would save, without saving it. Checks read every row up to 50,000 and a random sample of a larger result, fewer rows when inputs are long so the sample holds about 5,000,000 characters; label balance and the single-label stop count every row. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows, shape and count of one page (runs named page.rows, page.shape and page.count, up to 3) counting as one; another waits up to 5 seconds for a turn, then answers 503. All previews together use at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at once; a run that needs more spills to disk, then answers 422.
          */
         post: operations["any_query_shape_api_query_shape_post"];
         delete?: never;
@@ -1033,7 +1033,7 @@ export interface paths {
         put?: never;
         /**
          * Run SQL over a dataset's sources
-         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows and the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to 5 seconds for a turn, then answers 503.
+         * @description Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows, shape and count of one page (runs named page.rows, page.shape and page.count, up to 3) counting as one; another waits up to 5 seconds for a turn, then answers 503. All previews together use at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at once; a run that needs more spills to disk, then answers 422.
          */
         post: operations["dataset_query_api_datasets__slug__query_post"];
         delete?: never;
@@ -1053,7 +1053,7 @@ export interface paths {
         put?: never;
         /**
          * Count a dataset query's rows and run the quick checks
-         * @description As POST /api/query/shape, reading the dataset's sources by their old names too and marking the checks dismissed on the dataset. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows and the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to 5 seconds for a turn, then answers 503.
+         * @description As POST /api/query/shape, reading the dataset's sources by their old names too and marking the checks dismissed on the dataset. Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues work. A stopped run answers 409. At most 2 previews run on the server at once, the rows, shape and count of one page (runs named page.rows, page.shape and page.count, up to 3) counting as one; another waits up to 5 seconds for a turn, then answers 503. All previews together use at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at once; a run that needs more spills to disk, then answers 422.
          */
         post: operations["dataset_query_shape_api_datasets__slug__query_shape_post"];
         delete?: never;

@@ -13,7 +13,7 @@ from duckdb.sqltypes import BOOLEAN, VARCHAR
 
 from minibrain.data.checks import has_personal_data, personal_data_masked
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
-from minibrain.data.runs import QueryCancelled, cancelled, cap, watched
+from minibrain.data.runs import QueryCancelled, cancelled, cap, previewing, spill_space, watched
 from minibrain.encryption.duck import register
 
 MAX_ROW_BYTES = 64 * 1024 * 1024
@@ -36,6 +36,10 @@ BLOCKED_FUNCTIONS = ("query", "query_table", "which_secret")
 BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "delta_", "sqlite_", "duckdb_secrets")
 HAS_PERSONAL_DATA = "has_personal_data"
 PERSONAL_DATA_MASKED = "personal_data_masked"
+PREVIEW_OUT_OF_MEMORY = (
+    "this preview needs more memory than previews are allowed; press Run on a smaller query, or save the dataset to "
+    "check the full data"
+)
 
 
 class SourceError(Exception):
@@ -43,6 +47,8 @@ class SourceError(Exception):
 
 
 def readable_error(error: duckdb.Error) -> str:
+    if isinstance(error, duckdb.OutOfMemoryException) and previewing():
+        return PREVIEW_OUT_OF_MEMORY
     text = str(error)
     if not LONG_ROW.search(text):
         return text
@@ -191,7 +197,10 @@ def add_functions(connection: duckdb.DuckDBPyConnection) -> None:
 
 
 def connect(
-    tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
+    tables: Sequence[Table],
+    aliases: dict[str, str] | None = None,
+    output: Path | None = None,
+    spill: Path | None = None,
 ) -> duckdb.DuckDBPyConnection:
     connection = duckdb.connect(config=offline_config())
     try:
@@ -217,7 +226,7 @@ def connect(
         for alias, target in (aliases or {}).items():
             if target in names and alias not in names:
                 connection.execute(f"CREATE VIEW {quote_identifier(alias)} AS SELECT * FROM {quote_identifier(target)}")
-        cap(connection)
+        cap(connection, spill)
         connection.execute("SET enable_external_access = false")
         connection.execute("SET lock_configuration = true")
     except ExtensionMissingError as error:
@@ -233,23 +242,24 @@ def connect(
 def sandbox(
     tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
 ) -> Iterator[duckdb.DuckDBPyConnection]:
-    connection = connect(tables, aliases, output)
-    timer = threading.Timer(QUERY_TIMEOUT_SECONDS, connection.interrupt)
-    timer.start()
-    try:
-        with watched(connection):
-            yield connection
-        if cancelled():
-            raise QueryCancelled
-    except duckdb.InterruptException as error:
-        if cancelled():
-            raise QueryCancelled from error
-        raise SourceError(f"the query ran for more than {QUERY_TIMEOUT_SECONDS} seconds and was stopped") from error
-    except duckdb.Error as error:
-        raise SourceError(readable_error(error)) from error
-    finally:
-        timer.cancel()
-        connection.close()
+    with spill_space() as spill:
+        connection = connect(tables, aliases, output, spill)
+        timer = threading.Timer(QUERY_TIMEOUT_SECONDS, connection.interrupt)
+        timer.start()
+        try:
+            with watched(connection):
+                yield connection
+            if cancelled():
+                raise QueryCancelled
+        except duckdb.InterruptException as error:
+            if cancelled():
+                raise QueryCancelled from error
+            raise SourceError(f"the query ran for more than {QUERY_TIMEOUT_SECONDS} seconds and was stopped") from error
+        except duckdb.Error as error:
+            raise SourceError(readable_error(error)) from error
+        finally:
+            timer.cancel()
+            connection.close()
 
 
 def check_reference(node: dict[str, Any]) -> None:

@@ -1,4 +1,6 @@
 import os
+import shutil
+import tempfile
 import threading
 import time
 from collections.abc import Hashable, Iterator
@@ -6,16 +8,24 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from functools import lru_cache
+from pathlib import Path
 
 import duckdb
 import psutil
+
+from minibrain.data.extensions import home
 
 RunKey = tuple[str, str]
 
 PREVIEW_MEMORY_SHARE = 0.25
 PREVIEW_THREAD_SHARE = 0.5
 PREVIEW_SLOTS = 2
+RUNS_PER_PAGE = 3
+PREVIEW_RUNS = PREVIEW_SLOTS * RUNS_PER_PAGE
+MIN_RUN_MEMORY_MIB = 256
+PREVIEW_SPILL_SHARE = 1.0
 PREVIEW_WAIT_SECONDS = 5.0
+MIB = 1024 * 1024
 
 
 class QueryCancelled(Exception):
@@ -37,8 +47,17 @@ class Run:
 
 @dataclass(frozen=True)
 class PreviewCaps:
-    memory: str
+    memory_mib: int
     threads: int
+    spill_mib: int
+
+    @property
+    def memory(self) -> str:
+        return f"{self.memory_mib}MiB"
+
+    @property
+    def spill(self) -> str:
+        return f"{self.spill_mib}MiB"
 
 
 LOCK = threading.Lock()
@@ -49,19 +68,62 @@ CURRENT: ContextVar[Run | None] = ContextVar("query_run", default=None)
 PREVIEWING: ContextVar[bool] = ContextVar("previewing", default=False)
 
 
+def caps_for(memory_bytes: int, cores: int) -> PreviewCaps:
+    memory = max(int(memory_bytes * PREVIEW_MEMORY_SHARE) // PREVIEW_RUNS // MIB, MIN_RUN_MEMORY_MIB)
+    spill = max(int(memory_bytes * PREVIEW_SPILL_SHARE) // PREVIEW_RUNS // MIB, memory)
+    threads = max(int(cores * PREVIEW_THREAD_SHARE) // PREVIEW_RUNS, 1)
+    return PreviewCaps(memory_mib=memory, threads=threads, spill_mib=spill)
+
+
 @lru_cache(maxsize=1)
 def preview_caps() -> PreviewCaps:
-    memory = int(psutil.virtual_memory().total * PREVIEW_MEMORY_SHARE) // (1024 * 1024)
-    threads = int((os.cpu_count() or 1) * PREVIEW_THREAD_SHARE)
-    return PreviewCaps(memory=f"{max(memory, 256)}MB", threads=max(threads, 1))
+    return caps_for(psutil.virtual_memory().total, os.cpu_count() or 1)
 
 
-def cap(connection: duckdb.DuckDBPyConnection) -> None:
+def previewing() -> bool:
+    return PREVIEWING.get()
+
+
+def spill_root() -> Path:
+    return home() / "tmp" / "previews"
+
+
+def clear_spills() -> None:
+    root = spill_root()
+    if not root.is_dir():
+        return
+    for found in root.iterdir():
+        owner = found.name.split("-", 1)[0]
+        if not (owner.isdigit() and psutil.pid_exists(int(owner))):
+            shutil.rmtree(found, ignore_errors=True)
+
+
+@contextmanager
+def spill_space() -> Iterator[Path | None]:
+    if not PREVIEWING.get():
+        yield None
+        return
+    root = spill_root()
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    space = Path(tempfile.mkdtemp(prefix=f"{os.getpid()}-", dir=root))
+    try:
+        yield space
+    finally:
+        shutil.rmtree(space, ignore_errors=True)
+
+
+def cap(connection: duckdb.DuckDBPyConnection, spill: Path | None) -> None:
     if not PREVIEWING.get():
         return
     caps = preview_caps()
     connection.execute(f"SET memory_limit = '{caps.memory}'")
     connection.execute(f"SET threads = {caps.threads}")
+    if spill is None:
+        connection.execute("SET temp_directory = ''")
+        return
+    directory = str(spill).replace("'", "''")
+    connection.execute(f"SET temp_directory = '{directory}'")
+    connection.execute(f"SET max_temp_directory_size = '{caps.spill}'")
 
 
 def stop(run: Run) -> None:
@@ -82,7 +144,9 @@ def slot_of(owner: str, name: str | None) -> Hashable:
 
 
 def free_slot(slot: Hashable) -> bool:
-    return slot in SLOTS or len(SLOTS) < PREVIEW_SLOTS
+    if slot in SLOTS:
+        return SLOTS[slot] < RUNS_PER_PAGE
+    return len(SLOTS) < PREVIEW_SLOTS
 
 
 @contextmanager
