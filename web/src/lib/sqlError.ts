@@ -47,6 +47,10 @@ export function sqlMessage(text: string): string {
     return message.charAt(0).toUpperCase() + message.slice(1);
 }
 
+function leading(sql: string): number {
+    return sql.length - sql.trimStart().length;
+}
+
 function position(sql: string, offset: number) {
     const before = sql.slice(0, offset).split("\n");
     return { line: before.length, column: (before.at(-1)?.length ?? 0) + 1 };
@@ -78,14 +82,14 @@ export function sqlProblem(
     if (at === null) {
         return { message, diagnostics: [] };
     }
-    if (sent !== current) {
+    if (sent.trim() !== current.trim()) {
         return { message, diagnostics: [] };
     }
     return {
         message,
         diagnostics: [
             {
-                ...position(sent, at),
+                ...position(current, at - leading(sent) + leading(current)),
                 length: carets.length > 1 ? carets.length : undefined,
                 message,
             },

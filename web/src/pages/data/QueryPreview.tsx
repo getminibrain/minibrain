@@ -33,6 +33,8 @@ type PairColumn = QueryShape["missing"][number];
 
 const PREVIEW_ROWS = 50;
 const SETTLE_MS = 500;
+const PAUSED_SETTLE_MS = 1500;
+const STOP_GRACE_MS = 100;
 export const AUTO_RUN_ROWS = 1_000_000;
 const PAIR: PairColumn[] = ["input", "label"];
 
@@ -44,8 +46,32 @@ function stopRun(run: string) {
     api.DELETE("/api/query/runs/{run}", { params: { path: { run } } }).catch(() => undefined);
 }
 
-function fetchRows(dataset: string | null, sql: string, run: string, signal: AbortSignal) {
-    const body = { sql, run, rows: PREVIEW_ROWS };
+const turns = new Map<string, number>();
+
+function stopOnAbort(run: string, signal: AbortSignal) {
+    const turn = (turns.get(run) ?? 0) + 1;
+    turns.set(run, turn);
+    signal.addEventListener(
+        "abort",
+        () =>
+            window.setTimeout(() => {
+                if (turns.get(run) === turn) {
+                    stopRun(run);
+                }
+            }, STOP_GRACE_MS),
+        { once: true },
+    );
+}
+
+function fetchRows(
+    dataset: string | null,
+    sql: string,
+    run: string,
+    signal: AbortSignal,
+    rows = PREVIEW_ROWS,
+) {
+    stopOnAbort(run, signal);
+    const body = { sql, run, rows };
     return unwrap(
         dataset
             ? api.POST("/api/datasets/{slug}/query", {
@@ -57,7 +83,14 @@ function fetchRows(dataset: string | null, sql: string, run: string, signal: Abo
     );
 }
 
+async function fetchCount(dataset: string | null, sql: string, run: string, signal: AbortSignal) {
+    const found = await fetchRows(dataset, `SELECT count(*) FROM (\n${sql}\n)`, run, signal, 1);
+    const total = Number(found.rows[0]?.[0]);
+    return Number.isFinite(total) ? total : null;
+}
+
 function fetchShape(dataset: string | null, sql: string, run: string, signal: AbortSignal) {
+    stopOnAbort(run, signal);
     const body = { sql, run };
     return unwrap(
         dataset
@@ -86,14 +119,15 @@ export function useSettled(
             setSettled(live);
             return;
         }
-        if (paused) {
-            return;
-        }
-        const timer = window.setTimeout(() => setSettled(live), SETTLE_MS);
+        const timer = window.setTimeout(
+            () => setSettled(live),
+            paused ? PAUSED_SETTLE_MS : SETTLE_MS,
+        );
         return () => window.clearTimeout(timer);
     }, [live, immediate, auto, paused]);
     return {
         settled,
+        pausing: auto && !immediate && paused && live !== settled,
         stale: !auto && live !== null && live !== (asked ?? settled),
         runNow: (text: string, from: string | null = text) => {
             setSettled(text.trim() || null);
@@ -110,6 +144,7 @@ export function useLivePreview(
     const [run] = useState(runName);
     const rowsRun = `${run}.rows`;
     const shapeRun = `${run}.shape`;
+    const countRun = `${run}.count`;
     const rowsSql = filtered ?? sql;
     const rows = useQuery({
         queryKey: ["query-preview", dataset, rowsSql, "rows"],
@@ -129,18 +164,28 @@ export function useLivePreview(
         staleTime: 60_000,
         gcTime: 60_000,
     });
+    const focused = useQuery({
+        queryKey: ["query-preview", dataset, filtered, "count"],
+        queryFn: ({ signal }) => fetchCount(dataset, filtered ?? "", countRun, signal),
+        enabled: sql !== null && filtered !== null,
+        retry: false,
+        staleTime: 60_000,
+        gcTime: 60_000,
+    });
     useEffect(() => {
         if (sql === null) {
             stopRun(rowsRun);
             stopRun(shapeRun);
+            stopRun(countRun);
         }
-    }, [sql, rowsRun, shapeRun]);
+    }, [sql, rowsRun, shapeRun, countRun]);
     useEffect(
         () => () => {
             stopRun(rowsRun);
             stopRun(shapeRun);
+            stopRun(countRun);
         },
-        [rowsRun, shapeRun],
+        [rowsRun, shapeRun, countRun],
     );
     const current = sql !== null;
     const result = current ? rows.data : undefined;
@@ -148,9 +193,14 @@ export function useLivePreview(
     return {
         sql,
         filtered: current && filtered !== null,
+        filteredRows: current && filtered !== null ? (focused.data ?? undefined) : undefined,
+        filteredCounting: current && filtered !== null && focused.isFetching,
         rerun: () => {
             rows.refetch();
             shape.refetch();
+            if (filtered !== null) {
+                focused.refetch();
+            }
         },
         result,
         running: current && rows.isFetching,
@@ -281,7 +331,7 @@ function RoleMenu({
     );
 }
 
-export type Focus = { check: string; title: string; rows: number; majority: string | null };
+export type Focus = { check: string; title: string; majority: string | null };
 
 export type QualityProps = {
     dataset: string | null;
@@ -289,16 +339,26 @@ export type QualityProps = {
     effect: FixEffect | null;
     focus: Focus | null;
     canFix: boolean;
+    fixReady: boolean;
     onShowRows: (check: Finding) => void;
     onShowAll: () => void;
     onFix: (fix: Fix) => void;
 };
 
-function FocusBar({ focus, onShowAll }: { focus: Focus; onShowAll: () => void }) {
+function FocusBar({
+    focus,
+    rows,
+    onShowAll,
+}: {
+    focus: Focus;
+    rows: number | undefined;
+    onShowAll: () => void;
+}) {
+    const shown = rows === undefined ? "rows" : plain(rows, "row");
     return (
         <>
             <span className="min-w-0 truncate tabular-nums">
-                {`Showing ${plain(focus.rows, "row")} with ${focus.title.toLowerCase()}`}
+                {`Showing ${shown} with ${focus.title.toLowerCase()}`}
             </span>
             <Button variant="link" size="sm" className="h-auto px-0" onClick={onShowAll}>
                 Show all
@@ -333,8 +393,7 @@ export function QueryPreviewPanel({
     const { result } = preview;
     const records = recordsOf(result);
     const paired = preview.missing.length === 0 && Boolean(result?.columns.includes("input"));
-    const actionable =
-        paired && Boolean(result?.columns.includes("label")) && quality.canFix && !preview.filtered;
+    const actionable = paired && Boolean(result?.columns.includes("label")) && quality.canFix;
     const empty = preview.sql === null ? (waiting ?? idle) : "The query returned no rows.";
     const loading = preview.sql !== null && !result && preview.running;
     const focus = preview.filtered ? quality.focus : null;
@@ -342,8 +401,8 @@ export function QueryPreviewPanel({
     return (
         <RowsPreview
             records={records}
-            total={focus ? focus.rows : preview.counted?.rows}
-            counting={preview.counting && !preview.counted}
+            total={focus ? preview.filteredRows : preview.counted?.rows}
+            counting={focus ? preview.filteredCounting : preview.counting && !preview.counted}
             idle={preview.sql === null}
             loading={loading}
             error={preview.error}
@@ -360,7 +419,15 @@ export function QueryPreviewPanel({
                     onQuality={() => choose("quality")}
                 />
             }
-            bar={focus ? <FocusBar focus={focus} onShowAll={quality.onShowAll} /> : undefined}
+            bar={
+                focus ? (
+                    <FocusBar
+                        focus={focus}
+                        rows={preview.filteredRows}
+                        onShowAll={quality.onShowAll}
+                    />
+                ) : undefined
+            }
             qualityBadge={badge}
             quality={
                 <QualityTab
@@ -368,6 +435,7 @@ export function QueryPreviewPanel({
                     counting={preview.counting}
                     dataset={quality.dataset}
                     actionable={actionable}
+                    fixReady={quality.fixReady}
                     context={quality.context}
                     effect={quality.effect}
                     onShowRows={(check) => {

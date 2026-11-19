@@ -24,7 +24,7 @@ import { ErrorLine } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { allows } from "~/lib/access";
 import { count } from "~/lib/format";
-import { useDismiss } from "./Checks";
+import { keyedByText, useDismiss } from "./Checks";
 import {
     type Cleanup,
     type Step,
@@ -236,23 +236,25 @@ function Examples({ check }: { check: Finding }) {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {check.table.map((cells) => (
-                        <TableRow key={cells.join("\u0000")} className="last:border-b-0">
-                            {cells.map((cell, index) => (
-                                <TableCell
-                                    key={check.columns[index] ?? index}
-                                    className={
-                                        index === last && index > 0
-                                            ? "text-right text-muted-foreground"
-                                            : "max-w-0 truncate"
-                                    }
-                                    title={cell}
-                                >
-                                    {cell}
-                                </TableCell>
-                            ))}
-                        </TableRow>
-                    ))}
+                    {keyedByText(check.table, (cells) => cells.join("\u0000")).map(
+                        ({ key, item: cells }) => (
+                            <TableRow key={key} className="last:border-b-0">
+                                {cells.map((cell, index) => (
+                                    <TableCell
+                                        key={check.columns[index] ?? index}
+                                        className={
+                                            index === last && index > 0
+                                                ? "text-right text-muted-foreground"
+                                                : "max-w-0 truncate"
+                                        }
+                                        title={cell}
+                                    >
+                                        {cell}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ),
+                    )}
                 </TableBody>
             </Table>
         </div>
@@ -287,15 +289,15 @@ function fixesFor(check: Finding, context: FixContext, perLabel: number): Fix[] 
             const found: Fix[] = [];
             if (context.rare && limits) {
                 found.push({
-                    label: `Drop labels under ${count(limits.minLabelRows)} rows`,
-                    done: `Dropped labels under ${count(limits.minLabelRows)} rows`,
+                    label: `Drop labels under ${rowsText(limits.minLabelRows)}`,
+                    done: `Dropped labels under ${rowsText(limits.minLabelRows)}`,
                     cleanup: { rare: limits.minLabelRows },
                     step: rareStep(limits.minLabelRows),
                 });
             }
             found.push({
                 label: `Keep at most ${count(perLabel)} a label`,
-                done: `Kept at most ${count(perLabel)} rows a label`,
+                done: `Kept at most ${rowsText(perLabel)} a label`,
                 cleanup: { per_label: perLabel },
                 step: perLabelStep(perLabel),
             });
@@ -337,6 +339,7 @@ function FindingRow({
     total,
     context,
     actionable,
+    fixReady,
     dismiss,
     onShowRows,
     onFix,
@@ -345,6 +348,7 @@ function FindingRow({
     total: number;
     context: FixContext;
     actionable: boolean;
+    fixReady: boolean;
     dismiss: ReturnType<typeof useDismiss> | null;
     onShowRows: (check: Finding) => void;
     onFix: (fix: Fix) => void;
@@ -408,7 +412,12 @@ function FindingRow({
                                     groupClassName="w-full"
                                 />
                             )}
-                            <Button variant="outline" size="sm" onClick={() => onFix(fix)}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!fixReady}
+                                onClick={() => onFix(fix)}
+                            >
                                 {fix.label}
                             </Button>
                         </span>
@@ -504,6 +513,7 @@ export function QualityTab({
     counting,
     dataset,
     actionable,
+    fixReady,
     context,
     effect,
     onShowRows,
@@ -513,6 +523,7 @@ export function QualityTab({
     counting: boolean;
     dataset: string | null;
     actionable: boolean;
+    fixReady: boolean;
     context: FixContext;
     effect: FixEffect | null;
     onShowRows: (check: Finding) => void;
@@ -552,6 +563,7 @@ export function QualityTab({
                             total={total}
                             context={context}
                             actionable={actionable}
+                            fixReady={fixReady}
                             dismiss={dismiss}
                             onShowRows={onShowRows}
                             onFix={onFix}

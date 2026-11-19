@@ -105,6 +105,36 @@ function described(details: Details): Described {
     };
 }
 
+const SYSTEM_TAG = "minibrain:";
+const TAG_CHARS = 64;
+const MAX_TAGS = 20;
+
+function normalTag(tag: string): string {
+    const text = tag.split(/\s+/).filter(Boolean).join(" ");
+    const colon = text.indexOf(":");
+    if (colon < 0) {
+        return text;
+    }
+    return `${text.slice(0, colon).trim().toLowerCase()}:${text.slice(colon + 1).trim()}`;
+}
+
+function tagsProblem(text: string): string | null {
+    const tags = splitTags(text).map(normalTag).filter(Boolean);
+    for (const tag of tags) {
+        if (tag.toLowerCase().startsWith(SYSTEM_TAG)) {
+            return `Tags starting with ${SYSTEM_TAG} are set by minibrain`;
+        }
+        if (tag.length > TAG_CHARS) {
+            return `A tag can be at most ${TAG_CHARS} characters`;
+        }
+        if (tag.startsWith(":") || tag.endsWith(":")) {
+            return `A key:value tag needs both a key and a value: ${tag}`;
+        }
+    }
+    const distinct = new Set(tags.map((tag) => tag.toLowerCase()));
+    return distinct.size > MAX_TAGS ? `At most ${MAX_TAGS} tags` : null;
+}
+
 function sameDetails(left: Details, right: Details): boolean {
     const [a, b] = [described(left), described(right)];
     return a.name === b.name && a.description === b.description && a.tags.join() === b.tags.join();
@@ -170,6 +200,8 @@ function useRunKey(run: () => void) {
 }
 
 type Fixed = { done: string; before: number; live: string | null };
+
+type Focusing = { focus: Focus; on: string };
 
 function fixContext(shape: QueryShape | undefined, limits: Limits | null): FixContext {
     const quality = shape?.quality;
@@ -247,10 +279,12 @@ function useFocusWithin(focus: boolean) {
 function DetailsPopover({
     details,
     note,
+    problem,
     onChange,
 }: {
     details: Details;
     note: ReactNode;
+    problem: string | null;
     onChange: (details: Details) => void;
 }) {
     const filled = [details.description.trim() !== "", details.tags.trim() !== ""].filter(
@@ -259,11 +293,17 @@ function DetailsPopover({
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" aria-invalid={problem ? true : undefined}>
                     <IconNotes />
                     Details
-                    {filled > 0 && (
-                        <span className="text-sm text-muted-foreground tabular-nums">{filled}</span>
+                    {problem ? (
+                        <span className="text-sm text-destructive">Check the tags</span>
+                    ) : (
+                        filled > 0 && (
+                            <span className="text-sm text-muted-foreground tabular-nums">
+                                {filled}
+                            </span>
+                        )
                     )}
                 </Button>
             </PopoverTrigger>
@@ -281,9 +321,15 @@ function DetailsPopover({
                             }
                         />
                     </Field>
-                    <Field id="dataset-tags" label="Tags" hint={TAGS_HINT}>
+                    <Field
+                        id="dataset-tags"
+                        label="Tags"
+                        hint={TAGS_HINT}
+                        error={problem ?? undefined}
+                    >
                         <Input
                             id="dataset-tags"
+                            aria-invalid={problem ? true : undefined}
                             value={details.tags}
                             onChange={(event) => onChange({ ...details, tags: event.target.value })}
                         />
@@ -361,8 +407,9 @@ function DatasetWorkbench({
     onSave: (saving: Saving) => Promise<string>;
 }) {
     const router = useRouter();
-    const [draft, setDraft] = useState(initialDraft);
-    const [details, setDetails] = useState(initialDetails);
+    const [draft, setDraftState] = useState(initialDraft);
+    const [baseline, setBaseline] = useState(initialDraft);
+    const [details, setDetailsState] = useState(initialDetails);
     const limits = limitsOf(useDataSettings().data);
     const chars = limits?.charsPerToken ?? null;
     const sqlEditor = useRef<SqlEditorHandle>(null);
@@ -370,11 +417,18 @@ function DatasetWorkbench({
     const reading = rowsToRead(queriedSources(draft, sources, alias));
     const auto = reading !== null && reading < AUTO_RUN_ROWS;
     const [completing, setCompleting] = useState(false);
-    const { settled, stale, runNow } = useSettled(live, draft.mode === "columns", auto, completing);
-    const [focus, setFocus] = useState<Focus | null>(null);
+    const { settled, stale, pausing, runNow } = useSettled(
+        live,
+        draft.mode === "columns",
+        auto,
+        completing,
+    );
+    const [focusing, setFocus] = useState<Focusing | null>(null);
+    const focus = focusing && focusing.on === settled ? focusing.focus : null;
     const [fixed, setFixed] = useState<Fixed | null>(null);
+    const applying = useRef(false);
     const preview = useLivePreview(settled, dataset, focusedSql(focus, settled, limits));
-    const waiting = waitingText(settled, stale);
+    const waiting = pausing ? "Waiting for you to finish typing" : waitingText(settled, stale);
     const context = fixContext(preview.counted, limits);
     const effect =
         fixed && fixed.live === live
@@ -384,22 +438,28 @@ function DatasetWorkbench({
                   after: settled === fixed.live && preview.counted ? preview.counted.rows : null,
               }
             : null;
+    const fixReady = live !== null && live === settled && Boolean(preview.counted);
     const applyFix = async (fix: Fix) => {
         const before = preview.counted?.rows;
-        if (before === undefined) {
+        if (before === undefined || !fixReady || applying.current) {
             return;
         }
+        applying.current = true;
         setFocus(null);
         let next: string | null = null;
-        if (draft.mode === "columns") {
-            const changed = { ...draft, cleanup: { ...draft.cleanup, ...fix.cleanup } };
-            setDraft(changed);
-            next = previewSql(changed, sources, chars);
-        } else {
-            const text = await sqlEditor.current?.replace(wrappedSql(draft.sql, fix.step), {
-                format: true,
-            });
-            next = text?.trim() || null;
+        try {
+            if (draft.mode === "columns") {
+                const changed = { ...draft, cleanup: { ...draft.cleanup, ...fix.cleanup } };
+                setDraft(changed);
+                next = previewSql(changed, sources, chars);
+            } else {
+                const text = await sqlEditor.current?.replace(wrappedSql(draft.sql, fix.step), {
+                    format: true,
+                });
+                next = text?.trim() || null;
+            }
+        } finally {
+            applying.current = false;
         }
         setFixed({ done: fix.done, before, live: next });
         if (!auto && next) {
@@ -419,7 +479,7 @@ function DatasetWorkbench({
     useRunKey(run);
     const queryChanged = creating || !sameDraft(draft, initialDraft);
     const detailsChanged = !sameDetails(details, initialDetails);
-    const guard = useLeaveGuard(detailsChanged || !sameDraft(draft, initialDraft));
+    const guard = useLeaveGuard(detailsChanged || !sameDraft(draft, baseline));
     const queryBox = useFocusWithin(focusQuery);
     const split = useResizableWidth(QUERY_WIDTH);
     const save = useMutation({
@@ -429,9 +489,29 @@ function DatasetWorkbench({
             router.history.push(datasetHref(slug));
         },
     });
+    const freshen = () => {
+        if (!save.isPending) {
+            save.reset();
+        }
+    };
+    function setDraft(next: Draft) {
+        setDraftState(next);
+        freshen();
+    }
+    const setDetails = (next: Details) => {
+        setDetailsState(next);
+        freshen();
+    };
+    const suggest = (next: Draft) => {
+        if (sameDraft(draft, baseline)) {
+            setBaseline(next);
+        }
+        setDraftState(next);
+    };
     const over = useOverLimit(save.error, save.isPending && Boolean(save.variables?.body?.sample));
     const body = queryChanged ? draftBody(draft, sources) : null;
     const problem = details.name.trim() ? nameProblem(details.name) : null;
+    const tagProblem = tagsProblem(details.tags);
     const current = live !== null && live === settled;
     const missing = queryChanged && current && preview.missing.length > 0;
     const ready =
@@ -439,7 +519,8 @@ function DatasetWorkbench({
         (!queryChanged || body !== null) &&
         (creating || details.name.trim() !== "") &&
         !missing &&
-        problem === null;
+        problem === null &&
+        tagProblem === null;
     const runProblem = sqlProblem(preview.error, preview.sql ?? undefined, draft.sql);
     const saveProblem = over
         ? null
@@ -476,7 +557,12 @@ function DatasetWorkbench({
                 problem={problem}
                 onChange={(name) => setDetails({ ...details, name })}
             />
-            <DetailsPopover details={details} note={detail} onChange={setDetails} />
+            <DetailsPopover
+                details={details}
+                note={detail}
+                problem={tagProblem}
+                onChange={setDetails}
+            />
             <SegmentedTabs
                 size="sm"
                 tabs={MODES}
@@ -537,19 +623,19 @@ function DatasetWorkbench({
                             }}
                             editor={sqlEditor}
                             onChange={setDraft}
+                            onSuggest={suggest}
                             onRun={(text) => runNow(text, live)}
                         />
-                        {over && save.variables?.body ? (
+                        {over && body ? (
                             <SampleOffer
                                 total={over.total_rows}
                                 limit={over.row_limit}
-                                seed={save.variables.body.sample?.seed}
+                                seed={save.variables?.body?.sample?.seed}
                                 pending={save.isPending}
                                 onTake={(sample) =>
-                                    save.variables?.body &&
                                     save.mutate({
-                                        ...save.variables,
-                                        body: { ...save.variables.body, sample },
+                                        details: described(details),
+                                        body: { ...body, sample },
                                     })
                                 }
                             />
@@ -579,15 +665,19 @@ function DatasetWorkbench({
                         effect,
                         focus,
                         canFix: draft.mode === "columns" || Boolean(draft.sql.trim()),
+                        fixReady,
                         onShowRows: (check) =>
+                            settled &&
                             setFocus({
-                                check: check.check,
-                                title: check.title,
-                                rows: check.rows,
-                                majority:
-                                    check.check === "balance" && !context.rare
-                                        ? (check.table[0]?.[0] ?? null)
-                                        : null,
+                                on: settled,
+                                focus: {
+                                    check: check.check,
+                                    title: check.title,
+                                    majority:
+                                        check.check === "balance" && !context.rare
+                                            ? (check.table[0]?.[0] ?? null)
+                                            : null,
+                                },
                             }),
                         onShowAll: () => setFocus(null),
                         onFix: (fix) => void applyFix(fix),
@@ -667,12 +757,15 @@ export function NewDatasetPage({
                 const name = details.name || freeDatasetName(siblings, "New dataset");
                 const created = await unwrap(
                     api.POST("/api/datasets", {
-                        body: { name, folder_id: folder, ...body },
+                        body: {
+                            name,
+                            folder_id: folder,
+                            description: details.description || null,
+                            tags: details.tags,
+                            ...body,
+                        },
                     }),
                 );
-                if (details.description || details.tags.length > 0) {
-                    await patchDetails(created.slug, { ...details, name });
-                }
                 await refresh();
                 return created.slug;
             }}

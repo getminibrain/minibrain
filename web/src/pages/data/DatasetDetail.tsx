@@ -92,6 +92,40 @@ export function useDatasetRefresh(slug: string) {
     };
 }
 
+function rowsText(value: number): string {
+    return `${count(value)} ${value === 1 ? "row" : "rows"}`;
+}
+
+function cleanupSteps(mapping: DatasetSummary["mapping"]): string[] {
+    const { personal_data, max_tokens, conflicts, rare, per_label } = mapping.cleanup ?? {};
+    const steps: string[] = [];
+    if (mapping.skip_empty) {
+        steps.push("Skip rows with no answer");
+    }
+    if (personal_data) {
+        steps.push(
+            personal_data === "mask" ? "Mask personal data" : "Drop rows with personal data",
+        );
+    }
+    if (max_tokens) {
+        steps.push(`Drop inputs over ${count(max_tokens)} tokens`);
+    }
+    if (conflicts) {
+        steps.push(
+            conflicts === "common"
+                ? "Keep the most common label of each input"
+                : "Drop inputs with several labels",
+        );
+    }
+    if (rare) {
+        steps.push(`Drop labels under ${rowsText(rare)}`);
+    }
+    if (per_label) {
+        steps.push(`Keep at most ${rowsText(per_label)} a label`);
+    }
+    return steps;
+}
+
 function QueryPart({
     dataset,
     sources,
@@ -103,6 +137,7 @@ function QueryPart({
 }) {
     const { mapping } = dataset;
     const source = sources.find((item) => item.id === dataset.source_id);
+    const steps = cleanupSteps(mapping);
     let body: ReactNode;
     if (!mapping.sql) {
         body = (
@@ -133,6 +168,18 @@ function QueryPart({
                 <dd className="truncate font-mono">{mapping.input_column ?? "–"}</dd>
                 <dt className="text-muted-foreground">Label</dt>
                 <dd className="truncate font-mono">{mapping.label_column ?? "–"}</dd>
+                <dt className="text-muted-foreground">Clean up</dt>
+                <dd className="min-w-0">
+                    {steps.length === 0 ? (
+                        <span className="text-muted-foreground">None</span>
+                    ) : (
+                        <ul className="flex flex-col gap-1.5 tabular-nums">
+                            {steps.map((step) => (
+                                <li key={step}>{step}</li>
+                            ))}
+                        </ul>
+                    )}
+                </dd>
             </dl>
         );
     } else {

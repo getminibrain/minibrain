@@ -107,7 +107,7 @@ export function RowsPreview({
                     </span>
                 )}
             </div>
-            {bar && (active === "records" || active === "table") && (
+            {bar && active !== "example" && (
                 <div className="flex min-h-9 shrink-0 items-center gap-3 border-b bg-secondary px-3 text-sm">
                     {bar}
                 </div>

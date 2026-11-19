@@ -31,6 +31,16 @@ const TONES: Record<CheckInfo["status"], Tone> = {
 
 const ORDER: CheckInfo["status"][] = ["blocked", "warning", "skipped", "off", "ok"];
 
+export function keyedByText<T>(items: T[], text: (item: T) => string) {
+    const seen = new Map<string, number>();
+    return items.map((item) => {
+        const base = text(item);
+        const repeat = seen.get(base) ?? 0;
+        seen.set(base, repeat + 1);
+        return { key: `${base}\u0000${repeat}`, item };
+    });
+}
+
 export function useDismiss(dataset: string) {
     const client = useQueryClient();
     const refresh = () =>
@@ -90,8 +100,8 @@ function Finding({
             <p className="text-sm text-muted-foreground">{check.detail}</p>
             {check.examples.length > 0 && (
                 <ul className="flex flex-col gap-0.5">
-                    {check.examples.map((example) => (
-                        <li key={example} className="truncate">
+                    {keyedByText(check.examples, String).map(({ key, item: example }) => (
+                        <li key={key} className="truncate">
                             {example}
                         </li>
                     ))}
@@ -205,8 +215,8 @@ function CompactFinding({
                     <p className="text-sm text-muted-foreground">{check.detail}</p>
                     {check.examples.length > 0 && (
                         <ul className="flex flex-col gap-0.5">
-                            {check.examples.map((example) => (
-                                <li key={example} className="truncate">
+                            {keyedByText(check.examples, String).map(({ key, item: example }) => (
+                                <li key={key} className="truncate">
                                     {example}
                                 </li>
                             ))}

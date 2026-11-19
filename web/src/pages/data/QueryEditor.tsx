@@ -448,13 +448,20 @@ function roleOf(draft: Draft, column: string): string {
     return draft.label === column ? "label" : NONE;
 }
 
+function distinctNote(distinct: number, combined: boolean): string {
+    const about = `About ${count(distinct)} distinct ${distinct === 1 ? "value" : "values"}, estimated from the source's rows`;
+    return combined ? `${about}; the most in any one of the combined sources` : about;
+}
+
 function ColumnRow({
     facts,
     role,
+    combined,
     onRole,
 }: {
     facts: ColumnFacts;
     role: string;
+    combined: boolean;
     onRole: (role: string) => void;
 }) {
     return (
@@ -482,7 +489,13 @@ function ColumnRow({
                 </span>
             </td>
             <td className="hidden px-3 text-right text-sm tabular-nums @xs:table-cell">
-                {facts.distinct === null ? "–" : count(facts.distinct)}
+                {facts.distinct === null ? (
+                    "–"
+                ) : (
+                    <span title={distinctNote(facts.distinct, combined)}>
+                        {`≈${count(facts.distinct)}`}
+                    </span>
+                )}
             </td>
             <td className="py-1 pr-1.5 pl-0 text-right">
                 <SegmentedTabs size="sm" tabs={ROLE_TABS} active={role} onSelect={onRole} />
@@ -494,10 +507,12 @@ function ColumnRow({
 function ColumnList({
     facts,
     draft,
+    combined,
     onChange,
 }: {
     facts: ColumnFacts[];
     draft: Draft;
+    combined: boolean;
     onChange: (draft: Draft) => void;
 }) {
     const choose = (column: string, role: string) => {
@@ -527,6 +542,7 @@ function ColumnList({
                             key={item.name}
                             facts={item}
                             role={roleOf(draft, item.name)}
+                            combined={combined}
                             onRole={(role) => choose(item.name, role)}
                         />
                     ))}
@@ -541,25 +557,27 @@ function ColumnsMode({
     sources,
     cleanupDefaults,
     onChange,
+    onSuggest,
     onSwitch,
 }: {
     draft: Draft;
     sources: SourceSummary[];
     cleanupDefaults: CleanupDefaults;
     onChange: (draft: Draft) => void;
+    onSuggest: (draft: Draft) => void;
     onSwitch: () => void;
 }) {
     const chosen = chosenSources(draft, sources);
     const columns = sharedColumns(chosen);
     const { stats, suggestion } = useSuggestion(chosen, columns);
     const facts = columnFacts(chosen, stats, columns);
-    const latest = useRef({ draft, onChange });
-    latest.current = { draft, onChange };
+    const latest = useRef({ draft, onSuggest });
+    latest.current = { draft, onSuggest };
     const suggestionKey = suggestion
         ? [suggestion.input, suggestion.label, ...draft.sources].join("\n")
         : "";
     useEffect(() => {
-        const { draft: current, onChange: change } = latest.current;
+        const { draft: current, onSuggest: change } = latest.current;
         if (!suggestionKey || current.guessed.length === 0) {
             return;
         }
@@ -612,7 +630,12 @@ function ColumnsMode({
                                 list shows the columns they share.
                             </p>
                         )}
-                        <ColumnList facts={facts} draft={draft} onChange={onChange} />
+                        <ColumnList
+                            facts={facts}
+                            draft={draft}
+                            combined={chosen.length > 1}
+                            onChange={onChange}
+                        />
                     </div>
                     <CheckboxField
                         label="Skip rows with no answer"
@@ -873,6 +896,7 @@ export function QueryEditor({
     cleanupDefaults,
     editor,
     onChange,
+    onSuggest,
     onRun,
     onCompletingChange,
 }: {
@@ -884,6 +908,7 @@ export function QueryEditor({
     cleanupDefaults: CleanupDefaults;
     editor: RefObject<SqlEditorHandle | null>;
     onChange: (draft: Draft) => void;
+    onSuggest: (draft: Draft) => void;
     onRun: (sql: string) => void;
     onCompletingChange: (open: boolean) => void;
 }) {
@@ -906,6 +931,7 @@ export function QueryEditor({
                     sources={sources}
                     cleanupDefaults={cleanupDefaults}
                     onChange={onChange}
+                    onSuggest={onSuggest}
                     onSwitch={() => onChange(switchedDraft(draft, "sql", sources, chars))}
                 />
             )}
