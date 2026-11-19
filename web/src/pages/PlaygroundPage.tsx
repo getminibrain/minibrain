@@ -172,6 +172,7 @@ export function PlaygroundPage() {
     const end = useRef<HTMLDivElement | null>(null);
     const lastSaved = useRef<string | null>(null);
     const justOpened = useRef(false);
+    const conversation = useRef(0);
     const defaulted = useRef(false);
     const startChat = useRef(requestedChat);
     const pick = (name: string) => {
@@ -196,8 +197,13 @@ export function PlaygroundPage() {
         (id: number) => {
             aborter.current?.abort();
             defaulted.current = true;
+            conversation.current += 1;
+            const opening = conversation.current;
             openChat.mutate(id, {
                 onSuccess: (chat) => {
+                    if (opening !== conversation.current) {
+                        return;
+                    }
                     justOpened.current = true;
                     setTurns(turnsOf(chat.state));
                     setSettings(settingsOf(chat.state.settings));
@@ -220,6 +226,7 @@ export function PlaygroundPage() {
     }, [open]);
     const newChat = () => {
         aborter.current?.abort();
+        conversation.current += 1;
         setTurns([]);
         setChatId(null);
         setOpenedModel(null);
@@ -245,10 +252,14 @@ export function PlaygroundPage() {
         }
         const timer = window.setTimeout(() => {
             lastSaved.current = key;
+            const saving = conversation.current;
             saveMutate(
                 { id: chatId, model: target.name, version: target.version ?? null, state },
                 {
                     onSuccess: (saved) => {
+                        if (saving !== conversation.current) {
+                            return;
+                        }
                         if (chatId === null) {
                             lastSaved.current = JSON.stringify({
                                 chatId: saved.id,
@@ -260,7 +271,9 @@ export function PlaygroundPage() {
                         }
                     },
                     onError: () => {
-                        lastSaved.current = null;
+                        if (saving === conversation.current) {
+                            lastSaved.current = null;
+                        }
                     },
                 },
             );
