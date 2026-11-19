@@ -71,7 +71,7 @@ PREVIEWING: ContextVar[bool] = ContextVar("previewing", default=False)
 def caps_for(memory_bytes: int, cores: int) -> PreviewCaps:
     memory = max(int(memory_bytes * PREVIEW_MEMORY_SHARE) // PREVIEW_RUNS // MIB, MIN_RUN_MEMORY_MIB)
     spill = max(int(memory_bytes * PREVIEW_SPILL_SHARE) // PREVIEW_RUNS // MIB, memory)
-    threads = max(int(cores * PREVIEW_THREAD_SHARE) // PREVIEW_RUNS, 1)
+    threads = max(int(cores * PREVIEW_THREAD_SHARE) // PREVIEW_SLOTS, 1)
     return PreviewCaps(memory_mib=memory, threads=threads, spill_mib=spill)
 
 
@@ -84,26 +84,23 @@ def previewing() -> bool:
     return PREVIEWING.get()
 
 
-def spill_root() -> Path:
-    return home() / "tmp" / "previews"
+def spill_root(preview: bool = True) -> Path:
+    return home() / "tmp" / ("previews" if preview else "queries")
 
 
 def clear_spills() -> None:
-    root = spill_root()
-    if not root.is_dir():
-        return
-    for found in root.iterdir():
-        owner = found.name.split("-", 1)[0]
-        if not (owner.isdigit() and psutil.pid_exists(int(owner))):
-            shutil.rmtree(found, ignore_errors=True)
+    for root in (spill_root(), spill_root(preview=False)):
+        if not root.is_dir():
+            continue
+        for found in root.iterdir():
+            owner = found.name.split("-", 1)[0]
+            if not (owner.isdigit() and psutil.pid_exists(int(owner))):
+                shutil.rmtree(found, ignore_errors=True)
 
 
 @contextmanager
 def spill_space() -> Iterator[Path | None]:
-    if not PREVIEWING.get():
-        yield None
-        return
-    root = spill_root()
+    root = spill_root(PREVIEWING.get())
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     space = Path(tempfile.mkdtemp(prefix=f"{os.getpid()}-", dir=root))
     try:
@@ -112,8 +109,15 @@ def spill_space() -> Iterator[Path | None]:
         shutil.rmtree(space, ignore_errors=True)
 
 
+def spill_into(connection: duckdb.DuckDBPyConnection, spill: Path) -> None:
+    directory = str(spill).replace("'", "''")
+    connection.execute(f"SET temp_directory = '{directory}'")
+
+
 def cap(connection: duckdb.DuckDBPyConnection, spill: Path | None) -> None:
     if not PREVIEWING.get():
+        if spill is not None:
+            spill_into(connection, spill)
         return
     caps = preview_caps()
     connection.execute(f"SET memory_limit = '{caps.memory}'")
@@ -121,8 +125,7 @@ def cap(connection: duckdb.DuckDBPyConnection, spill: Path | None) -> None:
     if spill is None:
         connection.execute("SET temp_directory = ''")
         return
-    directory = str(spill).replace("'", "''")
-    connection.execute(f"SET temp_directory = '{directory}'")
+    spill_into(connection, spill)
     connection.execute(f"SET max_temp_directory_size = '{caps.spill}'")
 
 

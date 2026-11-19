@@ -13,6 +13,7 @@ from minibrain.data.runs import (
     MIN_RUN_MEMORY_MIB,
     PREVIEW_MEMORY_SHARE,
     PREVIEW_RUNS,
+    PREVIEW_SLOTS,
     PREVIEW_THREAD_SHARE,
     SLOTS,
     PreviewCaps,
@@ -214,9 +215,9 @@ GIB = 1024**3
     ("memory", "cores", "expected"),
     [
         (4 * GIB, 2, PreviewCaps(memory_mib=256, threads=1, spill_mib=682)),
-        (16 * GIB, 8, PreviewCaps(memory_mib=682, threads=1, spill_mib=2730)),
-        (64 * GIB, 16, PreviewCaps(memory_mib=2730, threads=1, spill_mib=10922)),
-        (256 * GIB, 64, PreviewCaps(memory_mib=10922, threads=5, spill_mib=43690)),
+        (16 * GIB, 8, PreviewCaps(memory_mib=682, threads=2, spill_mib=2730)),
+        (64 * GIB, 16, PreviewCaps(memory_mib=2730, threads=4, spill_mib=10922)),
+        (256 * GIB, 64, PreviewCaps(memory_mib=10922, threads=16, spill_mib=43690)),
     ],
 )
 def test_all_previews_together_share_one_budget(memory: int, cores: int, expected: PreviewCaps) -> None:
@@ -225,7 +226,7 @@ def test_all_previews_together_share_one_budget(memory: int, cores: int, expecte
     if caps.memory_mib > MIN_RUN_MEMORY_MIB:
         assert caps.memory_mib * PREVIEW_RUNS * MIB <= memory * PREVIEW_MEMORY_SHARE
     if caps.threads > 1:
-        assert caps.threads * PREVIEW_RUNS <= cores * PREVIEW_THREAD_SHARE
+        assert caps.threads * PREVIEW_SLOTS <= cores * PREVIEW_THREAD_SHARE
 
 
 def test_a_preview_run_takes_its_share_and_spills_into_its_own_folder() -> None:
@@ -248,6 +249,20 @@ def test_a_preview_reads_no_other_preview_spill() -> None:
     (other / "secret.tmp").write_text("x")
     try:
         with pytest.raises(SourceError), running("ana", "editor.rows"):
+            run_query([], f"SELECT * FROM read_text('{other}/secret.tmp')", None)
+    finally:
+        shutil.rmtree(other)
+
+
+def test_a_query_outside_previews_spills_into_its_own_folder_and_reads_no_other() -> None:
+    spill = Path(run_query([], SETTINGS, None).rows[0][2])
+    assert spill.parent == spill_root(preview=False)
+    assert not spill.exists()
+    other = spill_root(preview=False) / "1-other"
+    other.mkdir(parents=True)
+    (other / "secret.tmp").write_text("x")
+    try:
+        with pytest.raises(SourceError):
             run_query([], f"SELECT * FROM read_text('{other}/secret.tmp')", None)
     finally:
         shutil.rmtree(other)

@@ -452,11 +452,13 @@ Data is shared across models:
   dataset SQL cannot reach past its sources into the rest of an attached database.
 - The dataset editor's preview (first rows, then the full count and quick checks) runs as you type only when the
   sources it reads hold under 1,000,000 rows by their known counts; larger or uncounted sources run when Run (⌘↵ /
-  Ctrl+↵) is pressed, one action for both. All previews together take at most a quarter of the machine's memory and
-  half its cores: the budget is split evenly over every run that can be going at once (`PREVIEW_SLOTS` × a page's
-  rows, shape and count = 6), each run at least 256 MiB and one thread (`SET memory_limit`, `SET threads`,
-  `minibrain/data/runs.py`), so a 64 GB, 16-core server gives each run 2.7 GiB and one thread. A run that outgrows
-  its share spills to a folder of its own under `<home>/tmp/previews` (all runs together at most the machine's
+  Ctrl+↵) is pressed, one action for both. All previews together take at most a quarter of the machine's memory: it
+  is split evenly over every run that can be going at once (`PREVIEW_SLOTS` × a page's rows, shape and count = 6),
+  each run at least 256 MiB (`SET memory_limit`, `minibrain/data/runs.py`). Half the cores are split over the two
+  slots (`SET threads`, at least one), so a lone preview is not slowed to one thread; with both slots busy, CPU is
+  shared but never memory. A 64 GB, 16-core server gives each run 2.7 GiB and four threads. A run that outgrows
+  its share spills to a folder of its own under `<home>/tmp/previews` (saves and other sandboxed queries spill to
+  their own folders under `<home>/tmp/queries`, without a size cap) (all runs together at most the machine's
   memory on disk, removed when the run ends, never readable by another run's SQL); past that it answers 422 "This
   preview needs more memory than previews are allowed; press Run on a smaller query, or save the dataset to check
   the full data". Saves and training-data builds keep DuckDB's own limits. Each run keeps the 30-second stop. A new
