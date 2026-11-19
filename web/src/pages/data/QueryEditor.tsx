@@ -36,6 +36,7 @@ import {
 } from "./columnFacts";
 import { typeWord } from "./columnTypes";
 import { DUCKDB_WORDS } from "./duckdbWords";
+import { SourceIcon } from "./icons";
 import { RECIPES, type RecipeSource, recipeSql } from "./recipes";
 import {
     type Picks,
@@ -649,7 +650,7 @@ function TableList({
     return (
         <div className="flex max-h-64 min-h-0 min-w-0 flex-col rounded-lg border @2xl:max-h-none">
             <div className="border-b px-3 py-1.5 text-sm text-muted-foreground">
-                Tables you can query
+                Sources · click a name to add it to the query
             </div>
             {sources.length === 0 ? (
                 <p className="px-3 py-2 text-muted-foreground">No sources yet.</p>
@@ -662,14 +663,25 @@ function TableList({
                                 key={source.id}
                                 className="flex flex-col items-start gap-1 px-2 py-1.5"
                             >
-                                <button
-                                    type="button"
-                                    title={`Insert ${source.table}`}
-                                    onClick={() => onInsert(source.table)}
-                                    className={`px-1 font-mono ${insertable}`}
-                                >
-                                    {source.table}
-                                </button>
+                                <span className="flex w-full min-w-0 items-center gap-1.5">
+                                    <SourceIcon
+                                        source={source}
+                                        className="ml-1 size-4 shrink-0 text-muted-foreground"
+                                    />
+                                    <button
+                                        type="button"
+                                        title={`Insert ${source.table}`}
+                                        onClick={() => onInsert(source.table)}
+                                        className={`min-w-0 truncate px-1 font-mono ${insertable}`}
+                                    >
+                                        {source.table}
+                                    </button>
+                                    {source.rows === null ? null : (
+                                        <span className="ml-auto shrink-0 pr-1 text-sm text-muted-foreground tabular-nums">
+                                            {`${count(source.rows)} ${source.rows === 1 ? "row" : "rows"}`}
+                                        </span>
+                                    )}
+                                </span>
                                 <span className="flex flex-wrap gap-x-1 gap-y-0.5">
                                     {source.columns.map((column) => (
                                         <button
