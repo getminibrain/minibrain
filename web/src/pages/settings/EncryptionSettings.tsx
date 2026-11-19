@@ -21,6 +21,7 @@ import { SectionError } from "~/components/ErrorState";
 import { PolicyLabel } from "~/components/PolicyLabel";
 import { ErrorLine } from "~/components/Section";
 import { SettingsSection } from "~/components/SettingsSection";
+import { SourceBadge } from "~/components/SourceBadge";
 import { When } from "~/components/When";
 import { StatusText } from "~/components/models/StatusText";
 import { SECURITY, policyAnchor } from "~/pages/settings/settingsIndex";
@@ -48,10 +49,6 @@ const TASKS: Record<string, string> = {
     encrypt: "Encrypting existing files",
     rotate: "Rotating the master key",
     check: "Checking every file",
-};
-const LOCK_LABEL: Record<string, string> = {
-    "config file": "Set by config file",
-    environment: "Set by environment",
 };
 
 function active(status: EncryptionStatus | undefined): boolean {
@@ -115,9 +112,7 @@ function FieldRow({
                 control={
                     <>
                         <span>{display(field)}</span>
-                        <Badge variant="neutral" className="w-fit">
-                            {LOCK_LABEL[field.source] ?? field.source}
-                        </Badge>
+                        <SourceBadge source={field.source} />
                     </>
                 }
             />

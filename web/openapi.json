@@ -18976,6 +18976,11 @@
             "type": "string",
             "title": "Description"
           },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          },
           "kind": {
             "type": "string",
             "title": "Kind"

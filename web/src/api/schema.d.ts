@@ -5784,6 +5784,11 @@ export interface components {
             label: string;
             /** Description */
             description: string;
+            /**
+             * Detail
+             * @default
+             */
+            detail?: string;
             /** Kind */
             kind: string;
             /** Choices */

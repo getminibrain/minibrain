@@ -4,11 +4,14 @@ const SOURCE_LABEL: Record<string, string> = {
     "config file": "Set by config file",
     environment: "Set by environment",
     "built in": "Always on",
+    "config only": "Config file only",
 };
 
 const SOURCE_DETAIL: Record<string, string> = {
     "config file": "Set in the server's minibrain.yaml, so it can only be changed there.",
     environment: "Set by an environment variable on the server, so it can only be changed there.",
+    "config only":
+        "Set only in the server's minibrain.yaml or environment, never here: the server loads it as code.",
 };
 
 export function SourceBadge({ source }: { source: string }) {

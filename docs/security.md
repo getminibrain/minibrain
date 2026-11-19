@@ -436,6 +436,9 @@ Drop the `rotate` path from the policy if Vault admins rotate the key themselves
 version is newest. Tested against Vault 1.20.4 in dev mode with AppRole.
 
 PKCS#11 HSM. Install the extra (`pip install 'minibrain[hsm]'`, which adds PyKCS11) and the vendor's PKCS#11 module.
+minibrain loads that module into the server process, so its path is set only in `minibrain.yaml` or
+`MINIBRAIN_POLICY_HSM_LIBRARY`: Settings shows it read-only, and the API refuses to change it (409), so an admin
+account cannot point the server at a library of its choosing. The token and key labels stay editable in Settings.
 
 ```yaml
 policy:

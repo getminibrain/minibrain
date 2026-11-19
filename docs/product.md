@@ -667,7 +667,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Encryption at rest · API: GET /api/settings/encryption, PUT /api/settings/encryption, POST /api/settings/encryption/test, POST /api/settings/encryption/tasks · CLI: minibrain keys status, minibrain keys rotate, minibrain keys encrypt-existing · Policy: encryption · Config: MINIBRAIN_MASTER_KEY_FILE
 - **External key managers** · shipped · admin
   Wrap keys with Vault Transit, a PKCS#11 HSM or AWS KMS.
-  UI: Settings › Security › Encryption at rest · Policy: vault_address, vault_mount, vault_key, vault_namespace, vault_auth, vault_role_id, vault_auth_mount, vault_ca_bundle, hsm_library, hsm_token, hsm_key, kms_key, kms_region, kms_endpoint, kms_fips · Config: MINIBRAIN_VAULT_TOKEN, MINIBRAIN_VAULT_TOKEN_FILE, MINIBRAIN_VAULT_SECRET_ID, MINIBRAIN_VAULT_SECRET_ID_FILE, MINIBRAIN_HSM_PIN, MINIBRAIN_HSM_PIN_FILE
+  UI: Settings › Security › Encryption at rest · Policy: vault_address, vault_mount, vault_key, vault_namespace, vault_auth, vault_role_id, vault_auth_mount, vault_ca_bundle, hsm_library, hsm_token, hsm_key, kms_key, kms_region, kms_endpoint, kms_fips · Config: MINIBRAIN_VAULT_TOKEN, MINIBRAIN_VAULT_TOKEN_FILE, MINIBRAIN_VAULT_SECRET_ID, MINIBRAIN_VAULT_SECRET_ID_FILE, MINIBRAIN_HSM_PIN, MINIBRAIN_HSM_PIN_FILE, MINIBRAIN_POLICY_HSM_LIBRARY
 - **AI bill of materials** · shipped · admin
   Download a CycloneDX ML-BOM for each version.
   UI: Models › model › Versions › Model card · API: GET /api/models/{name}/versions/{number}/aibom.json

@@ -20,7 +20,7 @@ from minibrain.encryption.keys import (
     records_of,
 )
 from minibrain.encryption.providers import KeyUnavailableError
-from minibrain.policy import PolicyError, describe, update
+from minibrain.policy import LockedError, PolicyError, describe, update
 from minibrain.policy import load as load_policy
 from minibrain.registry.models import AuditEvent
 from minibrain.registry.settings_store import read
@@ -46,6 +46,7 @@ class EncryptionField(BaseModel):
     name: str
     label: str
     description: str
+    detail: str = ""
     kind: str
     choices: list[EncryptionChoice]
     value: Any
@@ -254,7 +255,7 @@ def test_encryption(body: EncryptionUpdate, session: SessionDep, settings: Setti
     kind = str(body.values.get(POLICY) or load_policy(session)[POLICY])
     try:
         kind, check = key_check(session, settings, body.values, actor)
-    except (EncryptionError, KeyUnavailableError, PolicyError) as error:
+    except (EncryptionError, KeyUnavailableError, PolicyError, LockedError) as error:
         check = EncryptionCheck(ok=False, message=str(error))
     finally:
         session.rollback()

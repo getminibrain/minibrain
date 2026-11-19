@@ -42,6 +42,11 @@ class Field:
     maximum: int | None = None
     minimum: int = 0
     detail: str = ""
+    config_only: bool = False
+
+    @property
+    def settable(self) -> bool:
+        return self.editable and not self.config_only
 
 
 FIELDS: tuple[Field, ...] = (
@@ -321,13 +326,15 @@ FIELDS: tuple[Field, ...] = (
     Field(
         "hsm_library",
         "PKCS#11 library",
-        "Path of the HSM vendor's PKCS#11 module on this server.",
+        "PKCS#11 module path, set only in minibrain.yaml or environment.",
         "text",
         "",
         detail=(
-            "Such as /usr/lib/softhsm/libsofthsm2.so. The user PIN comes from MINIBRAIN_HSM_PIN or the file "
-            "MINIBRAIN_HSM_PIN_FILE names."
+            "Set only as policy.hsm_library in minibrain.yaml or MINIBRAIN_POLICY_HSM_LIBRARY, never here: the "
+            "server loads this file as code. Such as /usr/lib/softhsm/libsofthsm2.so. The user PIN comes from "
+            "MINIBRAIN_HSM_PIN or the file MINIBRAIN_HSM_PIN_FILE names."
         ),
+        config_only=True,
     ),
     Field("hsm_token", "HSM token", "Label of the token (partition) that holds the key.", "text", ""),
     Field(
@@ -404,6 +411,7 @@ OTEL_ENV = {
 }
 OTEL_SIGNAL_ENDPOINTS = ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
 TRUE = {"1", "true", "yes", "on"}
+CONFIG_ONLY = "config only"
 Sealer = Callable[[str, str], str]
 
 
@@ -657,15 +665,19 @@ class Policy:
         return bool(self["request_bodies"]) if self["request_bodies_locked"] else chosen
 
 
+def stored(session: Session, field: Field) -> Any:
+    return read(session, PREFIX + field.name, field.default) if field.settable else field.default
+
+
 def value(session: Session, name: str) -> Any:
     locked = locked_sources()
     if name in locked:
         return locked[name][1]
-    return read(session, PREFIX + name, BY_NAME[name].default)
+    return stored(session, BY_NAME[name])
 
 
 def load(session: Session) -> Policy:
-    values = {field.name: read(session, PREFIX + field.name, field.default) for field in FIELDS}
+    values = {field.name: stored(session, field) for field in FIELDS}
     for name, (_, value) in locked_sources().items():
         values[name] = value
     values["safetensors_only"] = True
@@ -704,11 +716,17 @@ def describe(session: Session) -> list[dict[str, Any]]:
             "choices": [choice_of(field, choice) for choice in field.choices],
             "maximum": field.maximum,
             "value": shown(field, policy[field.name]),
-            "locked": field.name in locked or not field.editable,
-            "source": locked[field.name][0] if field.name in locked else ("built in" if not field.editable else "ui"),
+            "locked": field.name in locked or not field.settable,
+            "source": locked[field.name][0] if field.name in locked else unlocked_source(field),
         }
         for field in FIELDS
     ]
+
+
+def unlocked_source(field: Field) -> str:
+    if not field.editable:
+        return "built in"
+    return CONFIG_ONLY if field.config_only else "ui"
 
 
 def sealed(field: Field, value: dict[str, Any], seal: Sealer | None) -> dict[str, Any]:
@@ -723,6 +741,8 @@ def update(session: Session, name: str, value: Any, actor: str, seal: Sealer | N
     field = BY_NAME.get(name)
     if field is None:
         raise PolicyError(f"No policy called {name}")
+    if field.config_only:
+        raise LockedError(f"{field.label} can only be set in minibrain.yaml or {ENV[name]}, never here")
     if not field.editable or name in locked_sources():
         raise LockedError(f"{field.label} is set by configuration and cannot be changed here")
     before = shown(field, load(session)[name])
