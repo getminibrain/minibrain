@@ -419,7 +419,8 @@ works out of the box.
 - `auto` placement skips pools not used for serving; asking for one is a 422 with the reason. Engines already running
   there keep serving until their model is undeployed or moved.
 - Workers in a pool not used for training claim no training or scoring job; a job asked for such a pool is refused
-  with the reason (422). Jobs running when the use changes finish; queued jobs held to that pool wait.
+  with the reason (422). Jobs running when the use changes finish. A pool with queued training or scoring jobs held
+  to it cannot stop taking training: the change is a 409 naming those jobs, so cancel them or let them start first.
 - Downloads, imports, checks, repairs and exports run on any pool.
 - The Train page's Pool list and the Deploy dialogs show the other pools disabled, with why.
 - Each change writes a `pool.workloads` or `pool.description` audit event with `from` and `to`.

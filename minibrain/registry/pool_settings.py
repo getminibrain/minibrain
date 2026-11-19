@@ -5,7 +5,8 @@ from typing import Final, Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from minibrain.registry.models import JobKind, PoolSetting, now
+from minibrain.registry.models import Job, JobKind, JobStatus, PoolSetting, now
+from minibrain.registry.service import ConflictError
 
 Workload = Literal["serving", "training"]
 SERVING: Final = "serving"
@@ -15,6 +16,7 @@ ANY = frozenset(WORKLOADS)
 TRAINING_KINDS = frozenset({JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE})
 NOUNS = {SERVING: "serving", TRAINING: "training and scoring"}
 DESCRIPTION_LIMIT: Final = 120
+NAMED_JOBS: Final = 5
 
 
 class WorkloadError(ValueError):
@@ -89,10 +91,31 @@ def workload_of_job(kind: str) -> str | None:
     return TRAINING if kind in TRAINING_KINDS else None
 
 
+def held_jobs(session: Session, pool: str) -> list[Job]:
+    query = select(Job).where(Job.pool == pool, Job.status == JobStatus.QUEUED, Job.kind.in_(TRAINING_KINDS))
+    return list(session.scalars(query.order_by(Job.id)))
+
+
+def job_names(jobs: list[Job]) -> str:
+    named = ", ".join(f"#{job.id}" for job in jobs[:NAMED_JOBS])
+    return named + (f" and {len(jobs) - NAMED_JOBS} more" if len(jobs) > NAMED_JOBS else "")
+
+
+def refuse_stranding(session: Session, pool: str, workloads: frozenset[str]) -> None:
+    waiting = [] if TRAINING in workloads else held_jobs(session, pool)
+    if waiting:
+        noun = "job" if len(waiting) == 1 else "jobs"
+        raise ConflictError(
+            f"Pool {pool} has queued training or scoring {noun} that only it can run ({job_names(waiting)}). "
+            f"Cancel them on the Jobs page, or let them start, before {pool} stops taking training."
+        )
+
+
 def save_settings(session: Session, pool: str, wanted: PoolSettings, actor: str) -> PoolSettings:
     workloads = known(wanted.workloads)
     if not workloads:
         raise WorkloadError(f"Pool {pool} needs at least one use: {', '.join(WORKLOADS)}")
+    refuse_stranding(session, pool, workloads)
     description = wanted.description or None
     found = session.get(PoolSetting, pool)
     if workloads == ANY and description is None:

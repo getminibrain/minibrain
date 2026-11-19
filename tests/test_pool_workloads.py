@@ -137,3 +137,19 @@ def test_a_job_running_when_the_pool_stops_training_finishes(harness: Harness) -
     use(harness, "gpu-pool", "serving")
     body = {"token": claim["token"], "result": {"metrics": {}}, "outputs": {}}
     assert harness.internal(f"/jobs/{claim['job_id']}/complete", body).status_code == 204
+
+
+def test_a_pool_with_queued_training_held_to_it_keeps_taking_training(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(48 * GIB, libraries=("bitsandbytes",)), host="gpu-a10-1", pool="gpu-pool")
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora", "pool": "gpu-pool"})
+    assert version.status_code == 201, version.text
+    job_id = version.json()["job"]["id"]
+    refused = use(harness, "gpu-pool", "serving")
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail.startswith(f"Pool gpu-pool has queued training or scoring job that only it can run (#{job_id}).")
+    assert pool_of(harness, "gpu-pool")["workloads"] == ["serving", "training"]
+    assert use(harness, "gpu-pool", "training").status_code == 200
+    assert harness.client.post(f"/api/jobs/{job_id}/cancel").status_code == 200
+    assert use(harness, "gpu-pool", "serving").status_code == 200
