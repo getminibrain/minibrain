@@ -43,7 +43,7 @@ def signed_claim(settings: Settings, token: str) -> tuple[str, int, str] | None:
     kind, number = source[:1], source[1:]
     if kind not in SOURCES or not (number.isascii() and number.isdigit()) or not pool:
         return None
-    if not hmac.compare_digest(given, signature(settings, source, pool)):
+    if not hmac.compare_digest(given.encode(), signature(settings, source, pool).encode()):
         return None
     return kind, int(number), pool
 

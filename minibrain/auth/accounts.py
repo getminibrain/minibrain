@@ -237,7 +237,7 @@ def csrf_for(key: bytes, subject: str) -> str:
 
 
 def csrf_matches(key: bytes, subject: str, given: str | None) -> bool:
-    return given is not None and hmac.compare_digest(csrf_for(key, subject), given)
+    return given is not None and hmac.compare_digest(csrf_for(key, subject).encode(), given.encode())
 
 
 def local_for(session: Session, email: str) -> User | None:

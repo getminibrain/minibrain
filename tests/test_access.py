@@ -453,3 +453,14 @@ def test_every_other_route_needs_its_token(harness: Harness) -> None:
                 if client.request(method, filled(path), json={}).status_code != 401:
                     let_through.append((method, path))
     assert let_through == []
+
+
+def test_non_ascii_tokens_are_refused_not_crashed(harness: Harness) -> None:
+    anonymous = TestClient(harness.app, raise_server_exceptions=False)
+    for token in ("é", "engine.t1.rack.é"):
+        bearer = {b"authorization": f"Bearer {token}".encode("latin-1")}
+        for path in ("/internal/worker/bases", "/internal/gateway/bases"):
+            assert anonymous.get(path, headers=bearer).status_code == 401, (token, path)
+    signed_in = TestClient(harness.app, raise_server_exceptions=False, cookies=harness.client.cookies)
+    refused = signed_in.post("/api/auth/logout", headers={b"x-csrf-token": "é".encode("latin-1")})
+    assert refused.status_code == 403

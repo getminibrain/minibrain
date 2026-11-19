@@ -44,7 +44,7 @@ MAX_CLAIM_WAIT_SECONDS = 30.0
 
 def worker_caller(request: Request, session: SessionDep, authorization: Annotated[str, Header()] = "") -> Caller:
     token = bearer(authorization)
-    if token and hmac.compare_digest(token, request.app.state.settings.secret(LOCAL_KEY_FILE)):
+    if token and hmac.compare_digest(token.encode(), request.app.state.settings.secret(LOCAL_KEY_FILE).encode()):
         return Caller(LOCAL_POOL)
     found = credential_caller(session, token, address_of(request))
     if found is None:
