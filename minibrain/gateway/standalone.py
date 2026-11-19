@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import PlainTextResponse, Response
 
+from minibrain.body_limit import limit_bodies
 from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
 from minibrain.gateway.config import REPORT_SECONDS, GatewayConfig, RemoteConfig, gateway_id, served_bases
@@ -103,6 +104,7 @@ def create_gateway_app(
     app.state.telemetry.refresh()
     app.add_exception_handler(OpenAIError, openai_error)
     app.add_exception_handler(RequestValidationError, invalid_body)
+    limit_bodies(app)
     app.add_middleware(RequestContext)
     app.include_router(routes.router)
 

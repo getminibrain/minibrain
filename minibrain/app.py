@@ -68,6 +68,7 @@ from minibrain.auth.oidc import OidcClient
 from minibrain.auth.passwords import PasswordError
 from minibrain.auth.throttle import TooManyAttempts
 from minibrain.base_models import BaseModelSpec
+from minibrain.body_limit import limit_bodies
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import sync_declared
 from minibrain.data.dataset_versions import OverLimitError
@@ -316,6 +317,7 @@ def create_app(
         app.add_exception_handler(error, domain_error)
     app.add_exception_handler(OpenAIError, openai_error)
     app.add_exception_handler(RequestValidationError, invalid_body)
+    limit_bodies(app)
     app.add_middleware(PeerAddress)
     app.add_middleware(Identify)
     app.add_middleware(TrustedProxy)

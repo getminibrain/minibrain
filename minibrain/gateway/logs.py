@@ -12,6 +12,7 @@ from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog
 
 FLUSH_SECONDS = 2.0
 MAX_BUFFERED = 10_000
+SINK_BATCH = 500
 CHAT_KIND = "chat"
 COMPLETION_KIND = "completion"
 
@@ -61,13 +62,14 @@ class LogBuffer:
     def flush(self) -> int:
         with self.lock:
             batch, self.entries = self.entries, []
-        if not batch:
-            return 0
+        sent = 0
         try:
-            self.sink(batch)
+            while sent < len(batch):
+                self.sink(batch[sent : sent + SINK_BATCH])
+                sent += SINK_BATCH
         except Exception:
             with self.lock:
-                self.entries = (batch + self.entries)[-MAX_BUFFERED:]
+                self.entries = (batch[sent:] + self.entries)[-MAX_BUFFERED:]
             raise
         return len(batch)
 
