@@ -369,7 +369,8 @@ function DatasetWorkbench({
     const live = previewSql(draft, sources, chars);
     const reading = rowsToRead(queriedSources(draft, sources, alias));
     const auto = reading !== null && reading < AUTO_RUN_ROWS;
-    const { settled, stale, runNow } = useSettled(live, draft.mode === "columns", auto);
+    const [completing, setCompleting] = useState(false);
+    const { settled, stale, runNow } = useSettled(live, draft.mode === "columns", auto, completing);
     const [focus, setFocus] = useState<Focus | null>(null);
     const [fixed, setFixed] = useState<Fixed | null>(null);
     const preview = useLivePreview(settled, dataset, focusedSql(focus, settled, limits));
@@ -526,6 +527,8 @@ function DatasetWorkbench({
                             draft={draft}
                             sources={sources}
                             problem={draft.mode === "sql" ? (runProblem ?? saveProblem) : null}
+                            invalid={draft.mode === "sql" && !runProblem && saveProblem !== null}
+                            onCompletingChange={setCompleting}
                             chars={chars}
                             cleanupDefaults={{
                                 rare: limits?.minLabelRows ?? 10,

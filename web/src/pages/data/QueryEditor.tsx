@@ -797,17 +797,22 @@ function SqlMode({
     draft,
     sources,
     problem,
+    invalid,
     editor,
     onChange,
     onRun,
+    onCompletingChange,
 }: {
     draft: Draft;
     sources: SourceSummary[];
     problem: SqlProblem | null;
+    invalid: boolean;
     editor: RefObject<SqlEditorHandle | null>;
     onChange: (draft: Draft) => void;
     onRun: (sql: string) => void;
+    onCompletingChange: (open: boolean) => void;
 }) {
+    useEffect(() => () => onCompletingChange(false), [onCompletingChange]);
     const stats = useSourcesStats(sources.map((item) => item.id)).map((item) => item.data);
     const starter = starterFor(draft, sources, stats);
     const known = recipeSources(sources, stats);
@@ -845,6 +850,8 @@ function SqlMode({
                     schema={editorSchema(sources, stats)}
                     completions={DUCKDB_WORDS}
                     diagnostics={problem?.diagnostics}
+                    aria-invalid={invalid}
+                    onCompletingChange={onCompletingChange}
                     minLines={8}
                     fill
                     aria-label="SQL"
@@ -861,20 +868,24 @@ export function QueryEditor({
     draft,
     sources,
     problem,
+    invalid,
     chars,
     cleanupDefaults,
     editor,
     onChange,
     onRun,
+    onCompletingChange,
 }: {
     draft: Draft;
     sources: SourceSummary[];
     problem: SqlProblem | null;
+    invalid: boolean;
     chars: number | null;
     cleanupDefaults: CleanupDefaults;
     editor: RefObject<SqlEditorHandle | null>;
     onChange: (draft: Draft) => void;
     onRun: (sql: string) => void;
+    onCompletingChange: (open: boolean) => void;
 }) {
     return (
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${FORM_ROW_GAP}`}>
@@ -883,9 +894,11 @@ export function QueryEditor({
                     draft={draft}
                     sources={sources}
                     problem={problem}
+                    invalid={invalid}
                     editor={editor}
                     onChange={onChange}
                     onRun={onRun}
+                    onCompletingChange={onCompletingChange}
                 />
             ) : (
                 <ColumnsMode

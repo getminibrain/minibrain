@@ -148,8 +148,12 @@ export function errorMessage(error: unknown): string | undefined {
     return error instanceof Error ? error.message : String(error);
 }
 
-export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => unknown }) {
-    const message = errorMessage(error);
+export function ErrorLine({
+    error,
+    onRetry,
+    message: shown,
+}: { error: unknown; onRetry?: () => unknown; message?: string }) {
+    const message = shown ?? errorMessage(error);
     if (!message) {
         return null;
     }

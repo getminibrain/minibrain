@@ -17,6 +17,7 @@ export function RowsPreview({
     total,
     loading,
     error,
+    errorText,
     onRetry,
     table,
     example,
@@ -38,6 +39,7 @@ export function RowsPreview({
     total: number | null | undefined;
     loading: boolean;
     error: unknown;
+    errorText?: string;
     onRetry?: () => unknown;
     table: ReactNode;
     example?: ReactNode;
@@ -68,6 +70,8 @@ export function RowsPreview({
     );
     const active =
         (view === "example" && !example) || (view === "quality" && !quality) ? "records" : view;
+    const failed = Boolean(error) && records.length === 0;
+    const rowsShown = active === "records" || active === "table";
     const whole = total === null || total === undefined || total <= records.length;
     const shown = `${count(records.length)} ${records.length === 1 ? "row" : "rows"}`;
     const status = idle
@@ -110,10 +114,12 @@ export function RowsPreview({
             )}
             {Boolean(error) && active !== "quality" && (
                 <div className="border-b px-3 py-2">
-                    <ErrorLine error={error} onRetry={onRetry} />
+                    <ErrorLine error={error} message={errorText} onRetry={onRetry} />
                 </div>
             )}
-            {active === "table" ? (
+            {failed && rowsShown ? (
+                <div className="min-h-0 flex-1" />
+            ) : active === "table" ? (
                 <div className={`flex min-h-0 flex-1 flex-col ${FLUSH_GRID}`}>{table}</div>
             ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto">
@@ -135,20 +141,22 @@ export function RowsPreview({
                     )}
                 </div>
             )}
-            <div className="flex h-9 shrink-0 items-center gap-3 border-t px-3 text-sm text-muted-foreground tabular-nums">
-                <span className="truncate">{status}</span>
-                {onMore && !loading && !whole && (
-                    <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto px-0"
-                        disabled={loadingMore}
-                        onClick={onMore}
-                    >
-                        {loadingMore ? "Loading…" : "Show more"}
-                    </Button>
-                )}
-            </div>
+            {rowsShown && !failed && (
+                <div className="flex h-9 shrink-0 items-center gap-3 border-t px-3 text-sm text-muted-foreground tabular-nums">
+                    <span className="truncate">{status}</span>
+                    {onMore && !loading && !whole && (
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto px-0"
+                            disabled={loadingMore}
+                            onClick={onMore}
+                        >
+                            {loadingMore ? "Loading…" : "Show more"}
+                        </Button>
+                    )}
+                </div>
+            )}
         </section>
     );
 }

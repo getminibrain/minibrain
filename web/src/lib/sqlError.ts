@@ -3,6 +3,7 @@ import { errorText } from "./format";
 
 const CONTEXT = /\n+LINE (\d+): (.*)\n( *)(\^+)\s*$/;
 const ELLIPSIS = "...";
+const KIND = /^[A-Z][A-Za-z ]* Error: /;
 
 export type SqlProblem = { message: string; diagnostics: SqlDiagnostic[] };
 
@@ -40,6 +41,12 @@ function locate(sql: string, excerpt: Excerpt): number | null {
     return tied ? null : best;
 }
 
+export function sqlMessage(text: string): string {
+    const found = CONTEXT.exec(text);
+    const message = (found ? text.slice(0, found.index) : text).trim().replace(KIND, "");
+    return message.charAt(0).toUpperCase() + message.slice(1);
+}
+
 function position(sql: string, offset: number) {
     const before = sql.slice(0, offset).split("\n");
     return { line: before.length, column: (before.at(-1)?.length ?? 0) + 1 };
@@ -56,7 +63,7 @@ export function sqlProblem(
     const text = errorText(error);
     const found = CONTEXT.exec(text);
     if (!found || sent === undefined) {
-        return { message: text, diagnostics: [] };
+        return { message: sqlMessage(text), diagnostics: [] };
     }
     const [, line = "", excerpt = "", indent = "", carets = ""] = found;
     const cut = excerpt.startsWith(ELLIPSIS) ? ELLIPSIS.length : 0;
@@ -67,10 +74,10 @@ export function sqlProblem(
         tail: fragment.slice(caret),
         token: carets.length,
     });
+    const message = sqlMessage(text);
     if (at === null) {
-        return { message: text, diagnostics: [] };
+        return { message, diagnostics: [] };
     }
-    const message = text.slice(0, found.index).trim();
     if (sent !== current) {
         return { message, diagnostics: [] };
     }

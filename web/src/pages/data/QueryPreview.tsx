@@ -13,7 +13,8 @@ import { useEffect, useState } from "react";
 import { type QueryResponse, api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { StatusText } from "~/components/models/StatusText";
-import { count } from "~/lib/format";
+import { count, errorText } from "~/lib/format";
+import { sqlMessage } from "~/lib/sqlError";
 import { TrainingExample, rowSummary } from "./DatasetDetail";
 import {
     type Finding,
@@ -69,7 +70,12 @@ function fetchShape(dataset: string | null, sql: string, run: string, signal: Ab
     );
 }
 
-export function useSettled(live: string | null, immediate: boolean, auto: boolean) {
+export function useSettled(
+    live: string | null,
+    immediate: boolean,
+    auto: boolean,
+    paused: boolean,
+) {
     const [settled, setSettled] = useState(auto ? live : null);
     const [asked, setAsked] = useState<string | null>(null);
     useEffect(() => {
@@ -80,9 +86,12 @@ export function useSettled(live: string | null, immediate: boolean, auto: boolea
             setSettled(live);
             return;
         }
+        if (paused) {
+            return;
+        }
         const timer = window.setTimeout(() => setSettled(live), SETTLE_MS);
         return () => window.clearTimeout(timer);
-    }, [live, immediate, auto]);
+    }, [live, immediate, auto, paused]);
     return {
         settled,
         stale: !auto && live !== null && live !== (asked ?? settled),
@@ -338,6 +347,7 @@ export function QueryPreviewPanel({
             idle={preview.sql === null}
             loading={loading}
             error={preview.error}
+            errorText={preview.error ? sqlMessage(errorText(preview.error)) : undefined}
             marked={["label"]}
             summary={paired ? rowSummary : undefined}
             empty={empty}
