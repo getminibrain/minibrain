@@ -3245,7 +3245,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test storage settings */
+        /**
+         * Test storage settings
+         * @description Writes, reads back and removes a test object. Without a secret it uses the saved one, and only when the endpoint and region are the saved ones. Every test is audited.
+         */
         post: operations["test_storage_api_settings_storage_test_post"];
         delete?: never;
         options?: never;

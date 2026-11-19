@@ -32,7 +32,7 @@ from minibrain.models.bucket import WEIGHTS, writes_bucket
 from minibrain.models.copies import BUCKET
 from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.models.registry import models_dir
-from minibrain.object_store import CREDENTIAL_ENV, S3, StorageConfig, StorageError, load_config, read_secret
+from minibrain.object_store import CREDENTIAL_ENV, KEY, S3, StorageConfig, StorageError, load_config, read_secret
 from minibrain.object_store import apply as apply_storage
 from minibrain.object_store import check as check_storage
 from minibrain.object_store import clean as clean_storage
@@ -42,6 +42,7 @@ from minibrain.registry.compute import pools
 from minibrain.registry.files import ArtifactKind
 from minibrain.registry.models import (
     Artifact,
+    AuditEvent,
     BaseModel,
     BaseModelStatus,
     DatasetVersion,
@@ -54,6 +55,9 @@ from minibrain.storage import disk_space
 router = APIRouter(prefix="/api")
 
 MEGABYTE = 1024 * 1024
+TESTED = "storage.test"
+ONLY_SAVED_ENDPOINT = "the saved secret goes only to {saved}; give the secret again to test {draft}"
+NO_SAVED_BUCKET = "no S3 storage is saved yet, so give the secret to test {draft}"
 
 
 def device_info() -> DeviceInfo:
@@ -220,15 +224,52 @@ def update_storage(body: StorageUpdate, session: SessionDep, settings: SettingsD
     return storage_settings(session, settings, store)
 
 
-@router.post("/settings/storage/test", dependencies=[Depends(admin)], summary="Test storage settings")
-def test_storage(body: StorageUpdate, settings: SettingsDep) -> StorageCheck:
-    config = storage_update(body)
+def storage_target(config: StorageConfig) -> str:
+    return f"{config.endpoint} ({config.region})" if config.region else config.endpoint
+
+
+def saved_secret_for(session: Session, settings: Settings, draft: StorageConfig) -> str:
+    saved = clean_storage(load_config(session))
+    if saved.kind != S3:
+        raise StorageError(NO_SAVED_BUCKET.format(draft=storage_target(draft)))
+    if (draft.endpoint, draft.region) != (saved.endpoint, saved.region):
+        raise StorageError(ONLY_SAVED_ENDPOINT.format(saved=storage_target(saved), draft=storage_target(draft)))
+    return read_secret(settings)
+
+
+def storage_check(session: Session, settings: Settings, config: StorageConfig, secret: str) -> StorageCheck:
     try:
         cleaned = clean_storage(config)
-        check_storage(cleaned, body.secret or read_secret(settings))
+        if not secret and cleaned.endpoint:
+            secret = saved_secret_for(session, settings, cleaned)
+        check_storage(cleaned, secret)
     except StorageError as error:
         return StorageCheck(ok=False, message=str(error))
     return StorageCheck(ok=True, message=f"Wrote, read back and removed a test object in {cleaned.bucket}.")
+
+
+@router.post(
+    "/settings/storage/test",
+    dependencies=[Depends(admin)],
+    summary="Test storage settings",
+    description="Writes, reads back and removes a test object. Without a secret it uses the saved one, and only when "
+    "the endpoint and region are the saved ones. Every test is audited.",
+)
+def test_storage(body: StorageUpdate, session: SessionDep, settings: SettingsDep) -> StorageCheck:
+    config = storage_update(body)
+    secret = (body.secret or "").strip()
+    check = storage_check(session, settings, config, secret)
+    session.rollback()
+    detail = {
+        "endpoint": config.endpoint.strip(),
+        "bucket": config.bucket.strip(),
+        "region": config.region.strip(),
+        "saved_secret": not secret,
+        "ok": check.ok,
+    }
+    session.add(AuditEvent(actor=current_actor(), action=TESTED, target=KEY, detail=detail))
+    session.commit()
+    return check
 
 
 def dataset_version_bytes(session: Session) -> int:

@@ -124,6 +124,7 @@ const ACTIONS: Record<string, string> = {
     "policy.update": "Policy changed",
     "safety.block": "Blocked by the safety model",
     "settings.safety": "Safety model setting changed",
+    "storage.test": "Storage tested",
     "storage.update": "Storage changed",
     "version.card": "Model card edited",
     "version.note": "Version note edited",
@@ -377,7 +378,7 @@ export function targetLabel(event: AuditEvent, policies: Map<string, PolicyInfo>
     if (policy) {
         return policy.label;
     }
-    if (event.action === "storage.update") {
+    if (event.action.startsWith("storage.")) {
         return "Artifact storage";
     }
     if (event.action.startsWith("audit.")) {

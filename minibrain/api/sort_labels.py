@@ -109,6 +109,7 @@ ACTION_LABELS = {
     "settings.judge": "Default judge changed",
     "settings.prices": "Compute prices changed",
     "settings.safety": "Safety model setting changed",
+    "storage.test": "Storage tested",
     "storage.update": "Storage changed",
     "version.card": "Model card edited",
     "version.create": "Version created",

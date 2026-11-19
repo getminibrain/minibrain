@@ -78,6 +78,48 @@ def test_connection_check_writes_reads_and_removes_a_probe(
     assert harness.client.get("/api/settings/storage").json()["secret_set"] is False
 
 
+def storage_tests(harness: Harness) -> list[dict[str, Any]]:
+    events = harness.client.get("/api/audit", params={"action": "storage.test"}).json()["events"]
+    return [event["detail"] for event in events if event["action"] == "storage.test"]
+
+
+def test_a_storage_test_sends_the_saved_secret_only_to_the_saved_endpoint(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    MemoryFileSystem.store.clear()
+    sent: list[tuple[str, str]] = []
+
+    def fake(config: object_store.StorageConfig, secret: str) -> MemoryFileSystem:
+        sent.append((config.endpoint, secret))
+        return MemoryFileSystem()
+
+    monkeypatch.setitem(object_store.FILESYSTEMS, object_store.S3, fake)
+    unsaved = harness.client.post("/api/settings/storage/test", json=S3_BODY | {"secret": None}).json()
+    assert unsaved["ok"] is False and "no S3 storage is saved yet" in unsaved["message"]
+    assert harness.client.put("/api/settings/storage", json=S3_BODY).status_code == 200
+    sent.clear()
+    kept = harness.client.post("/api/settings/storage/test", json=S3_BODY | {"secret": None, "bucket": "other"})
+    assert kept.json()["ok"] is True
+    assert sent == [("https://minio.internal:9000", BUCKET_KEY)]
+    sent.clear()
+    for moved in ({"endpoint": "https://collector.example.com"}, {"region": "eu-west-1"}):
+        refused = harness.client.post("/api/settings/storage/test", json=S3_BODY | {"secret": ""} | moved).json()
+        assert refused["ok"] is False and "give the secret again" in refused["message"]
+    assert sent == []
+    retyped = S3_BODY | {"endpoint": "https://collector.example.com", "secret": "typed-again"}
+    assert harness.client.post("/api/settings/storage/test", json=retyped).json()["ok"] is True
+    assert sent == [("https://collector.example.com", "typed-again")]
+    audited = storage_tests(harness)
+    assert [(event["endpoint"], event["saved_secret"], event["ok"]) for event in reversed(audited)] == [
+        ("https://minio.internal:9000", True, False),
+        ("https://minio.internal:9000", True, True),
+        ("https://collector.example.com", True, False),
+        ("https://minio.internal:9000", True, False),
+        ("https://collector.example.com", False, True),
+    ]
+    assert all(BUCKET_KEY not in str(event) and "typed-again" not in str(event) for event in audited)
+
+
 def test_artifacts_go_to_the_bucket_and_the_secret_never_comes_back(harness: Harness, bucket: MemoryFileSystem) -> None:
     before = upload(harness)
     saved = harness.client.put("/api/settings/storage", json=S3_BODY)
