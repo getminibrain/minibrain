@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+import anyio
+from anyio import to_thread
 from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -339,6 +341,7 @@ def gateway_id(kind: str) -> str:
 
 
 REPORT_SECONDS = 10.0
+CHANGE_POLL_SECONDS = 0.5
 EngineStarter = Callable[[dict[str, BaseModelSpec], Replicas, frozenset[str]], dict[str, str]]
 
 
@@ -374,7 +377,6 @@ class LocalConfig:
         self.config = EMPTY
         self.built_at = 0.0
         self.lock = threading.Lock()
-        self.changed = threading.Condition()
         self.id = gateway_id("main")
         self.host = socket.gethostname()
         self.reported: tuple[str, float] = ("", 0.0)
@@ -396,9 +398,7 @@ class LocalConfig:
             self.report(session, config)
         self.built_at = time.monotonic()
         if config.version != self.config.version:
-            with self.changed:
-                self.config = config
-                self.changed.notify_all()
+            self.config = config
         return self.config
 
     def report(self, session: Session, config: GatewayConfig) -> None:
@@ -415,12 +415,13 @@ class LocalConfig:
             return self.rebuild()
         return self.config
 
-    def wait_for_change(self, version: str, timeout: float) -> GatewayConfig:
+    async def wait_for_change(self, version: str, timeout: float) -> GatewayConfig:
         deadline = time.monotonic() + timeout
-        while self.current().version == version and time.monotonic() < deadline:
-            with self.changed:
-                self.changed.wait(timeout=min(0.5, max(deadline - time.monotonic(), 0.0)))
-        return self.config
+        current = await to_thread.run_sync(self.current)
+        while current.version == version and (left := deadline - time.monotonic()) > 0:
+            await anyio.sleep(min(CHANGE_POLL_SECONDS, left))
+            current = await to_thread.run_sync(self.current)
+        return current
 
     def refresh_forever(self, stop: threading.Event) -> None:
         while not stop.wait(self.max_age):

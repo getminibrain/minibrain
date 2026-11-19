@@ -1,9 +1,13 @@
 import threading
+import time
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import cast
 
+import anyio
+import httpx
 import pytest
+from anyio import to_thread
 from fastapi import Request
 from sqlalchemy import event, select
 from sqlalchemy.dialects import postgresql
@@ -402,3 +406,40 @@ def test_an_idempotent_insert_that_meets_an_active_key_inserts_nothing(harness: 
         assert insert_once(session, {"kind": JobKind.VERIFY, "params": {}, "idempotency_key": "k"}) is None
         session.rollback()
         assert session.scalars(select(Job.id).where(Job.idempotency_key == "k")).all() == [first.id]
+
+
+LONG_POLLS = 8
+THREADS = 4
+
+
+async def api_time_while_polling(harness: Harness) -> tuple[int, float]:
+    to_thread.current_default_thread_limiter().total_tokens = THREADS
+    worker_headers = {"Authorization": f"Bearer {harness.token}"}
+    transport = httpx.ASGITransport(app=harness.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        client.cookies.update(dict(harness.client.cookies.items()))
+        version = (await client.get("/internal/gateway/config", headers=harness.gateway_headers)).headers["ETag"]
+        config_poll = {"version": version, "wait": 3}
+
+        async def poll(index: int) -> None:
+            if index % 2:
+                await client.get("/internal/gateway/config", params=config_poll, headers=harness.gateway_headers)
+                return
+            worker = {"id": f"w{index}", "host": f"h{index}", "kinds": ["train"], "gpus": 1, "pool": "local"}
+            await client.post("/internal/worker/claim", json={"worker": worker, "wait": 3}, headers=worker_headers)
+
+        measured: list[tuple[int, float]] = []
+        async with anyio.create_task_group() as group:
+            for index in range(LONG_POLLS):
+                group.start_soon(poll, index)
+            await anyio.sleep(0.5)
+            started = time.monotonic()
+            response = await client.get("/api/jobs")
+            measured.append((response.status_code, time.monotonic() - started))
+    return measured[0]
+
+
+def test_long_polls_leave_threads_for_other_requests(harness: Harness) -> None:
+    status, took = anyio.run(api_time_while_polling, harness)
+    assert status == 200
+    assert took < 1.0

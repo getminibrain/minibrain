@@ -2,9 +2,12 @@ import hmac
 import time
 from collections.abc import Iterator
 from datetime import datetime
+from functools import partial
 from typing import Annotated, Any, Literal
 
+import anyio
 import pydantic
+from anyio import to_thread
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import Field
@@ -23,11 +26,11 @@ from minibrain.auth.join_tokens import LOCAL_KEY_FILE, WORKER, Caller, address_o
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
-from minibrain.jobs.queue import EventIn, WorkerInfo
+from minibrain.jobs.queue import EventIn, SqlJobQueue, WorkerInfo
 from minibrain.lifecycle import STOPPING
 from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
 from minibrain.models.hardware import LOCAL_POOL
-from minibrain.models.machine_metrics import MachineSample
+from minibrain.models.machine_metrics import MachineSample, MetricsHistory
 from minibrain.models.placement import desired_engines
 from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
@@ -230,8 +233,36 @@ def register_worker(
     queue.register(body.info())
 
 
+def checked_in(
+    session: Session, request: Request, caller: Caller, queue: SqlJobQueue, metrics: MetricsHistory, worker: WorkerBody
+) -> str:
+    admitted(session, request, caller, worker)
+    state = report_worker(session, metrics, worker)
+    queue.register(worker.info())
+    return state
+
+
+def claim_once(session: Session, queue: SqlJobQueue, settings: Settings, worker: WorkerInfo) -> ClaimResponse | None:
+    while (claimed := queue.claim(worker)) is not None:
+        refusal = policy_refusal(session, claimed.job_id)
+        if refusal is None:
+            try:
+                env = job_secrets(session, settings, claimed.job_id)
+            except (ConnectionProblem, PolicyError, NotFoundError) as error:
+                refusal = str(error)
+            else:
+                return ClaimResponse(**claimed.__dict__, env=env)
+        queue.fail(claimed.job_id, claimed.token, refusal, False, None)
+    return None
+
+
+async def idle_until(deadline: float) -> None:
+    while not STOPPING.is_set() and (left := deadline - time.monotonic()) > 0:
+        await anyio.sleep(min(CLAIM_POLL_SECONDS, left))
+
+
 @router.post("/claim", response_model=None)
-def claim(
+async def claim(
     body: ClaimRequest,
     request: Request,
     caller: WorkerCaller,
@@ -240,30 +271,19 @@ def claim(
     settings: SettingsDep,
     metrics: MetricsDep,
 ) -> ClaimResponse | Response:
-    admitted(session, request, caller, body.worker)
     deadline = time.monotonic() + max(0.0, min(body.wait, MAX_CLAIM_WAIT_SECONDS))
-    worker = body.worker.info()
-    state = report_worker(session, metrics, body.worker)
-    queue.register(worker)
+    state = await to_thread.run_sync(partial(checked_in, session, request, caller, queue, metrics, body.worker))
     if state == DRAINING:
-        STOPPING.wait(max(0.0, deadline - time.monotonic()))
+        await idle_until(deadline)
         return Response(status_code=204)
+    worker = body.worker.info()
     while True:
-        claimed = queue.claim(worker)
-        if claimed is not None:
-            refusal = policy_refusal(session, claimed.job_id)
-            if refusal is None:
-                try:
-                    env = job_secrets(session, settings, claimed.job_id)
-                except (ConnectionProblem, PolicyError, NotFoundError) as error:
-                    refusal = str(error)
-                else:
-                    return ClaimResponse(**claimed.__dict__, env=env)
-            queue.fail(claimed.job_id, claimed.token, refusal, False, None)
-            continue
+        found = await to_thread.run_sync(partial(claim_once, session, queue, settings, worker))
+        if found is not None:
+            return found
         if STOPPING.is_set() or time.monotonic() >= deadline:
             return Response(status_code=204)
-        STOPPING.wait(CLAIM_POLL_SECONDS)
+        await anyio.sleep(CLAIM_POLL_SECONDS)
 
 
 @router.post("/engines")

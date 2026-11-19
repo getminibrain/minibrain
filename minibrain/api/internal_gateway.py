@@ -183,9 +183,9 @@ def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -
 
 
 @router.get("/config", dependencies=GatewayOnly)
-def config(request: Request, version: str = "", wait: float = 0.0) -> Response:
+async def config(request: Request, version: str = "", wait: float = 0.0) -> Response:
     source: LocalConfig = request.app.state.gateway_config
-    current = source.wait_for_change(version, max(0.0, min(wait, MAX_WAIT_SECONDS))) if version else source.current()
+    current = await source.wait_for_change(version, max(0.0, min(wait, MAX_WAIT_SECONDS)))
     if current.version == version:
         return Response(status_code=304, headers={"ETag": current.version})
     return Response(content=current.to_json(), media_type="application/json", headers={"ETag": current.version})
