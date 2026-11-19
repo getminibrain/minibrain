@@ -15,6 +15,7 @@ SECRET_WORDS = (
     "private_key",
 )
 SHORTEST_SECRET = 8
+SECRET_STATES = frozenset({"kept", "replaced"})
 
 
 def secret_name(name: str) -> bool:
@@ -22,11 +23,14 @@ def secret_name(name: str) -> bool:
     return any(word in lowered for word in SECRET_WORDS)
 
 
+def hidden(item: Any) -> bool:
+    return isinstance(item, str) and bool(item) and item not in SECRET_STATES
+
+
 def redact(value: Any) -> Any:
     if isinstance(value, dict):
         return {
-            key: REDACTED if secret_name(str(key)) and isinstance(item, str) and item else redact(item)
-            for key, item in value.items()
+            key: REDACTED if secret_name(str(key)) and hidden(item) else redact(item) for key, item in value.items()
         }
     if isinstance(value, list | tuple):
         return [redact(item) for item in value]
