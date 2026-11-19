@@ -232,6 +232,23 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     assert harness.client.get("/internal/gateway/bases", headers=bearer("engine.rack.00")).status_code == 401
 
 
+def test_pool_credentials_get_only_the_weights_placed_in_their_pool(harness: Harness) -> None:
+    on_main(harness, BIG_LAPTOP)
+    join(harness, "rack")
+    create_model(harness)
+    assert deploy(harness, "rack").status_code == 200
+    rack = bearer(harness.internal("/engines", worker_body("rack")).json()["engine_token"])
+    lab = bearer(harness.internal("/engines", worker_body("lab")).json()["engine_token"])
+    for path in (f"/internal/gateway/bases/{BASE}", f"/internal/gateway/bases/{BASE}/files/config.json"):
+        assert harness.client.get(path, headers=rack).status_code != 403, path
+        for other in (lab, bearer(harness.join_token("lab"))):
+            refused = harness.client.get(path, headers=other)
+            assert refused.status_code == 403 and "placed in pool lab" in refused.json()["detail"], path
+    with harness.sessions() as session:
+        found = session.scalars(select(AuditEvent).where(AuditEvent.action == "join_token.refused")).all()
+    assert any(event.detail.get("base_model") == BASE for event in found)
+
+
 def announce(harness: Harness, state: str, pool: str = "rack") -> None:
     body = {"id": f"e-{pool}", "host": RACK.host, "url": f"http://{pool}:9000", "base_model": BASE}
     body |= {"engine": "sglang", "state": state, "pool": pool, "managed": True}

@@ -39,13 +39,14 @@ MAX_WAIT_SECONDS = 30.0
 
 
 NOT_SERVED = "an engine token gets only the adapters of models served in pool"
+NOT_PLACED = "an engine token gets only the weights of models placed in pool"
 ENGINE_ONLY = "an engine token reaches only what engines need: announcing themselves, base weights and adapters"
 
 
 def engine_caller(request: Request, session: SessionDep, authorization: Annotated[str, Header()] = "") -> Caller | None:
     settings = request.app.state.settings
     token = bearer(authorization)
-    if token and hmac.compare_digest(token, settings.secret("gateway_token")):
+    if token and hmac.compare_digest(token.encode(), settings.secret("gateway_token").encode()):
         return None
     joined = credential_caller(session, token, address_of(request))
     if joined is not None:
@@ -159,14 +160,24 @@ def bases(session: SessionDep) -> LiveBases:
     return live(session)
 
 
-@router.get("/bases/{key}")
+def placed_in_pool(key: str, request: Request, session: SessionDep, caller: EngineCaller) -> None:
+    if caller is not None and key not in pool_bases(session, caller.pool):
+        detail = {"pool": caller.pool, "reason": NOT_PLACED, "address": address_of(request)}
+        refuse(session, caller.target, detail, {"base_model": key})
+        raise HTTPException(status_code=403, detail=f"{NOT_PLACED} {caller.pool}")
+
+
+ForPool = [Depends(placed_in_pool)]
+
+
+@router.get("/bases/{key}", dependencies=ForPool)
 def base_weights(
     key: str, session: SessionDep, settings: SettingsDep, store: StoreDep, response: Response
 ) -> BaseWeights:
     return weights_of(session, settings, store, key, response)
 
 
-@router.get("/bases/{key}/files/{path:path}")
+@router.get("/bases/{key}/files/{path:path}", dependencies=ForPool)
 def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -> FileResponse:
     return file_of(session, settings, key, path)
 
