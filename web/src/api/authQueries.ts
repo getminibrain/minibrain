@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api, clearSignOutReason, onSignedOut, setCsrfToken, succeed, unwrap } from "./client";
 import type { components } from "./schema";
@@ -26,6 +26,14 @@ async function loadSession(): Promise<SessionInfo> {
     return info;
 }
 
+function forgetOtherPeople(client: QueryClient): void {
+    client.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
+}
+
+function personId(info: SessionInfo | undefined): number | null {
+    return info?.person?.id ?? null;
+}
+
 export function useSession() {
     const client = useQueryClient();
     useEffect(
@@ -35,7 +43,18 @@ export function useSession() {
             }),
         [client],
     );
-    return useQuery({ queryKey: authKeys.session, queryFn: loadSession, staleTime: 60_000 });
+    return useQuery({
+        queryKey: authKeys.session,
+        queryFn: async () => {
+            const info = await loadSession();
+            const before = client.getQueryData<SessionInfo>(authKeys.session);
+            if (before && personId(before) !== personId(info)) {
+                forgetOtherPeople(client);
+            }
+            return info;
+        },
+        staleTime: 60_000,
+    });
 }
 
 export function usePerson(): PersonInfo | null {
@@ -47,8 +66,8 @@ function useSignedIn() {
     return async (info: SessionInfo) => {
         clearSignOutReason();
         setCsrfToken(info.csrf_token ?? null);
+        forgetOtherPeople(client);
         client.setQueryData(authKeys.session, info);
-        await client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
     };
 }
 
@@ -82,8 +101,9 @@ export function useSignOut() {
         mutationFn: () => succeed(api.POST("/api/auth/logout")),
         onSettled: async () => {
             setCsrfToken(null);
-            client.setQueryData(authKeys.session, await loadSession());
-            client.removeQueries({ predicate: (query) => query.queryKey[0] !== "auth" });
+            const info = await loadSession();
+            forgetOtherPeople(client);
+            client.setQueryData(authKeys.session, info);
         },
     });
 }

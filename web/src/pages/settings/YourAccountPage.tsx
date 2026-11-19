@@ -348,9 +348,9 @@ export function YourAccountPage() {
         >
             <ErrorLine error={profile.error} onRetry={profile.refetch} />
             <SettingsSections>
-                {data && <ProfileSection profile={data} />}
-                {data && <PasswordSection profile={data} />}
-                {data && <SessionsSection profile={data} />}
+                {data && <ProfileSection key={data.id} profile={data} />}
+                {data && <PasswordSection key={data.id} profile={data} />}
+                {data && <SessionsSection key={data.id} profile={data} />}
                 <SettingsSection
                     icon={IconPalette}
                     anchor={APPEARANCE.anchor}
