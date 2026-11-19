@@ -9,12 +9,15 @@ MESSAGES = "messages"
 USER = "user"
 ASSISTANT = "assistant"
 SKIP_EMPTY = "skip_empty"
+INPUT_COLUMN = "input_column"
+LABEL_COLUMN = "label_column"
+PAIR_KEYS = {INPUT_COLUMN, LABEL_COLUMN}
 
 Template = dict[str, str]
 
 
 def pair_template(input_column: str, label_column: str) -> Template:
-    return {USER: "{" + input_column + "}", ASSISTANT: "{" + label_column + "}"}
+    return {INPUT_COLUMN: input_column, LABEL_COLUMN: label_column}
 
 
 def chat_template(column: str = MESSAGES) -> Template:
@@ -23,6 +26,10 @@ def chat_template(column: str = MESSAGES) -> Template:
 
 def is_chat(template: Template) -> bool:
     return MESSAGES in template
+
+
+def is_pair(template: Template) -> bool:
+    return bool(PAIR_KEYS & set(template))
 
 
 def skips_empty(template: Template | None) -> bool:
@@ -52,6 +59,8 @@ def columns_in(text: str) -> list[str]:
 def template_columns(template: Template) -> list[str]:
     if is_chat(template):
         return [template[MESSAGES]]
+    if is_pair(template):
+        return list(dict.fromkeys([template[INPUT_COLUMN], template[LABEL_COLUMN]]))
     return list(dict.fromkeys([*columns_in(template.get(USER, "")), *columns_in(template.get(ASSISTANT, ""))]))
 
 
@@ -63,6 +72,8 @@ def single_column(text: str) -> str | None:
 def plain_columns(template: Template | None) -> tuple[str | None, str | None]:
     if not template or is_chat(template):
         return None, None
+    if is_pair(template):
+        return template.get(INPUT_COLUMN), template.get(LABEL_COLUMN)
     return single_column(template.get(USER, "")), single_column(template.get(ASSISTANT, ""))
 
 
@@ -95,6 +106,10 @@ def checked(template: Template) -> Template:
         if set(template) != {MESSAGES} or not template[MESSAGES].strip():
             raise SourceError("a chat mapping names the column that holds the messages")
         return {MESSAGES: template[MESSAGES].strip()}
+    if is_pair(template):
+        if set(template) - {SKIP_EMPTY, *CLEANUP_KEYS} != PAIR_KEYS or not all(template[key] for key in PAIR_KEYS):
+            raise SourceError("a column mapping names the input column and the label column")
+        return cleaning(skipping_empty(template, skips_empty(template)), cleanup_of(template))
     if set(template) - {SKIP_EMPTY, *CLEANUP_KEYS} != {USER, ASSISTANT}:
         raise SourceError("a mapping fills the user and assistant messages, or names a messages column")
     for slot in (USER, ASSISTANT):
@@ -107,9 +122,11 @@ def template_sql(template: Template, tables: Sequence[str]) -> str:
     found = checked(template)
     if is_chat(found):
         return select_from([(quote_identifier(found[MESSAGES]), MESSAGES)], tables)
-    label = slot_sql(found[ASSISTANT])
+    pair = is_pair(found)
+    text = plain_sql(found[INPUT_COLUMN]) if pair else slot_sql(found[USER])
+    label = plain_sql(found[LABEL_COLUMN]) if pair else slot_sql(found[ASSISTANT])
     where = filled(label) if skips_empty(found) else None
-    sql = select_from([(slot_sql(found[USER]), "input"), (label, "label")], tables, where)
+    sql = select_from([(text, "input"), (label, "label")], tables, where)
     return cleaned_sql(sql, cleanup_of(found))
 
 

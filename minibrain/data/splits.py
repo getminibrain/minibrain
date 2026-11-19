@@ -1,6 +1,6 @@
 import random
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
 
@@ -54,12 +54,15 @@ def pairs(rows: Sequence[Row]) -> list[tuple[str | None, str | None]]:
     return [(text, expected) for _, text, expected in rows]
 
 
-def answer_labels(examples: Sequence[Example]) -> list[str]:
-    counts = Counter(example.expected for example in examples)
+def counted_labels(counts: Mapping[str, int], examples: int) -> list[str]:
     short = all(len(label) <= LABEL_CHARS and "\n" not in label for label in counts)
-    if not counts or not short or len(counts) > MAX_LABELS or 2 * len(counts) > len(examples):
+    if not counts or not short or len(counts) > MAX_LABELS or 2 * len(counts) > examples:
         return []
     return sorted(counts)
+
+
+def answer_labels(examples: Sequence[Example]) -> list[str]:
+    return counted_labels(Counter(example.expected for example in examples), len(examples))
 
 
 def pick_shots(pool: list[Example], labelled: bool) -> list[Example]:

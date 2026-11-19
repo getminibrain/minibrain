@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 import duckdb
+from duckdb.sqltypes import BOOLEAN, VARCHAR
 
+from minibrain.data.checks import has_personal_data, personal_data_masked
 from minibrain.data.extensions import ExtensionMissingError, load, offline_config
 from minibrain.data.runs import QueryCancelled, cancelled, cap, watched
 from minibrain.encryption.duck import register
@@ -32,6 +34,8 @@ QUERY_TIMEOUT_SECONDS = 30
 TABLE_NAME_LENGTH = 48
 BLOCKED_FUNCTIONS = ("query", "query_table", "which_secret")
 BLOCKED_PREFIXES = ("postgres_", "mysql_", "iceberg_", "delta_", "sqlite_", "duckdb_secrets")
+HAS_PERSONAL_DATA = "has_personal_data"
+PERSONAL_DATA_MASKED = "personal_data_masked"
 
 
 class SourceError(Exception):
@@ -181,12 +185,18 @@ def table_relation(connection: duckdb.DuckDBPyConnection, table: Table, attached
     return read_files(table.reader, table.files)
 
 
+def add_functions(connection: duckdb.DuckDBPyConnection) -> None:
+    connection.create_function(HAS_PERSONAL_DATA, has_personal_data, [VARCHAR], BOOLEAN, side_effects=False)
+    connection.create_function(PERSONAL_DATA_MASKED, personal_data_masked, [VARCHAR], VARCHAR, side_effects=False)
+
+
 def connect(
     tables: Sequence[Table], aliases: dict[str, str] | None = None, output: Path | None = None
 ) -> duckdb.DuckDBPyConnection:
     connection = duckdb.connect(config=offline_config())
     try:
         register(connection)
+        add_functions(connection)
         readable: list[str] = []
         directories: list[str] = [str(output) + "/"] if output is not None else []
         for index, table in enumerate(tables):
@@ -295,7 +305,7 @@ def statement_tables(sql: str) -> set[str]:
 def wrapped(sql: str, limit: int | None = None) -> str:
     statement = sql.strip().rstrip(";")
     statement_tables(statement)
-    query = f"SELECT * FROM ({statement}) AS query"
+    query = f"SELECT * FROM (\n{statement}\n) AS query"
     return query if limit is None else f"{query} LIMIT {int(limit)}"
 
 
@@ -487,25 +497,35 @@ def count_rows(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None
     return int(found[0]) if found else 0
 
 
-def quality_of(connection: duckdb.DuckDBPyConnection, examples: str) -> Quality:
+LabelCounts = list[tuple[str, int]]
+
+
+def measured(connection: duckdb.DuckDBPyConnection, examples: str, labels: int = 0) -> tuple[Quality, LabelCounts]:
     found = connection.execute(
         f"WITH everything AS ({examples}), usable AS ({usable_examples(examples)}), "
         "per_label AS (SELECT expected, count(*) AS rows FROM usable GROUP BY expected) "
         "SELECT (SELECT count(*) FROM everything), (SELECT count(*) FROM usable), "
         "(SELECT count(DISTINCT input) FROM usable), (SELECT count(*) FROM per_label), "
         "(SELECT coalesce(min(rows), 0) FROM per_label), (SELECT coalesce(max(rows), 0) FROM per_label), "
-        "(SELECT coalesce(avg(length(input)), 0) FROM usable)"
+        "(SELECT coalesce(avg(length(input)), 0) FROM usable), "
+        "(SELECT list(struct_pack(label := expected, rows := rows) ORDER BY rows DESC, expected) "
+        f"FROM (SELECT * FROM per_label ORDER BY rows DESC, expected LIMIT {int(labels)}))"
     ).fetchone()
-    rows, usable, distinct, labels, smallest, largest, mean = found or (0, 0, 0, 0, 0, 0, 0.0)
-    return Quality(
+    rows, usable, distinct, kinds, smallest, largest, mean, counted = found or (0, 0, 0, 0, 0, 0, 0.0, [])
+    quality = Quality(
         rows=int(rows),
         empty=int(rows) - int(usable),
         duplicates=int(usable) - int(distinct),
-        labels=int(labels),
+        labels=int(kinds),
         smallest_label=int(smallest),
         largest_label=int(largest),
         mean_input_chars=float(mean),
     )
+    return quality, [(str(item["label"]), int(item["rows"])) for item in counted or []]
+
+
+def quality_of(connection: duckdb.DuckDBPyConnection, examples: str) -> Quality:
+    return measured(connection, examples)[0]
 
 
 def label_counts_of(connection: duckdb.DuckDBPyConnection, examples: str, limit: int) -> list[tuple[str, int]]:
@@ -534,7 +554,7 @@ def saved_quality(location: str, limit: int) -> tuple[Quality, list[tuple[str, i
     examples = f"SELECT messages, input, expected FROM read_parquet({quote_literal(location)})"
     with duckdb.connect() as connection:
         register(connection)
-        return quality_of(connection, examples), label_counts_of(connection, examples, limit)
+        return measured(connection, examples, limit)
 
 
 def table_identifier(name: str) -> str:
@@ -582,12 +602,24 @@ PairColumn = Literal["input", "label"]
 PAIR_COLUMNS: tuple[PairColumn, ...] = ("input", "label")
 
 
+Pair = tuple[str | None, str | None]
+
+
 @dataclass(frozen=True)
 class QueryShape:
     rows: int
     missing: list[PairColumn]
     quality: Quality | None
-    examples: list[ExampleRow] | None
+    checked: list[Pair] | None
+    labels: list[tuple[str, int]] = field(default_factory=list)
+    example: Pair = (None, None)
+
+
+@dataclass(frozen=True)
+class ShapeLimits:
+    rows: int
+    chars: int
+    labels: int
 
 
 def missing_example_columns(columns: Sequence[Column]) -> list[PairColumn]:
@@ -597,23 +629,33 @@ def missing_example_columns(columns: Sequence[Column]) -> list[PairColumn]:
     return [name for name in PAIR_COLUMNS if name not in names]
 
 
-def query_shape(tables: Sequence[Table], sql: str, aliases: dict[str, str] | None = None, cap: int = 0) -> QueryShape:
+def rows_to_check(limits: ShapeLimits, mean_chars: float) -> int:
+    return max(1, min(limits.rows, int(limits.chars // max(mean_chars, 1.0))))
+
+
+def first_usable(connection: duckdb.DuckDBPyConnection, examples: str) -> Pair:
+    found = connection.execute(f"SELECT messages, expected FROM ({usable_examples(examples)}) LIMIT 1").fetchone()
+    return (to_text(found[0]), to_text(found[1])) if found else (None, None)
+
+
+def query_shape(
+    tables: Sequence[Table], sql: str, limits: ShapeLimits, aliases: dict[str, str] | None = None
+) -> QueryShape:
     with sandbox(tables, aliases) as connection:
         found = connection.execute(f"DESCRIBE {wrapped(sql, 0)}").fetchall()
         columns = [Column(name=row[0], type=row[1]) for row in found]
         missing = missing_example_columns(columns)
         if missing:
             counted = connection.execute(f"SELECT count(*) FROM ({wrapped(sql)})").fetchone()
-            return QueryShape(rows=int(counted[0]) if counted else 0, missing=missing, quality=None, examples=None)
+            return QueryShape(rows=int(counted[0]) if counted else 0, missing=missing, quality=None, checked=None)
         examples = examples_query(sql, columns)
-        quality = quality_of(connection, examples)
-        rows: list[ExampleRow] | None = None
-        if cap > 0:
-            sample = f" USING SAMPLE reservoir({int(cap)} ROWS) REPEATABLE ({SAMPLE_SEED})"
-            sample = sample if quality.rows > cap else ""
-            fetched = connection.execute(f"SELECT messages, input, expected FROM ({examples}){sample}").fetchall()
-            rows = [(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in fetched]
-    return QueryShape(rows=quality.rows, missing=[], quality=quality, examples=rows)
+        quality, labels = measured(connection, examples, limits.labels)
+        taken = rows_to_check(limits, quality.mean_input_chars)
+        sample = f" USING SAMPLE reservoir({taken} ROWS) REPEATABLE ({SAMPLE_SEED})" if quality.rows > taken else ""
+        fetched = connection.execute(f"SELECT input, expected FROM ({examples}){sample}").fetchall()
+        example = first_usable(connection, examples)
+    checked = [(to_text(text), to_text(expected)) for text, expected in fetched]
+    return QueryShape(rows=quality.rows, missing=[], quality=quality, checked=checked, labels=labels, example=example)
 
 
 @dataclass(frozen=True)
@@ -629,7 +671,6 @@ SAVED_SHOWN = (("input", "input"), ("expected", "label"))
 
 def saved_rows(location: str, offset: int, limit: int) -> SavedRows:
     saved = f"read_parquet({quote_literal(location)})"
-    usable = f"SELECT messages, expected FROM ({usable_examples(f'SELECT * FROM {saved}')}) LIMIT 1"
     with duckdb.connect() as connection:
         register(connection)
         types = dict(
@@ -639,12 +680,12 @@ def saved_rows(location: str, offset: int, limit: int) -> SavedRows:
         found = connection.execute(
             f"SELECT messages, input, expected FROM {saved} LIMIT {int(limit)} OFFSET {int(offset)}"
         ).fetchall()
-        first = connection.execute(usable).fetchone()
+        first = first_usable(connection, f"SELECT * FROM {saved}")
     return SavedRows(
         columns=[(shown, str(types.get(name, "VARCHAR"))) for name, shown in SAVED_SHOWN],
         rows=[(to_text(messages), to_text(text), to_text(expected)) for messages, text, expected in found],
         total=int(counted[0]) if counted else 0,
-        example=(to_text(first[0]), to_text(first[1])) if first else (None, None),
+        example=first,
     )
 
 

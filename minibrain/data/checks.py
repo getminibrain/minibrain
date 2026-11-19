@@ -2,7 +2,7 @@ import hashlib
 import json
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 
 from minibrain.data.splits import MIN_ROWS, STEADY_ROWS
@@ -108,8 +108,14 @@ def rows_to_train_on(rows: list[tuple[str, str]], examples: int) -> Finding:
     return Finding("empty", "ok", "Rows to train on", f"{plural(examples, 'row')} with an input and an answer.")
 
 
-def hard_stops(rows: list[tuple[str, str]], labelled: bool, examples: int) -> list[Finding]:
-    labels = Counter(label for _, label in rows)
+def label_rows(rows: list[tuple[str, str]], counted: Mapping[str, int] | None) -> Counter[str]:
+    return Counter(counted) if counted is not None else Counter(label for _, label in rows)
+
+
+def hard_stops(
+    rows: list[tuple[str, str]], labelled: bool, examples: int, counted: Mapping[str, int] | None = None
+) -> list[Finding]:
+    labels = label_rows(rows, counted)
     empty = rows_to_train_on(rows, examples)
     if not labelled:
         return [empty]
@@ -171,10 +177,16 @@ def conflicts(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object
     )
 
 
-def balance(rows: list[tuple[str, str]], limits: CheckLimits, _splits: object, labelled: bool = True) -> Finding:
+def balance(
+    rows: list[tuple[str, str]],
+    limits: CheckLimits,
+    _splits: object,
+    labelled: bool = True,
+    counted: Mapping[str, int] | None = None,
+) -> Finding:
     if not labelled:
         return Finding("balance", "skipped", "Label balance", "Not checked: the answers are not a set of labels.")
-    counts = Counter(label for _, label in rows)
+    counts = label_rows(rows, counted)
     if not counts:
         return Finding("balance", "ok", "Label balance", "No labels yet.")
     top, top_rows = counts.most_common(1)[0]
@@ -202,7 +214,7 @@ def balance(rows: list[tuple[str, str]], limits: CheckLimits, _splits: object, l
         "warning",
         "Unbalanced labels",
         sentence("; ".join(problems)) + ". A model learns rare labels poorly.",
-        count=len(rare) + (1 if share > limits.majority_share else 0),
+        count=len(rare) + (1 if majority else 0),
         examples=tuple(f"{label}: {size}" for label, size in rare[:EXAMPLES]),
         rows=sum(size for _, size in rare) if rare else top_rows,
         columns=("Label", "Rows"),
@@ -265,12 +277,6 @@ def length(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object, r
     )
 
 
-EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
-PHONE = re.compile(r"(?<![\w+])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{1,4}\)[\s.-]?)?\d{2,4}(?:[\s.-]\d{2,4}){2,4}(?!\w)")
-CARD = re.compile(r"(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)")
-IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b")
-
-
 def luhn(digits: str) -> bool:
     total = 0
     for index, char in enumerate(reversed(digits)):
@@ -301,28 +307,77 @@ def is_phone(found: str) -> bool:
     return least <= digits <= 15 and not is_card(found)
 
 
-PATTERNS: tuple[tuple[str, re.Pattern[str], Callable[[str], bool]], ...] = (
-    ("email address", EMAIL, lambda _found: True),
-    ("card number", CARD, is_card),
-    ("IBAN", IBAN, iban_valid),
-    ("phone number", PHONE, is_phone),
+def lengths(pattern: str, low: int, high: int) -> tuple[re.Pattern[str], ...]:
+    return tuple(re.compile(pattern.replace("{n}", f"{{{n}}}")) for n in range(high, low - 1, -1))
+
+
+def ranged(pattern: str, low: int, high: int) -> re.Pattern[str]:
+    return re.compile(pattern.replace("{n}", f"{{{low},{high}}}"))
+
+
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+PHONE = re.compile(r"(?<![\w+])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{1,4}\)[\s.-]?)?\d{2,4}(?:[\s.-]\d{2,4}){2,4}(?!\w)")
+CARD = r"(?<!\d)\d(?:[ -]?\d){n}(?!\d)"
+IBAN = r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){n}\b"
+CARD_DIGITS = (12, 18)
+IBAN_CHARACTERS = (11, 30)
+
+
+@dataclass(frozen=True)
+class Detector:
+    name: str
+    search: re.Pattern[str]
+    valid: Callable[[str], bool]
+    shorter: tuple[re.Pattern[str], ...] = ()
+
+    def candidates(self, text: str, hit: re.Match[str]) -> Iterator[re.Match[str]]:
+        tried = (pattern.match(text, hit.start()) for pattern in self.shorter) if self.shorter else iter((hit,))
+        return (found for found in tried if found is not None and self.valid(found.group()))
+
+    def resume(self, hit: re.Match[str]) -> int:
+        return hit.start() + 1 if self.shorter else hit.end()
+
+
+DETECTORS = (
+    Detector("email address", EMAIL, bool),
+    Detector("card number", ranged(CARD, *CARD_DIGITS), is_card, lengths(CARD, *CARD_DIGITS)),
+    Detector("IBAN", ranged(IBAN, *IBAN_CHARACTERS), iban_valid, lengths(IBAN, *IBAN_CHARACTERS)),
+    Detector("phone number", PHONE, is_phone),
 )
 
+Found = list[tuple[str, re.Match[str]]]
 
-def matches(text: str) -> list[tuple[str, re.Match[str]]]:
-    found: list[tuple[str, re.Match[str]]] = []
-    for name, pattern, valid in PATTERNS:
-        for match in pattern.finditer(text):
-            overlaps = any(match.start() < other.end() and other.start() < match.end() for _, other in found)
-            if not overlaps and valid(match.group()):
-                found.append((name, match))
+
+def overlapping(match: re.Match[str], found: Found) -> bool:
+    return any(match.start() < other.end() and other.start() < match.end() for _, other in found)
+
+
+def matches(text: str) -> Found:
+    found: Found = []
+    for detector in DETECTORS:
+        position = 0
+        while (hit := detector.search.search(text, position)) is not None:
+            chosen = next((one for one in detector.candidates(text, hit) if not overlapping(one, found)), None)
+            if chosen is None:
+                position = detector.resume(hit)
+                continue
+            found.append((detector.name, chosen))
+            position = chosen.end()
     return found
 
 
-def masked(text: str, found: list[tuple[str, re.Match[str]]]) -> str:
+def masked(text: str, found: Found) -> str:
     for name, match in sorted(found, key=lambda item: item[1].start(), reverse=True):
         text = f"{text[: match.start()]}[{name}]{text[match.end() :]}"
     return text
+
+
+def has_personal_data(text: str) -> bool:
+    return bool(matches(text))
+
+
+def personal_data_masked(text: str) -> str:
+    return masked(text, matches(text))
 
 
 def personal_data(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object) -> Finding:
@@ -388,10 +443,11 @@ def run_checks(
     examples: int | None = None,
     only: Sequence[str] = CHECKS,
     text_budget: int | None = None,
+    label_counts: Mapping[str, int] | None = None,
 ) -> list[Finding]:
     rows = usable(raw)
     kept = examples if examples is not None else len({text for text, _ in rows})
-    findings = hard_stops(rows, labelled, kept)
+    findings = hard_stops(rows, labelled, kept, label_counts)
     too_much = text_budget is not None and sum(len(text) for text, _ in rows) > text_budget
     for name in CHECKS:
         if name not in only:
@@ -403,7 +459,7 @@ def run_checks(
         elif name == "length":
             findings.append(length(rows, limits, splits, raw))
         elif name == "balance":
-            findings.append(balance(rows, limits, splits, labelled))
+            findings.append(balance(rows, limits, splits, labelled, label_counts))
         else:
             findings.append(RUNNERS[name](rows, limits, splits))
     return findings

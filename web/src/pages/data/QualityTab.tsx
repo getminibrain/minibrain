@@ -551,7 +551,7 @@ export function QualityTab({
                 shape.checked !== undefined &&
                 shape.checked < shape.rows && (
                     <p className="text-sm text-muted-foreground tabular-nums">
-                        {`The checks read a random ${count(shape.checked)} of the ${count(shape.rows)} rows; their counts are for those rows.`}
+                        {`The checks read a random ${count(shape.checked)} of the ${count(shape.rows)} rows; their counts are for those rows, except label balance, which counts every row.`}
                     </p>
                 )}
             {open.length > 0 && (

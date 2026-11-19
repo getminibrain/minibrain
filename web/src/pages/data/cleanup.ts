@@ -14,45 +14,32 @@ export const NO_CLEANUP: Cleanup = {
 
 const ORDER: CleanupKey[] = ["personal_data", "max_tokens", "conflicts", "rare", "per_label"];
 
-const TEXT = "CAST(input AS VARCHAR)";
-export const INPUT = `trim(${TEXT})`;
-export const LABEL = "trim(CAST(label AS VARCHAR))";
-export const USABLE = `coalesce(${INPUT}, '') <> '' AND coalesce(${LABEL}, '') <> ''`;
-
-const PERSONAL_PATTERNS: [string, string][] = [
-    ["email address", String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}`],
-    ["IBAN", String.raw`\b[A-Z]{2}\d{2}( ?[A-Z0-9]){11,30}\b`],
-    ["card number", String.raw`\b\d([ -]?\d){12,18}\b`],
-    [
-        "phone number",
-        String.raw`\+\d{1,3}[\s.-]?(\(\d{1,4}\)[\s.-]?)?\d{2,4}([\s.-]\d{2,4}){1,4}\b` +
-            String.raw`|\(\d{1,4}\)[\s.-]?\d{3,4}[\s.-]\d{3,4}\b` +
-            String.raw`|\b\d{3,4}[\s.-]\d{3,4}[\s.-]\d{3,4}\b`,
-    ],
-];
+const WHITESPACE =
+    "\t\n\v\f\r\x1c\x1d\x1e\x1f \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007" +
+    "\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+const HAS_PERSONAL_DATA = "has_personal_data";
+const PERSONAL_DATA_MASKED = "personal_data_masked";
 
 export function literal(value: string): string {
     return `'${value.replaceAll("'", "''")}'`;
 }
 
-function maskedInput(): string {
-    return PERSONAL_PATTERNS.reduce(
-        (text, [name, pattern]) => `regexp_replace(${text}, '${pattern}', '[${name}]', 'g')`,
-        TEXT,
-    );
+function stripped(expression: string): string {
+    return `trim(${expression}, ${literal(WHITESPACE)})`;
 }
 
-function personalMatch(): string {
-    return PERSONAL_PATTERNS.map(([, pattern]) => `regexp_matches(${TEXT}, '${pattern}')`).join(
-        " OR ",
-    );
-}
+const TEXT = "CAST(input AS VARCHAR)";
+export const INPUT = stripped(TEXT);
+export const LABEL = stripped("CAST(label AS VARCHAR)");
+export const USABLE = `coalesce(${INPUT}, '') <> '' AND coalesce(${LABEL}, '') <> ''`;
 
 export function personalStep(choice: "mask" | "drop"): Step {
     if (choice === "mask") {
-        return (table) => `SELECT * REPLACE (${maskedInput()} AS input) FROM ${table}`;
+        return (table) =>
+            `SELECT * REPLACE (${PERSONAL_DATA_MASKED}(${TEXT}) AS input) FROM ${table}`;
     }
-    return (table) => `SELECT * FROM ${table} WHERE input IS NULL OR NOT (${personalMatch()})`;
+    return (table) =>
+        `SELECT * FROM ${table} WHERE input IS NULL OR NOT ${HAS_PERSONAL_DATA}(${TEXT})`;
 }
 
 export function longStep(tokens: number, chars: number): Step {
@@ -63,7 +50,7 @@ export function longStep(tokens: number, chars: number): Step {
 export function conflictsStep(choice: "common" | "drop"): Step {
     if (choice === "drop") {
         return (table) =>
-            `SELECT * FROM ${table} QUALIFY count(DISTINCT ${LABEL}) OVER (PARTITION BY ${INPUT}) <= 1`;
+            `SELECT * FROM ${table} QUALIFY count(DISTINCT nullif(${LABEL}, '')) OVER (PARTITION BY ${INPUT}) <= 1`;
     }
     return (table) =>
         `SELECT * EXCLUDE (_label_rows) FROM (SELECT *, count(*) OVER (PARTITION BY ${INPUT}, ${LABEL}) ` +
@@ -116,7 +103,7 @@ export function cleanedSql(sql: string, cleanup: Cleanup, chars: number): string
     }
     const names = ["base", ...steps.map((_, index) => `step_${index + 1}`)];
     const parts = [
-        `base AS (${sql})`,
+        `base AS (\n${sql}\n)`,
         ...steps.map((step, index) => `${names[index + 1]} AS (${step(names[index] ?? "base")})`),
     ];
     return `WITH ${parts.join(", ")} SELECT * FROM ${names.at(-1)}`;
@@ -156,7 +143,8 @@ export function affectedStep(
             return (table) =>
                 `SELECT * FROM ${table} WHERE coalesce(${LABEL}, '') <> '' AND (coalesce(${INPUT}, '') = '' OR ${long}) ORDER BY length(${INPUT}) DESC NULLS FIRST`;
         case "personal_data":
-            return (table) => `SELECT * FROM ${table} WHERE ${USABLE} AND (${personalMatch()})`;
+            return (table) =>
+                `SELECT * FROM ${table} WHERE ${USABLE} AND ${HAS_PERSONAL_DATA}(${TEXT})`;
         default:
             return null;
     }

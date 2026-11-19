@@ -1,9 +1,10 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict
 from functools import lru_cache
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, Path, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
@@ -82,7 +83,7 @@ from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.remote import REMOTE_KINDS
-from minibrain.data.runs import cancel, running
+from minibrain.data.runs import PREVIEW_SLOTS, PREVIEW_WAIT_SECONDS, PreviewsBusy, cancel, running
 from minibrain.data.shared import (
     FOLDER,
     Added,
@@ -110,6 +111,8 @@ from minibrain.data.shared import (
 from minibrain.data.sources import (
     ColumnSummary,
     ExampleRow,
+    QueryShape,
+    ShapeLimits,
     SourceError,
     Table,
     assess,
@@ -127,7 +130,7 @@ from minibrain.data.sources import (
     summarize,
     to_text,
 )
-from minibrain.data.splits import answer_labels, clean, pairs
+from minibrain.data.splits import counted_labels
 from minibrain.data.templates import Template, cleaning, pair_template, skipping_empty, template_sql
 from minibrain.data.transcoded import drop_fallbacks
 from minibrain.policy import PolicyError, locked_sources
@@ -136,7 +139,7 @@ from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Sourc
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags, user_tags
-from minibrain.tasks.contracts import FREE_TEXT, suggested_contract
+from minibrain.tasks.contracts import FREE_TEXT, MAX_LABELS, suggested_contract
 from minibrain.tasks.examples import turns_of
 
 router = APIRouter(prefix="/api")
@@ -149,6 +152,7 @@ MORE_ROWS = 500
 STATS_SAMPLE = 10_000
 LABEL_COUNTS = 200
 QUICK_CHECK_ROWS = 50_000
+SHAPE_LIMITS = ShapeLimits(rows=QUICK_CHECK_ROWS, chars=QUICK_TEXT_CHARS // 2, labels=MAX_LABELS + 1)
 NO_ANSWER_COLUMN = "no answer column is picked in the dataset yet"
 
 
@@ -407,18 +411,19 @@ def first_example(rows: Sequence[ExampleRow]) -> list[ChatMessage]:
     return chat_example(*found)
 
 
-def quick_checks(
-    rows: Sequence[ExampleRow], session: Session, dismissed: dict[str, str], kept: int | None = None
-) -> list[CheckInfo]:
-    examples = clean(rows)
+def quick_checks(found: QueryShape, session: Session, dismissed: dict[str, str]) -> list[CheckInfo]:
+    quality = found.quality
+    kept = quality.rows - quality.empty - quality.duplicates if quality is not None else 0
+    counts = dict(found.labels)
     findings = run_checks(
-        pairs(rows),
+        found.checked or [],
         None,
         load_limits(session).checks(),
-        labelled=bool(answer_labels(examples)),
-        examples=len(examples) if kept is None else kept,
+        labelled=bool(counted_labels(counts, kept)),
+        examples=kept,
         only=QUICK_CHECKS,
         text_budget=QUICK_TEXT_CHARS,
+        label_counts=counts,
     )
     return [
         CheckInfo.model_validate(item | {"dismissed": dismissed.get(str(item["check"])) == item["signature"]})
@@ -433,23 +438,21 @@ def shape_of_query(
     aliases: dict[str, str] | None = None,
     dismissed: dict[str, str] | None = None,
 ) -> QueryShapeInfo:
-    found = query_shape(tables, sql, aliases, QUICK_CHECK_ROWS)
-    quality, rows = found.quality, found.examples
-    if quality is None:
+    found = query_shape(tables, sql, SHAPE_LIMITS, aliases)
+    quality = found.quality
+    if quality is None or found.checked is None:
         return QueryShapeInfo(
             rows=found.rows, missing=found.missing, quality=None, largest_share=None, checks=None, example=[]
         )
     usable = quality.rows - quality.empty
-    sampled = rows is not None and len(rows) < quality.rows
-    kept = usable - quality.duplicates if sampled else None
     return QueryShapeInfo(
         rows=found.rows,
         missing=[],
         quality=QualityInfo.model_validate(quality, from_attributes=True),
         largest_share=quality.largest_label / usable if usable else None,
-        checks=quick_checks(rows, session, dismissed or {}, kept) if rows is not None else None,
-        example=first_example(rows if rows is not None else example_rows(tables, sql, aliases, PREVIEW_ROWS)),
-        checked=len(rows) if rows is not None else None,
+        checks=quick_checks(found, session, dismissed or {}),
+        example=chat_example(*found.example),
+        checked=len(found.checked),
     )
 
 
@@ -636,20 +639,31 @@ def source_query(
 ) -> QueryResponse:
     source = get_source(session, source_id)
     sources = sources_in(session, body.sql, [source])
-    with running(current_actor(), body.run):
+    with previewing(body.run):
         return query_rows(tables_of(settings, store, sources), body.sql, aliases_for([source]), body.rows)
 
 
 RUN_DESCRIPTION = (
     "Name the run to replace it: a newer request with the same run stops this one, so a live preview never queues "
-    "work. A stopped run answers 409."
+    f"work. A stopped run answers 409. At most {PREVIEW_SLOTS} previews run on the server at once, the rows and "
+    f"the shape of one page (runs named page.rows and page.shape) counting as one; another waits up to "
+    f"{PREVIEW_WAIT_SECONDS:g} seconds for a turn, then answers 503."
 )
+
+
+@contextmanager
+def previewing(run: str | None) -> Iterator[None]:
+    try:
+        with running(current_actor(), run):
+            yield
+    except PreviewsBusy as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.post("/query", dependencies=[Depends(builder)], summary="Run SQL over any sources", description=RUN_DESCRIPTION)
 def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, store: StoreDep) -> QueryResponse:
     sources = sources_in(session, body.sql)
-    with running(current_actor(), body.run):
+    with previewing(body.run):
         return query_rows(tables_of(settings, store, sources), body.sql, limit=body.rows)
 
 
@@ -658,14 +672,15 @@ def any_query(body: QueryRequest, session: SessionDep, settings: SettingsDep, st
     dependencies=[Depends(builder)],
     summary="Count a query's rows and run the quick checks",
     description="The row count, labels, empty and repeated inputs and the quick data checks of what the query would "
-    f"save, without saving it. Checks read every row up to {QUICK_CHECK_ROWS:,}, and a random {QUICK_CHECK_ROWS:,} "
-    f"of a larger result. {RUN_DESCRIPTION}",
+    f"save, without saving it. Checks read every row up to {QUICK_CHECK_ROWS:,} and a random sample of a larger "
+    f"result, fewer rows when inputs are long so the sample holds about {SHAPE_LIMITS.chars:,} characters; label "
+    f"balance and the single-label stop count every row. {RUN_DESCRIPTION}",
 )
 def any_query_shape(
     body: QueryShapeRequest, session: SessionDep, settings: SettingsDep, store: StoreDep
 ) -> QueryShapeInfo:
     sources = sources_in(session, body.sql)
-    with running(current_actor(), body.run):
+    with previewing(body.run):
         return shape_of_query(session, tables_of(settings, store, sources), body.sql)
 
 
@@ -815,7 +830,7 @@ def dataset_query(
 ) -> QueryResponse:
     dataset = get_dataset(session, slug)
     sources = sources_in(session, body.sql, dataset.sources)
-    with running(current_actor(), body.run):
+    with previewing(body.run):
         return query_rows(tables_of(settings, store, sources), body.sql, aliases_for(dataset.sources), body.rows)
 
 
@@ -831,7 +846,7 @@ def dataset_query_shape(
 ) -> QueryShapeInfo:
     dataset = get_dataset(session, slug)
     sources = sources_in(session, body.sql, dataset.sources)
-    with running(current_actor(), body.run):
+    with previewing(body.run):
         return shape_of_query(
             session,
             tables_of(settings, store, sources),

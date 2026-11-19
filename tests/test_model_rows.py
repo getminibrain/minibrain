@@ -122,7 +122,7 @@ def test_demo_creates_a_model_with_mapped_data_each_time(harness: Harness, monke
         "general",
         "demo_travel_intents.jsonl",
     )
-    assert body["mapping"]["template"] == {"user": "{message}", "assistant": "{intent}"}
+    assert body["mapping"]["template"] == {"input_column": "message", "label_column": "intent"}
     assert body["dataset_version"]["rows"] == 750
     assert len(body["label_proposal"]["labels"]) == 5
     again = harness.client.post("/api/models/demo").json()

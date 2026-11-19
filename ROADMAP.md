@@ -453,8 +453,11 @@ Data is shared across models:
 - The dataset editor's preview (first rows, then the full count and quick checks) runs as you type only when the
   sources it reads hold under 1,000,000 rows by their known counts; larger or uncounted sources run when Run (⌘↵ /
   Ctrl+↵) is pressed, one action for both. A preview connection takes at most a quarter of the machine's memory and
-  half its cores (`SET memory_limit`, `SET threads`, `minibrain/data/runs.py`), keeps the 30-second stop, and each
-  person runs one preview at a time: a new preview stops their previous one.
+  half its cores (`SET memory_limit`, `SET threads`, `minibrain/data/runs.py`) and keeps the 30-second stop. A new
+  preview stops only the previous one from the same page (its rows and its shape still run side by side), so two
+  tabs never cancel each other. At most two previews run on the server at once (`PREVIEW_SLOTS`, a page's rows and
+  shape counting as one); another waits up to 5 seconds for a turn, then answers 503 "Previews are busy. Press Run
+  to try again."
 - The editor (`/data/datasets/new`, `/data/datasets/<slug>/edit`) is a page of its own beside the app's menu, without
   the Data tree and header: a title bar (back, the name as an editable title, Details for description and tags, Pick
   columns / Write SQL, Run, Cancel, Save) over the query and the preview side by side at full height, split by a
@@ -606,12 +609,17 @@ dataset and on the Training page before a run starts:
   default, both editable); train/test leakage (a test or held-out input also in training once case, spacing and
   punctuation are ignored); empty inputs and inputs past the training example's length (estimated at four characters
   a token); personal data found by local patterns: email addresses, phone numbers, card numbers (Luhn-checked) and
-  IBANs (mod-97-checked). The report says plainly that the patterns can miss names and addresses.
+  IBANs (mod-97-checked), each card or IBAN candidate tried at shorter lengths before it is rejected, so trailing
+  words or digits do not hide it. The report says plainly that the patterns can miss names and addresses. Mask and
+  drop, and Show rows, call the same detector through two functions registered on the sandboxed DuckDB connection
+  (`has_personal_data`, `personal_data_masked`), so a fix acts on exactly the rows the check flags.
 - "Dismiss for this dataset" stores the check and a signature of its result on the dataset; the warning shows again
   when a later version's result for that check differs.
 - The dataset editor runs the quick checks (all but train/test overlap, which needs the split) on every row up to
-  50,000 and on a random 50,000 of a larger result, personal data only while those rows hold under 10 million
-  characters. Each finding says how many rows it touches and lists them as a small table (input and labels,
+  50,000 and on a random 50,000 of a larger result, fewer when inputs are long so the rows read hold about 5
+  million characters; personal data only while they hold under 10 million. Label balance and the single-label stop
+  count every row of the result, not the sample. Checks and fixes strip the same whitespace (every Unicode space,
+  tab and line break); an empty label is not a second label of an input. Each finding says how many rows it touches and lists them as a small table (input and labels,
   label and rows, input and tokens, input and what was found); repeated and empty inputs show as info, since training
   already drops them. The preview's Quality tab gives the verdict (ready to train, N to look at, or why it cannot
   train), the thresholds with a link to Settings › Data, Show rows (the current query wrapped in SQL that keeps the

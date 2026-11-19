@@ -178,7 +178,7 @@ def test_two_column_tables_map_to_one_turn_chats(harness: Harness) -> None:
         assert created.status_code == 201, created.text
         detail = attach(harness, slug, f"{slug}.csv", pairs_csv(header))
         first, second = header.split(",")
-        assert detail["mapping"]["template"] == {"user": f"{{{first}}}", "assistant": f"{{{second}}}"}
+        assert detail["mapping"]["template"] == {"input_column": first, "label_column": second}
         preview = harness.client.get(f"/api/models/{slug}/preview").json()
         assert [message["role"] for message in preview["example"]] == ["user", "assistant"]
         assert preview["rows"][0]["label"].startswith("Hold the button")

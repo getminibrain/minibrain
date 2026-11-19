@@ -1,4 +1,4 @@
-from minibrain.data.checks import TOO_MUCH_TEXT, CheckLimits, Finding, blocking, run_checks
+from minibrain.data.checks import TOO_MUCH_TEXT, CheckLimits, Finding, blocking, masked, matches, run_checks
 from minibrain.data.splits import Row, clean, split
 from minibrain.tasks.examples import Example, Turn, encode_turns, single
 from tests.conftest import Harness, tickets_csv
@@ -229,3 +229,38 @@ def test_quick_checks_skip_personal_data_over_the_text_budget() -> None:
     found = by_check(run_checks(rows, None, CheckLimits(), text_budget=100))["personal_data"]
     assert (found.status, found.detail) == ("skipped", TOO_MUCH_TEXT)
     assert by_check(run_checks(rows, None, CheckLimits(), text_budget=10**6))["personal_data"].status == "ok"
+
+
+PERSONAL_TEXTS = (
+    "IBAN DE89370400440532013000 EUR",
+    "IBAN DE89 3704 0044 0532 0130 00 BIC COBADEFFXXX",
+    "4111 1111 1111 1111 2 items",
+    "order 12 4111 1111 1111 1111",
+    "Order 1700000000000 shipped",
+)
+
+
+def test_personal_data_tries_shorter_matches_before_giving_up() -> None:
+    found = {text: matches(text) for text in PERSONAL_TEXTS}
+    assert {text: [name for name, _ in hits] for text, hits in found.items()} == {
+        "IBAN DE89370400440532013000 EUR": ["IBAN"],
+        "IBAN DE89 3704 0044 0532 0130 00 BIC COBADEFFXXX": ["IBAN"],
+        "4111 1111 1111 1111 2 items": ["card number"],
+        "order 12 4111 1111 1111 1111": ["card number"],
+        "Order 1700000000000 shipped": [],
+    }
+    assert masked("4111 1111 1111 1111 2 items", found["4111 1111 1111 1111 2 items"]) == "[card number] 2 items"
+
+
+def test_a_single_label_counts_once_in_the_balance_finding() -> None:
+    found = by_check(run_checks([(f"row {index}", "only") for index in range(5)], None, CheckLimits()))["balance"]
+    assert (found.status, found.count) == ("warning", 1)
+
+
+def test_label_counts_of_the_whole_result_replace_the_sample_for_balance() -> None:
+    sample = [(f"row {index}", "common") for index in range(150)]
+    counted = {"common": 9_000, "rare": 3}
+    found = by_check(run_checks(sample, None, CheckLimits(), label_counts=counted))
+    assert found["single_label"].status == "ok"
+    balance = found["balance"]
+    assert (balance.count, balance.rows, balance.table) == (2, 3, (("common", "9,000"), ("rare", "3")))

@@ -10,6 +10,7 @@
         "typecheck": "tsc --noEmit",
         "lint": "biome check .",
         "lint:fix": "biome check --write .",
+        "test:cleanup": "node --no-warnings --experimental-strip-types scripts/check-cleanup.ts",
         "gen:api": "cd .. && uv run minibrain openapi --output web/openapi.json && cd web && openapi-typescript openapi.json --default-non-nullable false -o src/api/schema.d.ts"
     },
     "dependencies": {

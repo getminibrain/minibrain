@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping
 
 from minibrain.data.checks import CHARS_PER_TOKEN
-from minibrain.data.sources import SourceError
+from minibrain.data.sources import HAS_PERSONAL_DATA, PERSONAL_DATA_MASKED, SourceError, stripped
 
 CONFLICTS = "conflicts"
 PER_LABEL = "per_label"
@@ -13,39 +13,16 @@ CHOICES = {CONFLICTS: ("common", "drop"), PERSONAL_DATA: ("mask", "drop")}
 NUMBERS = {MAX_TOKENS: (1, 1_000_000), RARE: (2, 100_000), PER_LABEL: (1, 50_000_000)}
 
 TEXT = "CAST(input AS VARCHAR)"
-INPUT = f"trim({TEXT})"
-LABEL = "trim(CAST(label AS VARCHAR))"
-
-PERSONAL_PATTERNS = (
-    ("email address", r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"),
-    ("IBAN", r"\b[A-Z]{2}\d{2}( ?[A-Z0-9]){11,30}\b"),
-    ("card number", r"\b\d([ -]?\d){12,18}\b"),
-    (
-        "phone number",
-        r"\+\d{1,3}[\s.-]?(\(\d{1,4}\)[\s.-]?)?\d{2,4}([\s.-]\d{2,4}){1,4}\b"
-        r"|\(\d{1,4}\)[\s.-]?\d{3,4}[\s.-]\d{3,4}\b"
-        r"|\b\d{3,4}[\s.-]\d{3,4}[\s.-]\d{3,4}\b",
-    ),
-)
+INPUT = stripped(TEXT)
+LABEL = stripped("CAST(label AS VARCHAR)")
 
 Cleanup = Mapping[str, str]
 
 
-def masked_input() -> str:
-    text = TEXT
-    for name, pattern in PERSONAL_PATTERNS:
-        text = f"regexp_replace({text}, '{pattern}', '[{name}]', 'g')"
-    return text
-
-
-def personal_match() -> str:
-    return " OR ".join(f"regexp_matches({TEXT}, '{pattern}')" for _, pattern in PERSONAL_PATTERNS)
-
-
 def personal_step(choice: str) -> Callable[[str], str]:
     if choice == "mask":
-        return lambda table: f"SELECT * REPLACE ({masked_input()} AS input) FROM {table}"
-    return lambda table: f"SELECT * FROM {table} WHERE input IS NULL OR NOT ({personal_match()})"
+        return lambda table: f"SELECT * REPLACE ({PERSONAL_DATA_MASKED}({TEXT}) AS input) FROM {table}"
+    return lambda table: f"SELECT * FROM {table} WHERE input IS NULL OR NOT {HAS_PERSONAL_DATA}({TEXT})"
 
 
 def long_step(tokens: int) -> Callable[[str], str]:
@@ -54,7 +31,9 @@ def long_step(tokens: int) -> Callable[[str], str]:
 
 def conflicts_step(choice: str) -> Callable[[str], str]:
     if choice == "drop":
-        return lambda table: f"SELECT * FROM {table} QUALIFY count(DISTINCT {LABEL}) OVER (PARTITION BY {INPUT}) <= 1"
+        return lambda table: (
+            f"SELECT * FROM {table} QUALIFY count(DISTINCT nullif({LABEL}, '')) OVER (PARTITION BY {INPUT}) <= 1"
+        )
     return lambda table: (
         f"SELECT * EXCLUDE (_label_rows) FROM (SELECT *, count(*) OVER (PARTITION BY {INPUT}, {LABEL}) "
         f"AS _label_rows FROM {table}) QUALIFY dense_rank() OVER (PARTITION BY {INPUT} "
@@ -75,7 +54,7 @@ def per_label_step(rows: int) -> Callable[[str], str]:
 def number(cleanup: Cleanup, key: str) -> int:
     low, high = NUMBERS[key]
     text = cleanup[key]
-    if not text.isdigit() or not low <= int(text) <= high:
+    if not (text.isascii() and text.isdecimal()) or not low <= int(text) <= high:
         raise SourceError(f"{key} takes a whole number from {low:,} to {high:,}")
     return int(text)
 
@@ -108,6 +87,6 @@ def cleaned_sql(sql: str, cleanup: Cleanup) -> str:
     if not steps:
         return sql
     names = ["base", *(f"step_{index}" for index in range(1, len(steps) + 1))]
-    parts = [f"base AS ({sql})"]
+    parts = [f"base AS (\n{sql}\n)"]
     parts += [f"{names[index + 1]} AS ({step(names[index])})" for index, step in enumerate(steps)]
     return f"WITH {', '.join(parts)} SELECT * FROM {names[-1]}"

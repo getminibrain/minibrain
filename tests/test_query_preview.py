@@ -9,12 +9,14 @@ import pytest
 from minibrain.data.runs import (
     PREVIEW_MEMORY_SHARE,
     PREVIEW_THREAD_SHARE,
+    SLOTS,
+    PreviewsBusy,
     QueryCancelled,
     cancel,
     preview_caps,
     running,
 )
-from minibrain.data.sources import run_query
+from minibrain.data.sources import ShapeLimits, SourceError, run_query
 from tests.conftest import Harness, tickets_csv
 
 SLOW = "SELECT count(*) AS n FROM range(200000) a, range(200000) b"
@@ -69,12 +71,43 @@ def test_the_shape_counts_rows_labels_and_runs_the_quick_checks(harness: Harness
 
 
 def test_a_large_result_runs_the_quick_checks_on_a_sample(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("minibrain.api.data.QUICK_CHECK_ROWS", 20)
+    monkeypatch.setattr("minibrain.api.data.SHAPE_LIMITS", ShapeLimits(rows=20, chars=10**9, labels=257))
     upload(harness, "tickets.csv", repeated_csv())
     found = harness.client.post("/api/query/shape", json={"sql": PAIRS}).json()
     assert (found["rows"], found["checked"], found["quality"]["rows"]) == (43, 20, 43)
     checks = {check["check"]: check for check in found["checks"]}
     assert checks["empty"]["detail"].startswith("41 rows")
+
+
+def test_label_balance_of_a_sampled_result_counts_every_row(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.api.data.SHAPE_LIMITS", ShapeLimits(rows=20, chars=10**9, labels=257))
+    lines = ["text,category", *(f"ticket {index},{'billing' if index % 2 else 'bug'}" for index in range(200))]
+    lines += [f"odd {index},odd" for index in range(3)]
+    upload(harness, "tickets.csv", ("\n".join(lines) + "\n").encode())
+    found = harness.client.post("/api/query/shape", json={"sql": PAIRS}).json()
+    balance = {check["check"]: check for check in found["checks"]}["balance"]
+    assert found["checked"] == 20
+    assert (balance["count"], balance["rows"]) == (1, 3)
+    assert balance["table"] == [["odd", "3"]]
+
+
+def test_long_inputs_shrink_the_sample_to_the_text_budget(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.api.data.SHAPE_LIMITS", ShapeLimits(rows=50_000, chars=2_000, labels=257))
+    lines = ["text,category", *(f"{index:03d} {'x' * 96},{'billing' if index % 2 else 'bug'}" for index in range(60))]
+    upload(harness, "tickets.csv", ("\n".join(lines) + "\n").encode())
+    found = harness.client.post("/api/query/shape", json={"sql": PAIRS}).json()
+    assert (found["rows"], found["checked"]) == (60, 20)
+    assert found["example"][-1]["role"] == "assistant"
+
+
+def test_a_query_may_end_in_a_line_comment(harness: Harness) -> None:
+    upload(harness, "tickets.csv", tickets_csv())
+    commented = f"{PAIRS} -- the tickets"
+    shape = harness.client.post("/api/query/shape", json={"sql": commented})
+    assert shape.status_code == 200, shape.text
+    assert shape.json()["rows"] == 200
+    rows = harness.client.post("/api/query", json={"sql": commented, "rows": 3})
+    assert rows.status_code == 200, rows.text
 
 
 def test_the_shape_names_the_missing_column_instead_of_failing(harness: Harness) -> None:
@@ -172,19 +205,81 @@ def test_a_preview_takes_at_most_a_quarter_of_memory_and_half_the_cores() -> Non
     assert run_query([], SETTINGS, None).rows != capped
 
 
-def test_a_new_preview_from_the_same_person_stops_their_previous_one() -> None:
-    first: list[BaseException | None] = []
-    other: list[BaseException | None] = []
-    older = slow_run("ana", "editor-1.rows", first)
-    elsewhere = slow_run("bob", "editor-9.rows", other)
-    with running("ana", "editor-2.rows"):
-        older.join(timeout=10)
-        assert not older.is_alive()
-        assert isinstance(first[0], QueryCancelled)
-        assert elsewhere.is_alive()
-    assert cancel("bob", "editor-9.rows")
-    elsewhere.join(timeout=10)
-    assert isinstance(other[0], QueryCancelled)
+def stopped(*runs: tuple[str, str, threading.Thread]) -> None:
+    for owner, name, thread in runs:
+        cancel(owner, name)
+        thread.join(timeout=10)
+        assert not thread.is_alive()
+
+
+def test_two_pages_of_the_same_person_preview_at_once() -> None:
+    outcome: list[BaseException | None] = []
+    first = slow_run("ana", "editor-1.rows", outcome)
+    try:
+        with running("ana", "editor-2.rows"):
+            assert run_query([], "SELECT 1 AS n", None).rows == [[1]]
+        assert first.is_alive()
+    finally:
+        stopped(("ana", "editor-1.rows", first))
+    assert isinstance(outcome[0], QueryCancelled)
+
+
+def test_a_third_preview_waits_for_a_turn_then_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.data.runs.PREVIEW_WAIT_SECONDS", 0.5)
+    outcome: list[BaseException | None] = []
+    first = slow_run("ana", "editor-1.rows", outcome)
+    second = slow_run("bob", "editor-2.rows", outcome)
+    try:
+        with running("ana", "editor-1.shape"):
+            assert run_query([], "SELECT 1 AS n", None).rows == [[1]]
+        started = time.monotonic()
+        with (
+            pytest.raises(PreviewsBusy, match="Previews are busy"),
+            running("cy", "editor-3.rows"),
+        ):
+            pass
+        assert time.monotonic() - started >= 0.5
+    finally:
+        stopped(("ana", "editor-1.rows", first), ("bob", "editor-2.rows", second))
+    assert not SLOTS
+
+
+def test_a_waiting_preview_runs_when_a_turn_frees(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.data.runs.PREVIEW_WAIT_SECONDS", 10.0)
+    outcome: list[BaseException | None] = []
+    first = slow_run("ana", "editor-1.rows", outcome)
+    second = slow_run("bob", "editor-2.rows", outcome)
+    threading.Timer(0.3, cancel, ["ana", "editor-1.rows"]).start()
+    try:
+        with running("cy", "editor-3.rows"):
+            assert run_query([], "SELECT 1 AS n", None).rows == [[1]]
+    finally:
+        stopped(("ana", "editor-1.rows", first), ("bob", "editor-2.rows", second))
+    assert not SLOTS
+
+
+def test_a_turn_frees_when_a_preview_fails_or_times_out(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(SourceError), running("ana", "editor-1.rows"):
+        run_query([], "SELECT nothing FROM nowhere", None)
+    assert not SLOTS
+    monkeypatch.setattr("minibrain.data.sources.QUERY_TIMEOUT_SECONDS", 0.3)
+    with pytest.raises(SourceError, match="was stopped"), running("ana", "editor-1.rows"):
+        run_query([], SLOW, None)
+    assert not SLOTS
+
+
+def test_a_busy_server_answers_503_with_what_to_do(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("minibrain.data.runs.PREVIEW_WAIT_SECONDS", 0.2)
+    upload(harness, "tickets.csv", tickets_csv())
+    outcome: list[BaseException | None] = []
+    first = slow_run("ana", "editor-1.rows", outcome)
+    second = slow_run("bob", "editor-2.rows", outcome)
+    try:
+        busy = harness.client.post("/api/query", json={"sql": PAIRS, "run": "editor-3.rows"})
+    finally:
+        stopped(("ana", "editor-1.rows", first), ("bob", "editor-2.rows", second))
+    assert (busy.status_code, busy.json()["detail"]) == (503, "Previews are busy. Press Run to try again.")
+    assert harness.client.post("/api/query", json={"sql": PAIRS, "run": "editor-3.rows"}).status_code == 200
 
 
 def test_the_rows_and_the_shape_of_one_preview_run_side_by_side() -> None:

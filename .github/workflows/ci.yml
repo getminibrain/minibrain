@@ -77,6 +77,8 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
+      - name: Clean-up SQL matches the Python builder
+        run: pnpm test:cleanup
       - name: Build
         run: pnpm build
 
