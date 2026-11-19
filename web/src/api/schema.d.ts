@@ -3451,6 +3451,8 @@ export interface components {
             link_pending: boolean;
             /** Sessions */
             sessions: number;
+            /** Api Keys */
+            api_keys: number;
             /** Last Sign In At */
             last_sign_in_at: string | null;
             /**

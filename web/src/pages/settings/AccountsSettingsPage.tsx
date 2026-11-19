@@ -5,6 +5,7 @@ import {
     Badge,
     Button,
     CodeBlock,
+    ConfirmDialog,
     DataGrid,
     DataGridDetail,
     Dialog,
@@ -54,6 +55,7 @@ import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { When } from "~/components/When";
 import { ROLE_LABELS, SOURCE_LABELS, roleRank } from "~/lib/access";
+import { count } from "~/lib/format";
 import { relativeTime, timeValue } from "~/lib/time";
 import { ACCOUNTS } from "~/pages/settings/settingsIndex";
 
@@ -376,6 +378,47 @@ function PersonMenu({
     );
 }
 
+function keysGone(person: AccountInfo): string {
+    if (person.api_keys === 0) {
+        return "They have no API keys.";
+    }
+    const keys = person.api_keys === 1 ? "The API key" : `All ${count(person.api_keys)} API keys`;
+    return `${keys} they created ${person.api_keys === 1 ? "is" : "are"} deleted and stop working at once; turning the account back on does not restore ${person.api_keys === 1 ? "it" : "them"}.`;
+}
+
+function TurnOffDialog({
+    person,
+    onOpenChange,
+    onConfirm,
+}: {
+    person: AccountInfo | null;
+    onOpenChange: (open: boolean) => void;
+    onConfirm: (person: AccountInfo) => Promise<unknown>;
+}) {
+    const [shown, setShown] = useState(person);
+    useEffect(() => {
+        if (person) {
+            setShown(person);
+        }
+    }, [person]);
+    const who = shown ? (shown.email ?? shown.name) : "";
+    return (
+        <ConfirmDialog
+            open={person !== null}
+            onOpenChange={onOpenChange}
+            title={`Turn off ${who}?`}
+            description={
+                shown
+                    ? `${who} is signed out everywhere and cannot sign in until you turn the account on again. ${keysGone(shown)}`
+                    : ""
+            }
+            confirmLabel="Turn off"
+            destructive
+            onConfirm={() => (person ? onConfirm(person).catch(() => undefined) : undefined)}
+        />
+    );
+}
+
 function RoleCell({ person }: { person: AccountInfo }) {
     const label = person.role ? (
         ROLE_LABELS[person.role]
@@ -458,6 +501,7 @@ function People() {
     const [adding, setAdding] = useState(false);
     const [editing, setEditing] = useState<AccountInfo | null>(null);
     const [link, setLink] = useState<PasswordLink | null>(null);
+    const [turningOff, setTurningOff] = useState<AccountInfo | null>(null);
     const newLink = useMutation({
         mutationFn: (person: AccountInfo) =>
             unwrap(
@@ -485,7 +529,7 @@ function People() {
             icon={IconUsers}
             anchor={PEOPLE.anchor}
             title={PEOPLE.title}
-            description="Everyone who can sign in. Turning someone off signs them out at once."
+            description="Everyone who can sign in. Turning someone off signs them out at once and deletes the API keys they created."
             actions={
                 <Button variant="outline" onClick={() => setAdding(true)}>
                     <IconUserPlus />
@@ -512,9 +556,14 @@ function People() {
                         me={row.id === me?.id}
                         onEdit={() => setEditing(row)}
                         onLink={() => newLink.mutate(row)}
-                        onToggle={() => toggle.mutate(row)}
+                        onToggle={() => (row.disabled ? toggle.mutate(row) : setTurningOff(row))}
                     />
                 )}
+            />
+            <TurnOffDialog
+                person={turningOff}
+                onOpenChange={(open) => !open && setTurningOff(null)}
+                onConfirm={(person) => toggle.mutateAsync(person)}
             />
             <AddPersonDialog open={adding} onOpenChange={setAdding} onLink={setLink} />
             <EditPersonDialog person={editing} onOpenChange={(open) => !open && setEditing(null)} />

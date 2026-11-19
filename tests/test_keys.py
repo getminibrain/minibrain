@@ -206,8 +206,10 @@ def test_turning_an_account_off_revokes_its_keys(harness: Harness, tmp_path: Pat
     assert harness.client.post("/v1/chat/completions", headers=theirs, json=chat("base-one")).status_code == 200
     with harness.sessions() as session:
         ids = {user.email: user.id for user in session.scalars(select(User))}
+    listed = {person["email"]: person["api_keys"] for person in harness.client.get("/api/accounts").json()["people"]}
+    assert (listed["builder@example.com"], listed["other@example.com"]) == (1, 1)
     off = harness.client.patch(f"/api/accounts/{ids['builder@example.com']}", json={"disabled": True})
-    assert off.status_code == 200
+    assert off.status_code == 200 and off.json()["api_keys"] == 0
     assert harness.client.post("/v1/chat/completions", headers=theirs, json=chat("base-one")).status_code == 401
     assert harness.client.post("/v1/chat/completions", headers=kept, json=chat("base-one")).status_code == 200
     with harness.sessions() as session:

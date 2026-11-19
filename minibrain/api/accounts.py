@@ -26,7 +26,7 @@ from minibrain.auth.accounts import (
 from minibrain.auth.config import AuthConfig
 from minibrain.auth.identity import current_actor, current_person
 from minibrain.auth.roles import Role, role_of
-from minibrain.registry.models import AuditEvent, User, now
+from minibrain.registry.models import ApiKey, AuditEvent, User, now
 
 router = APIRouter(prefix="/api/accounts")
 
@@ -50,6 +50,7 @@ class AccountInfo(BaseModel):
     password_set: bool
     link_pending: bool
     sessions: int
+    api_keys: int
     last_sign_in_at: datetime | None
     created_at: datetime
 
@@ -93,7 +94,14 @@ def auth_config(request: Request) -> AuthConfig:
 AuthDep = Annotated[AuthConfig, Depends(auth_config)]
 
 
-def account_info(session: Session, config: AuthConfig, user: User, sessions: int) -> AccountInfo:
+def key_counts(session: Session, user_id: int | None = None) -> dict[int, int]:
+    query = select(ApiKey.created_by_id, func.count()).group_by(ApiKey.created_by_id)
+    if user_id is not None:
+        query = query.where(ApiKey.created_by_id == user_id)
+    return {owner: count for owner, count in session.execute(query) if owner is not None}
+
+
+def account_info(session: Session, config: AuthConfig, user: User, sessions: int, keys: int) -> AccountInfo:
     person = person_for(session, user, config)
     pending = user.reset_expires_at is not None and user.reset_expires_at > now()
     return AccountInfo(
@@ -109,13 +117,15 @@ def account_info(session: Session, config: AuthConfig, user: User, sessions: int
         password_set=user.password_hash is not None,
         link_pending=pending,
         sessions=sessions,
+        api_keys=keys,
         last_sign_in_at=user.last_sign_in_at,
         created_at=user.created_at,
     )
 
 
 def one_account(session: Session, config: AuthConfig, user: User) -> AccountInfo:
-    return account_info(session, config, user, live_session_counts(session).get(user.id, 0))
+    sessions = live_session_counts(session).get(user.id, 0)
+    return account_info(session, config, user, sessions, key_counts(session, user.id).get(user.id, 0))
 
 
 def cleaned(name: str | None) -> str:
@@ -145,10 +155,11 @@ def is_last_admin(session: Session, user: User) -> bool:
 @router.get("", dependencies=[Depends(admin)], summary="List accounts")
 def accounts(session: SessionDep, config: AuthDep) -> AccountsInfo:
     counts = live_session_counts(session)
+    keys = key_counts(session)
     people = session.scalars(select(User).order_by(func.lower(User.name), User.id))
     proxy = config.proxy
     return AccountsInfo(
-        people=[account_info(session, config, user, counts.get(user.id, 0)) for user in people],
+        people=[account_info(session, config, user, counts.get(user.id, 0), keys.get(user.id, 0)) for user in people],
         mapping=[RoleMapping(group=group, role=role) for group, role in sorted(config.roles.items())],
         default_role=policy.value(session, "default_role"),
         default_role_locked="default_role" in policy.locked_sources(),

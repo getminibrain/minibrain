@@ -11818,6 +11818,10 @@
             "type": "integer",
             "title": "Sessions"
           },
+          "api_keys": {
+            "type": "integer",
+            "title": "Api Keys"
+          },
           "last_sign_in_at": {
             "anyOf": [
               {
@@ -11849,6 +11853,7 @@
           "password_set",
           "link_pending",
           "sessions",
+          "api_keys",
           "last_sign_in_at",
           "created_at"
         ],
