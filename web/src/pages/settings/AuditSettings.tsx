@@ -105,7 +105,7 @@ function liveAcknowledged(chain: ChainInfo): boolean {
 function liveStatus(chain: ChainInfo): string {
     const record = liveRecord(chain);
     if (record === null) {
-        return "This break is not in the history yet. The next scheduled check records it, the nightly full check at the latest, and then an admin can acknowledge it.";
+        return "This break is not in the history yet. Verify again to record it, and then an admin can acknowledge it.";
     }
     return record.acknowledged_at
         ? "This break is acknowledged and kept in the history below."
@@ -127,8 +127,8 @@ function earlierBreaks(chain: ChainInfo): string | null {
         return null;
     }
     return open === 1
-        ? "A break found earlier is not acknowledged yet; it stays open until an admin acknowledges it."
-        : `${count(open)} breaks found earlier are not acknowledged yet; they stay open until an admin acknowledges them.`;
+        ? "Another break is not acknowledged yet; it stays open until an admin acknowledges it."
+        : `${count(open)} other breaks are not acknowledged yet; they stay open until an admin acknowledges them.`;
 }
 
 function chainText(chain: ChainInfo): string {
