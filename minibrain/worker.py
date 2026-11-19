@@ -1,3 +1,4 @@
+import itertools
 import json
 import logging
 import os
@@ -51,6 +52,8 @@ REMOTE_KINDS = [JobKind.TRAIN, JobKind.EVAL, JobKind.JUDGE, JobKind.EXPORT]
 LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
+MAX_BACKOFF_SECONDS = 30.0
+EVENT_BATCH = 200
 CLAIM_WAIT_SECONDS = 25.0
 RETRIES = 6
 STAGED = "file.staged"
@@ -135,22 +138,34 @@ class MainClient:
         else:
             self.headers[LEASE_HEADER] = lease
 
-    def call(self, method: str, path: str, opener: Callable[[], Any] | None = None, **kwargs: Any) -> Response:
+    def call(
+        self,
+        method: str,
+        path: str,
+        opener: Callable[[], Any] | None = None,
+        retries: int | None = None,
+        patient: bool = False,
+        **kwargs: Any,
+    ) -> Response:
         delay = 1.0
+        limit = RETRIES if retries is None else retries
         headers = self.headers | kwargs.pop("extra", {})
-        for attempt in range(RETRIES):
+        for attempt in itertools.count():
+            last = not patient and attempt >= limit - 1
             body = opener() if opener is not None else None
             try:
                 response = self.http.request(method, path, headers=headers, content=body, **kwargs)
-            except httpx.TransportError:
-                if attempt == RETRIES - 1:
+            except httpx.TransportError as error:
+                if last:
                     raise
+                if attempt == limit - 1:
+                    log.warning("main is unreachable (%s); waiting for it to come back", error)
             else:
                 if response.status_code == 409:
                     raise LeaseLostError(response.text)
                 if response.status_code == 410:
                     raise MachineRemovedError(refusal_of(response))
-                if response.status_code < 500 or attempt == RETRIES - 1:
+                if response.status_code < 500 or last:
                     response.raise_for_status()
                     return response
             finally:
@@ -158,7 +173,7 @@ class MainClient:
                     body.close()
             if self.stop.wait(delay):
                 raise WorkerStoppedError("worker is stopping")
-            delay = min(delay * 2, 30.0)
+            delay = min(delay * 2, MAX_BACKOFF_SECONDS)
         raise RuntimeError("unreachable")
 
     def worker_body(self) -> dict[str, Any]:
@@ -185,20 +200,22 @@ class MainClient:
     def heartbeat(self, job_id: int, token: str) -> dict[str, Any]:
         return self.call("POST", f"/internal/worker/jobs/{job_id}/heartbeat", json={"token": token}).json()
 
-    def events(self, job_id: int, token: str, events: list[dict[str, Any]]) -> None:
-        self.call("POST", f"/internal/worker/jobs/{job_id}/events", json={"token": token, "events": events})
+    def events(self, job_id: int, token: str, events: list[dict[str, Any]], final: bool) -> None:
+        body = {"token": token, "events": events}
+        retries = None if final else 1
+        self.call("POST", f"/internal/worker/jobs/{job_id}/events", retries=retries, patient=final, json=body)
 
     def complete(
         self, job_id: int, token: str, result: dict[str, Any], outputs: dict[str, str], log: str | None
     ) -> None:
         body = {"token": token, "result": result, "outputs": outputs, "log": log}
-        self.call("POST", f"/internal/worker/jobs/{job_id}/complete", json=body)
+        self.call("POST", f"/internal/worker/jobs/{job_id}/complete", patient=True, json=body)
 
     def fail(
         self, job_id: int, token: str, error: str, retryable: bool, log: str | None, code: str | None = None
     ) -> None:
-        body = {"token": token, "error": error, "retryable": retryable, "log": log}
-        self.call("POST", f"/internal/worker/jobs/{job_id}/fail", json=body | ({"code": code} if code else {}))
+        body = {"token": token, "error": error, "retryable": retryable, "log": log} | ({"code": code} if code else {})
+        self.call("POST", f"/internal/worker/jobs/{job_id}/fail", patient=True, json=body)
 
     def upload(self, store: ArtifactStore, artifact_id: str, kind: str, packing: str, name: str) -> str:
         headers = {"X-Artifact-Kind": kind, "X-Artifact-Packing": packing, "X-Artifact-Name": name}
@@ -206,6 +223,7 @@ class MainClient:
             "PUT",
             f"/internal/worker/artifacts/{artifact_id}",
             opener=lambda: file_chunks(store.open(artifact_id)),
+            patient=True,
             extra=headers,
         )
         return artifact_id
@@ -217,6 +235,7 @@ class MainClient:
             "PUT",
             f"/internal/worker/artifacts/{artifact_id}",
             opener=lambda: file_chunks(path.open("rb")),
+            patient=True,
             extra=headers,
         )
 
@@ -235,6 +254,12 @@ class MainClient:
         with self.http.stream("GET", f"/internal/worker/artifacts/{artifact_id}", headers=self.headers) as response:
             response.raise_for_status()
             store.put_stream(StreamReader(response.iter_bytes()), expected=artifact_id)
+
+
+def transient(error: httpx.HTTPError) -> bool:
+    if isinstance(error, httpx.HTTPStatusError):
+        return error.response.status_code >= 500
+    return isinstance(error, httpx.TransportError)
 
 
 def file_chunks(stream: BinaryIO) -> Iterator[bytes]:
@@ -283,6 +308,7 @@ class LineCollector:
         self.publisher = publisher
         self.parser = OutputParser()
         self.pending: list[dict[str, Any]] = []
+        self.unsent: list[dict[str, Any]] = []
         self.tail: list[str] = []
         self.lock = threading.Lock()
         self.thread = threading.Thread(target=self.pump, daemon=True)
@@ -360,19 +386,33 @@ class Worker:
         configure_logging()
         self.client.stop = stop
         try:
-            self.client.register()
-            self.prune_copies()
-            pruned = time.monotonic()
-            while not stop.is_set():
-                self.run_once(CLAIM_WAIT_SECONDS)
-                if time.monotonic() - pruned > PRUNE_SECONDS:
-                    self.prune_copies()
-                    pruned = time.monotonic()
+            self.keep_trying(stop)
         except MachineRemovedError as error:
             log.error("%s", error)
             stop.set()
         except WorkerStoppedError:
             return
+
+    def keep_trying(self, stop: threading.Event) -> None:
+        registered, pruned, delay = False, 0.0, 1.0
+        while not stop.is_set():
+            try:
+                if not registered:
+                    self.client.register()
+                    registered = True
+                if time.monotonic() - pruned > PRUNE_SECONDS:
+                    self.prune_copies()
+                    pruned = time.monotonic()
+                self.run_once(CLAIM_WAIT_SECONDS)
+                delay = 1.0
+            except LeaseLostError:
+                continue
+            except httpx.HTTPError as error:
+                if not transient(error):
+                    raise
+                log.warning("main is unreachable (%s); trying again in %.0f s", error, delay)
+                stop.wait(delay)
+                delay = min(delay * 2, MAX_BACKOFF_SECONDS)
 
     def run_once(self, wait: float = 0.0) -> bool:
         claim = self.client.claim(wait)
@@ -555,7 +595,7 @@ class Worker:
                 process.stdin.write(secrets)
         lines = LineCollector(process.stdout, log_path, publisher)
         cancelled = False
-        last_flush = time.monotonic()
+        last_flush, flush_every = time.monotonic(), FLUSH_SECONDS
         try:
             while process.poll() is None:
                 time.sleep(0.2)
@@ -565,8 +605,9 @@ class Worker:
                     cancelled = True
                     stop_group(process)
                 moment = time.monotonic()
-                if moment - last_flush >= FLUSH_SECONDS:
-                    self.flush(job_id, token, lines)
+                if moment - last_flush >= flush_every:
+                    sent = self.flush(job_id, token, lines)
+                    flush_every = FLUSH_SECONDS if sent else min(flush_every * 2, MAX_BACKOFF_SECONDS)
                     last_flush = moment
         except BaseException:
             stop_group(process)
@@ -575,10 +616,18 @@ class Worker:
         self.flush(job_id, token, lines, final=True)
         return process.returncode, cancelled, lines.tail
 
-    def flush(self, job_id: int, token: str, lines: LineCollector, final: bool = False) -> None:
-        events = lines.drain(final)
-        for start in range(0, len(events), 200):
-            self.client.events(job_id, token, events[start : start + 200])
+    def flush(self, job_id: int, token: str, lines: LineCollector, final: bool = False) -> bool:
+        lines.unsent += lines.drain(final)
+        while lines.unsent:
+            try:
+                self.client.events(job_id, token, lines.unsent[:EVENT_BATCH], final)
+            except httpx.HTTPError as error:
+                if not transient(error):
+                    raise
+                log.warning("main is unreachable; keeping %d events of job %s to send later", len(lines.unsent), job_id)
+                return False
+            del lines.unsent[:EVENT_BATCH]
+        return True
 
 
 def stop_group(process: subprocess.Popen[bytes]) -> None:

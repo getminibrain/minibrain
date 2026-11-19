@@ -3,12 +3,14 @@ import time
 from datetime import timedelta
 from typing import Any
 
+import httpx
 import pytest
 
 from minibrain import worker as worker_module
 from minibrain.jobs import queue as queue_module
 from minibrain.jobs.effects import DomainEffects
 from minibrain.registry.files import MissingArtifactError
+from minibrain.worker import MainClient, Worker
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
@@ -130,3 +132,67 @@ def test_orphaned_worker_stops_without_waiting_out_retries(harness: Harness) -> 
     stop.set()
     thread.join(timeout=5)
     assert not thread.is_alive() and time.monotonic() - started < 3
+
+
+class Outage:
+    def __init__(self, inner: Any, after_claim: bool = True) -> None:
+        self.inner = inner
+        self.after_claim = after_claim
+        self.down = threading.Event()
+        self.refused = 0
+
+    def request(self, method: str, url: str, **kwargs: Any) -> Any:
+        if self.down.is_set():
+            self.refused += 1
+            raise httpx.ConnectError("main is restarting")
+        response = self.inner.request(method, url, **kwargs)
+        if self.after_claim and url.endswith("/claim") and response.status_code == 200:
+            self.after_claim = False
+            self.down.set()
+        return response
+
+    def stream(self, *args: Any, **kwargs: Any) -> Any:
+        return self.inner.stream(*args, **kwargs)
+
+    def come_back_after(self, seconds: float) -> None:
+        threading.Timer(seconds, self.down.clear).start()
+
+
+def outage_worker(harness: Harness, outage: Outage) -> Worker:
+    config = harness.worker_config(["train"])
+    return Worker(config, client=MainClient(config, http=outage), modules=FAKE)
+
+
+def test_a_job_keeps_running_while_main_is_unreachable(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    queued_training(harness)
+    monkeypatch.setattr(worker_module, "RETRIES", 2)
+    monkeypatch.setattr(worker_module, "MAX_BACKOFF_SECONDS", 1.0)
+    monkeypatch.setenv("FAKE_JOB_SECONDS", "3")
+    outage = Outage(harness.client)
+    outage.come_back_after(5.0)
+    assert outage_worker(harness, outage).run_once()
+    job = train_job(harness)
+    assert outage.refused > 2
+    assert (job["status"], [attempt["outcome"] for attempt in job["attempts"]]) == ("succeeded", ["succeeded"])
+    assert "half way" in harness.client.get(f"/api/jobs/{job['id']}/events").text
+
+
+def test_the_worker_waits_for_main_instead_of_exiting(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    queued_training(harness)
+    monkeypatch.setattr(worker_module, "RETRIES", 2)
+    monkeypatch.setattr(worker_module, "MAX_BACKOFF_SECONDS", 1.0)
+    monkeypatch.setattr(worker_module, "CLAIM_WAIT_SECONDS", 0.2)
+    monkeypatch.setattr(worker_module, "configure_logging", lambda: None)
+    outage = Outage(harness.client, after_claim=False)
+    outage.down.set()
+    outage.come_back_after(4.0)
+    stop = threading.Event()
+    running = threading.Thread(target=outage_worker(harness, outage).run_forever, args=(stop,))
+    running.start()
+    deadline = time.monotonic() + 30
+    while train_job(harness)["status"] != "succeeded" and time.monotonic() < deadline:
+        assert running.is_alive()
+        time.sleep(0.2)
+    stop.set()
+    running.join(timeout=10)
+    assert train_job(harness)["status"] == "succeeded"
