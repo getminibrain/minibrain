@@ -10,8 +10,9 @@ import pytest
 import yaml
 from sqlalchemy import select
 
+from minibrain.api import connections as connections_api
 from minibrain.connections import vault
-from minibrain.connections.store import context
+from minibrain.connections.store import Resolved, context
 from minibrain.encryption import keys, secrets
 from minibrain.registry.models import AuditEvent, Connection
 from minibrain.settings import Settings
@@ -157,6 +158,38 @@ def test_endpoints_must_pass_the_network_policy(harness: Harness) -> None:
     assert saved["ok"] is False and "Offline" in saved["message"]
 
 
+def test_a_saved_secret_is_tested_only_against_its_saved_address(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    probed: list[tuple[str, str]] = []
+
+    def probe(connection: Resolved) -> str:
+        probed.append((connection.config.host, connection.secret))
+        return "reached"
+
+    monkeypatch.setattr(connections_api, "probe", probe)
+    saved = created(harness, POSTGRES)
+    draft = {key: value for key, value in POSTGRES.items() if key != "secret"} | {"id": saved["id"]}
+    elsewhere = harness.client.post("/api/connections/test", json=draft | {"host": "collector.example"}).json()
+    assert elsewhere["ok"] is False and "give the secret again" in elsewhere["message"] and probed == []
+    retyped = harness.client.post("/api/connections/test", json=draft | {"host": "collector.example", "secret": "new"})
+    assert retyped.json()["ok"] is True and probed == [("collector.example", "new")]
+    assert harness.client.post("/api/connections/test", json=draft | {"user": "other"}).json()["ok"] is True
+    assert harness.client.post(f"/api/connections/{saved['id']}/test").json()["ok"] is True
+    assert probed[1:] == [("db.internal", PASSWORD), ("db.internal", PASSWORD)]
+    with harness.sessions() as session:
+        query = select(AuditEvent).where(AuditEvent.action == "connection.test").order_by(AuditEvent.id)
+        events = list(session.scalars(query))
+    assert [(event.detail["ok"], event.detail["saved_secret"]) for event in events] == [
+        (False, True),
+        (True, False),
+        (True, True),
+        (True, True),
+    ]
+    assert all(event.target == f"connection:{saved['id']}" for event in events)
+    assert PASSWORD not in everything_said(harness)
+
+
 def write_config(path: Path, connections: list[dict]) -> None:
     path.write_text(yaml.safe_dump({"connections": connections}))
 
@@ -189,6 +222,8 @@ def test_config_connections_resolve_references_and_are_locked(
     changed = harness.client.put(f"/api/connections/{warehouse}", json=POSTGRES)
     assert changed.status_code == 409 and "minibrain.yaml" in changed.json()["detail"]
     assert harness.client.delete(f"/api/connections/{warehouse}").status_code == 409
+    draft = {key: value for key, value in POSTGRES.items() if key != "secret"} | {"id": warehouse}
+    assert harness.client.post("/api/connections/test", json=draft).status_code == 409
     monkeypatch.delenv("WAREHOUSE_PASSWORD")
     secret_file.unlink()
     gone = {item["name"]: item for item in harness.client.get("/api/connections").json()}

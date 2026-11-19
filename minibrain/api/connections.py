@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import cast
 
 from fastapi import APIRouter, Depends, Response
@@ -34,6 +35,7 @@ from minibrain.connections.store import (
     list_connections,
     locked,
     reference,
+    require_editable,
     resolve,
     secret_of,
     secret_problem,
@@ -44,10 +46,11 @@ from minibrain.data.remote import DATABASE, ICEBERG, S3_SOURCE, database_tables,
 from minibrain.data.shared import add_remote
 from minibrain.data.sources import SourceError
 from minibrain.policy import PolicyError
-from minibrain.registry.models import Connection
+from minibrain.registry.models import AuditEvent, Connection
 from minibrain.settings import Settings
 
 router = APIRouter(prefix="/api")
+TESTED = "connection.test"
 
 
 def body_config(body: ConnectionBody) -> ConnectionConfig:
@@ -115,33 +118,53 @@ def remove_connection(connection_id: int, session: SessionDep) -> None:
     session.commit()
 
 
+ONLY_SAVED_ADDRESS = "the saved secret goes only to {saved}; give the secret again to test {draft}"
+
+
 def draft_resolved(session: Session, settings: Settings, body: ConnectionTestBody) -> Resolved:
     name, config = clean_name(body.name), clean(body_config(body))
     check_policy(session, name, config)
     secret = (body.secret or "").strip()
     if not secret and body.id is not None:
-        secret = secret_of(settings, get_connection(session, body.id))
+        saved = get_connection(session, body.id)
+        require_editable(saved)
+        if config.address != config_of(saved).address:
+            raise ConnectionProblem(ONLY_SAVED_ADDRESS.format(saved=config_of(saved).summary, draft=config.summary))
+        secret = secret_of(settings, saved)
     if not secret:
         raise ConnectionProblem("give the secret to test with")
     return Resolved(id=body.id or 0, name=name, config=config, secret=secret)
 
 
-@router.post("/connections/test", dependencies=[Depends(admin)], summary="Test connection settings")
-def test_connection(body: ConnectionTestBody, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
+def tested(
+    session: Session, target: str, name: str, config: ConnectionConfig, check: ConnectionCheck, saved: bool
+) -> None:
+    detail = {"name": name, "kind": config.kind, "address": config.summary, "saved_secret": saved, "ok": check.ok}
+    session.add(AuditEvent(actor=current_actor(), action=TESTED, target=target, detail=detail))
+    session.commit()
+
+
+def checked(connection: Callable[[], Resolved]) -> ConnectionCheck:
     try:
-        return ConnectionCheck(ok=True, message=probe(draft_resolved(session, settings, body)))
+        return ConnectionCheck(ok=True, message=probe(connection()))
     except (SourceError, ConnectionProblem, PolicyError) as error:
         return ConnectionCheck(ok=False, message=str(error))
+
+
+@router.post("/connections/test", dependencies=[Depends(admin)], summary="Test connection settings")
+def test_connection(body: ConnectionTestBody, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
+    check = checked(lambda: draft_resolved(session, settings, body))
+    target = f"connection:{body.id}" if body.id is not None else "connection"
+    tested(session, target, body.name, body_config(body), check, not (body.secret or "").strip())
+    return check
 
 
 @router.post("/connections/{connection_id}/test", dependencies=[Depends(admin)], summary="Test a saved connection")
 def test_saved_connection(connection_id: int, session: SessionDep, settings: SettingsDep) -> ConnectionCheck:
-    try:
-        return ConnectionCheck(
-            ok=True, message=probe(resolve(session, settings, get_connection(session, connection_id)))
-        )
-    except (SourceError, ConnectionProblem, PolicyError) as error:
-        return ConnectionCheck(ok=False, message=str(error))
+    connection = get_connection(session, connection_id)
+    check = checked(lambda: resolve(session, settings, connection))
+    tested(session, f"connection:{connection.id}", connection.name, config_of(connection), check, True)
+    return check
 
 
 @router.get(

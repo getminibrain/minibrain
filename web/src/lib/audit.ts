@@ -32,10 +32,12 @@ export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 const ACTIONS: Record<string, string> = {
     "connection.create": "Connection created",
     "connection.delete": "Connection deleted",
+    "connection.test": "Connection tested",
     "connection.update": "Connection changed",
     "encryption.key": "Encryption key added",
     "encryption.retire": "Encryption key retired",
     "encryption.rotate": "Encryption key rotated",
+    "encryption.test": "Encryption key tested",
     "feedback.example": "Feedback added to test examples",
     "feedback.example_remove": "Test example removed",
     "job.delete": "Job deleted",

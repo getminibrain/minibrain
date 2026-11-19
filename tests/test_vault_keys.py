@@ -2,10 +2,12 @@ import io
 from collections.abc import Iterator
 
 import pytest
+from sqlalchemy import select
 
 from minibrain.encryption import envelope, keys, rekey, vault_transit
 from minibrain.encryption.envelope import HEADER
 from minibrain.registry.files import store_for
+from minibrain.registry.models import AuditEvent
 from tests.conftest import Harness
 from tests.fake_vault import ROLE_ID, ROLE_PROOF, ROOT, FakeVault
 
@@ -57,6 +59,25 @@ def test_a_switch_that_cannot_reach_vault_is_refused(harness: Harness, vault: Fa
     assert harness.client.get("/api/settings/encryption").json()["provider"] == "local"
     checked = harness.client.post("/api/settings/encryption/test", json={"values": VAULT}).json()
     assert checked["ok"] is False and "unreachable" in checked["message"]
+
+
+def test_a_test_signs_in_to_vault_only_at_the_saved_address_and_is_audited(harness: Harness, vault: FakeVault) -> None:
+    assert harness.client.post("/api/settings/encryption/test", json={"values": VAULT}).json()["ok"] is True
+    switch(harness, VAULT)
+    signed_in = len(vault.calls)
+    elsewhere = VAULT | {"vault_address": "https://collector.example:8200"}
+    refused = harness.client.post("/api/settings/encryption/test", json={"values": elsewhere}).json()
+    assert refused["ok"] is False and "saved address" in refused["message"] and len(vault.calls) == signed_in
+    assert harness.client.post("/api/settings/encryption/test", json={"values": VAULT}).json()["ok"] is True
+    with harness.sessions() as session:
+        query = select(AuditEvent).where(AuditEvent.action == "encryption.test").order_by(AuditEvent.id)
+        found = [(event.detail["values"]["vault_address"], event.detail["ok"]) for event in session.scalars(query)]
+        changes = session.scalars(select(AuditEvent).where(AuditEvent.action == "policy.update")).all()
+    assert found == [(ADDRESS, True), ("https://collector.example:8200", False), (ADDRESS, True)]
+    assert sorted((event.target, event.detail["to"]) for event in changes) == [
+        ("encryption", "vault"),
+        ("vault_address", ADDRESS),
+    ]
 
 
 def test_rotation_moves_every_file_to_the_new_transit_version(harness: Harness, vault: FakeVault) -> None:

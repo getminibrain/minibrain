@@ -29,6 +29,12 @@ from minibrain.settings import Settings
 router = APIRouter(prefix="/api/settings/encryption")
 
 PROVIDER_PREFIXES = ("vault_", "hsm_", "kms_")
+VAULT = "vault"
+VAULT_ADDRESS = "vault_address"
+TESTED = "encryption.test"
+UNSAVED_VAULT = (
+    "minibrain signs in to Vault only at the saved address; save {address} as the Vault address, then test it"
+)
 
 
 class EncryptionChoice(BaseModel):
@@ -222,22 +228,41 @@ def change_encryption(body: EncryptionUpdate, session: SessionDep, settings: Set
     return status(session, settings)
 
 
+def address_of(values: dict[str, Any]) -> str:
+    return str(values.get(VAULT_ADDRESS) or "").strip().rstrip("/")
+
+
+def key_check(session: Session, settings: Settings, values: dict[str, Any], actor: str) -> tuple[str, EncryptionCheck]:
+    saved = address_of(load_policy(session).values)
+    apply_values(session, values, actor)
+    found = dict(load_policy(session).values)
+    kind = str(found.get(POLICY))
+    if kind == OFF:
+        return kind, EncryptionCheck(ok=True, message="Encryption at rest is off, so there is no key to test")
+    if kind == VAULT and saved and address_of(found) != saved:
+        return kind, EncryptionCheck(ok=False, message=UNSAVED_VAULT.format(address=address_of(found)))
+    provider = build(settings, kind, found, records_of(session))
+    probe(provider)
+    return kind, EncryptionCheck(
+        ok=True, message=f"{LABELS.get(kind, kind)} wrapped and unwrapped a test key with {provider.current()}"
+    )
+
+
 @router.post("/test", dependencies=[Depends(admin)], summary="Test an encryption key")
 def test_encryption(body: EncryptionUpdate, session: SessionDep, settings: SettingsDep) -> EncryptionCheck:
+    actor = current_actor()
+    kind = str(body.values.get(POLICY) or load_policy(session)[POLICY])
     try:
-        apply_values(session, body.values, current_actor())
-        values = dict(load_policy(session).values)
-        kind = str(values.get(POLICY))
-        if kind == OFF:
-            return EncryptionCheck(ok=True, message="Encryption at rest is off, so there is no key to test")
-        provider = build(settings, kind, values, records_of(session))
-        probe(provider)
-        message = f"{LABELS.get(kind, kind)} wrapped and unwrapped a test key with {provider.current()}"
-        return EncryptionCheck(ok=True, message=message)
+        kind, check = key_check(session, settings, body.values, actor)
     except (EncryptionError, KeyUnavailableError, PolicyError) as error:
-        return EncryptionCheck(ok=False, message=str(error))
+        check = EncryptionCheck(ok=False, message=str(error))
     finally:
         session.rollback()
+    tried = {name: value for name, value in body.values.items() if is_encryption_field(name)}
+    detail = {"provider": kind, "values": tried, "ok": check.ok}
+    session.add(AuditEvent(actor=actor, action=TESTED, target="encryption", detail=detail))
+    session.commit()
+    return check
 
 
 @router.post("/tasks", dependencies=[Depends(admin)], summary="Start a re-encryption task")
