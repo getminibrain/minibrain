@@ -7,6 +7,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from sqlalchemy import Select, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.jobs.output import EVENT, STATE
@@ -116,43 +118,56 @@ def enqueue(
     base_model_id: str | None = None,
     pool: str | None = None,
 ) -> Job:
-    if idempotency_key is not None:
-        existing = session.scalar(
-            select(Job).where(
-                Job.idempotency_key == idempotency_key,
-                Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-            )
-        )
-        if existing is not None:
-            return existing
+    existing = active_with_key(session, idempotency_key) if idempotency_key is not None else None
+    if existing is not None:
+        return existing
     workload = workload_of_job(kind)
     if pool is not None and workload is not None:
         require(session, pool, workload)
     rules = policy(kind)
     owner = session.get(Model, model_id) if model_id is not None else None
     version = session.get(Version, version_id) if version_id is not None else None
-    job = Job(
-        kind=kind,
-        params=params,
-        model_id=model_id,
-        version_id=version_id,
-        base_model_id=base_model_id,
-        model_slug=owner.slug if owner else None,
-        model_name=owner.name if owner else None,
-        version_number=version.number if version else None,
-        base_model_key=base_model_id,
-        needs_gpu=rules.needs_gpu,
-        max_attempts=rules.max_attempts,
-        idempotency_key=idempotency_key,
-        priority=priority,
-        retry_of=retry_of,
-        pool=pool,
-        outputs={},
-    )
-    session.add(job)
-    session.flush()
+    values: dict[str, Any] = {
+        "kind": kind,
+        "params": params,
+        "model_id": model_id,
+        "version_id": version_id,
+        "base_model_id": base_model_id,
+        "model_slug": owner.slug if owner else None,
+        "model_name": owner.name if owner else None,
+        "version_number": version.number if version else None,
+        "base_model_key": base_model_id,
+        "needs_gpu": rules.needs_gpu,
+        "max_attempts": rules.max_attempts,
+        "idempotency_key": idempotency_key,
+        "priority": priority,
+        "retry_of": retry_of,
+        "pool": pool,
+        "outputs": {},
+    }
+    if idempotency_key is None:
+        job = Job(**values)
+        session.add(job)
+        session.flush()
+    else:
+        inserted = insert_once(session, values)
+        if inserted is None:
+            return taken_key(session, idempotency_key)
+        job = inserted
     add_state(session, job, "queued")
     return job
+
+
+def insert_once(session: Session, values: dict[str, Any]) -> Job | None:
+    build = postgresql_insert if session.get_bind().dialect.name == "postgresql" else sqlite_insert
+    return session.scalar(build(Job).values(values).on_conflict_do_nothing().returning(Job))
+
+
+def taken_key(session: Session, key: str) -> Job:
+    found = active_with_key(session, key)
+    if found is None:
+        raise JobStateError(f"another job took {key} and then finished")
+    return found
 
 
 def version_going(job: Job) -> bool:
@@ -195,6 +210,19 @@ def same_work_active(session: Session, job: Job) -> Job | None:
         return None
     query = select(Job).where(target, Job.kind == job.kind, Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]))
     return session.scalar(query.order_by(Job.id).limit(1))
+
+
+def retry_key(job: Job) -> str:
+    if job.version_id is not None:
+        return f"retry:{job.kind}:version:{job.version_id}"
+    if job.base_model_id is not None:
+        return f"retry:{job.kind}:base:{job.base_model_id}"
+    return f"retry:{job.id}"
+
+
+def active_with_key(session: Session, key: str) -> Job | None:
+    active = Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING])
+    return session.scalar(select(Job).where(Job.idempotency_key == key, active))
 
 
 def refuse_rerun(session: Session, job: Job) -> None:
@@ -455,11 +483,21 @@ class SqlJobQueue:
     def cancel(self, session: Session, job: Job) -> None:
         if job.status in TERMINAL:
             raise JobStateError(f"job {job.id} is already {job.status}")
-        if job.status == JobStatus.QUEUED:
+        stopped = session.execute(
+            update(Job)
+            .where(Job.id == job.id, Job.status == JobStatus.QUEUED)
+            .values(status=JobStatus.CANCELLED)
+            .returning(Job.id)
+            .execution_options(synchronize_session=False)
+        ).scalar()
+        session.refresh(job)
+        if stopped is not None:
             self.finish(session, job, JobStatus.CANCELLED)
-        else:
-            job.cancel_requested = True
-            add_state(session, job, "cancel requested", "warning")
+            return
+        if job.status in TERMINAL:
+            raise JobStateError(f"job {job.id} is already {job.status}")
+        job.cancel_requested = True
+        add_state(session, job, "cancel requested", "warning")
 
     def retry(self, session: Session, job: Job) -> Job:
         if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
@@ -472,6 +510,7 @@ class SqlJobQueue:
             dict(job.params),
             model_id=job.model_id,
             version_id=job.version_id,
+            idempotency_key=retry_key(job),
             priority=job.priority,
             retry_of=job.id,
             base_model_id=job.base_model_id,

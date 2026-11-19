@@ -3,13 +3,15 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import cast
 
+import pytest
 from fastapi import Request
-from sqlalchemy import event
+from sqlalchemy import event, select
 from sqlalchemy.dialects import postgresql
 
 from minibrain.api.jobs import events_after
+from minibrain.jobs import queue as queue_module
 from minibrain.jobs.policy import LEASE
-from minibrain.jobs.queue import WorkerInfo, enqueue, expirable
+from minibrain.jobs.queue import WorkerInfo, enqueue, expirable, insert_once
 from minibrain.registry.models import Job, JobKind, now
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset, finish
@@ -359,3 +361,44 @@ def test_job_lists_name_the_pool_a_job_ran_in(harness: Harness) -> None:
     listed = harness.client.get("/api/jobs").json()["items"][0]
     assert (listed["id"], listed["pool"]) == (claim["job_id"], "rack")
     assert job(harness, claim["job_id"])["pool"] == "rack"
+
+
+def test_a_cancel_that_loses_the_race_to_a_claim_asks_the_running_job_to_stop(harness: Harness) -> None:
+    lora_job(harness)
+    with harness.sessions() as session:
+        found = session.scalar(select(Job).where(Job.kind == JobKind.TRAIN))
+        assert found is not None and found.status == "queued"
+        claim = harness.claim(["train"])
+        assert claim is not None
+        harness.queue.cancel(session, found)
+        session.commit()
+        assert (found.status, found.cancel_requested, found.lease_token) == ("running", True, claim["token"])
+    beat = harness.internal(f"/jobs/{claim['job_id']}/heartbeat", {"token": claim["token"]})
+    assert beat.status_code == 200 and beat.json()["cancel"] is True
+    assert fail(harness, claim, "cancelled", retryable=False) == 204
+    assert job(harness, claim["job_id"])["status"] == "cancelled"
+
+
+def test_a_retry_racing_another_retry_gets_the_same_job(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    lora_job(harness)
+    claim = harness.claim(["train"])
+    assert claim is not None
+    fail(harness, claim, "bad", retryable=False)
+    monkeypatch.setattr(queue_module, "refuse_rerun", lambda session, job: None)
+    with harness.sessions() as one, harness.sessions() as two:
+        first = harness.queue.retry(one, one.get_one(Job, claim["job_id"]))
+        one.commit()
+        second = harness.queue.retry(two, two.get_one(Job, claim["job_id"]))
+        two.commit()
+        assert first.id == second.id
+        trains = two.scalars(select(Job.id).where(Job.kind == JobKind.TRAIN, Job.status == "queued")).all()
+        assert trains == [first.id]
+
+
+def test_an_idempotent_insert_that_meets_an_active_key_inserts_nothing(harness: Harness) -> None:
+    with harness.sessions() as session:
+        first = enqueue(session, JobKind.VERIFY, {}, idempotency_key="k")
+        session.commit()
+        assert insert_once(session, {"kind": JobKind.VERIFY, "params": {}, "idempotency_key": "k"}) is None
+        session.rollback()
+        assert session.scalars(select(Job.id).where(Job.idempotency_key == "k")).all() == [first.id]
