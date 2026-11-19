@@ -12,8 +12,8 @@ commands below use 3.12, which the Docker image runs.
 | [`uv tool install`](#uv-tool-install) | A `minibrain` command that stays installed |
 | [`pip` in a virtual environment](#pip-in-a-virtual-environment) | Machines without uv |
 
-Releases are on [GitHub Releases](https://github.com/offbeatport/minibrain/releases) (wheel, sdist, SBOMs,
-`SHA256SUMS`, the installer and a Sigstore bundle per file) and in GHCR (`ghcr.io/offbeatport/minibrain`); how they
+Releases are on [GitHub Releases](https://github.com/getminibrain/minibrain/releases) (wheel, sdist, SBOMs,
+`SHA256SUMS`, the installer and a Sigstore bundle per file) and in GHCR (`ghcr.io/getminibrain/minibrain`); how they
 are made: [`releasing.md`](releasing.md). minibrain is not on PyPI yet, so wherever a command below installs
 `minibrain`, pass the release wheel's URL instead (see [Install from GitHub Releases](#install-from-github-releases)).
 Before the first release, build the wheel from this repo with `mise run build` (or `uv build --wheel`; both need Node
@@ -35,7 +35,7 @@ download and the signature checks against a real release.
 ## Installer
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
 ```
 
 On Linux (x86_64 or arm64, glibc) and macOS (Apple silicon), it:
@@ -58,19 +58,19 @@ On Linux (x86_64 or arm64, glibc) and macOS (Apple silicon), it:
 Options go after `sh -s --`:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh -s -- --docker
-curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | MINIBRAIN_VERSION=0.1.0 sh
+curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh -s -- --docker
+curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | MINIBRAIN_VERSION=0.1.0 sh
 ```
 
 Each release also carries the `install.sh` it was made with, signed like its other files:
-`curl -LsSf https://github.com/offbeatport/minibrain/releases/download/v0.1.0/install.sh | MINIBRAIN_VERSION=0.1.0 sh`.
+`curl -LsSf https://github.com/getminibrain/minibrain/releases/download/v0.1.0/install.sh | MINIBRAIN_VERSION=0.1.0 sh`.
 To read it before it runs, download it and run `sh install.sh`. Run it again to upgrade; `uv tool uninstall minibrain`
 removes minibrain. On Windows, run it in WSL or use Docker Desktop.
 
 ## Run with Docker
 
 ```sh
-docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
+docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/getminibrain/minibrain
 ```
 
 On its first start it prints a one-time setup link, `http://127.0.0.1:8000/setup?token=…`: open it to create the admin
@@ -94,7 +94,7 @@ Every image is signed and carries its SBOM: [Verify a release](#verify-a-release
 On a Linux host with NVIDIA GPUs, a driver for CUDA 13.2 and the NVIDIA Container Toolkit, run the CUDA image:
 
 ```sh
-docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain:cuda
+docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/getminibrain/minibrain:cuda
 docker logs minibrain | grep setup
 ```
 
@@ -103,10 +103,10 @@ The production `docker run` is under [Docker → Run](#run) and the compose file
 ## Install from GitHub Releases
 
 Each release carries the wheel, with the web UI inside, and an sdist. Take the URL from the
-[release page](https://github.com/offbeatport/minibrain/releases); it has this form:
+[release page](https://github.com/getminibrain/minibrain/releases); it has this form:
 
 ```sh
-WHEEL=https://github.com/offbeatport/minibrain/releases/download/v0.1.0/minibrain-0.1.0-py3-none-any.whl
+WHEEL=https://github.com/getminibrain/minibrain/releases/download/v0.1.0/minibrain-0.1.0-py3-none-any.whl
 uv tool install --python 3.12 "$WHEEL"
 pipx install --python python3.12 "$WHEEL"
 pip install "$WHEEL"
@@ -118,7 +118,7 @@ Use one of them, `pip` inside a virtual environment (below). With extras, name t
 
 ```sh
 curl -fsSLO "$WHEEL"
-curl -fsSLO https://github.com/offbeatport/minibrain/releases/download/v0.1.0/SHA256SUMS
+curl -fsSLO https://github.com/getminibrain/minibrain/releases/download/v0.1.0/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
@@ -134,7 +134,7 @@ recorded in Sigstore's public transparency log
 
 | Flag | Value |
 |---|---|
-| `--certificate-identity` | `https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0` (the release's tag) |
+| `--certificate-identity` | `https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0` (the release's tag) |
 | `--certificate-oidc-issuer` | `https://token.actions.githubusercontent.com` |
 
 The commands use [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 (tested with 3.1.4) and
@@ -143,10 +143,10 @@ release 0.1.0.
 ### Files
 
 ```sh
-BASE=https://github.com/offbeatport/minibrain/releases/download/v0.1.0
+BASE=https://github.com/getminibrain/minibrain/releases/download/v0.1.0
 curl -fsSL -O "$BASE/SHA256SUMS" -O "$BASE/SHA256SUMS.sigstore.json" -O "$BASE/minibrain-0.1.0-py3-none-any.whl"
 cosign verify-blob --bundle SHA256SUMS.sigstore.json \
-  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 ```
@@ -159,17 +159,17 @@ minibrain-0.1.0-py3-none-any.whl.sigstore.json <same flags> minibrain-0.1.0-py3-
 
 ```sh
 cosign verify \
-  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/offbeatport/minibrain:0.1.0
+  --certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/getminibrain/minibrain:0.1.0
 cosign verify-attestation --type cyclonedx \
-  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/offbeatport/minibrain:0.1.0 > /dev/null
+  --certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com ghcr.io/getminibrain/minibrain:0.1.0 > /dev/null
 ```
 
 - Each index (`0.1.0`, `0.1.0-cuda`) and each per-architecture image is signed, so verifying the digest you run
-  works too: `ghcr.io/offbeatport/minibrain@sha256:…`.
+  works too: `ghcr.io/getminibrain/minibrain@sha256:…`.
 - `latest` and `cuda` move between releases: match any release tag with
-  `--certificate-identity-regexp '^https://github\.com/offbeatport/minibrain/\.github/workflows/release\.yml@refs/tags/v'`
+  `--certificate-identity-regexp '^https://github\.com/getminibrain/minibrain/\.github/workflows/release\.yml@refs/tags/v'`
   in place of `--certificate-identity`.
 - The SBOM attestations: the Python and web SBOMs on each index, the image's own SBOM (operating system packages
   included) on each per-architecture image. The same SBOMs are release files.
@@ -179,8 +179,8 @@ cosign verify-attestation --type cyclonedx \
 GitHub's attestations record the commit and the workflow run that built each file and image (SLSA build provenance):
 
 ```sh
-gh attestation verify minibrain-0.1.0-py3-none-any.whl --repo offbeatport/minibrain
-gh attestation verify oci://ghcr.io/offbeatport/minibrain:0.1.0 --repo offbeatport/minibrain
+gh attestation verify minibrain-0.1.0-py3-none-any.whl --repo getminibrain/minibrain
+gh attestation verify oci://ghcr.io/getminibrain/minibrain:0.1.0 --repo getminibrain/minibrain
 ```
 
 ### Offline
@@ -199,7 +199,7 @@ it across with the files and their bundles, then add `--trusted-root` to any com
 
 ```sh
 cosign verify-blob --bundle SHA256SUMS.sigstore.json --trusted-root trusted_root.json \
-  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
 ```
 
@@ -207,9 +207,9 @@ Images: save the image with its signatures and attestations on the connected mac
 other side, then load it into the internal registry, where `cosign verify --trusted-root trusted_root.json` works too:
 
 ```sh
-cosign save --dir minibrain-0.1.0 ghcr.io/offbeatport/minibrain:0.1.0
+cosign save --dir minibrain-0.1.0 ghcr.io/getminibrain/minibrain:0.1.0
 cosign verify --local-image --trusted-root trusted_root.json \
-  --certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.1.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com minibrain-0.1.0
 cosign load --dir minibrain-0.1.0 registry.internal/minibrain:0.1.0
 ```
@@ -370,7 +370,7 @@ docker run -d --name minibrain --restart unless-stopped --stop-timeout 30 \
   -p 127.0.0.1:8000:8000 \
   -v minibrain-data:/data \
   -v /srv/models:/models:ro \
-  ghcr.io/offbeatport/minibrain:cuda
+  ghcr.io/getminibrain/minibrain:cuda
 ```
 
 The setup link for the first admin is in the container log: `docker logs minibrain | grep setup`
@@ -380,7 +380,7 @@ The setup link for the first admin is in the container log: `docker logs minibra
 - `/data` is `MINIBRAIN_HOME` and a volume. A bind mount must be writable by uid 1000:
   `sudo chown -R 1000:1000 /srv/minibrain-data`.
 - PID 1 is `tini`. The entrypoint is `minibrain` and the default command is `serve --host 0.0.0.0 --port 8000`, so
-  `docker run --rm ghcr.io/offbeatport/minibrain:cuda extensions` runs another command and `docker exec minibrain minibrain extensions`
+  `docker run --rm ghcr.io/getminibrain/minibrain:cuda extensions` runs another command and `docker exec minibrain minibrain extensions`
   runs one in a running container.
 - `--shm-size` gives PyTorch shared memory for data loading; Docker's default of 64 MB is too small.
 - `--stop-timeout 30` gives main time to finish open requests on `docker stop`; it can take about 25 seconds, and
@@ -446,7 +446,7 @@ and what delta bundles: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
 ### Compose
 
-[`compose.yaml`](../compose.yaml) runs one service on an NVIDIA host from `ghcr.io/offbeatport/minibrain:cuda`: all
+[`compose.yaml`](../compose.yaml) runs one service on an NVIDIA host from `ghcr.io/getminibrain/minibrain:cuda`: all
 GPUs reserved, the port on `127.0.0.1`, data in the `minibrain-data` volume and `./models` mounted read-only at
 `/models`.
 
@@ -456,7 +456,7 @@ docker compose logs minibrain | grep setup
 ```
 
 Put overrides in a `.env` file next to it: `MINIBRAIN_DATABASE_URL`, `MINIBRAIN_MODELS_DIR` (the host folder for
-`/models`), `MINIBRAIN_IMAGE` (the image, such as `ghcr.io/offbeatport/minibrain:0.1.0-cuda` to pin a release).
+`/models`), `MINIBRAIN_IMAGE` (the image, such as `ghcr.io/getminibrain/minibrain:0.1.0-cuda` to pin a release).
 
 The file keeps its `build:` section for local builds. `docker compose up -d --build` builds the image from the checkout
 and tags it as `MINIBRAIN_IMAGE`, so set `MINIBRAIN_IMAGE=minibrain:cuda` with it, to keep a local build apart from the
@@ -514,7 +514,7 @@ docker run -d --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data \
   -e MINIBRAIN_ADMIN_EMAIL=admin@example.com \
   -e MINIBRAIN_ADMIN_PASSWORD_FILE=/run/secrets/admin_password \
   -v "$PWD/admin_password.txt:/run/secrets/admin_password:ro" \
-  ghcr.io/offbeatport/minibrain
+  ghcr.io/getminibrain/minibrain
 ```
 
 On Kubernetes, mount a Secret as a volume and point `MINIBRAIN_ADMIN_PASSWORD_FILE` at the file. With single sign-on
@@ -534,8 +534,8 @@ load it on the target. Pull with `--platform linux/arm64` when the target's arch
 registry, `cosign save` and `cosign load` carry the signatures across too ([Offline](#offline)).
 
 ```sh
-docker pull ghcr.io/offbeatport/minibrain:0.1.0-cuda
-docker save ghcr.io/offbeatport/minibrain:0.1.0-cuda | gzip > minibrain-0.1.0-cuda.tar.gz
+docker pull ghcr.io/getminibrain/minibrain:0.1.0-cuda
+docker save ghcr.io/getminibrain/minibrain:0.1.0-cuda | gzip > minibrain-0.1.0-cuda.tar.gz
 docker load -i minibrain-0.1.0-cuda.tar.gz
 ```
 
@@ -720,7 +720,7 @@ Docker, with a backup of the volume on the way:
 
 ```sh
 docker stop minibrain
-docker run --rm --user 0 --entrypoint tar -v minibrain-data:/data -v "$PWD":/backup ghcr.io/offbeatport/minibrain:cuda \
+docker run --rm --user 0 --entrypoint tar -v minibrain-data:/data -v "$PWD":/backup ghcr.io/getminibrain/minibrain:cuda \
   czf /backup/minibrain-data.tgz -C /data .
 docker rm minibrain
 ```

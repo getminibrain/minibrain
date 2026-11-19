@@ -110,5 +110,5 @@ ARG COMMIT=""
 LABEL org.opencontainers.image.title="minibrain" \
       org.opencontainers.image.description="Private platform for small, task-specific models" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/offbeatport/minibrain" \
+      org.opencontainers.image.source="https://github.com/getminibrain/minibrain" \
       org.opencontainers.image.revision="${COMMIT}"

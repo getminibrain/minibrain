@@ -58,7 +58,7 @@ def test_notes_list_breaking_changes_first_and_link_the_comparison() -> None:
         Change("b2", BREAKING, "api", "drop /api/v0"),
         Change("c3", "Features", None, "release workflow"),
     ]
-    notes = render(found, version="0.2.0", since="v0.1.0", repo="offbeatport/minibrain", image="ghcr.io/o/minibrain")
+    notes = render(found, version="0.2.0", since="v0.1.0", repo="getminibrain/minibrain", image="ghcr.io/o/minibrain")
     sections = [line for line in notes.splitlines() if line.startswith("### ")]
     assert sections == ["### Breaking changes", "### Features", "### Fixes"]
     assert "- **api:** drop /api/v0 (b2)" in notes
@@ -67,10 +67,10 @@ def test_notes_list_breaking_changes_first_and_link_the_comparison() -> None:
     assert "`ghcr.io/o/minibrain:0.2.0-cuda`" in notes
     assert "releases/download/v0.2.0/install.sh | MINIBRAIN_VERSION=0.2.0 sh" in notes
     identity = (
-        "--certificate-identity https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v0.2.0"
+        "--certificate-identity https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v0.2.0"
     )
     assert f"cosign verify {identity} --certificate-oidc-issuer https://token.actions.githubusercontent.com" in notes
-    assert notes.rstrip().endswith("https://github.com/offbeatport/minibrain/compare/v0.1.0...v0.2.0")
+    assert notes.rstrip().endswith("https://github.com/getminibrain/minibrain/compare/v0.1.0...v0.2.0")
 
 
 def test_a_first_release_lists_every_commit_without_a_comparison() -> None:

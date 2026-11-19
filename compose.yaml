@@ -1,6 +1,6 @@
 services:
   minibrain:
-    image: ${MINIBRAIN_IMAGE:-ghcr.io/offbeatport/minibrain:cuda}
+    image: ${MINIBRAIN_IMAGE:-ghcr.io/getminibrain/minibrain:cuda}
     build:
       context: .
       args:

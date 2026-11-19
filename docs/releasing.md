@@ -60,7 +60,7 @@ GitHub Release `v0.1.0`, with notes and these files:
 | `<file>.sigstore.json` | One Sigstore bundle per file above, `SHA256SUMS` included: signature, certificate and transparency log proof, for `cosign verify-blob` online or offline |
 | `minibrain-provenance.sigstore.json` | SLSA build provenance for every file above, from `actions/attest` |
 
-Images in `ghcr.io/offbeatport/minibrain`, each a multi-arch index for linux/amd64 and linux/arm64:
+Images in `ghcr.io/getminibrain/minibrain`, each a multi-arch index for linux/amd64 and linux/arm64:
 
 | Tag | Image |
 |---|---|
@@ -108,7 +108,7 @@ release: same files, same `build.json` commit and build time. Everything else co
 
 ### Runner disk and build cache
 
-Measured on the first dry run ([run 41705098920](https://github.com/offbeatport/minibrain/actions/runs/41705098920),
+Measured on the first dry run ([run 41705098920](https://github.com/getminibrain/minibrain/actions/runs/41705098920),
 2026-11-03): the standard hosted runners have a 145 GB root disk with about 86 GB (`ubuntu-24.04`) and 107 GB
 (`ubuntu-24.04-arm`) free when a job starts. A CUDA build uses about 18 GB of it and a CPU build about 5 GB, so the
 image jobs free no space and need no larger runners. Each one prints `df -h /` at the end, to show if that changes.
@@ -121,7 +121,7 @@ image jobs free no space and need no larger runners. Each one prints `df -h /` a
 The image SBOM comes after the build in the same job: loading the image into Docker (all cached) and scanning it
 with syft take about 30 seconds each for a CPU image and 1.5 minutes each for a CUDA one, and each SBOM is about
 3 MB (about 4,200 components, 1,230 to 1,280 of them packages). The CUDA amd64 job ends with 62 GB free, measured on
-the dry run with signing ([run 41738301352](https://github.com/offbeatport/minibrain/actions/runs/41738301352)).
+the dry run with signing ([run 41738301352](https://github.com/getminibrain/minibrain/actions/runs/41738301352)).
 
 The whole run takes about 15 minutes, half of it CI. The images use no exported layer cache:
 
@@ -157,7 +157,7 @@ is stored anywhere. Steps for the account owner:
    | Field | Value |
    |---|---|
    | PyPI Project Name | `minibrain` |
-   | Owner | `offbeatport` |
+   | Owner | `getminibrain` |
    | Repository name | `minibrain` |
    | Workflow name | `release.yml` |
    | Environment name | `pypi` |
@@ -206,7 +206,7 @@ identity is the workflow file at the tag, which is what a verifier checks:
 
 | Field | Value |
 |---|---|
-| Identity (certificate SAN) | `https://github.com/offbeatport/minibrain/.github/workflows/release.yml@refs/tags/v<version>` |
+| Identity (certificate SAN) | `https://github.com/getminibrain/minibrain/.github/workflows/release.yml@refs/tags/v<version>` |
 | OIDC issuer | `https://token.actions.githubusercontent.com` |
 
 | Subject | Made with | Stored |

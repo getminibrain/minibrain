@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-repo="offbeatport/minibrain"
+repo="getminibrain/minibrain"
 python_version="3.12"
 issuer="https://token.actions.githubusercontent.com"
 workflow="https://github.com/${repo}/.github/workflows/release.yml"
-workflow_pattern="^https://github\\.com/offbeatport/minibrain/\\.github/workflows/release\\.yml@refs/tags/v[0-9]"
+workflow_pattern="^https://github\\.com/getminibrain/minibrain/\\.github/workflows/release\\.yml@refs/tags/v[0-9]"
 uv_installer="https://astral.sh/uv/install.sh"
 
 mode=native

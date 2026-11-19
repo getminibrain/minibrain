@@ -13,7 +13,7 @@ release on Linux or macOS (Apple silicon) with uv, checking its checksum and, wh
 `sh -s -- --docker` pulls the Docker image instead:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/offbeatport/minibrain/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
 minibrain serve
 ```
 
@@ -24,14 +24,14 @@ uvx --python 3.12 minibrain serve
 ```
 
 `uv tool install minibrain` or `pip install minibrain`, then `minibrain serve`, work too. minibrain is not on PyPI yet:
-until it is, pass the wheel from [GitHub Releases](https://github.com/offbeatport/minibrain/releases) instead of
+until it is, pass the wheel from [GitHub Releases](https://github.com/getminibrain/minibrain/releases) instead of
 `minibrain`, or, before the first release, build it from this repo (see Develop) and run it with
 `uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve`. With Docker, the CPU image, or the
 CUDA one on a Linux host with NVIDIA GPUs:
 
 ```sh
-docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain
-docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/offbeatport/minibrain:cuda
+docker run --name minibrain -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/getminibrain/minibrain
+docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -v minibrain-data:/data ghcr.io/getminibrain/minibrain:cuda
 ```
 
 Every release file and image is signed keyless with Sigstore; the checks, online and offline, are in
