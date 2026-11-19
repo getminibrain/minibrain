@@ -159,6 +159,10 @@ class ArtifactStore:
     def local(self, artifact_id: str) -> bool:
         return self.path(artifact_id).is_file()
 
+    def local_ids(self) -> set[str]:
+        stored = {path.name for path in self.root.glob("*/*") if is_artifact_id(path.name)}
+        return stored | {path.name for path in self.cache.glob("*") if is_artifact_id(path.name)}
+
     def has(self, artifact_id: str) -> bool:
         return self.local(artifact_id) or (self.remote is not None and self.remote.has(artifact_id))
 

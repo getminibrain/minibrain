@@ -11,7 +11,7 @@ from anyio import to_thread
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from minibrain.api.bases import BaseWeights, LiveBases, live
@@ -368,6 +368,24 @@ def download_artifact(
     if not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")
+
+
+class Leftovers(pydantic.BaseModel):
+    jobs: list[int] = Field(default_factory=list, max_length=10_000)
+    artifacts: list[str] = Field(default_factory=list, max_length=10_000)
+
+
+def active_jobs(session: Session, pool: str) -> list[Job]:
+    active = Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING])
+    return list(session.scalars(select(Job).where(active, or_(Job.pool.is_(None), Job.pool == pool))))
+
+
+@router.post("/kept")
+def kept(body: Leftovers, session: SessionDep, caller: WorkerCaller) -> Leftovers:
+    jobs = active_jobs(session, caller.pool)
+    needs = {value for job in jobs for value in strings(job.params)}
+    running = sorted(job.id for job in jobs if job.id in set(body.jobs))
+    return Leftovers(jobs=running, artifacts=sorted(set(body.artifacts) & needs))
 
 
 class StoredFiles(pydantic.BaseModel):

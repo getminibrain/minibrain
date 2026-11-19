@@ -20,9 +20,10 @@ from typing import IO, Any, BinaryIO, Protocol
 
 import httpx
 
-from minibrain.artifacts import CHUNK, ArtifactStore, Packing, StreamReader
+from minibrain.artifacts import CHUNK, ArtifactStore, Packing, Stored, StreamReader
 from minibrain.jobs.device_time import device_time
 from minibrain.jobs.output import OutputParser, structured
+from minibrain.jobs.retention import JOB_FOLDER
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
 from minibrain.models.hardware import LOCAL_POOL
@@ -53,6 +54,7 @@ LOCAL_KINDS = list(MODULES)
 HEARTBEAT_SECONDS = 15.0
 FLUSH_SECONDS = 1.0
 MAX_BACKOFF_SECONDS = 30.0
+MAX_LEFTOVERS = 10_000
 EVENT_BATCH = 200
 CLAIM_WAIT_SECONDS = 25.0
 RETRIES = 6
@@ -245,6 +247,11 @@ class MainClient:
     def bases(self, key: str) -> dict[str, Any]:
         return dict(self.call("GET", f"/internal/worker/bases/{key}").json())
 
+    def kept(self, jobs: list[int], artifacts: list[str]) -> tuple[set[int], set[str]]:
+        body = {"jobs": jobs[:MAX_LEFTOVERS], "artifacts": artifacts[:MAX_LEFTOVERS]}
+        found = self.call("POST", "/internal/worker/kept", json=body).json()
+        return set(found["jobs"]), set(found["artifacts"])
+
     def live_bases(self) -> dict[str, str | None]:
         return dict(self.call("GET", "/internal/worker/bases").json()["bases"])
 
@@ -402,6 +409,7 @@ class Worker:
                     registered = True
                 if time.monotonic() - pruned > PRUNE_SECONDS:
                     self.prune_copies()
+                    self.prune_leftovers()
                     pruned = time.monotonic()
                 self.run_once(CLAIM_WAIT_SECONDS)
                 delay = 1.0
@@ -419,7 +427,27 @@ class Worker:
         if claim is None:
             return False
         self.run(claim)
+        self.prune_leftovers()
         return True
+
+    def job_folders(self) -> dict[int, Path]:
+        root = self.config.home / "work"
+        found = (JOB_FOLDER.match(entry.name) for entry in root.iterdir()) if root.is_dir() else ()
+        return {int(match.group(1)): root / match.group(0) for match in found if match is not None}
+
+    def prune_leftovers(self) -> None:
+        folders, artifacts = self.job_folders(), self.store.local_ids()
+        if not folders and not artifacts:
+            return
+        try:
+            jobs, needed = self.client.kept(sorted(folders), sorted(artifacts))
+        except Exception:
+            log.warning("could not check this worker's job files against main")
+            return
+        for job_id in folders.keys() - jobs:
+            shutil.rmtree(folders[job_id], ignore_errors=True)
+        for artifact_id in artifacts - needed:
+            self.store.delete(artifact_id)
 
     def prune_copies(self) -> None:
         if not self.config.prune:
@@ -504,25 +532,27 @@ class Worker:
 
     def outputs(self, claim: dict[str, Any], attempt_dir: Path) -> dict[str, str]:
         if claim["kind"] == JobKind.TRAIN:
-            stored = self.store.put_dir(attempt_dir / "out")
-            return {"adapter": self.client.upload(self.store, stored.id, "adapter", Packing.TAR, "adapter")}
+            adapter = self.store.put_dir(attempt_dir / "out")
+            return {"adapter": self.hand_over(adapter, "adapter", Packing.TAR, "adapter")}
         if claim["kind"] == JobKind.EXPORT:
             return {EXPORTED: self.export(attempt_dir / "out", str(claim["params"]["name"]))}
         return {}
 
+    def hand_over(self, stored: Stored, kind: str, packing: str, name: str) -> str:
+        try:
+            return self.client.upload(self.store, stored.id, kind, packing, name)
+        finally:
+            self.store.delete(stored.id)
+
     def export(self, folder: Path, name: str) -> str:
         stored = self.store.put_dir(folder)
         shutil.rmtree(folder, ignore_errors=True)
-        try:
-            return self.client.upload(self.store, stored.id, EXPORTED, Packing.TAR, name)
-        finally:
-            self.store.delete(stored.id)
+        return self.hand_over(stored, EXPORTED, Packing.TAR, name)
 
     def upload_log(self, log_path: Path) -> str | None:
         if not log_path.exists():
             return None
-        stored = self.store.put_file(log_path)
-        return self.client.upload(self.store, stored.id, "log", Packing.FILE, "log.txt")
+        return self.hand_over(self.store.put_file(log_path), "log", Packing.FILE, "log.txt")
 
     def run(self, claim: dict[str, Any]) -> None:
         job_id, token, kind = claim["job_id"], claim["token"], claim["kind"]
@@ -566,6 +596,7 @@ class Worker:
         finally:
             self.client.hold(None)
             lease.end()
+            shutil.rmtree(attempt_dir, ignore_errors=True)
 
     def supervise(
         self,

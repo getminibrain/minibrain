@@ -5,11 +5,13 @@ from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from minibrain import worker as worker_module
 from minibrain.jobs import queue as queue_module
 from minibrain.jobs.effects import DomainEffects
 from minibrain.registry.files import MissingArtifactError
+from minibrain.registry.models import Job
 from minibrain.worker import MainClient, Worker
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
@@ -196,3 +198,32 @@ def test_the_worker_waits_for_main_instead_of_exiting(harness: Harness, monkeypa
     stop.set()
     running.join(timeout=10)
     assert train_job(harness)["status"] == "succeeded"
+
+
+def worker_files(harness: Harness) -> list[str]:
+    root = harness.settings.home / "worker"
+    kept = ("artifacts", "cache", "work")
+    return sorted(
+        str(path.relative_to(root))
+        for path in root.rglob("*")
+        if path.is_file() and path.parts[-1] != ".complete" and path.relative_to(root).parts[0] in kept
+    )
+
+
+def test_a_worker_keeps_only_what_queued_or_running_jobs_still_need(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    queued_training(harness)
+    assert harness.worker(kinds=["train"], modules=FAKE).run_once()
+    with harness.sessions() as session:
+        evaluation = session.scalars(select(Job).where(Job.kind == "eval")).one()
+        dataset, adapter = evaluation.params["dataset_version"]["id"], evaluation.params["adapter"]["id"]
+    leftovers = worker_files(harness)
+    assert leftovers and all(dataset in name or adapter in name for name in leftovers)
+    assert any(name.startswith("cache/") for name in leftovers)
+    assert harness.worker(kinds=["eval"], modules=FAKE).run_once()
+    assert worker_files(harness) == []
+    monkeypatch.setenv("FAKE_JOB_EXIT", "2")
+    add_version(harness, "lora")
+    harness.worker(kinds=["train"], modules=FAKE).run_once()
+    assert worker_files(harness) == []
