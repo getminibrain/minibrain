@@ -3,9 +3,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from httpx2 import Response
+from sqlalchemy import select, update
 
 from minibrain.auth.roles import Role
-from minibrain.registry.models import ApiKey, AuditEvent
+from minibrain.registry.models import ApiKey, AuditEvent, User
 from tests.conftest import Harness
 from tests.test_accounts import csrf
 from tests.test_flow import SLUG, add_key, create_on_data, create_with_dataset, deploy, finish
@@ -192,3 +193,29 @@ def test_keys_take_an_expiry_within_the_policy(harness: Harness, tmp_path: Path)
     assert harness.client.get("/api/keys/expiry").json() == {"max_days": 30}
     late = harness.client.post("/api/keys", json={"name": "late", "models": custom, "expires_in_days": 90})
     assert late.status_code == 422
+
+
+def test_turning_an_account_off_revokes_its_keys(harness: Harness, tmp_path: Path) -> None:
+    two_models(harness, tmp_path)
+    kept = headers(add_key(harness, BASE, name="admins"))
+    body = {"name": "builders", "models": [{"kind": "base", "key": "base-one"}]}
+    builder = harness.person(Role.BUILDER)
+    theirs = headers(builder.post("/api/keys", json=body, headers=csrf(builder)).json())
+    other = harness.person(Role.BUILDER, "other@example.com")
+    stray = headers(other.post("/api/keys", json=body | {"name": "others"}, headers=csrf(other)).json())
+    assert harness.client.post("/v1/chat/completions", headers=theirs, json=chat("base-one")).status_code == 200
+    with harness.sessions() as session:
+        ids = {user.email: user.id for user in session.scalars(select(User))}
+    off = harness.client.patch(f"/api/accounts/{ids['builder@example.com']}", json={"disabled": True})
+    assert off.status_code == 200
+    assert harness.client.post("/v1/chat/completions", headers=theirs, json=chat("base-one")).status_code == 401
+    assert harness.client.post("/v1/chat/completions", headers=kept, json=chat("base-one")).status_code == 200
+    with harness.sessions() as session:
+        revoked = session.scalars(select(AuditEvent).where(AuditEvent.action == "key.revoke")).all()
+        assert [(event.detail["name"], event.detail["reason"]) for event in revoked] == [
+            ("builders", "its creator's account was turned off")
+        ]
+        session.execute(update(User).where(User.id == ids["other@example.com"]).values(disabled=True))
+        session.commit()
+    harness.app.state.gateway_config.rebuild()
+    assert harness.client.post("/v1/chat/completions", headers=stray, json=chat("base-one")).status_code == 401

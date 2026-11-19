@@ -621,7 +621,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Create the first admin by one-time link, environment or SSO.
   API: POST /api/auth/setup · CLI: minibrain admin setup-link, minibrain admin create · Config: auth.admins, MINIBRAIN_ADMIN_EMAIL, MINIBRAIN_ADMIN_PASSWORD_FILE
 - **Accounts** · shipped · admin
-  Invite people, set roles, disable accounts and reset passwords.
+  Invite people, set roles, reset passwords; turning one off revokes its keys.
   UI: Settings › Accounts · API: GET /api/accounts, POST /api/accounts, PATCH /api/accounts/{account_id}, POST /api/accounts/{account_id}/password-link, POST /api/auth/reset · CLI: minibrain admin reset-password
 - **Roles** · shipped · admin
   Viewer, Builder and Admin, enforced per route, mapped from groups.

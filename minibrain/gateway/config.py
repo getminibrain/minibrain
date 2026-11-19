@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from sqlalchemy import select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.artifacts import ArtifactStore
@@ -32,6 +32,7 @@ from minibrain.registry.models import (
     ReservedName,
     Teardown,
     TeardownKind,
+    User,
     VersionKind,
     VersionStatus,
 )
@@ -270,7 +271,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
             expires_at=key.expires_at.isoformat() if key.expires_at else None,
             all_models=key.all_models,
         )
-        for key in session.scalars(select(ApiKey))
+        for key in session.scalars(live_keys())
     }
     config = GatewayConfig(
         version="",
@@ -286,6 +287,11 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         stopping=stopping,
     )
     return replace(config, version=hash_of(config.to_json()))
+
+
+def live_keys() -> Select[ApiKey]:
+    creator = select(User.id).where(User.id == ApiKey.created_by_id, User.disabled.is_(True))
+    return select(ApiKey).where(or_(ApiKey.created_by_id.is_(None), ~creator.exists()))
 
 
 def registered_replicas(session: Session, specs: dict[str, BaseModelSpec]) -> Replicas:

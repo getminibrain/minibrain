@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from minibrain import policy
 from minibrain.api.access import admin
 from minibrain.api.deps import SessionDep
+from minibrain.api.keys import revoke_keys_of
 from minibrain.auth.accounts import (
     LOCAL,
     AccountError,
@@ -189,6 +190,7 @@ def change_disabled(session: Session, user: User, disabled: bool) -> tuple[Any, 
     user.disabled = disabled
     if disabled:
         end_sessions(session, user)
+        revoke_keys_of(session, user.id)
     return not disabled, disabled
 
 

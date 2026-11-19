@@ -22,6 +22,7 @@ from minibrain.registry.service import (
 router = APIRouter(prefix="/api/keys")
 
 ALL_MODELS_NEEDS_ADMIN = f"A key for all models needs the {LABELS[Role.ADMIN]} role"
+OWNER_TURNED_OFF = "its creator's account was turned off"
 
 
 def resolve(session: Session, refs: list[ModelRef]) -> tuple[list[Model], list[str]]:
@@ -85,10 +86,18 @@ def get_key(session: Session, key_id: int) -> ApiKey:
     return key
 
 
-def audit(session: Session, action: str, key: ApiKey) -> None:
+def audit(session: Session, action: str, key: ApiKey, **extra: str) -> None:
     models = [model.key for model in key_info(session, key).models]
-    detail = {"name": key.name, "scope": "all" if key.all_models else "models", "models": models}
+    detail = {"name": key.name, "scope": "all" if key.all_models else "models", "models": models} | extra
     session.add(AuditEvent(actor=current_actor(), action=action, target=key.prefix, detail=detail))
+
+
+def revoke_keys_of(session: Session, user_id: int) -> int:
+    found = list(session.scalars(select(ApiKey).where(ApiKey.created_by_id == user_id)))
+    for key in found:
+        audit(session, "key.revoke", key, reason=OWNER_TURNED_OFF)
+        session.delete(key)
+    return len(found)
 
 
 def expiry_days(session: Session, wanted: int | None) -> int | None:
