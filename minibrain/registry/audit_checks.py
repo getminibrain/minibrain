@@ -10,6 +10,8 @@ from minibrain.registry.audit_chain import HEAD, ChainBreak, ChainReport, Sealed
 from minibrain.registry.models import SYSTEM_ACTOR, AuditChain, AuditChainBreak, AuditEvent, now
 
 BROKEN_ACTION = "audit.chain_broken"
+FULL = "full"
+HOURLY = "hourly"
 FULL_HOUR = 3
 FULL_AFTER = timedelta(hours=12)
 FULL_LATEST = timedelta(hours=36)
@@ -32,28 +34,47 @@ def full_due(last: datetime | None, moment: datetime) -> bool:
 
 
 def known(session: Session, broken: ChainBreak) -> bool:
-    query = select(AuditChainBreak.id).where(AuditChainBreak.seq == broken.seq, AuditChainBreak.reason == broken.reason)
+    query = select(AuditChainBreak.id).where(
+        AuditChainBreak.seq == broken.seq,
+        AuditChainBreak.reason == broken.reason,
+        AuditChainBreak.fingerprint == broken.fingerprint,
+    )
     return session.scalar(query.limit(1)) is not None
 
 
-def record_break(session: Session, broken: ChainBreak, full: bool) -> None:
-    found_by = "full" if full else "hourly"
+def record_break(session: Session, broken: ChainBreak, found_by: str) -> None:
     detail = {"seq": broken.seq, "event_id": broken.event_id, "reason": broken.reason, "check": found_by}
-    session.add(AuditChainBreak(seq=broken.seq, event_id=broken.event_id, reason=broken.reason, found_by=found_by))
+    session.add(
+        AuditChainBreak(
+            seq=broken.seq,
+            event_id=broken.event_id,
+            reason=broken.reason,
+            found_by=found_by,
+            fingerprint=broken.fingerprint,
+        )
+    )
     session.add(AuditEvent(actor=SYSTEM_ACTOR, action=BROKEN_ACTION, target="audit_events", detail=detail))
+
+
+def record_new(session: Session, report: ChainReport, found_by: str) -> int:
+    fresh = [broken for broken in dict.fromkeys(report.breaks) if not known(session, broken)]
+    for broken in fresh:
+        record_break(session, broken, found_by)
+    return len(fresh)
 
 
 def settle(session: Session, report: ChainReport, full: bool) -> None:
     session.commit()
     moment = now()
-    values: dict[str, Any] = {"full_checked_at": moment} if full else {}
-    broken = report.broken
-    if broken is None:
-        values |= {"verified_seq": report.last_seq, "verified_hash": report.last_hash, "verified_at": moment}
-    elif not known(session, broken):
-        record_break(session, broken, full)
-    if values:
-        session.execute(update(AuditChain).where(AuditChain.id == HEAD).values(**values))
+    values: dict[str, Any] = {
+        "verified_seq": report.checked_seq,
+        "verified_hash": report.checked_hash,
+        "verified_at": moment,
+    }
+    if full:
+        values["full_checked_at"] = moment
+    record_new(session, report, FULL if full else HOURLY)
+    session.execute(update(AuditChain).where(AuditChain.id == HEAD).values(**values))
     session.commit()
 
 

@@ -381,7 +381,9 @@ def chain_summary(report: "ChainReport") -> str:
     if report.broken is not None:
         found = f" (event {report.broken.event_id})" if report.broken.event_id is not None else ""
         verified = f" Verified up to seq {report.last_seq}." if report.events else ""
-        return f"Audit chain broken at seq {report.broken.seq}{found}: {report.broken.reason}.{verified}"
+        more = len(report.breaks) - 1
+        later = f" {more} more {'break' if more == 1 else 'breaks'} after it." if more > 0 else ""
+        return f"Audit chain broken at seq {report.broken.seq}{found}: {report.broken.reason}.{verified}{later}"
     if report.events == 0:
         text = "Audit chain verified: no sealed events"
     else:

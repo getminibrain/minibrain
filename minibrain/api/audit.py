@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, StringConstraints
 from sqlalchemy import ColumnElement, SQLColumnExpression, String, cast, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -23,6 +24,7 @@ from minibrain.auth.identity import current_actor
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
 from minibrain.registry.audit_chain import ChainReport, head_of, verify
+from minibrain.registry.audit_checks import FULL, record_new
 from minibrain.registry.models import PEER_ADDRESS, AuditChain, AuditChainBreak, AuditEvent, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.siem import target_of, waiting
@@ -469,7 +471,19 @@ def siem_info(session: Session) -> SiemInfo:
 
 @router.get("/chain", dependencies=[Depends(admin)], summary="Check the audit hash chain")
 def chain(session: SessionDep) -> AuditChainInfo:
-    return chain_info(verify(session), siem_info(session), automatic_of(head_of(session)), break_history(session))
+    report = verify(session)
+    remember_breaks(session, report)
+    return chain_info(report, siem_info(session), automatic_of(head_of(session)), break_history(session))
+
+
+def remember_breaks(session: Session, report: ChainReport) -> None:
+    if not report.breaks:
+        return
+    try:
+        if record_new(session, report, FULL):
+            session.commit()
+    except IntegrityError:
+        session.rollback()
 
 
 @router.post(

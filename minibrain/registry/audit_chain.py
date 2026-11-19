@@ -8,7 +8,6 @@ from typing import Any
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from minibrain.redaction import redact
 from minibrain.registry.models import AuditChain, AuditEvent
 
 GENESIS = "0" * 64
@@ -35,6 +34,7 @@ class ChainBreak:
     seq: int
     event_id: int | None
     reason: str
+    fingerprint: str = ""
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,9 @@ class ChainReport:
     pending: int
     broken: ChainBreak | None
     last_hash: str = GENESIS
+    breaks: tuple[ChainBreak, ...] = ()
+    checked_seq: int = 0
+    checked_hash: str = GENESIS
 
     @property
     def verified(self) -> bool:
@@ -58,10 +61,11 @@ class Progress:
     anchor: int = 0
     previous: str = GENESIS
     count: int = 0
+    skipped: int = 0
 
     @property
     def last(self) -> int:
-        return self.anchor + self.count
+        return self.anchor + self.count + self.skipped
 
 
 def stamp(at: datetime) -> str:
@@ -88,7 +92,7 @@ def chain_fields(
         "ip": ip,
         "action": action,
         "target": target,
-        "detail": redact(detail if detail is not None else {}),
+        "detail": detail if detail is not None else {},
     }
 
 
@@ -187,30 +191,41 @@ def foreign(first: int, last: int) -> str:
     return f"{span(first, last)} {'was' if first == last else 'were'} not sealed by minibrain"
 
 
-def start(progress: Progress, row: Sealed, anchors: Anchors) -> ChainBreak | None:
+def start(progress: Progress, row: Sealed, anchors: Anchors) -> list[ChainBreak]:
     progress.first = row.seq
     if row.seq == 1:
-        return None
+        return []
     cut = anchors().get(row.seq - 1)
     if cut is None:
-        return ChainBreak(row.seq, row.id, f"events before seq {row.seq} were deleted without a prune")
+        progress.skipped, progress.previous = row.seq - 1, row.prev_hash or ""
+        return [ChainBreak(row.seq, row.id, f"events before seq {row.seq} were deleted without a prune")]
     progress.anchor, progress.previous = row.seq - 1, cut
-    return None
+    return []
 
 
-def check(progress: Progress, row: Sealed) -> ChainBreak | None:
+def link(progress: Progress, row: Sealed) -> ChainBreak | None:
     expected = progress.last + 1
     if row.seq != expected:
+        progress.skipped += row.seq - expected
+        progress.previous = row.prev_hash or ""
         return ChainBreak(expected, None, missing(expected, row.seq - 1))
     if row.prev_hash != progress.previous:
         after_prune = progress.count == 0 and progress.anchor > 0
         source = f"the prune at seq {progress.anchor}" if after_prune else f"seq {row.seq - 1}"
-        return ChainBreak(row.seq, row.id, f"its previous hash does not match {source}")
-    if row.hash is None or digest(row.fields) != row.hash:
-        return ChainBreak(row.seq, row.id, "its contents changed after it was sealed")
-    progress.previous = row.hash
-    progress.count += 1
+        return ChainBreak(row.seq, row.id, f"its previous hash does not match {source}", digest(row.fields))
     return None
+
+
+def check(progress: Progress, row: Sealed) -> list[ChainBreak]:
+    linked = link(progress, row)
+    found = [linked] if linked is not None else []
+    contents = digest(row.fields)
+    relinked = linked is not None and linked.seq == row.seq
+    if not relinked and contents != row.hash:
+        found.append(ChainBreak(row.seq, row.id, "its contents changed after it was sealed", contents))
+    progress.previous = row.hash or contents
+    progress.count += 1
+    return found
 
 
 def ending(progress: Progress, head: Head, latest: Callable[[], Head], anchors: Anchors) -> ChainBreak | None:
@@ -233,8 +248,19 @@ def ending(progress: Progress, head: Head, latest: Callable[[], Head], anchors: 
         if progress.last < head_seq:
             return None
     if progress.previous != head_hash:
-        return ChainBreak(head_seq, None, "the newest event does not match the chain head")
+        return ChainBreak(head_seq, None, "the newest event does not match the chain head", head_hash)
     return None
+
+
+@dataclass(frozen=True)
+class Clean:
+    count: int
+    last: int
+    previous: str
+
+
+def clean_of(progress: Progress) -> Clean:
+    return Clean(progress.count, progress.last, progress.previous)
 
 
 def walk(
@@ -244,18 +270,34 @@ def walk(
     anchors: Anchors,
     pending: int,
     resumed: Progress | None = None,
+    found: Iterable[ChainBreak] = (),
 ) -> ChainReport:
     progress = resumed or Progress()
-    broken: ChainBreak | None = None
+    breaks = list(found)
+    clean = clean_of(progress) if breaks else None
     for row in rows:
-        broken = start(progress, row, anchors) if progress.first is None else None
-        broken = broken or check(progress, row)
-        if broken is not None:
-            break
-    else:
-        broken = ending(progress, head, latest, anchors)
+        before = clean_of(progress) if clean is None else clean
+        broken = start(progress, row, anchors) if progress.first is None else []
+        broken += check(progress, row)
+        if broken and clean is None:
+            clean = before
+        breaks += broken
+    last = ending(progress, head, latest, anchors)
+    if last is not None:
+        clean = clean or clean_of(progress)
+        breaks.append(last)
+    kept = clean or clean_of(progress)
     return ChainReport(
-        progress.count, progress.first, progress.last, progress.anchor, pending, broken, progress.previous
+        kept.count,
+        progress.first,
+        kept.last,
+        progress.anchor,
+        pending,
+        breaks[0] if breaks else None,
+        kept.previous,
+        tuple(breaks),
+        progress.last,
+        progress.previous,
     )
 
 
@@ -293,19 +335,20 @@ def verify(session: Session, rows: Callable[[Iterator[Sealed]], Iterable[Sealed]
     return walk(found, head, lambda: current_head(session), lambda: prune_anchors(session), pending)
 
 
-def resume(session: Session, seq: int, verified: str) -> Progress | ChainBreak:
+def resume(session: Session, seq: int, verified: str) -> tuple[Progress, ChainBreak | None]:
     progress = Progress(first=seq, anchor=seq, previous=verified)
     cuts = prune_anchors(session)
     row = session.execute(select(AuditEvent.id, AuditEvent.hash).where(AuditEvent.seq == seq)).first()
+    broken = None
     if row is None and not any(cut >= seq for cut in cuts):
-        return ChainBreak(seq, None, missing(seq, seq))
-    if row is not None and row.hash != verified:
-        return ChainBreak(seq, row.id, "its hash changed after it was verified")
+        broken = ChainBreak(seq, None, missing(seq, seq))
+    elif row is not None and row.hash != verified:
+        broken = ChainBreak(seq, row.id, "its hash changed after it was verified", row.hash or "")
     following = session.scalar(select(func.min(AuditEvent.seq)).where(AuditEvent.seq > seq))
     resumed_at = (following if following is not None else head_of(session).seq + 1) - 1
     if resumed_at > seq and resumed_at in cuts:
         progress.anchor, progress.previous = resumed_at, cuts[resumed_at]
-    return progress
+    return progress, broken
 
 
 def verify_after(session: Session, seq: int, verified: str) -> ChainReport:
@@ -313,11 +356,10 @@ def verify_after(session: Session, seq: int, verified: str) -> ChainReport:
         return verify(session)
     head = current_head(session)
     pending = unsealed(session)
-    start = resume(session, seq, verified)
-    if isinstance(start, ChainBreak):
-        return ChainReport(0, None, seq - 1, 0, pending, start, verified)
+    start, broken = resume(session, seq, verified)
     rows = stored(session, after=start.anchor)
-    return walk(rows, head, lambda: current_head(session), lambda: prune_anchors(session), pending, start)
+    found = [broken] if broken is not None else []
+    return walk(rows, head, lambda: current_head(session), lambda: prune_anchors(session), pending, start, found)
 
 
 def actor_id_of(value: Any) -> int | None:

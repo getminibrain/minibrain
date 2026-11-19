@@ -85,7 +85,8 @@ def test_an_edit_after_the_mark_shows_in_the_hourly_check(harness: Harness) -> N
     run_sql(harness, 'UPDATE audit_events SET detail = \'{"name": "other"}\' WHERE seq = 5')
     report = check(harness)
     assert report.broken is not None and report.broken.seq == 5
-    assert chain_head(harness).verified_seq == 3
+    assert [found.seq for found in chain_breaks(harness)] == [5]
+    assert chain_head(harness).verified_seq == 6
 
 
 @pytest.mark.parametrize(("deleted", "seq", "reason"), [(5, 5, "seq 5 is missing"), (2, 2, "seq 2 is missing")])
@@ -349,6 +350,75 @@ def test_views_are_recorded_once_an_hour_per_admin(harness: Harness) -> None:
         session.commit()
     harness.client.get("/api/audit")
     assert len(audit_events(harness, "audit.view")) == 3
+
+
+def breaks_found(harness: Harness) -> list[tuple[int, str, bool]]:
+    return [(found.seq, found.reason, found.acknowledged_at is not None) for found in chain_breaks(harness)]
+
+
+def test_checks_walk_past_a_break_so_later_breaks_are_recorded(harness: Harness) -> None:
+    tampered(harness, seq=3)
+    check(harness, full=True)
+    assert acknowledge(harness.client, chain_breaks(harness)[0].id).status_code == 200
+    sealed_events(harness, 5)
+    run_sql(harness, "UPDATE audit_events SET target = 'evil' WHERE seq = 7")
+    run_sql(harness, "DELETE FROM audit_events WHERE seq = 9")
+    hourly = check(harness)
+    assert [(found.seq, found.reason) for found in hourly.breaks] == [
+        (7, "its contents changed after it was sealed"),
+        (9, "seq 9 is missing"),
+    ]
+    for full in (False, True, False, True):
+        check(harness, full=full)
+    assert breaks_found(harness) == [
+        (3, "its contents changed after it was sealed", True),
+        (7, "its contents changed after it was sealed", False),
+        (9, "seq 9 is missing", False),
+    ]
+    assert len(problems_of(harness.client, "audit_chain_broken")) == 2
+    assert chain_head(harness).verified_seq == chain_head(harness).seq
+
+
+def test_tampering_again_with_an_acknowledged_row_is_raised_again(harness: Harness) -> None:
+    tampered(harness, seq=3)
+    check(harness, full=True)
+    assert acknowledge(harness.client, chain_breaks(harness)[0].id).status_code == 200
+    check(harness, full=True)
+    assert len(chain_breaks(harness)) == 1
+    run_sql(harness, "UPDATE audit_events SET target = 'changed again' WHERE seq = 3")
+    check(harness, full=True)
+    assert breaks_found(harness) == [
+        (3, "its contents changed after it was sealed", True),
+        (3, "its contents changed after it was sealed", False),
+    ]
+    assert len(problems_of(harness.client, "audit_chain_broken")) == 1
+
+
+def test_a_break_seen_by_the_chain_page_is_recorded_and_raised(harness: Harness) -> None:
+    tampered(harness, seq=2)
+    assert problems_of(harness.client, "audit_chain_broken") == []
+    info = harness.client.get("/api/audit/chain").json()
+    assert (info["verified"], info["broken"]["seq"]) == (False, 2)
+    assert [(row["seq"], row["found_by"], row["acknowledged_at"]) for row in info["breaks"]] == [(2, "full", None)]
+    [problem] = problems_of(harness.client, "audit_chain_broken")
+    assert problem["text"] == "Audit log integrity broken at #2"
+    harness.client.get("/api/audit/chain")
+    assert len(chain_breaks(harness)) == 1
+    assert len(broken_events(harness)) == 1
+
+
+def test_secret_values_are_redacted_before_they_are_stored_and_sealed(harness: Harness) -> None:
+    sealed_events(harness, 1, action="connection.update", detail={"changed": ["x"], "secret": "s3cr3t-value"})
+    with harness.sessions() as session:
+        stored = session.scalar(select(AuditEvent.detail).where(AuditEvent.action == "connection.update"))
+    assert stored == {"changed": ["x"], "secret": "[redacted]"}
+    assert check(harness, full=True).verified
+    run_sql(harness, "UPDATE audit_events SET detail = json_set(detail, '$.secret', 'kept') WHERE seq = 1")
+    report = check(harness, full=True)
+    assert report.broken is not None and (report.broken.seq, report.broken.reason) == (
+        1,
+        "its contents changed after it was sealed",
+    )
 
 
 def test_watching_the_chain_is_never_recorded(harness: Harness) -> None:

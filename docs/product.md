@@ -648,7 +648,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Prove no audit event was changed or removed.
   UI: Settings › Security › Audit integrity, Settings › Audit log · API: GET /api/audit/chain · CLI: minibrain audit verify
 - **Automatic audit checks** · shipped · admin
-  Verify the chain hourly and in full nightly; raise a break.
+  Verify the chain hourly and in full nightly; raise every break.
   UI: Home › Needs attention, Settings › Audit log · API: GET /api/problems, GET /api/audit/chain
 - **Audit break history** · shipped · admin
   Keep every chain break until an admin acknowledges it with a note.
