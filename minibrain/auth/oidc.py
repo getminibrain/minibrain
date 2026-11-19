@@ -218,7 +218,8 @@ class OidcClient:
             ).validate(claims)
         except (JoseError, ValueError) as error:
             raise OidcError(f"The ID token did not verify: {error}", "unverified") from error
-        email = claims.get("email") if str(claims.get("email_verified")).lower() != "false" else None
+        verified = claims.get("email_verified")
+        email = claims.get("email") if verified is True or verified == "true" else None
         name = claims.get("name") or claims.get("preferred_username") or email
         return OidcClaims(
             subject=str(claims["sub"]),

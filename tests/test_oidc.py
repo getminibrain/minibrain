@@ -28,7 +28,13 @@ OIDC = {
     "label": "Keycloak",
 }
 AUTH = {"oidc": OIDC, "roles": {"minibrain-admins": "admin", "ml-team": "builder"}}
-ADA = {"sub": "ada-1", "email": "Ada@Example.com", "name": "Ada Lovelace", "groups": ["ml-team"]}
+ADA = {
+    "sub": "ada-1",
+    "email": "Ada@Example.com",
+    "email_verified": True,
+    "name": "Ada Lovelace",
+    "groups": ["ml-team"],
+}
 
 
 @dataclass
@@ -253,12 +259,13 @@ def test_sso_with_admin_as_the_default_role_needs_no_setup_link(
             assert prepare(session, load_auth(), {}) == FirstRun()
 
 
-@pytest.mark.parametrize("verified", [False, "false"])
+@pytest.mark.parametrize("verified", [False, "false", None, "yes", 1])
 def test_an_unverified_email_does_not_match_auth_admins(
     settings: Settings, monkeypatch: pytest.MonkeyPatch, verified: object
 ) -> None:
     for sso in sso_install(settings, monkeypatch, {"oidc": OIDC, "admins": ["boss@example.com"]}):
-        sso.provider.claims = {"sub": "mallory-1", "email": "boss@example.com", "email_verified": verified}
+        unverified = {"sub": "mallory-1", "email": "boss@example.com"}
+        sso.provider.claims = unverified if verified is None else unverified | {"email_verified": verified}
         browser = sso.browser()
         sign_in(sso, browser)
         person = browser.get("/api/auth/session").json()["person"]
