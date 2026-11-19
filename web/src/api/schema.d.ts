@@ -5236,6 +5236,10 @@ export interface components {
             /** Folder Id */
             folder_id?: number | null;
             sample?: components["schemas"]["SampleRequest"] | null;
+            /** Description */
+            description?: string | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** DatasetFolderChoice */
         DatasetFolderChoice: {

@@ -135,7 +135,7 @@ from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Source, now
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
-from minibrain.tags import merged_tags
+from minibrain.tags import merged_tags, user_tags
 from minibrain.tasks.contracts import FREE_TEXT, suggested_contract
 from minibrain.tasks.examples import turns_of
 
@@ -707,6 +707,7 @@ def list_datasets(session: SessionDep, settings: SettingsDep, store: StoreDep) -
     summary="Create a dataset",
 )
 def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsDep, store: StoreDep) -> DatasetSummary:
+    tags = user_tags(body.tags or [])
     first = body.source_ids[0] if body.source_ids else body.source_id
     source = get_source(session, first) if first is not None else None
     if source is None and body.sql is None:
@@ -716,6 +717,8 @@ def create_dataset(body: DatasetCreate, session: SessionDep, settings: SettingsD
     if source is not None:
         require_rows(settings, store, source)
     dataset = add_dataset(session, settings, store, body.name, source, folder)
+    dataset.description = (body.description or "").strip() or None
+    dataset.tags = tags or None
     mapping = MappingUpdate(
         source_id=body.source_id,
         source_ids=body.source_ids,

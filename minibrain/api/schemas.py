@@ -465,6 +465,8 @@ class DatasetCreate(BaseModel):
     sql: str | None = None
     folder_id: int | None = None
     sample: SampleRequest | None = None
+    description: str | None = Field(default=None, max_length=1000)
+    tags: list[str] | None = Field(default=None, max_length=20)
 
 
 FolderName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]

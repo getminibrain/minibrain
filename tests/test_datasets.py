@@ -137,3 +137,17 @@ def test_a_single_source_dataset_can_say_from_source(harness: Harness) -> None:
     assert mapped.json()["rows"] == 200
     queried = harness.client.post("/api/datasets/tickets/query", json={"sql": "SELECT count(*) AS n FROM source"})
     assert queried.json()["rows"] == [["200"]]
+
+
+def test_a_new_dataset_takes_its_description_and_tags_or_is_not_made(harness: Harness) -> None:
+    tickets = upload(harness, "tickets.csv", tickets_csv())
+    picked = {"source_id": tickets["id"], "input_column": "text", "label_column": "category"}
+    refused = harness.client.post("/api/datasets", json={"name": "Tickets", **picked, "tags": ["team:"]})
+    assert refused.status_code == 422, refused.text
+    assert harness.client.get("/api/datasets/tickets").status_code == 404
+    created = harness.client.post(
+        "/api/datasets",
+        json={"name": "Tickets", **picked, "description": "  Routing  ", "tags": ["Team: fraud", "urgent"]},
+    )
+    assert created.status_code == 201, created.text
+    assert (created.json()["description"], created.json()["tags"]) == ("Routing", ["team:fraud", "urgent"])
