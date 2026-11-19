@@ -648,8 +648,8 @@ RUN_DESCRIPTION = (
     f"work. A stopped run answers 409. At most {PREVIEW_SLOTS} previews run on the server at once, the rows, shape "
     f"and count of one page (runs named page.rows, page.shape and page.count, up to {RUNS_PER_PAGE}) counting as one; "
     f"another waits up to {PREVIEW_WAIT_SECONDS:g} seconds for a turn, then answers 503. All previews together use "
-    "at most a quarter of the server's memory and half its cores, split evenly over every run that can be going at "
-    "once; a run that needs more spills to disk, then answers 422."
+    "at most a quarter of the server's memory, split evenly over every run that can be going at once, and half its "
+    "cores, split over the slots; a run that needs more memory spills to disk, then answers 422."
 )
 
 
