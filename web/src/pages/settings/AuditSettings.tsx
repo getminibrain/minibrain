@@ -52,10 +52,23 @@ const RETENTION_CHOICES: [number, string][] = [
     [90, "90 days"],
 ];
 
+const CHAIN_KEY = ["audit", "chain"] as const;
+
 export function useChain() {
+    const client = useQueryClient();
     return useQuery({
-        queryKey: ["audit", "chain"],
-        queryFn: () => unwrap(api.GET("/api/audit/chain")),
+        queryKey: CHAIN_KEY,
+        queryFn: async () => {
+            const chain = await unwrap(api.GET("/api/audit/chain"));
+            if (chain.broken) {
+                void client.invalidateQueries({ queryKey: PROBLEMS_KEY });
+                void client.invalidateQueries({
+                    predicate: (query) =>
+                        query.queryKey[0] === "audit" && query.queryKey[1] !== "chain",
+                });
+            }
+            return chain;
+        },
     });
 }
 
@@ -75,17 +88,28 @@ function openBreaks(chain: ChainInfo): ChainBreak[] {
     return chain.breaks.filter((found) => found.acknowledged_at === null);
 }
 
-function liveAcknowledged(chain: ChainInfo): boolean {
+function liveRecord(chain: ChainInfo): ChainBreak | null {
     const live = chain.broken;
+    if (live === null) {
+        return null;
+    }
     return (
-        live !== null &&
-        chain.breaks.some(
-            (found) =>
-                found.acknowledged_at !== null &&
-                found.seq === live.seq &&
-                found.reason === live.reason,
-        )
+        chain.breaks.find((found) => found.seq === live.seq && found.reason === live.reason) ?? null
     );
+}
+
+function liveAcknowledged(chain: ChainInfo): boolean {
+    return (liveRecord(chain)?.acknowledged_at ?? null) !== null;
+}
+
+function liveStatus(chain: ChainInfo): string {
+    const record = liveRecord(chain);
+    if (record === null) {
+        return "This break is not in the history yet. The next scheduled check records it, the nightly full check at the latest, and then an admin can acknowledge it.";
+    }
+    return record.acknowledged_at
+        ? "This break is acknowledged and kept in the history below."
+        : "The break stays recorded until an admin acknowledges it.";
 }
 
 function unacknowledgedSeq(chain: ChainInfo): number | null {
@@ -115,11 +139,7 @@ function chainText(chain: ChainInfo): string {
         parts.push(
             `Seq ${count(chain.broken.seq)}: ${chain.broken.reason}.${intact} Compare it with your SIEM's copy or an earlier export to see what changed.`,
         );
-        parts.push(
-            liveAcknowledged(chain)
-                ? "This break is acknowledged and kept in the history below."
-                : "The break stays recorded until an admin acknowledges it.",
-        );
+        parts.push(liveStatus(chain));
     } else if (chain.events > 0 && chain.first_seq !== null) {
         parts.push(
             `${events(chain.events)}, ${seqRange(chain.first_seq, chain.last_seq)}, match their hashes and link to the one before.`,
