@@ -213,6 +213,15 @@ def test_forwarded_addresses_count_only_from_the_proxy(proxied: Proxied) -> None
     assert [event.ip for event in events] == ["203.0.113.5", STRANGER]
 
 
+def test_a_spoofed_first_forwarded_line_does_not_become_the_client(proxied: Proxied) -> None:
+    admin = as_person("ada", groups="minibrain-admins")
+    through = proxied.client()
+    headers = admin | csrf_for(through, admin)
+    lines = [*headers.items(), ("X-Forwarded-For", "6.6.6.6"), ("X-Forwarded-For", "203.0.113.9, 10.0.0.1")]
+    assert through.put("/api/policies/request_bodies", json={"value": True}, headers=lines).status_code == 200
+    assert [event.ip for event in proxied.events("policy.update")] == ["203.0.113.9"]
+
+
 def set_up_admin(proxied: Proxied, client: TestClient) -> None:
     with proxied.app.state.sessions() as session:
         create_local(session, ADMIN, "Ada", Role.ADMIN, PASSWORD)

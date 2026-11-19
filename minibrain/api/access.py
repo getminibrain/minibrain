@@ -62,7 +62,7 @@ class TrustedProxy:
             headers = Headers(scope=scope)
             scope = dict(scope)
             scope[VIA_PROXY] = True
-            forwarded = forwarded_client(headers.get("x-forwarded-for"), proxy)
+            forwarded = forwarded_client(", ".join(headers.getlist("x-forwarded-for")), proxy)
             if forwarded:
                 scope["client"] = (forwarded, 0)
             scheme = headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
