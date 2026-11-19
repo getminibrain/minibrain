@@ -3,7 +3,7 @@
 A release is a `v*` tag. Pushing one runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): it
 checks the tag against `pyproject.toml`, runs CI, builds the Docker images from the wheel CI built, and publishes the
 images to GHCR and the files to GitHub Releases. Every file and image is signed keyless through Sigstore and carries
-SLSA build provenance ([Signing and provenance](#signing-and-provenance)). Nothing goes to PyPI yet (below).
+SLSA build provenance ([Signing and provenance](#signing-and-provenance)). After the GitHub Release, the wheel and sdist go to [PyPI](#pypi).
 
 ## Cut a release
 
@@ -146,56 +146,29 @@ services, so nothing reaches Sigstore's certificate authority or transparency lo
 `release-assets-signatures` artifact. The image signatures, the SBOM attestations, the provenance and the offline
 check of a saved image need the pushed images and the tag's OIDC identity, so they run only on a tag.
 
-## PyPI: not set up yet
+## PyPI
 
-Publishing will use PyPI's Trusted Publishing: PyPI trusts a short-lived OIDC token from this workflow, so no API token
-is stored anywhere. Steps for the account owner:
+Publishing uses PyPI's Trusted Publishing: PyPI trusts a short-lived OIDC token from this workflow, so no API token is
+stored anywhere. The `pypi` job in `release.yml` runs after the GitHub Release, so PyPI only gets versions that were
+released in full. It uploads the wheel and sdist from the `ci` job; the action's default `attestations: true` signs
+PEP 740 attestations through Sigstore with this workflow's OIDC identity, so PyPI shows the provenance of each upload.
 
-1. On pypi.org, signed in with two-factor authentication: Your account → Publishing → Add a new pending publisher →
-   GitHub, with:
+The GitHub environment `pypi` allows only `v*` tags and needs a required reviewer to approve each upload.
 
-   | Field | Value |
-   |---|---|
-   | PyPI Project Name | `minibrain` |
-   | Owner | `getminibrain` |
-   | Repository name | `minibrain` |
-   | Workflow name | `release.yml` |
-   | Environment name | `pypi` |
+On pypi.org the account owner adds the trusted publisher (Your account → Publishing → Add a new pending publisher →
+GitHub, signed in with two-factor authentication):
 
-   A pending publisher reserves nothing: the project is created by the first upload, and until then anyone can register
-   the name. `minibrain` was free on PyPI on 2026-11-03. The same form on test.pypi.org gives a rehearsal target.
-2. On GitHub: Settings → Environments → New environment `pypi`. Under Deployment branches and tags choose Selected
-   branches and tags and add the tag rule `v*`; add yourself under Required reviewers to approve each upload.
-3. Add this job to `release.yml`, after the GitHub Release, so PyPI only gets versions that were released in full:
+| Field | Value |
+|---|---|
+| PyPI Project Name | `minibrain` |
+| Owner | `getminibrain` |
+| Repository name | `minibrain` |
+| Workflow name | `release.yml` |
+| Environment name | `pypi` |
 
-   ```yaml
-     pypi:
-       name: PyPI
-       needs: [version, release]
-       if: needs.version.outputs.publish == 'true'
-       runs-on: ubuntu-24.04
-       timeout-minutes: 10
-       environment:
-         name: pypi
-         url: https://pypi.org/p/minibrain
-       permissions:
-         id-token: write
-       steps:
-         - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-           with:
-             name: minibrain-wheel
-             path: dist
-         - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-           with:
-             name: minibrain-sdist
-             path: dist
-         - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-   ```
-
-   The action's default `attestations: true` signs PEP 740 attestations through Sigstore with this workflow's OIDC
-   identity, the same keyless signing as the release files, so PyPI shows the provenance of each upload.
-4. Drop the "not on PyPI yet" notes from [`install.md`](install.md) and the README: `uvx minibrain` and
-   `pip install minibrain` then work as written.
+A pending publisher reserves nothing: the project is created by the first upload. The same form on test.pypi.org gives
+a rehearsal target. After the first upload, drop the "not on PyPI yet" notes from [`install.md`](install.md) and the
+README.
 
 ## Signing and provenance
 

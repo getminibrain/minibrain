@@ -413,3 +413,25 @@ jobs:
           gh release create "${TAG}" "${RUNNER_TEMP}"/assets/* \
             --repo "${GITHUB_REPOSITORY}" --verify-tag --title "minibrain ${VERSION}" \
             --notes-file "${RUNNER_TEMP}/notes/notes.md" --prerelease="${PRERELEASE}"
+
+  pypi:
+    name: PyPI
+    needs: [version, release]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/minibrain
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: minibrain-wheel
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: minibrain-sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
