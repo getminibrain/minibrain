@@ -440,13 +440,22 @@ export function MemoryCell({
     memory,
     offline,
     label,
+    cpuOnly = false,
 }: {
     memory: Memory | null;
     offline: number | null;
     label: string;
+    cpuOnly?: boolean;
 }) {
     if (memory) {
         return <MemoryFigure memory={memory} label={label} />;
+    }
+    if (cpuOnly) {
+        return (
+            <Tip tip="CPU only: no GPU memory. Models run in RAM.">
+                <span className="cursor-default text-muted-foreground">–</span>
+            </Tip>
+        );
     }
     return offline ? (
         <span className="text-muted-foreground tabular-nums">{sizeText(offline)}</span>

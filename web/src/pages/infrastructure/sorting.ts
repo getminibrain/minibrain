@@ -1,5 +1,14 @@
 import { type Problem, problemsOfMachine } from "~/api/problemQueries";
-import { cpuOf, gpuCount, machineStatuses, memoryOf, modelChips, ramOf, shareOf } from "./fleet";
+import {
+    capacityOf,
+    cpuOf,
+    gpuCount,
+    machineStatuses,
+    memoryOf,
+    modelChips,
+    ramOf,
+    shareOf,
+} from "./fleet";
 import type { MachineRow } from "./machines";
 
 export type SortKey = "host" | "status" | "gpu" | "memory" | "cpu" | "ram" | "running";
@@ -15,7 +24,7 @@ function sortValue(row: MachineRow, key: SortKey, problems: Problem[] | undefine
     const values: Record<SortKey, () => SortValue> = {
         host: () => node.host,
         status: () => machineStatuses(row, problemsOfMachine(problems, node.id))[0].rank,
-        gpu: () => gpuCount(node) * 1000 + (node.usable_bytes ?? 0) / 1024 ** 3,
+        gpu: () => gpuCount(node) * 1000 + (capacityOf(node) ?? 0) / 1024 ** 3,
         memory: () => {
             const memory = memoryOf(row);
             return memory ? shareOf(memory.used, memory.capacity) : null;

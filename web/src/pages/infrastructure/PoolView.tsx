@@ -19,7 +19,7 @@ import { count } from "~/lib/format";
 import { bytes } from "~/lib/time";
 import { PoolRowMenu } from "./PoolRowMenu";
 import { PoolDescription, UseBadge } from "./PoolUse";
-import { versioned } from "./activity";
+import { hasGpuMemory, versioned } from "./activity";
 import {
     FitText,
     Lead,
@@ -232,6 +232,7 @@ function PoolBand({
                     memory={poolMemory(rows)}
                     offline={offlineCapacity(rows)}
                     label={`Pool ${pool.name} GPU memory`}
+                    cpuOnly={rows.length > 0 && !rows.some((row) => hasGpuMemory(row.node))}
                 />
             </TableCell>
             <TableCell className={CELL} />
@@ -294,6 +295,7 @@ function MachineLine({
                     memory={memoryOf(row)}
                     offline={node.online ? null : capacityOf(node)}
                     label={`${node.host} GPU memory`}
+                    cpuOnly={!hasGpuMemory(node)}
                 />
             </TableCell>
             <TableCell data-column="cpu" className={NUMBER}>

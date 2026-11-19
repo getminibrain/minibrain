@@ -9,6 +9,7 @@ import {
     type NodeJob,
     engineLabel,
     engineState,
+    hasGpuMemory,
     jobSubject,
     memoryView,
     servedHref,
@@ -77,6 +78,9 @@ function gpuShares(node: NodeInfo): GpuShare[] {
 }
 
 export function memoryOf(row: MachineRow): Memory | null {
+    if (!hasGpuMemory(row.node)) {
+        return null;
+    }
     const view = memoryView(row.node, row.engines);
     return view
         ? {
@@ -89,6 +93,9 @@ export function memoryOf(row: MachineRow): Memory | null {
 }
 
 export function capacityOf(node: NodeInfo): number | null {
+    if (!hasGpuMemory(node)) {
+        return null;
+    }
     const total = node.gpus.reduce((sum, gpu) => sum + gpu.memory_bytes, 0);
     return node.usable_bytes ?? (total > 0 ? total : null);
 }

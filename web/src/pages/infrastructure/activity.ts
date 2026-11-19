@@ -14,6 +14,10 @@ export const MEMORY_LABELS: Record<string, string> = {
     mps: "unified memory",
 };
 
+export function hasGpuMemory(node: NodeInfo): boolean {
+    return node.accelerator !== "cpu";
+}
+
 export const ENGINE_LABELS: Record<string, string> = {
     sglang: "SGLang",
     vllm: "vLLM",
@@ -142,7 +146,7 @@ export function measuredView(node: NodeInfo): MemoryView | null {
 
 export function estimatedView(node: NodeInfo, engines: ReplicaInfo[]): MemoryView | null {
     const total = node.usable_bytes;
-    if (!node.online || !total) {
+    if (!node.online || !total || !hasGpuMemory(node)) {
         return null;
     }
     const segments = memorySegments(node, engines);
