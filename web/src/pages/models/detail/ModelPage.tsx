@@ -323,7 +323,7 @@ export function ModelVersionPage() {
     if (!lookup.row || lookup.row.kind !== "custom") {
         return <Missing lookup={lookup} />;
     }
-    return <VersionView row={lookup.row} number={number} />;
+    return <VersionView key={`${lookup.row.key}:${number}`} row={lookup.row} number={number} />;
 }
 
 export function ModelComparePage() {

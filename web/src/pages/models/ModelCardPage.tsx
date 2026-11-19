@@ -414,7 +414,7 @@ export function ModelCardPage() {
                     <CardMissing slug={slug} number={null} />
                 </>
             ) : (
-                <CardPage target={{ slug, number }} />
+                <CardPage key={`${slug}:${number}`} target={{ slug, number }} />
             )}
         </Page>
     );
