@@ -167,8 +167,7 @@ GitHub, signed in with two-factor authentication):
 | Environment name | `pypi` |
 
 A pending publisher reserves nothing: the project is created by the first upload. The same form on test.pypi.org gives
-a rehearsal target. After the first upload, drop the "not on PyPI yet" notes from [`install.md`](install.md) and the
-README.
+a rehearsal target.
 
 ## Signing and provenance
 

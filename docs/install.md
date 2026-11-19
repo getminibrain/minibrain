@@ -14,16 +14,7 @@ commands below use 3.12, which the Docker image runs.
 
 Releases are on [GitHub Releases](https://github.com/getminibrain/minibrain/releases) (wheel, sdist, SBOMs,
 `SHA256SUMS`, the installer and a Sigstore bundle per file) and in GHCR (`ghcr.io/getminibrain/minibrain`); how they
-are made: [`releasing.md`](releasing.md). minibrain is not on PyPI yet, so wherever a command below installs
-`minibrain`, pass the release wheel's URL instead (see [Install from GitHub Releases](#install-from-github-releases)).
-Before the first release, build the wheel from this repo with `mise run build` (or `uv build --wheel`; both need Node
-with pnpm) and pass the file:
-
-```sh
-uvx --python 3.12 --from dist/minibrain-0.0.0-py3-none-any.whl minibrain serve
-uv tool install --python 3.12 dist/minibrain-0.0.0-py3-none-any.whl
-pip install dist/minibrain-0.0.0-py3-none-any.whl
-```
+are made: [`releasing.md`](releasing.md). The package is on [PyPI](https://pypi.org/project/minibrain/) as `minibrain`.
 
 Verified: `uvx` and `minibrain serve` on macOS (Apple silicon) and on Linux (Debian, CPU torch); the CPU image; the
 CUDA image built for amd64 and arm64 and started without a GPU; the release workflow's dry run (wheel, sdist and all
