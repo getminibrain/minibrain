@@ -1813,7 +1813,6 @@ Two modes, same code, same adapter format (PEFT safetensors).
 - Training; eval vs base with cost and latency; promote
 - `transformers` and `sglang` backends
 - Gateway: chat completions, `response_format`, scoped API keys
-- Air-gapped install bundle
 
 ### v1
 
@@ -1933,18 +1932,15 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       `replicas` per pool in values, storage as a PVC or S3, secrets from Kubernetes Secrets, and an air-gapped values
       file pointing at a private registry. The customer scales with `replicas` or their own autoscaler; minibrain
       creating pods itself is the Kubernetes launcher in v2
-- [ ] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
-      (built: `release.yml` on `v*` tags puts the wheel, sdist, SBOMs and `SHA256SUMS` on GitHub Releases and CPU
-      and CUDA images for amd64 and arm64 on GHCR, the images installing that same wheel; dry run passed, no tag
-      pushed yet. PyPI not yet: Trusted Publishing steps in `docs/releasing.md`; no private index)
+- [x] Releases: wheels on GitHub Releases, then PyPI or a private index; Docker image built from the same wheel
+      (`release.yml` on `v*` tags puts the wheel, sdist, SBOMs and `SHA256SUMS` on GitHub Releases, CPU and CUDA
+      images for amd64 and arm64 on GHCR installing that same wheel, and the wheel on PyPI; v0.1.0 and v0.1.1 shipped
+      this way. No private index)
 - [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install.md`
 - [x] `curl … | sh` installer (`install.sh`): the release wheel with uv and the right torch backend, checked against
       `SHA256SUMS` and, with cosign, its signature; `--docker` pulls the image (tested on macOS, Debian 13 and
       Ubuntu 24.04 against dry-run files; not yet against a tagged release)
 - [x] Python 3.13: allowed in `requires-python`; CI tests 3.12 and 3.13
-- [ ] Offline install bundle; air-gap CI test
-- [ ] Signed offline update bundles (app and base models) with rollback (release files are signed with cosign
-      now; bundles will reuse that signing)
 - [x] Switch base: per model, live traffic stays on its own base until a version on the new one is deployed
 - [ ] Rebase: rebuild every model on a new base model, compare, promote
 - [x] Feedback endpoint (`POST /v1/feedback`, scoped keys, input required unless kept), thumbs and "Correct it"
@@ -1952,9 +1948,9 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       Save as test example in the Playground → held-out rows of the next version's data
 - [ ] Review queue for domain experts: plain language, assignment, reviewer agreement (plain language,
       Assign to me, keyboard review and disagreement first done; agreement between reviewers not yet)
-- [ ] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, image SBOMs per release,
+- [x] SBOM, AI bill of materials per version, signed images (Python and web SBOMs in CI, image SBOMs per release,
       the per-version AI-BOM, and keyless cosign signatures, SBOM attestations and SLSA provenance on every image and
-      release file built; signing first runs for real on the first tag)
+      release file; ran for real on the v0.1.0 and v0.1.1 tags)
 - [x] Audit log page: filters, server-side paging, CSV and JSONL export, retention policy, client address
 - [x] This install page with a diagnostics zip that never carries secrets
 - [ ] Problems (added 2026-11-17): `GET /api/problems` computes what needs attention from current state on each request
@@ -1974,8 +1970,8 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       the generation config and SHA256SUMS into one tar uploaded as an artifact; reused per version and base files,
       deleted with the version, audited when started and downloaded
 - [ ] Reference hardware configs
-- [ ] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`):
-      the last step before tagging v1
+- [x] PyPI publishing through Trusted Publishing (`release.yml`, environment `pypi`, steps in `docs/releasing.md`;
+      v0.1.1 is the first release on PyPI)
 
 ### Before release (added 2026-11-17)
 
@@ -1993,11 +1989,12 @@ it finds:
 - [ ] Light mode fixed across the app: every page, dialog and chart checked and corrected in light, not only dark
 - [ ] Security review: auth, roles, joining, worker and engine tokens, secrets, audit; an outside review if possible
 - [ ] Documentation: install, first model, joining machines, training, serving, API, security, upgrades
-- [ ] Logo and icon set
-- [ ] Website: product page, docs, install, contact
+- [x] Logo and icon set: the Volt badge with the bolt-split brain (`web/src/components/brand/mark.ts`), the favicon in
+      the app and on getminibrain.com
+- [ ] Website: product page, docs, install, contact (built: getminibrain.com in its own repo; deploying on Coolify is
+      left)
 - [ ] Core journey end to end on a fresh install, scripted as a release check
 - [ ] A real GPU run: gpt-oss-20b serving and LoRA training on an NVIDIA box
-- [ ] Offline install bundle tested on an air-gapped machine, then an upgrade with rollback
 - [ ] Backup and restore, tested and documented
 - [ ] Licences: third-party notices, model licences shown before download, LICENSE and the CLA
 - [ ] Release process: versioning, changelog, signed artefacts
@@ -2011,6 +2008,11 @@ it finds:
 
 ## v2
 
+- Air-gapped installs (moved from v1 on 2026-11-20: air-gapped is an option, not the main audience; `MINIBRAIN_OFFLINE=1`
+  keeps working in v1):
+  - Offline install bundle and an air-gap CI test
+  - Signed offline update bundles (app and base models) with rollback, reusing the cosign signing of release files
+  - The offline bundle tested on an air-gapped machine, then an upgrade with rollback
 - Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers):
   - Teacher pool, permanent or temporary; API teacher opt-in, off by default; prompt-only version 0 on it
   - Teacher labelling with the review queue, uncertain rows first

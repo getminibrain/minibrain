@@ -1,7 +1,7 @@
 # Product
 
 Users: product, engineer, ml, admin
-Principles: any size, own hardware, air-gapped, gated on scores
+Principles: any size, own hardware or cloud, private, gated on scores
 
 ## Data
 - **Upload sources** · shipped · product, ml
@@ -751,10 +751,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Platforms
 - **Air-gapped bundle** · planned · admin
   Install from one offline bundle, tested in CI without network.
-  Roadmap: Offline
+  Roadmap: v2
 - **Signed update bundles** · planned · admin
   Carry signed app and model updates across the gap, with rollback.
-  Roadmap: Offline
+  Roadmap: v2
 - **PyPI releases** · planned · admin
   Publish wheels to PyPI through Trusted Publishing.
   Roadmap: v1 scope
