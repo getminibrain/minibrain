@@ -213,7 +213,7 @@ jobs:
             fi
             args+=(
               --annotation "index:org.opencontainers.image.title=minibrain"
-              --annotation "index:org.opencontainers.image.description=Private platform for small, task-specific models"
+              --annotation "index:org.opencontainers.image.description=Private AI platform: train, evaluate and serve models of any size on your own data, fully offline"
               --annotation "index:org.opencontainers.image.licenses=Apache-2.0"
               --annotation "index:org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
               --annotation "index:org.opencontainers.image.version=${VERSION}"
