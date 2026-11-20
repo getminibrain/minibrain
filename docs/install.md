@@ -696,7 +696,8 @@ Notes:
 ## Upgrading
 
 Back up the data directory first: stop minibrain and copy the folder, and dump the database too if it is in Postgres.
-Database migrations run when main starts. To go back to an older version, restore the backup.
+Database migrations run when main starts. To go back to an older version, restore the backup. The full procedure,
+with machines that joined main and rolling back: [Upgrades](upgrades.md).
 
 | Install | Upgrade |
 |---|---|
