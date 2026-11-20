@@ -290,7 +290,7 @@ at answer time.
 One install is one supervised process tree: one command starts it, and minibrain starts and restarts the rest.
 main is the control plane; gateways and engines are the serving plane. Production runs on GPU racks, rented or on-prem;
 a laptop install is onboarding. A local main can drive remote GPU workers and engines. Details and tradeoffs:
-`docs/architecture.md` and the docs it links.
+`docs/reference/architecture.md` and the docs it links.
 
 | Process | Runs |
 |---|---|
@@ -327,12 +327,12 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   rotating cuts off the old one and the engine tokens minted from it. Add machine is pick a pool, copy one command
   (`minibrain worker --main URL --pool NAME`). Without a token the worker asks to join and prints a code; an admin
   approves it under Machines › Waiting for approval, and the machine gets a credential bound to its pool and host,
-  kept across restarts and revoked by removing the machine. Never a token-free join. Details: `docs/serving.md`, A
-  machine joins; `docs/security.md`.
+  kept across restarts and revoked by removing the machine. Never a token-free join. Details: `docs/install/machines.md`;
+  `docs/security/network.md`.
 - [x] Deploy to a pool (2026-11-14): Deploy and Promote take a pool (or auto: this machine when it fits, else the
   pool with most memory left) and a replica count; a pool where the model does not fit is refused. Workers in that pool
   start and stop the engines to match, gateways route the deployed name only to that pool, and the model says where
-  it runs or that it waits for a machine. Details: `docs/serving.md`, Deployments on a pool.
+  it runs or that it waits for a machine. Details: `docs/guides/deployments.md`.
 - [x] Rolling pool moves (2026-11-14): moving a live deployment keeps the old pool serving until the new pool's
   engines are ready, then switches the route and stops the old ones; a failed engine or no machine for 5 minutes
   rolls it back and the model says why.
@@ -341,7 +341,7 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   only to pools used for serving; training and scoring jobs only to pools used for training; downloads, imports,
   checks and exports anywhere. A production pool set to Serving can never be starved by training. Pools stay one
   concept (capacity, like Kubernetes node pools) rather than separate training and inference pools, because the same
-  machine is often both. Details: `docs/serving.md`, Pool use.
+  machine is often both. Details: `docs/guides/deployments.md`.
 - [ ] Serving first on Both pools: GPU leases prefer engines; a job takes only GPUs no engine needs and waits (or, for
   a long run, checkpoints and yields) when serving needs them back.
 - [ ] Infrastructure shows each pool's use and load, e.g. "gpu-a10 · Serving · 2 engines · 0 jobs", and the Train
@@ -523,7 +523,7 @@ Data is shared across models:
     Fingerprint: `v<version>-` plus a SHA-256 of the folder, the version and the newest log file's name, size and
     modification time, so a dataset version names the table version it copied. Not from S3 or HTTPS: the extension's
     delta-kernel-rs reads the log over its own rustls and ring TLS, outside OpenSSL, so it is not FIPS-ready
-    (`docs/security.md`, TLS in DuckDB extensions); those paths are refused with that reason. A folder holding
+    (`docs/security/network.md`, TLS in DuckDB extensions); those paths are refused with that reason. A folder holding
     `_delta_log` cannot be added as a plain folder source.
 - Remote fingerprints are cached for 30 seconds per source so listing pages does not hit a bucket or database on
   every request. Everything goes through the row limit and the 30-second timeout, and dataset versions copy the
@@ -750,7 +750,7 @@ from. They have different endpoints and keys, so they are configured apart.
 - Each connection's endpoint must pass the network policy when it is saved, tested and every time it is used; a
   blocked one says which host to add under Allowed hosts.
 - Secrets are write-only: encrypted at rest with AES-256-GCM (`cryptography`, through OpenSSL) under their own data
-  key, wrapped by the install's master key (see Encryption at rest in `docs/security.md`: `<home>/keys/master.key`,
+  key, wrapped by the install's master key (see `docs/security/encryption.md`: `<home>/keys/master.key`,
   the file `MINIBRAIN_MASTER_KEY_FILE` names, Vault Transit, a PKCS#11 HSM or AWS KMS), with the connection's id as
   associated data. The API only says whether a secret is set; Replace
   writes a new one. Create, update and delete are audited (`connection.create`, `connection.update` with the changed
@@ -1126,7 +1126,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   (GGUF base models), `vllm` (the same OpenAI-server path as SGLang, with runtime LoRA updates; built 2026-11-06,
   not yet run on a GPU).
 - Requests carry OpenAI's sampling fields plus `top_k`, `min_p` and `repetition_penalty`, passed to every engine
-  (`docs/serving.md`, Sampling); unset fields keep the model's default, custom models answer at temperature 0, and
+  (`docs/api/chat-completions.md`, Sampling); unset fields keep the model's default, custom models answer at temperature 0, and
   `max_tokens` unset runs to the context limit. An engine that cannot honour a field refuses it with a 400.
 - Engines are never exposed; the gateway proxies every call.
 
@@ -1136,7 +1136,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - `/v1/completions` (built 2026-11-12): a raw `prompt` continued without the chat template, for code completion and
   base models, streamed too; keys, `name@N`, sampling, safety and request logs (kind `completion`) as in chat. A custom
   model applies its adapter but not its instructions or contract. One prompt per call; `logprobs`, `echo` and
-  `suffix` are refused with a 400. Details in `docs/serving.md`, Text completions.
+  `suffix` are refused with a 400. Details in `docs/api/text-completions.md`.
 - `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema; without
   one, a custom model's contract holds decoding: its labels for a label set, its schema for a JSON contract (checked
   the same way). A request's format only narrows a model whose contract is free text; a label or schema contract
@@ -1144,15 +1144,15 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   (prompt-only versions with their few-shot turns first); system messages from the app are dropped.
 - Tool calling: `tools`, `tool_choice` and `parallel_tool_calls`, rendered by the base's chat template and read back
   as `tool_calls` (format detected from the template; SGLang and vLLM use their own parsers). Built 2026-11-06;
-  details in `docs/serving.md`, Tool calling.
+  details in `docs/api/tool-calling.md`.
 - Reasoning: `reasoning_effort` (`none`, `low`, `medium`, `high`) mapped per family (Qwen3 `enable_thinking`,
   gpt-oss `reasoning_effort`, DeepSeek-R1 always on), detected from the template; the reasoning returns as
-  `reasoning_content` and never reaches answers, logs or graders. Built 2026-11-06; `docs/serving.md`, Reasoning.
+  `reasoning_content` and never reaches answers, logs or graders. Built 2026-11-06; `docs/api/reasoning.md`.
 - Safety model: a guard base checks requests and optionally answers (install default under Settings, a per-model
   override, a per-request `safety` field that can add but not remove); a block is an OpenAI refusal with
   `finish_reason: content_filter` and the categories, kept in the request log and audited as `safety.block`. The
   catalogue carries Llama Guard 3, ShieldGemma, Qwen3Guard and gpt-oss-safeguard. Built 2026-11-06;
-  `docs/serving.md`, Safety model. Hidden from the UI for v1 (2026-11-14): running a guard means deploying and
+  `docs/api/safety.md`. Hidden from the UI for v1 (2026-11-14): running a guard means deploying and
   keeping a second model, too much to manage at first; the API and settings stay and the UI returns as an advanced
   option.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
@@ -1199,7 +1199,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   the CSRF header on changes). Management routes carry one tag each from `minibrain/api/sections.py` (Models,
   Versions, Data, Training and jobs, Evaluations, Feedback, Playground; Monitoring, Keys, Infrastructure; Settings,
   Accounts, Audit, Reference), grouped by `x-tagGroups` into Build, Operate and Administer. `/internal` (workers and
-  gateways), `/healthz`, `/readyz` and `/metrics` are left out of the schema (`docs/observability.md` covers the
+  gateways), `/healthz`, `/readyz` and `/metrics` are left out of the schema (`docs/observability/metrics.md` covers the
   operator endpoints). The page fills in this install's base URL and deployed
   model names, and curl, Python and JavaScript samples (the `openai` SDK for `/v1`). Try it: `/v1` with a key pasted
   into the page, kept in memory and never sent to main; `/api` with the signed-in session, the page adding the CSRF
@@ -1215,7 +1215,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 
 ### Accounts and roles
 
-Built, with the details in `docs/security.md`; OIDC is tested against an in-process fake provider and proxy headers
+Built, with the details in `docs/security/accounts.md`; OIDC is tested against an in-process fake provider and proxy headers
 against test clients, not yet against Entra, Okta, ADFS, Keycloak or a real proxy. People sign in; apps keep using API
 keys, and `/v1` stays key-only.
 
@@ -1617,7 +1617,7 @@ in the UI can be provisioned from it, so a locked-down or GitOps install starts 
 
 ## Observability
 
-Off by default, and only ever towards systems the customer runs. Details: `docs/observability.md`.
+Off by default, and only ever towards systems the customer runs. Details: `docs/observability/opentelemetry.md`.
 
 - OpenTelemetry: OTLP over HTTP (protobuf; no gRPC) to the customer's collector, set as admin policies (endpoint,
   headers encrypted and write-only, protocol, service name, CA bundle) that `minibrain.yaml` and the standard
@@ -1676,7 +1676,7 @@ v1, the evidence regulated buyers ask for first:
 
 - SBOM (CycloneDX) for every image and Python dependency set. Built: CI uploads Python (uv export from `uv.lock`)
   and web (syft from `web/pnpm-lock.yaml`) SBOMs beside the wheel; each release adds an SBOM per image (syft against
-  the image it pushes), attached to the release and attested on the image. Details: `docs/security.md`.
+  the image it pushes), attached to the release and attested on the image. Details: `docs/security/supply-chain.md`.
 - AI bill of materials per version: base model weights hash, license, training dataset version hash, recipe, eval result.
   Built: a deterministic CycloneDX 1.6 ML-BOM per version (`aibom.json`, Download AI-BOM on the model card) with
   the adapter's SHA-256, the sources' fingerprints and its own SHA-256, validated against the schema in tests.
@@ -1689,7 +1689,7 @@ v1, the evidence regulated buyers ask for first:
   leader seals each event with a sequence number, the previous hash and the SHA-256 of its canonical form (so
   out-of-order commits on Postgres just seal later); `minibrain audit verify`, `GET /api/audit/chain` and the Audit log
   page report the first break; SIEM export is RFC 5424 over TLS, TCP or UDP with a stored cursor. Format, canonical
-  form and guarantees: `docs/security.md`.
+  form and guarantees: `docs/security/audit.md`.
 - Encryption at rest for dataset versions, staging files and adapters. Built: every stored file (uploads, dataset versions,
   adapters, logs, staging databases, base weights in a bucket; local folder or S3 bucket) is sealed with its own
   AES-256-GCM data key in a chunked STREAM format, wrapped by a master key from a local key file (default), HashiCorp
@@ -1697,7 +1697,8 @@ v1, the evidence regulated buyers ask for first:
   files through a decrypting filesystem, so main keeps no plaintext copies; workers, engines and gateways keep plain
   working copies.
   `minibrain keys status | rotate | encrypt-existing` and Settings → Security re-wrap headers without re-encrypting
-  bodies and encrypt older files in place. Format, providers and measurements: `docs/security.md`.
+  bodies and encrypt older files in place. Format, providers and measurements: `docs/security/encryption.md`,
+  `docs/security/key-providers.md` and `docs/notes/security.md`.
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
 - PII and PHI handling as in Data; access to every model is scoped and audited.
@@ -1707,7 +1708,7 @@ v1, the evidence regulated buyers ask for first:
   - Non-security hashing (MinHash) passes `usedforsecurity=False`.
   - All crypto through OpenSSL or the `cryptography` library; nothing hand-rolled. Native code that brings its own TLS
     stays off the network: DuckDB's delta extension (rustls and ring in delta-kernel-rs) reads Delta tables from
-    server folders only, while httpfs does S3 and Iceberg TLS through OpenSSL (`docs/security.md`).
+    server folders only, while httpfs does S3 and Iceberg TLS through OpenSSL (`docs/security/network.md`).
   - Base images that can run in FIPS mode (Red Hat UBI).
   - Enforced in CI and `mise run check` by ruff `S324` and `scripts/check_crypto.py` (tested in
     `tests/test_check_crypto.py`), which fails on: MD5, SHA-1 or BLAKE2 through `hashlib` without
@@ -1919,7 +1920,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
 - [x] Roles: Admin, Builder, Viewer enforced per route; group-to-role mapping; Settings → Accounts
 - [x] FIPS-ready crypto rules enforced in CI: ruff `S324` and `scripts/check_crypto.py`
 - [x] Local install via uv on Linux and macOS
-- [ ] Local install via uv on Windows (documented in `docs/install.md`; not verified yet)
+- [ ] Local install via uv on Windows (documented in `docs/install/python.md`; not verified yet)
 - [ ] Production Docker image, CUDA 13.2 with a CPU variant and the DuckDB extensions baked in (built for amd64 and
       arm64 and started without a GPU; verify on a GPU box)
 - [x] Wheel ships the built UI: `uvx minibrain serve` needs no Node
@@ -1936,7 +1937,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       (`release.yml` on `v*` tags puts the wheel, sdist, SBOMs and `SHA256SUMS` on GitHub Releases, CPU and CUDA
       images for amd64 and arm64 on GHCR installing that same wheel, and the wheel on PyPI; v0.1.0 and v0.1.1 shipped
       this way. No private index)
-- [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install.md`
+- [x] Install docs for `uvx`, `uv tool install`, `pip install` and Docker: `docs/install/`
 - [x] `curl … | sh` installer (`install.sh`): the release wheel with uv and the right torch backend, checked against
       `SHA256SUMS` and, with cosign, its signature; `--docker` pulls the image (tested on macOS, Debian 13 and
       Ubuntu 24.04 against dry-run files; not yet against a tagged release)
@@ -2098,7 +2099,7 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Quantized bases in the bucket were not refused for training up front: the check read `config.json` from main's
   disk, which a bucket model may not have. It reads it through the store from the saved file list.
 - [x] A local engine's first start included downloading its model, which could exceed the 600 s startup limit for very
-  large models. Fetching the working copy is now its own step before loading, with progress (`docs/serving.md`), and
+  large models. Fetching the working copy is now its own step before loading, with progress (`docs/reference/how-serving-works.md`), and
   each file gets a fresh signed link.
 - [x] Key rotation re-uploaded every bucket object whole, which is slow for large weights. It sends the new header and
   the first 5 MiB and the bucket copies the rest server-side (Artifact storage).

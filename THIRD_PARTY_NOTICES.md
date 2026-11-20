@@ -1,8 +1,8 @@
 # Third-party notices
 
-Python and web dependencies are listed in the SBOMs ([security](docs/security.md#software-sbom)); CI checks their
+Python and web dependencies are listed in the SBOMs ([supply chain](https://getminibrain.com/docs/security/supply-chain)); CI checks their
 licences against the project's policy, and `uv run python scripts/check_licences.py --list` prints each one with its
-licence ([security](docs/security.md#dependency-licences)). This file covers what those do not: the DuckDB extensions
+licence ([supply chain](https://getminibrain.com/docs/security/supply-chain)). This file covers what those do not: the DuckDB extensions
 the Docker image carries.
 
 ## DuckDB extensions
@@ -57,4 +57,4 @@ network I/O and cryptography, found in the v2.0.0 binaries:
 | aws-lc-rs | 1.16.2 | ISC AND (Apache-2.0 OR ISC) |
 
 minibrain keeps that code off the network: Delta tables are read from folders on the server only
-([security](docs/security.md#tls-in-duckdb-extensions)).
+([network and ports](https://getminibrain.com/docs/security/network)).

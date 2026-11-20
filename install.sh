@@ -94,7 +94,7 @@ detect_platform() {
     case "$(uname -s)" in
         (Linux) os=linux ;;
         (Darwin) os=macos ;;
-        (MINGW* | MSYS* | CYGWIN*) fail "on Windows, run this in WSL, use Docker Desktop, or pip (docs/install.md)" ;;
+        (MINGW* | MSYS* | CYGWIN*) fail "on Windows, run this in WSL, use Docker Desktop, or pip (https://getminibrain.com/docs/install/python)" ;;
         (*) fail "unsupported operating system: $(uname -s)" ;;
     esac
     case "$(uname -m)" in

@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SERVER = "https://github.com"
+DOCS = "https://getminibrain.com/docs"
 OIDC_ISSUER = "https://token.actions.githubusercontent.com"
 HEADER = re.compile(r"^(?P<kind>[a-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?: (?P<summary>.+)$")
 BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
@@ -77,7 +78,7 @@ def changes(ref: str, since: str | None, cwd: Path = ROOT) -> list[Change]:
 
 def install_lines(version: str, repo: str, image: str) -> list[str]:
     files = f"{SERVER}/{repo}/releases/download/v{version}"
-    guide = f"{SERVER}/{repo}/blob/v{version}/docs/install.md"
+    guide = f"{DOCS}/get-started/installation"
     wheel = f"{files}/minibrain-{version}-py3-none-any.whl"
     identity = f"--certificate-identity {SERVER}/{repo}/.github/workflows/release.yml@refs/tags/v{version}"
     issuer = f"--certificate-oidc-issuer {OIDC_ISSUER}"
@@ -98,9 +99,9 @@ def install_lines(version: str, repo: str, image: str) -> list[str]:
         "  `sha256sum --check --ignore-missing SHA256SUMS`",
         f"- Images: `cosign verify {identity} {issuer} {image}:{version}`",
         f"- Provenance: `gh attestation verify <file or oci://{image}:{version}> --repo {repo}`",
-        f"- Offline and air-gapped: [docs/install.md]({guide}#verify-a-release)",
+        f"- Offline and air-gapped: [Verify a release]({DOCS}/install/verify-release)",
         "",
-        f"Guide: [docs/install.md]({guide})",
+        f"Guide: [Installation]({guide})",
     ]
 
 

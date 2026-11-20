@@ -1,6 +1,9 @@
-# Your first model
-
-From an empty install to an app calling a model trained on your own data, through the OpenAI-compatible API.
+---
+title: Your first model
+description: From an empty install to an app calling a model trained on your own data, through the OpenAI-compatible API.
+sidebar:
+  order: 3
+---
 
 This walkthrough builds a classifier that sorts support messages into labels such as `billing`, `bug` and `refund`.
 The same steps make a chat assistant or a model that answers in JSON; only the Output choice in step 3 changes. Home's
@@ -8,7 +11,7 @@ The same steps make a chat assistant or a model that answers in JSON; only the O
 
 You need:
 
-- minibrain installed and running ([Install](install.md)). The commands below use `http://127.0.0.1:8000`, the
+- minibrain installed and running ([Install](installation.md)). The commands below use `http://127.0.0.1:8000`, the
   default address.
 - A CSV with a column of text and a column of labels, at least 10 rows. Under 100 rows the scores are rough.
 - A machine that can train the base model you pick: an NVIDIA, AMD or Intel GPU, Apple silicon, or a CPU for the
@@ -30,7 +33,7 @@ On its first start, `minibrain serve` prints a one-time setup link and opens it 
 
 In Docker the link is in the container log: `docker logs minibrain | grep setup`. Lost it:
 `minibrain admin setup-link` prints a new one. Every other way to create the first admin:
-[Install → First admin](install.md#first-admin).
+[Install → First admin](../install/first-admin.md).
 
 ## 2. Add data
 
@@ -67,7 +70,7 @@ In **Add model**, **Dataset → Upload new…** uploads a file and makes the dat
 1. Open **Models** and click **Add model**.
 2. **Base**: the open model to build on. The picker puts the catalogue models that suit your machines first; its
    filters include **Fits your compute** and **Trains on your compute**. A base that is not on the install yet
-   downloads in the background once you create the model ([Models → Catalogue](models.md#catalogue)).
+   downloads in the background once you create the model ([Models → Catalogue](../guides/models.md)).
 3. **Format**: keep a full-precision format. Quantized formats serve but cannot be trained.
 4. **Dataset**: the dataset from step 2.
 5. **Output**: suggested from the dataset's answers. For a label column it suggests **Labels** and fills in the
@@ -123,7 +126,7 @@ the answers that differ, tick both versions on the model's **Versions** tab and 
 **Deploy v1** on the Evaluations row does the same with the automatic pool. The header says **Deploying v1** while
 the model loads, then **Deployed · v1 on local**. From now on `support-triage` is answered by v1, and each version
 stays callable by number, such as `support-triage@0`. Pools, replicas and moves:
-[Serving → Deployments on a pool](serving.md#deployments-on-a-pool).
+[Serving → Deployments on a pool](../guides/deployments.md).
 
 ## 8. Create an API key
 
@@ -174,7 +177,7 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 The answer, in `choices[0].message.content`, is a single label such as `billing`. The model's instructions are applied
 for you, it answers at temperature 0 unless the request sets one, and its answers are held to the label set
-([Serving → Structured output](serving.md#structured-output)). `"model": "support-triage@0"` calls the baseline
+([Serving → Structured output](../api/structured-output.md)). `"model": "support-triage@0"` calls the baseline
 instead, deployed or not. `GET /v1/models` lists every name the key can call.
 
 | Status | Means |
@@ -183,19 +186,19 @@ instead, deployed or not. `GET /v1/models` lists every name the key can call.
 | 403 | The key does not cover this model |
 | 404, `support-triage is not deployed` | Deploy it (step 7), or call a version such as `support-triage@1` |
 
-Streaming, sampling, tool calling and reasoning work as in OpenAI's API: [Serving](serving.md).
+Streaming, sampling, tool calling and reasoning work as in OpenAI's API: [Serving](../api/overview.md).
 
 ## 10. Watch it run
 
 **Monitoring → Requests** lists every `/v1` call, newest first, and the model's **Monitoring** tab charts its
 requests, latency and errors per version. The audit log under **Settings → Audit log** records the model, the
-training run, the deploy and the key. To send metrics and traces to your own tools: [Observability](observability.md).
+training run, the deploy and the key. To send metrics and traces to your own tools: [Observability](../observability/metrics.md).
 
 ## Next steps
 
 - Improve it: rate or correct answers in the **Playground**, accept them under **Feedback**, then **Train** again.
   The new version takes the accepted rows, is scored on the same held-out rows and is compared with the live one
-  ([Training](training.md)).
-- Add GPU machines to train and serve larger models: [Joining machines](machines.md).
-- Invite your team and set who may do what: [Security → Accounts and sign-in](security.md#accounts-and-sign-in).
-- How the pieces fit together: [Architecture](architecture.md).
+  ([Training](../guides/training.md)).
+- Add GPU machines to train and serve larger models: [Joining machines](../install/machines.md).
+- Invite your team and set who may do what: [Security → Accounts and sign-in](../security/accounts.md).
+- How the pieces fit together: [Architecture](../reference/architecture.md).

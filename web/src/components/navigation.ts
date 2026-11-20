@@ -61,7 +61,7 @@ export const SECTIONS: NavSection[] = [
 
 export const ACCOUNT_PATH = "/settings/account";
 
-export const DOCS_URL = "https://github.com/getminibrain/minibrain/tree/main/docs";
+export const DOCS_URL = "https://getminibrain.com/docs";
 
 export const SETTINGS_PAGES: NavEntry[] = [
     { label: "Your account", path: ACCOUNT_PATH, icon: IconUser },

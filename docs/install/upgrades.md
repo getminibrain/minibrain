@@ -1,4 +1,9 @@
-# Upgrades
+---
+title: Upgrades
+description: Install a new minibrain release on main and on every machine that joined it, keep the data, and roll back if needed.
+sidebar:
+  order: 11
+---
 
 An upgrade installs a new minibrain release on main and on every machine that joined it, keeps the data, and migrates
 the database when main starts.
@@ -6,20 +11,22 @@ the database when main starts.
 Today an upgrade stops main for as long as the restart takes. On one machine (`minibrain serve`) that stops inference
 too, because the gateway and the local engines run inside main. With standalone gateways and engines on other
 machines, inference keeps going from the gateways' cached configuration
-([Control and serving planes](serving.md#control-and-serving-planes)). Not built yet: rolling upgrades of main without
-downtime, a policy for running main and machines on different releases, a backup command and a downgrade command.
-Going back to an older release means restoring a backup.
+([How serving works](../reference/how-serving-works.md)). Not built yet: rolling upgrades of main without downtime, a
+policy for running main and machines on different releases, a backup command and a downgrade command. Going back to an
+older release means restoring a backup.
 
+:::caution
 Upgrades start from 0.1.1. A database made by 0.1.0 predates the current migrations and cannot be upgraded: start
-0.1.1 on a new home folder and database.
+0.1.1 or later on a new home folder and database.
+:::
 
 ## Check the running version
 
 | Where | Shows |
 |---|---|
-| The user menu | Its last line, such as `minibrain 0.1.1`, for anyone signed in |
-| Settings › This install › Software | The `minibrain` row and the Build commit (admins) |
-| Infrastructure › Machines, a machine's Versions | Each library on that machine beside main's |
+| The user menu | Its last line, such as `minibrain 0.1.2`, for anyone signed in |
+| **Settings** › **This install** › **Software** | The `minibrain` row and the **Build** commit (admins) |
+| **Infrastructure** › **Machines**, a machine's **Versions** | Each library on that machine beside main's |
 
 From a shell: `uv tool list`, `pip show minibrain` in the virtual environment, or for Docker:
 
@@ -30,10 +37,10 @@ docker exec minibrain python -c "import importlib.metadata as m; print(m.version
 ## Read the release notes
 
 Each [GitHub Release](https://github.com/getminibrain/minibrain/releases) carries notes: the install and verify
-commands for that version, then every change since the previous release, Breaking changes first. Read the notes of
+commands for that version, then every change since the previous release, breaking changes first. Read the notes of
 every release between yours and the one you install; main applies the migrations in between in order. Check
 `minibrain.yaml` against them: main stops on a value it rejects and names the key, and logs a key it no longer knows
-as a warning ([Config file](install.md#config-file)).
+as a warning ([Configuration](configuration.md)).
 
 ## Back up first
 
@@ -43,11 +50,11 @@ There is no backup command yet, and restore is not tested end to end. Stop main,
 |---|---|---|
 | The home folder | `~/.minibrain` or `MINIBRAIN_HOME`; `/data` (the `minibrain-data` volume) in Docker | Holds `minibrain.db`, `secrets/`, `minibrain.yaml` and, with local storage, `models/` and `artifacts/` |
 | Postgres | The database `MINIBRAIN_DATABASE_URL` names | Instead of `minibrain.db` |
-| The master key | `keys/` in the home folder, or the file `MINIBRAIN_MASTER_KEY_FILE` names | Keep it apart from the data. With Vault, an HSM or KMS it stays there ([Key providers](security.md#key-providers)) |
-| The bucket | Settings › Storage, when artifacts live in S3-compatible storage | Keep versioning on: objects deleted after the backup are gone otherwise |
+| The master key | `keys/` in the home folder, or the file `MINIBRAIN_MASTER_KEY_FILE` names | Keep it apart from the data. With Vault, an HSM or KMS it stays there ([Key providers](../security/key-providers.md)) |
+| The bucket | **Settings** › **Storage**, when artifacts live in S3-compatible storage | Keep versioning on: objects deleted after the backup are gone otherwise |
 
-[Where data lives](install.md#where-data-lives) lists the folders minibrain rebuilds, which a backup can leave out. Use
-the line for your install (native, Docker, Compose), plus `pg_dump` with Postgres:
+[Where data lives](data-folder.md) lists the folders minibrain rebuilds, which a backup can leave out. Use the line
+for your install (native, Docker, Compose), plus `pg_dump` with Postgres:
 
 ```sh
 tar czf minibrain-home.tgz -C "${MINIBRAIN_HOME:-$HOME/.minibrain}" .
@@ -70,12 +77,12 @@ commands. Back up before running any of them on the new release.
    share one database.
 3. Back up (above).
 4. Install the new release the way you installed the old one (below). The installer checks the signature when cosign
-   is installed; otherwise [verify the release](install.md#verify-a-release) first.
+   is installed; otherwise [verify the release](verify-release.md) first.
 5. Start main. It migrates the database before it listens ([What happens on start](#what-happens-on-start)). With
    several mains, start one, wait until `/readyz` answers, then start the others.
 6. Check `curl -s http://127.0.0.1:8000/healthz`, the version in the user menu and the log. A release with a new
    DuckDB needs that version's extensions: the image carries them; a native install runs `minibrain extensions install`.
-7. Upgrade the machines that joined main ([Machines that joined main](#machines-that-joined-main)).
+7. Upgrade the machines that joined main ([below](#upgrade-machines-that-joined-main)).
 
 ### Installer
 
@@ -111,8 +118,8 @@ docker compose pull && docker compose up -d
 ```
 
 Keep every flag of your own `docker run` and change only the tag; the CPU image's tag is `<version>`
-([Run with Docker](install.md#run-with-docker)). With Compose and a release pinned in `.env`, set `MINIBRAIN_IMAGE` to
-the new tag first; a local build is `docker compose up -d --build` ([Compose](install.md#compose)).
+([Docker](docker.md#image-tags)). With Compose and a release pinned in `.env`, set `MINIBRAIN_IMAGE` to the new tag
+first; a local build is `docker compose up -d --build` ([Docker Compose](compose.md)).
 
 ## What happens on start
 
@@ -134,23 +141,23 @@ While main is down:
 | Workers on other machines | Keep running their jobs, retry main every 30 s at most, and send the jobs' events later |
 | Jobs on main's own worker | Stop with main and are retried; training resumes from its last checkpoint |
 
-## Machines that joined main
+## Upgrade machines that joined main
 
-Run every worker, engine and standalone gateway on main's release ([Joining machines](machines.md)). There is no
+Run every worker, engine and standalone gateway on main's release ([Add machines](machines.md)). There is no
 version-skew policy yet: mixed releases are not tested, and main does not turn a machine away for its version. Until it
-matches, Infrastructure › Machines marks the machine Version drift, and Needs attention says, for example,
-`gpu-01 runs other library versions than main:
-minibrain 0.1.0 (main has 0.1.1)`. The check compares minibrain, torch, transformers and peft, ignoring local build
-tags such as `+cu132`. For each worker machine, after main:
+matches, **Infrastructure** › **Machines** marks the machine **Version drift**, and **Needs attention** says, for
+example, `gpu-01 runs other library versions than main: minibrain 0.1.1 (main has 0.1.2)`. The check compares
+minibrain, torch, transformers and peft, ignoring local build tags such as `+cu132`. For each worker machine, after
+main:
 
-1. Infrastructure › Machines, open the machine, Drain. Its jobs finish and no new one starts there; each engine keeps
-   serving until another machine in the pool has its model ready. A model no other machine can take keeps serving
-   here and stops with the worker ([Drain and remove](serving.md#drain-and-remove)).
-2. Wait for "Drained: nothing runs here and it takes no new work."
+1. In **Infrastructure** › **Machines**, open the machine and click **Drain**. Its jobs finish and no new one starts
+   there; each engine keeps serving until another machine in the pool has its model ready. A model no other machine
+   can take keeps serving here and stops with the worker ([Machine health](machine-health.md)).
+2. Wait for "Drained: nothing runs here and it takes no new work. Safe to remove."
 3. Stop `minibrain worker`, upgrade it the same way as main, and start it with the same command. It keeps its approval
-   in `<home>/worker/approval.json`, or joins again with its token ([A machine joins](serving.md#a-machine-joins)). A
-   drained machine stays drained across the restart.
-4. Undrain. Its Versions table shows no drift.
+   in `<home>/worker/approval.json`, or joins again with its token ([Add machines](machines.md)). A drained machine
+   stays drained across the restart.
+4. Click **Undrain**. Its **Versions** table shows no drift.
 
 Restart standalone gateways one at a time behind the load balancer; each reads its saved config at start and answers
 `/readyz` with it. Restart standalone engines (`minibrain engine`) one at a time; gateways fail over to other replicas.

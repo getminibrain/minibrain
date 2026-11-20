@@ -10,11 +10,11 @@ On your own hardware or cloud, under your control.
 [![PyPI](https://img.shields.io/pypi/v/minibrain?label=PyPI)](https://pypi.org/project/minibrain/)
 [![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](pyproject.toml)
 [![Image](https://img.shields.io/badge/image-ghcr.io-blue?logo=docker&logoColor=white)](https://github.com/getminibrain/minibrain/pkgs/container/minibrain)
-[![Signed](https://img.shields.io/badge/signed-Sigstore-blue)](docs/install.md#verify-a-release)
+[![Signed](https://img.shields.io/badge/signed-Sigstore-blue)](https://getminibrain.com/docs/install/verify-release)
 [![License](https://img.shields.io/github/license/getminibrain/minibrain)](LICENSE)
 
-[Install](docs/install.md) · [Serving](docs/serving.md) · [Models](docs/models.md) · [Security](docs/security.md) ·
-[Roadmap](ROADMAP.md)
+[Docs](https://getminibrain.com/docs) · [Install](https://getminibrain.com/docs/get-started/installation) · [Your first model](https://getminibrain.com/docs/get-started/first-model) ·
+[API](https://getminibrain.com/docs/api/overview) · [Roadmap](ROADMAP.md)
 
 </div>
 
@@ -52,7 +52,7 @@ docker run -d --name minibrain --gpus all --shm-size 8g -p 127.0.0.1:8000:8000 -
 ```
 
 In Docker, `docker logs minibrain | grep setup` finds the setup link. Air-gapped installs, PyTorch backends,
-compose, upgrades and signature checks are in [`docs/install.md`](docs/install.md).
+compose, upgrades and signature checks are in the [install guide](https://getminibrain.com/docs/install/installer).
 
 </details>
 
@@ -85,7 +85,7 @@ print(reply.choices[0].message.content)
 ```
 
 `support-triage` follows the live version; `support-triage@2` pins one. Structured output with `json_schema` is
-supported ([`docs/serving.md`](docs/serving.md#structured-output)).
+supported ([structured output](https://getminibrain.com/docs/api/structured-output)).
 
 ## Scale out
 
@@ -98,19 +98,20 @@ One command runs everything on one machine. The same package adds machines as yo
 | `minibrain gateway --main-url http://main:8000 --port 8100` | A standalone `/v1` gateway that keeps answering while main restarts |
 
 Base models come from Hugging Face or a mirror, an S3 bucket, or a local folder; `MINIBRAIN_OFFLINE=1` turns off
-every outbound call ([`docs/models.md`](docs/models.md)). Metrics, traces and logs export to your own stack
-([`docs/observability.md`](docs/observability.md)).
+every outbound call ([base models](https://getminibrain.com/docs/guides/models)). Metrics, traces and logs export to your own stack
+([observability](https://getminibrain.com/docs/observability/metrics)).
 
 ## Documentation
 
 | | |
 |---|---|
-| [Install](docs/install.md) | Every install path, air-gapped installs, upgrades, verifying a release |
-| [Models](docs/models.md) | The catalogue, model sources, downloads and imports |
-| [Serving](docs/serving.md) | The `/v1` gateway, streaming, tool calling, structured output, routing |
-| [Security](docs/security.md) | Sign-in and single sign-on, policies, audit log, encryption at rest, SBOMs |
-| [Observability](docs/observability.md) | OpenTelemetry, Prometheus, JSON logs |
-| [Architecture](docs/architecture.md) | Control and serving planes, jobs, storage |
+| [Get started](https://getminibrain.com/docs) | What minibrain is, installation and your first model |
+| [Install and run](https://getminibrain.com/docs/install/installer) | Every install path, GPUs, configuration, machines, upgrades, verifying a release |
+| [Guides](https://getminibrain.com/docs/guides/data) | Data, base models, training, evaluation and deployments |
+| [API](https://getminibrain.com/docs/api/overview) | The OpenAI-compatible `/v1` API: chat, streaming, structured output, tool calling |
+| [Security](https://getminibrain.com/docs/security/accounts) | Sign-in and single sign-on, policies, audit log, encryption at rest, supply chain |
+| [Observability](https://getminibrain.com/docs/observability/metrics) | Prometheus, OpenTelemetry and JSON logs |
+| [Reference](https://getminibrain.com/docs/reference/architecture) | Architecture, how serving works, the CLI |
 | [Roadmap](ROADMAP.md) | Where minibrain is going |
 
 ## Develop
