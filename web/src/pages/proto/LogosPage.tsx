@@ -83,6 +83,210 @@ function Carved({ uid, cut, children }: { uid: string; cut: ReactNode; children:
     );
 }
 
+const BRAIN_WIDTH = 34.34;
+const BRAIN_HEIGHT = 25.57;
+
+function MiniBrain({ x, y, scale, fill }: { x: number; y: number; scale: number; fill: string }) {
+    const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+    return (
+        <g
+            transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${scale}) translate(-32 -31.6)`}
+        >
+            <Carved uid={uid} cut={<Fissure />}>
+                <path d={BRAIN} fill={fill} />
+            </Carved>
+        </g>
+    );
+}
+
+function polar(radius: number, degrees: number, cx = 32, cy = 32): [number, number] {
+    const t = (degrees * Math.PI) / 180;
+    return [cx + radius * Math.cos(t), cy + radius * Math.sin(t)];
+}
+
+function rowOfSizes(scales: number[], gap: number): { x: number; y: number; scale: number }[] {
+    const widths = scales.map((scale) => BRAIN_WIDTH * scale);
+    const base = 32 + (BRAIN_HEIGHT * Math.max(...scales)) / 2;
+    let x = 32 - (widths.reduce((sum, w) => sum + w, 0) + gap * (scales.length - 1)) / 2;
+    return scales.map((scale, i) => {
+        const placed = { x: x + widths[i] / 2, y: base - (BRAIN_HEIGHT * scale) / 2, scale };
+        x += widths[i] + gap;
+        return placed;
+    });
+}
+
+const SIZES = rowOfSizes([0.27, 0.4, 0.56], 3.2);
+const OCTO_NODES = Array.from({ length: 8 }, (_, i) => polar(22, i * 45 + 22.5));
+const RING_BRAINS = Array.from({ length: 6 }, (_, i) => polar(16.5, i * 60 - 90));
+const MOON = polar(19, -42, 30, 34);
+const FLOCK = [
+    { x: 32, y: 22, scale: 0.36 },
+    { x: 21, y: 33, scale: 0.28 },
+    { x: 43, y: 33, scale: 0.28 },
+    { x: 12.5, y: 44, scale: 0.22 },
+    { x: 51.5, y: 44, scale: 0.22 },
+];
+
+function Squircle({ fill }: { fill: string }) {
+    return <path d={TILE} fill={fill} />;
+}
+
+const MANY: Mark[] = [
+    {
+        id: "06",
+        name: "Quad",
+        note: "Four minibrains, one tile: a specialist for every job.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                {[21.5, 42.5].flatMap((x) =>
+                    [23, 41].map((y) => (
+                        <MiniBrain key={`${x}-${y}`} x={x} y={y} scale={0.42} fill={p.glyph} />
+                    )),
+                )}
+            </>
+        ),
+    },
+    {
+        id: "07",
+        name: "Trio",
+        note: "Three minds working together. The quietest of the set at small sizes.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                <MiniBrain x={32} y={22.5} scale={0.44} fill={p.glyph} />
+                <MiniBrain x={21.3} y={41.5} scale={0.44} fill={p.glyph} />
+                <MiniBrain x={42.7} y={41.5} scale={0.44} fill={p.glyph} />
+            </>
+        ),
+    },
+    {
+        id: "08",
+        name: "Sizes",
+        note: "Small, medium and large on one baseline: models of any size.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                {SIZES.map((b) => (
+                    <MiniBrain key={b.scale} x={b.x} y={b.y} scale={b.scale} fill={p.glyph} />
+                ))}
+            </>
+        ),
+    },
+    {
+        id: "09",
+        name: "Split",
+        note: "A minibrain budding off a larger one: a specialist made from a base model.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                <MiniBrain x={25.5} y={34.5} scale={0.62} fill={p.glyph} />
+                <circle cx="44.5" cy="22.5" r="10.6" fill={p.brand} />
+                <MiniBrain x={44.5} y={22.5} scale={0.4} fill={p.glyph} />
+            </>
+        ),
+    },
+    {
+        id: "10",
+        name: "Fork",
+        note: "One base model branching into two specialists, like a family tree of versions.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                <g fill="none" stroke={p.glyph} strokeWidth="2" strokeLinecap="round">
+                    <path d="M32 37.5V33C32 29.5 27 28.8 22.5 27" />
+                    <path d="M32 33C32 29.5 37 28.8 41.5 27" />
+                </g>
+                <MiniBrain x={32} y={45} scale={0.46} fill={p.glyph} />
+                <MiniBrain x={19.5} y={20.5} scale={0.34} fill={p.glyph} />
+                <MiniBrain x={44.5} y={20.5} scale={0.34} fill={p.glyph} />
+            </>
+        ),
+    },
+    {
+        id: "11",
+        name: "Orbit",
+        note: "A minibrain orbiting a larger mind: the specialist beside the private frontier model.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                <circle cx="30" cy="34" r="19" fill="none" stroke={p.glyph} strokeWidth="1.8" />
+                <MiniBrain x={30} y={34} scale={0.62} fill={p.glyph} />
+                <circle cx={MOON[0]} cy={MOON[1]} r="7.2" fill={p.brand} />
+                <MiniBrain x={MOON[0]} y={MOON[1]} scale={0.3} fill={p.glyph} />
+            </>
+        ),
+    },
+    {
+        id: "12",
+        name: "Octo",
+        note: "A central brain and eight nodes, like an octopus with a brain in every arm.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                <MiniBrain x={32} y={32} scale={0.6} fill={p.glyph} />
+                {OCTO_NODES.map(([x, y]) => (
+                    <circle key={`${x}-${y}`} cx={x} cy={y} r="2.6" fill={p.glyph} />
+                ))}
+            </>
+        ),
+    },
+    {
+        id: "13",
+        name: "Ring",
+        note: "Six minibrains in a circle: a council of specialists with no single centre.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                {RING_BRAINS.map(([x, y]) => (
+                    <MiniBrain key={`${x}-${y}`} x={x} y={y} scale={0.27} fill={p.glyph} />
+                ))}
+            </>
+        ),
+    },
+    {
+        id: "14",
+        name: "Flock",
+        note: "Five minibrains flying in formation: coordinated, each with its own job.",
+        draw: (p) => (
+            <>
+                <Squircle fill={p.brand} />
+                {FLOCK.map((b) => (
+                    <MiniBrain
+                        key={`${b.x}-${b.y}`}
+                        x={b.x}
+                        y={b.y}
+                        scale={b.scale}
+                        fill={p.glyph}
+                    />
+                ))}
+            </>
+        ),
+    },
+    {
+        id: "15",
+        name: "Deck",
+        note: "Stacked tiles, one minibrain on top: many models, one install.",
+        draw: (p) => (
+            <>
+                {[
+                    [6.5, -6.5],
+                    [2, -2],
+                    [-2.5, 2.5],
+                ].map(([dx, dy]) => (
+                    <g
+                        key={`${dx}`}
+                        transform={`translate(${dx} ${dy}) translate(32 32) scale(.7) translate(-32 -32)`}
+                    >
+                        <path d={TILE} fill={p.brand} stroke={p.ground} strokeWidth="2.8" />
+                    </g>
+                ))}
+                <MiniBrain x={29.5} y={34.5} scale={0.46} fill={p.glyph} />
+            </>
+        ),
+    },
+];
+
 const MARKS: Mark[] = [
     {
         id: "00",
@@ -277,6 +481,16 @@ export function LogosPage() {
             <Section title="Cortex" caption="The mark you picked, and five refinements of it.">
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10">
                     {MARKS.map((mark) => (
+                        <MarkPreview key={mark.id} mark={mark} />
+                    ))}
+                </div>
+            </Section>
+            <Section
+                title="Many minds"
+                caption="A minibrain for every job: many specialists, one centre, like an octopus with a brain in every arm."
+            >
+                <div className="grid grid-cols-3 gap-x-8 gap-y-10">
+                    {MANY.map((mark) => (
                         <MarkPreview key={mark.id} mark={mark} />
                     ))}
                 </div>
