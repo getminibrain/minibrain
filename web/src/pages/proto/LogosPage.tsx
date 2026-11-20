@@ -30,25 +30,26 @@ const GROUNDS: Record<Mode, { ground: string; ink: string }> = {
 
 const COLOURS: Colour[] = [
     { id: "ink", name: "Ink", light: "#1b1c1d", dark: "#3a3d44" },
-    { id: "graphite", name: "Graphite", light: "#3a3f4b", dark: "#565c69" },
-    { id: "slate", name: "Slate", light: "#45566b", dark: "#617590" },
-    { id: "cobalt", name: "Cobalt", light: "#026ecd", dark: "#2f6ff0" },
-    { id: "sky", name: "Sky", light: "#0567a8", dark: "#1585c8" },
-    { id: "ultramarine", name: "Ultramarine", light: "#2b3ad6", dark: "#4f5df2" },
-    { id: "indigo", name: "Indigo", light: "#4332c4", dark: "#6450ea" },
-    { id: "violet", name: "Violet", light: "#6a2bd1", dark: "#8550ea" },
-    { id: "plum", name: "Plum", light: "#7d1f8c", dark: "#a03bb0" },
-    { id: "magenta", name: "Magenta", light: "#b0185a", dark: "#d6347a" },
-    { id: "crimson", name: "Crimson", light: "#b5162b", dark: "#dd3343" },
-    { id: "oxblood", name: "Oxblood", light: "#7a1824", dark: "#a52a37" },
-    { id: "vermilion", name: "Vermilion", light: "#c2380f", dark: "#e2531f" },
-    { id: "copper", name: "Copper", light: "#9a4a1a", dark: "#bf6229" },
-    { id: "ochre", name: "Ochre", light: "#8f5f00", dark: "#ad7a06" },
-    { id: "olive", name: "Olive", light: "#4f6b12", dark: "#668a1a" },
-    { id: "forest", name: "Forest", light: "#1d5c34", dark: "#2a7a46" },
-    { id: "emerald", name: "Emerald", light: "#04704f", dark: "#0b8f65" },
-    { id: "teal", name: "Teal", light: "#0b6b69", dark: "#118a86" },
-    { id: "petrol", name: "Petrol", light: "#0f5a73", dark: "#1a7896" },
+    { id: "rose", name: "Rose", light: "#f00071", dark: "#ff277c" },
+    { id: "red", name: "Red", light: "#f7002a", dark: "#ff333c" },
+    { id: "scarlet", name: "Scarlet", light: "#e43b00", dark: "#f84100" },
+    { id: "flame", name: "Flame", light: "#cf5500", dark: "#df5c00" },
+    { id: "tangerine", name: "Tangerine", light: "#bf6200", dark: "#d16b00" },
+    { id: "emerald", name: "Emerald", light: "#008e40", dark: "#009a46" },
+    { id: "jade", name: "Jade", light: "#008d65", dark: "#00996e" },
+    { id: "teal", name: "Teal", light: "#008b7a", dark: "#009784" },
+    { id: "lagoon", name: "Lagoon", light: "#008989", dark: "#009696" },
+    { id: "cyan", name: "Cyan", light: "#008899", dark: "#0094a6" },
+    { id: "azure", name: "Azure", light: "#0084af", dark: "#0091c0" },
+    { id: "electric", name: "Electric", light: "#007ed9", dark: "#0089ea" },
+    { id: "cobalt", name: "Cobalt", light: "#2971ff", dark: "#4181ff" },
+    { id: "royal", name: "Royal", light: "#4f6cff", dark: "#5c7bff" },
+    { id: "indigo", name: "Indigo", light: "#6d64ff", dark: "#7775ff" },
+    { id: "violet", name: "Violet", light: "#8b57ff", dark: "#936aff" },
+    { id: "purple", name: "Purple", light: "#ab41ff", dark: "#b158ff" },
+    { id: "orchid", name: "Orchid", light: "#cd00f9", dark: "#d636ff" },
+    { id: "magenta", name: "Magenta", light: "#df00c5", dark: "#f300d7" },
+    { id: "pink", name: "Pink", light: "#ea0094", dark: "#fe00a2" },
 ];
 
 function paletteFor(colour: Colour, mode: Mode): Palette {
@@ -432,7 +433,7 @@ function ColourMatrix({
 }
 
 export function LogosPage() {
-    const [colourId, setColourId] = useState("ink");
+    const [colourId, setColourId] = useState("cobalt");
     const colour = COLOURS.find((c) => c.id === colourId) ?? COLOURS[0];
     return (
         <Page wide>
@@ -442,7 +443,7 @@ export function LogosPage() {
             />
             <Section
                 title="Colour"
-                caption="Each colour has a light and a dark value; the white brain stays above 3.7:1 on both."
+                caption="Vivid colours at full saturation, with Ink as the reference. The white brain stays at 4.2:1 or more in light mode and 3.6:1 in dark."
             >
                 <ColourPicker value={colour.id} onChange={setColourId} />
             </Section>
@@ -458,7 +459,7 @@ export function LogosPage() {
             </Section>
             <Section
                 title="Every colour"
-                caption="All twenty colours on every mark, light and dark. Pick a row to preview it above."
+                caption="Every colour on every mark, light and dark. Pick a row to preview it above."
             >
                 <ColourMatrix selected={colour.id} onSelect={setColourId} />
             </Section>
