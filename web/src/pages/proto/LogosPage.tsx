@@ -406,6 +406,116 @@ function DarkOption({ option }: { option: (typeof DARK_OPTIONS)[number] }) {
     );
 }
 
+type BrainTile = {
+    name: string;
+    light: string;
+    dark: string;
+    glyphs: { name: string; colour: string }[];
+};
+
+const BRAIN_TILES: BrainTile[] = [
+    {
+        name: "Volt",
+        light: "#a6d900",
+        dark: "#bcf600",
+        glyphs: [
+            { name: "Ink", colour: "#1b1c1d" },
+            { name: "Navy", colour: "#0b1f4d" },
+            { name: "Plum", colour: "#3b0d3f" },
+            { name: "Oxblood", colour: "#4a0d17" },
+            { name: "Forest", colour: "#0f3d2e" },
+            { name: "Deep blue", colour: "#123a9c" },
+        ],
+    },
+    {
+        name: "Rose",
+        light: "#f00071",
+        dark: "#ff277c",
+        glyphs: [
+            { name: "White", colour: "#ffffff" },
+            { name: "Ink", colour: "#1b1c1d" },
+            { name: "Cream", colour: "#fff4e0" },
+            { name: "Plum", colour: "#3b0d3f" },
+            { name: "Navy", colour: "#0b1f4d" },
+            { name: "Oxblood", colour: "#4a0d17" },
+        ],
+    },
+];
+
+const BRAIN_SIZES = [32, 20, 16];
+const WEAK_CONTRAST = 3;
+
+function luminance(hex: string): number {
+    const channels = [1, 3, 5].map(
+        (start) => Number.parseInt(hex.slice(start, start + 2), 16) / 255,
+    );
+    const [r, g, b] = channels.map((c) =>
+        c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+    const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (high + 0.05) / (low + 0.05);
+}
+
+function Ratio({ mode, value }: { mode: Mode; value: number }) {
+    return (
+        <span className={cn("tabular-nums", value < WEAK_CONTRAST && "text-warning")}>
+            {mode === "light" ? "Light" : "Dark"} {value.toFixed(1)}:1
+            {value < WEAK_CONTRAST ? " low" : ""}
+        </span>
+    );
+}
+
+function BrainColourCard({ tile, glyph }: { tile: BrainTile; glyph: BrainTile["glyphs"][number] }) {
+    const mark = MARKS.find((m) => m.id === FIT_MARK) ?? MARKS[0];
+    return (
+        <div className="flex flex-col gap-3 rounded-md border border-border p-4">
+            <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                    <span
+                        className="size-3.5 rounded-full border border-border"
+                        style={{ background: glyph.colour }}
+                    />
+                    <span className="font-medium">{glyph.name}</span>
+                    <span className="font-mono text-sm text-muted-foreground">{glyph.colour}</span>
+                </span>
+                <span className="flex gap-3 text-sm text-muted-foreground">
+                    {MODES.map((mode) => (
+                        <Ratio key={mode} mode={mode} value={contrast(glyph.colour, tile[mode])} />
+                    ))}
+                </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+                {MODES.map((mode) => {
+                    const palette: Palette = {
+                        brand: tile[mode],
+                        glyph: glyph.colour,
+                        ...GROUNDS[mode],
+                    };
+                    return (
+                        <Ground key={mode} mode={mode} className="gap-3 px-3 py-4">
+                            <Logo
+                                mark={mark}
+                                palette={palette}
+                                size={96}
+                                label={`${glyph.name} on ${tile.name}, ${mode}`}
+                            />
+                            <span className="flex flex-col items-center gap-2">
+                                {BRAIN_SIZES.map((size) => (
+                                    <Logo key={size} mark={mark} palette={palette} size={size} />
+                                ))}
+                            </span>
+                        </Ground>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 const FIT_CANDIDATES = ["sky", "aqua", "turquoise", "volt"];
 const FIT_MARK = "27";
 
@@ -549,6 +659,23 @@ export function LogosPage() {
                 <div className="grid grid-cols-2 gap-x-8 gap-y-10">
                     {DARK_OPTIONS.map((option) => (
                         <DarkOption key={option.name} option={option} />
+                    ))}
+                </div>
+            </Section>
+            <Section
+                title="Brain colour"
+                caption="Volt stays ink; here are other brain colours on Volt, and Rose as a tile, light and dark. Colours under 3:1 on the light tile are left out."
+            >
+                <div className="flex flex-col gap-8">
+                    {BRAIN_TILES.map((tile) => (
+                        <div key={tile.name} className="flex flex-col gap-3">
+                            <h3 className="text-lg font-semibold">On {tile.name}</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {tile.glyphs.map((glyph) => (
+                                    <BrainColourCard key={glyph.name} tile={tile} glyph={glyph} />
+                                ))}
+                            </div>
+                        </div>
                     ))}
                 </div>
             </Section>
