@@ -143,11 +143,7 @@ export function SummaryFact({
     icon,
     label,
     children,
-}: {
-    icon?: TablerIcon;
-    label: string;
-    children: ReactNode;
-}) {
+}: { icon?: TablerIcon; label: string; children: ReactNode }) {
     return (
         <div className="contents">
             <dt className="flex items-start gap-2 text-muted-foreground">

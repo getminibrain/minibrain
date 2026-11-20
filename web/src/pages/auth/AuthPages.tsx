@@ -181,10 +181,7 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
         signIn.mutate({ email, password });
     };
     return (
-        <AuthFrame
-            title="Sign in"
-            footer="Forgot your password? Ask an admin for a new link."
-        >
+        <AuthFrame title="Sign in" footer="Forgot your password? Ask an admin for a new link.">
             <form onSubmit={submit}>
                 <FieldGroup>
                     <InsecureNotice />
