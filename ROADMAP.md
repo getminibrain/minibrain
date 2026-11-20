@@ -1987,6 +1987,7 @@ it finds:
 - [ ] Home page
 - [ ] Playground
 - [ ] Settings: every section checked against what it controls
+- [ ] Light mode fixed across the app: every page, dialog and chart checked and corrected in light, not only dark
 - [ ] Security review: auth, roles, joining, worker and engine tokens, secrets, audit; an outside review if possible
 - [ ] Documentation: install, first model, joining machines, training, serving, API, security, upgrades
 - [ ] Logo and icon set
@@ -2081,6 +2082,10 @@ it finds:
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [ ] `test_long_polls_leave_threads_for_other_requests` is flaky in CI: `/api/jobs` took 2.98 s and 3.87 s (limit 1 s)
+  in 2 of its first 4 runs, finishing only when the 3 s long polls did. It always passes locally, even with every CPU
+  busy. Ruled out by slowing each step in turn: the gateway config rebuild and its lock, worker check-in, claims, and
+  session-touch writes.
 - [x] Switching the OS from dark to light with the page open left some Cobalt colours dark (`--input-background`):
   the preset is applied with obp-ui's `applyPresetStyle`, which clears every preset property before setting a mode.
 - [x] Training on a Mac used the CPU: training now picks CUDA (or ROCm), Intel XPU, the Apple GPU, then CPU, in bf16 or
