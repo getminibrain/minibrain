@@ -463,3 +463,22 @@ jobs:
           name: minibrain-sdist
           path: dist
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  website:
+    name: Website docs
+    needs: [version, release]
+    if: needs.version.outputs.publish == 'true' && needs.version.outputs.prerelease != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Redeploy getminibrain.com with this release's docs
+        env:
+          COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "${COOLIFY_DEPLOY_URL}" ]; then
+            echo "COOLIFY_DEPLOY_URL is not set; the website keeps its current docs"
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 \
+            --header "Authorization: Bearer ${COOLIFY_TOKEN}" "${COOLIFY_DEPLOY_URL}"

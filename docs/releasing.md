@@ -90,6 +90,8 @@ under Other changes; a compare link closes them. Preview them with
 | Release assets | Checks the wheel, sdist, SBOMs and `install.sh` are there for this version, writes `SHA256SUMS` and the notes | `contents: read` |
 | Sign and attest | Signs every release file and image, attests the SBOMs and the provenance, and checks every signature ([below](#signing-and-provenance)). In a dry run, signs the files with a throwaway key only | `contents: read`, `packages: write`, `id-token: write`, `attestations: write` |
 | GitHub Release | `gh release create` with the assets, their bundles and the notes. Tag push only | `contents: write` |
+| PyPI | Uploads the wheel and sdist ([below](#pypi)) | `id-token: write` |
+| Website docs | Calls the Coolify deploy webhook so getminibrain.com rebuilds `/docs` from this release. Skipped for pre-releases and when `COOLIFY_DEPLOY_URL` is not set | none |
 
 - The workflow's default token has no permissions; each job asks for what it needs. Only the image jobs and Sign and
   attest can write packages, only Sign and attest can request an OIDC token or write attestations, and only the last
@@ -172,6 +174,12 @@ GitHub, signed in with two-factor authentication):
 
 A pending publisher reserves nothing: the project is created by the first upload. The same form on test.pypi.org gives
 a rehearsal target.
+
+## Website docs
+
+getminibrain.com builds `/docs` from `docs/` at the latest release. Two repository secrets let a release rebuild it:
+`COOLIFY_DEPLOY_URL`, the deploy webhook of the getminibrain.com application in Coolify, and `COOLIFY_TOKEN`, a Coolify
+API token with deploy permission.
 
 ## Signing and provenance
 
