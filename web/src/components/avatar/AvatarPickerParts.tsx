@@ -400,12 +400,14 @@ export function CustomLetters({
 }
 
 export function RecentStrip({
+    className,
     items,
     selected,
     name,
     onPeek,
     onSelect,
 }: {
+    className?: string;
     items: AvatarChoice[];
     selected: AvatarChoice;
     name: string;
@@ -414,16 +416,8 @@ export function RecentStrip({
 }) {
     const empty = Math.max(RECENT_LIMIT - items.length, 0);
     return (
-        <section
-            aria-label="Recent"
-            className="flex min-w-0 flex-col gap-label border-t pt-4 lg:mt-auto"
-        >
-            <div className="flex h-5 items-center gap-2">
-                <span className="font-medium">Recent</span>
-                <span className="text-sm text-muted-foreground">
-                    Up to {RECENT_LIMIT}, newest first
-                </span>
-            </div>
+        <section aria-label="Recent" className={cn("flex min-w-0 items-center gap-3", className)}>
+            <span className="text-muted-foreground">Recent</span>
             <ul className="flex items-center gap-1.5" onPointerLeave={() => onPeek(null)}>
                 {items.map((item) => {
                     const checked = sameChoice(item, selected);
@@ -441,7 +435,7 @@ export function RecentStrip({
                                         onBlur={() => onPeek(null)}
                                         onClick={() => onSelect(item)}
                                         className={cn(
-                                            "relative flex size-10 items-center justify-center rounded-md border border-transparent p-0.5 hover:bg-secondary",
+                                            "relative flex size-8 items-center justify-center rounded-md border border-transparent p-0.5 hover:bg-secondary",
                                             PRESS_RING,
                                             checked && "border-primary",
                                         )}
@@ -458,7 +452,7 @@ export function RecentStrip({
                     <li
                         key={`slot-${slot}`}
                         aria-hidden="true"
-                        className="size-10 rounded-md border border-dashed"
+                        className="size-8 rounded-md border border-dashed"
                     />
                 ))}
             </ul>

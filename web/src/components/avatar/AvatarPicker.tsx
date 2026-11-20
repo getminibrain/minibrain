@@ -21,14 +21,12 @@ import {
     RecentStrip,
     StylePicker,
 } from "./AvatarPickerParts";
-import { AvatarTile } from "./AvatarTile";
 import {
     CUSTOM_LETTERS,
     GRID_SIZE,
     type Session,
     choose,
     deal,
-    describe,
     draftOf,
     finalChoice,
     pickStyle,
@@ -197,28 +195,20 @@ export function PickerDialog({
                             onPeek={(tone) => setPeek(tone ? { ...draft, tone } : null)}
                             onPick={(tone) => update((previous) => recolour(previous, tone))}
                         />
-                        <RecentStrip
-                            items={session.recent}
-                            selected={draft}
-                            name={displayName}
-                            onPeek={setPeek}
-                            onSelect={pick}
-                        />
                     </div>
                     <div className="min-w-0 lg:col-start-1 lg:row-start-2">
                         <ContextStrip choice={shown} name={displayName} />
                     </div>
                 </div>
                 <DialogFooter className="max-sm:sticky max-sm:-bottom-7 max-sm:-mx-7 max-sm:-mb-7 max-sm:grid max-sm:grid-cols-2 max-sm:border-t max-sm:bg-card max-sm:px-7 max-sm:py-4 sm:items-center">
-                    <p
-                        aria-live="polite"
-                        className="flex min-w-0 items-center gap-2 max-sm:col-span-2 sm:mr-auto"
-                        data-testid="avatar-summary"
-                    >
-                        <span className="text-muted-foreground">Saves</span>
-                        <AvatarTile choice={draft} name={displayName} size="sm" />
-                        <span className="truncate font-medium">{describe(draft, displayName)}</span>
-                    </p>
+                    <RecentStrip
+                        className="max-sm:col-span-2 sm:mr-auto"
+                        items={session.recent}
+                        selected={draft}
+                        name={displayName}
+                        onPeek={setPeek}
+                        onSelect={pick}
+                    />
                     <DialogClose render={<Button variant="outline">Cancel</Button>} />
                     <Button type="button" onClick={() => use(draft)}>
                         Use avatar
