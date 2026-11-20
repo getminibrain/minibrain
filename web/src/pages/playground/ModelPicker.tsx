@@ -61,7 +61,7 @@ export function ModelPicker({
     }, [targets, rows]);
     if (targets.length === 0) {
         return (
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="ghost">
                 <Link href="/discover">
                     <IconDownload />
                     Download a model

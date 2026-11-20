@@ -517,6 +517,7 @@ export function PlaygroundPage() {
                                 <ChatComposer
                                     autoFocus
                                     variant="dock"
+                                    className="py-4"
                                     sendOn="mod-enter"
                                     placeholder="Type a message"
                                     busy={busy}
