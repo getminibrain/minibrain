@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  UV_VERSION: "0.13.5"
+  UV_VERSION: "0.13.7"
   NODE_VERSION: "24"
   SYFT_VERSION: "1.54.1"
   SYFT_SHA256: "c069905b391cc4c20a5ba65ad5c10be2a7ba074f8ea6ad203e24d14e303dad47"
