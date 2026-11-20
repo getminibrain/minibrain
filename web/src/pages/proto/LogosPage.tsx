@@ -349,6 +349,63 @@ function MarkPreview({ mark, colour }: { mark: Mark; colour: Colour }) {
     );
 }
 
+const DARK_OPTIONS = [
+    {
+        name: "Ink on Volt",
+        tile: "#bcf600",
+        glyph: "#1b1c1d",
+        note: "The current logo: the ink brain reads as cut out of the badge.",
+    },
+    {
+        name: "Volt on graphite",
+        tile: "#2c2f35",
+        glyph: "#bcf600",
+        note: "Inverted: the brain glows Volt on a graphite badge.",
+    },
+    {
+        name: "Volt on ink",
+        tile: "#16171a",
+        glyph: "#bcf600",
+        note: "Inverted on a near-black badge: the brain floats, the badge almost disappears.",
+    },
+    {
+        name: "White on Volt",
+        tile: "#bcf600",
+        glyph: "#ffffff",
+        note: "White on bright Volt is 1.1:1: shown so you can see why it fails.",
+    },
+];
+const DARK_SIZES = [128, 48, 32, 20, 16];
+
+function DarkOption({ option }: { option: (typeof DARK_OPTIONS)[number] }) {
+    const mark = MARKS.find((m) => m.id === FIT_MARK) ?? MARKS[0];
+    const palette: Palette = { brand: option.tile, glyph: option.glyph, ...GROUNDS.dark };
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+                <h3 className="text-lg font-semibold">{option.name}</h3>
+                <p className="min-h-[2lh] text-sm text-muted-foreground">{option.note}</p>
+            </div>
+            <Ground mode="dark" className="gap-5 px-4 py-8">
+                {DARK_SIZES.map((size) => (
+                    <Logo key={size} mark={mark} palette={palette} size={size} />
+                ))}
+            </Ground>
+            <Ground mode="dark" className="py-6">
+                <span className="flex items-center gap-2.5">
+                    <Logo mark={mark} palette={palette} size={28} />
+                    <span
+                        className="font-display text-xl font-semibold tracking-tight"
+                        style={{ color: GROUNDS.dark.ink }}
+                    >
+                        minibrain
+                    </span>
+                </span>
+            </Ground>
+        </div>
+    );
+}
+
 const FIT_CANDIDATES = ["sky", "aqua", "turquoise", "volt"];
 const FIT_MARK = "27";
 
@@ -484,6 +541,16 @@ export function LogosPage() {
                 caption="Vivid colours at full saturation, with Ink as the reference. The white brain stays at 4.2:1 or more in light mode and 3.6:1 in dark; Sky, Aqua, Turquoise and Volt are bright tiles with an ink brain."
             >
                 <ColourPicker value={colour.id} onChange={setColourId} />
+            </Section>
+            <Section
+                title="Dark mode"
+                caption="The Volt Prime badge on a dark background, four ways."
+            >
+                <div className="grid grid-cols-2 gap-x-8 gap-y-10">
+                    {DARK_OPTIONS.map((option) => (
+                        <DarkOption key={option.name} option={option} />
+                    ))}
+                </div>
             </Section>
             <Section
                 title="Theme fit"
