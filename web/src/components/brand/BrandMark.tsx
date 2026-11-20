@@ -1,16 +1,16 @@
-import { cn } from "obp-ui";
-import markUrl from "./mark.svg";
-
-export const PRODUCT_NAME = "minibrain";
+import { cn, getTheme, onThemeChange } from "obp-ui";
+import { useSyncExternalStore } from "react";
+import { MARK_URLS, PRODUCT_NAME } from "./mark";
 
 export function BrandMark({
     size = 20,
     label,
     className,
 }: { size?: number; label?: string; className?: string }) {
+    const theme = useSyncExternalStore(onThemeChange, getTheme);
     return (
         <img
-            src={markUrl}
+            src={MARK_URLS[theme]}
             width={size}
             height={size}
             alt={label ?? ""}

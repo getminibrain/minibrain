@@ -22,7 +22,7 @@ const MODES: Mode[] = ["light", "dark"];
 
 const PALETTES: Record<Mode, Palette> = {
     light: { brand: "#1b1c1d", glyph: "#feffff", ink: "#202121", ground: "#f4f5f5" },
-    dark: { brand: "#1b1c1d", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
+    dark: { brand: "#34373d", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
 };
 
 const BRAIN = [
