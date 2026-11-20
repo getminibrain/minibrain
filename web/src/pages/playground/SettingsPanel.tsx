@@ -1,4 +1,4 @@
-import { IconPencil, IconPlus, IconTrash, IconX } from "@tabler/icons-react";
+import { IconCode, IconPencil, IconPlus, IconRestore, IconTrash, IconX } from "@tabler/icons-react";
 import {
     Button,
     Collapsible,
@@ -21,12 +21,14 @@ import {
 import { type ReactNode, useState } from "react";
 import { signature } from "~/lib/functionSchema";
 import {
+    DEFAULT_SETTINGS,
     type FunctionSpec,
     type ResponseFormat,
     type Settings,
     type Target,
     jsonProblem,
     reasoningOptions,
+    requestBody,
 } from "~/lib/playground";
 import { FunctionDialog } from "./FunctionDialog";
 import { Presets } from "./Presets";
@@ -39,18 +41,137 @@ const TWO = { maximumFractionDigits: 2 };
 
 type Change = (next: Partial<Settings>) => void;
 
+const BEHAVIOUR = ["temperature", "reasoning"] as const;
+const SAMPLING_KEYS = [
+    "top_p",
+    "top_k",
+    "min_p",
+    "presence_penalty",
+    "frequency_penalty",
+    "repetition_penalty",
+    "seed",
+] as const;
+
+function changedCount(settings: Settings, keys: readonly (keyof Settings)[]): number {
+    return keys.filter((key) => settings[key] !== DEFAULT_SETTINGS[key]).length;
+}
+
+function outputCount(settings: Settings): number {
+    return (
+        changedCount(settings, ["max_tokens"]) +
+        Number(settings.response_format !== "text") +
+        Number(settings.functions.length > 0)
+    );
+}
+
+function samplingCount(settings: Settings): number {
+    return changedCount(settings, SAMPLING_KEYS) + Number(settings.stop.length > 0);
+}
+
 function Group({
     title,
-    children,
+    help,
+    count = 0,
+    disabled = false,
     open = true,
-}: { title: string; children: ReactNode; open?: boolean }) {
+    children,
+}: {
+    title: string;
+    help?: ReactNode;
+    count?: number;
+    disabled?: boolean;
+    open?: boolean;
+    children: ReactNode;
+}) {
     return (
-        <Collapsible defaultOpen={open} className="border-b px-4 py-3 last:border-b-0">
-            <CollapsibleTrigger className="w-full font-medium">{title}</CollapsibleTrigger>
+        <Collapsible defaultOpen={open} className="border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+                <CollapsibleTrigger className="min-w-0 flex-1 font-medium">
+                    {title}
+                </CollapsibleTrigger>
+                {count > 0 && (
+                    <span className="text-sm text-muted-foreground tabular-nums">{count} set</span>
+                )}
+                {help && <InfoTip label={`About ${title}`}>{help}</InfoTip>}
+            </div>
             <CollapsibleContent>
-                <div className="flex flex-col gap-4 pt-3">{children}</div>
+                <fieldset
+                    disabled={disabled}
+                    className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0 pt-3"
+                >
+                    {children}
+                </fieldset>
             </CollapsibleContent>
         </Collapsible>
+    );
+}
+
+function sentValue(key: string, value: unknown): string {
+    if (Array.isArray(value)) {
+        const noun = key === "tools" ? "tool" : key;
+        return `${value.length} ${noun}${value.length === 1 ? "" : "s"}`;
+    }
+    if (typeof value === "number") {
+        return `${key} ${value.toLocaleString()}`;
+    }
+    if (typeof value === "string") {
+        return `${key} ${value}`;
+    }
+    if (key === "response_format") {
+        return String((value as { type?: string }).type ?? key);
+    }
+    if (key === "tool_choice") {
+        return "tool_choice function";
+    }
+    return key;
+}
+
+function sentSummary(settings: Settings, target: Target): string[] {
+    const {
+        model: _model,
+        messages: _messages,
+        ...body
+    } = requestBody(target.name, settings, [], target);
+    return Object.entries(body).map(([key, value]) => sentValue(key, value));
+}
+
+function Sends({
+    target,
+    settings,
+    changed,
+    onReset,
+    onViewCode,
+}: {
+    target: Target | undefined;
+    settings: Settings;
+    changed: boolean;
+    onReset: () => void;
+    onViewCode?: () => void;
+}) {
+    const parts = target ? sentSummary(settings, target) : [];
+    return (
+        <div className="sticky bottom-0 mt-auto flex flex-col gap-2 border-t bg-card px-4 py-3">
+            <div className="flex items-center gap-1">
+                <span className="flex-1 font-medium">Sends</span>
+                {onViewCode && (
+                    <Button size="sm" variant="ghost" disabled={!target} onClick={onViewCode}>
+                        <IconCode />
+                        View code
+                    </Button>
+                )}
+                <Button size="sm" variant="ghost" disabled={!changed} onClick={onReset}>
+                    <IconRestore />
+                    Reset all
+                </Button>
+            </div>
+            <p className="font-mono text-sm break-words text-muted-foreground">
+                {!target
+                    ? "No model selected"
+                    : parts.length === 0
+                      ? "Model defaults only"
+                      : parts.join(" · ")}
+            </p>
+        </div>
     );
 }
 
@@ -59,7 +180,7 @@ function Labelled({
     label,
     help,
     children,
-}: { id: string | null; label: string; help: ReactNode; children: ReactNode }) {
+}: { id: string | null; label: string; help?: ReactNode; children: ReactNode }) {
     return (
         <div className="flex flex-col gap-label">
             <div className="flex items-center gap-1.5">
@@ -68,7 +189,7 @@ function Labelled({
                 ) : (
                     <span className="leading-snug font-medium">{label}</span>
                 )}
-                <InfoTip label={`About ${label}`}>{help}</InfoTip>
+                {help && <InfoTip label={`About ${label}`}>{help}</InfoTip>}
             </div>
             {children}
         </div>
@@ -338,7 +459,7 @@ function StopControl({ settings, onChange }: { settings: Settings; onChange: Cha
         <Labelled
             id="playground-stop"
             label="Stop sequences"
-            help={`Up to ${MAX_STOPS} texts that end the answer when the model writes them; they are not returned. Unset: the model's own stop tokens only.`}
+            help={`Up to ${MAX_STOPS} texts that end the answer when the model writes them; they are not returned. Default: the model's own stop tokens only.`}
         >
             <div className="flex gap-2">
                 <Input
@@ -396,24 +517,41 @@ export function SettingsPanel({
     onSettings,
     preset,
     onPreset,
+    disabled = false,
+    onViewCode,
 }: {
     target: Target | undefined;
     settings: Settings;
     onSettings: (next: Settings) => void;
     preset: number | null;
     onPreset: (id: number | null) => void;
+    disabled?: boolean;
+    onViewCode?: () => void;
 }) {
     const change: Change = (next) => onSettings({ ...settings, ...next });
     const note = contractNote(target);
     const limit = target?.context_tokens ?? TOKEN_CAP;
+    const behaviour = changedCount(settings, BEHAVIOUR);
+    const output = outputCount(settings);
+    const sampling = samplingCount(settings);
+    const reset = () =>
+        onSettings({
+            ...DEFAULT_SETTINGS,
+            safety_model: settings.safety_model,
+            safety_answers: settings.safety_answers,
+        });
     return (
-        <div className="flex flex-col">
+        <div className="flex min-h-full flex-col">
             {note && (
                 <div className="border-b px-4 py-3">
                     <Note>{note}</Note>
                 </div>
             )}
-            <Group title="Presets">
+            <Group
+                title="Presets"
+                disabled={disabled}
+                help="A preset keeps every setting in this panel under a name, for you alone. One preset can load by default when the Playground opens."
+            >
                 <Presets
                     settings={settings}
                     onLoad={onSettings}
@@ -421,24 +559,10 @@ export function SettingsPanel({
                     onChosen={onPreset}
                 />
             </Group>
-            <Group title="Settings">
-                <OptionalNumberField
-                    id="playground-max-tokens"
-                    label="Max tokens"
-                    help={`The most tokens the answer may use. Unset means the model's limit${target?.context_tokens ? `, ${target.context_tokens.toLocaleString()} tokens of context for this one` : ""}.`}
-                    value={settings.max_tokens}
-                    onValueChange={(max_tokens) => change({ max_tokens })}
-                    min={1}
-                    max={limit}
-                    step={1}
-                    largeStep={256}
-                    fallback={Math.min(1024, limit)}
-                    format={WHOLE}
-                />
+            <Group title="Behaviour" count={behaviour} disabled={disabled}>
                 <OptionalNumberField
                     id="playground-temperature"
                     label="Temperature"
-                    help="How varied the answer is, from 0 (the likeliest token every time) to 2. Unset keeps the model's default; your custom models answer at 0, the way they were scored."
                     value={settings.temperature}
                     onValueChange={(temperature) => change({ temperature })}
                     min={0}
@@ -447,18 +571,36 @@ export function SettingsPanel({
                     largeStep={0.1}
                     fallback={0.7}
                     format={TWO}
+                    unsetLabel="Default"
                 />
+                {target?.kind === "custom" && settings.temperature === null && (
+                    <Note>
+                        Your custom models answer at 0 by default, the way they were scored.
+                    </Note>
+                )}
                 <ReasoningControl target={target} settings={settings} onChange={change} />
             </Group>
-            <Group title="Format options">
+            <Group title="Output" count={output} disabled={disabled}>
+                <OptionalNumberField
+                    id="playground-max-tokens"
+                    label="Max tokens"
+                    value={settings.max_tokens}
+                    onValueChange={(max_tokens) => change({ max_tokens })}
+                    min={1}
+                    max={limit}
+                    step={1}
+                    largeStep={256}
+                    fallback={Math.min(1024, limit)}
+                    format={WHOLE}
+                    unsetLabel="Default"
+                />
                 <FormatControl target={target} settings={settings} onChange={change} />
                 <FunctionsControl target={target} settings={settings} onChange={change} />
             </Group>
-            <Group title="Sampling" open={false}>
+            <Group title="Sampling" count={sampling} disabled={disabled} open={false}>
                 <OptionalNumberField
                     id="playground-top-p"
                     label="Top P"
-                    help="Sample only from the likeliest tokens whose probabilities add up to this share. Unset keeps the model's default."
                     value={settings.top_p}
                     onValueChange={(top_p) => change({ top_p })}
                     min={0.01}
@@ -466,11 +608,12 @@ export function SettingsPanel({
                     step={0.01}
                     fallback={0.9}
                     format={TWO}
+                    unsetLabel="Default"
                 />
                 <OptionalNumberField
                     id="playground-top-k"
                     label="Top K"
-                    help="Sample only from this many of the likeliest tokens. An engine extension; unset keeps the model's default."
+                    help="Sample only from this many of the likeliest tokens. An engine extension; Default keeps the model's own."
                     value={settings.top_k}
                     onValueChange={(top_k) => change({ top_k })}
                     min={1}
@@ -478,11 +621,12 @@ export function SettingsPanel({
                     step={1}
                     fallback={40}
                     format={WHOLE}
+                    unsetLabel="Default"
                 />
                 <OptionalNumberField
                     id="playground-min-p"
                     label="Min P"
-                    help="Drop tokens less likely than this share of the likeliest one. An engine extension; unset keeps the model's default."
+                    help="Drop tokens less likely than this share of the likeliest one. An engine extension; Default keeps the model's own."
                     value={settings.min_p}
                     onValueChange={(min_p) => change({ min_p })}
                     min={0}
@@ -490,11 +634,11 @@ export function SettingsPanel({
                     step={0.01}
                     fallback={0.05}
                     format={TWO}
+                    unsetLabel="Default"
                 />
                 <OptionalNumberField
                     id="playground-presence"
                     label="Presence penalty"
-                    help="Above 0 favours tokens that have not appeared yet, so the answer moves to new topics; below 0 does the opposite. Unset: 0."
                     value={settings.presence_penalty}
                     onValueChange={(presence_penalty) => change({ presence_penalty })}
                     min={-2}
@@ -502,11 +646,11 @@ export function SettingsPanel({
                     step={0.1}
                     fallback={0}
                     format={TWO}
+                    unsetLabel="Default"
                 />
                 <OptionalNumberField
                     id="playground-frequency"
                     label="Frequency penalty"
-                    help="Above 0 lowers a token's odds the more often it has appeared, so the answer repeats itself less. Unset: 0."
                     value={settings.frequency_penalty}
                     onValueChange={(frequency_penalty) => change({ frequency_penalty })}
                     min={-2}
@@ -514,11 +658,12 @@ export function SettingsPanel({
                     step={0.1}
                     fallback={0}
                     format={TWO}
+                    unsetLabel="Default"
                 />
                 <OptionalNumberField
                     id="playground-repetition"
                     label="Repetition penalty"
-                    help="Above 1 discourages repeating any token seen so far, prompt included; 1 changes nothing. An engine extension; unset keeps the model's default."
+                    help="Above 1 discourages repeating any token seen so far, prompt included; 1 changes nothing. An engine extension; Default keeps the model's own."
                     value={settings.repetition_penalty}
                     onValueChange={(repetition_penalty) => change({ repetition_penalty })}
                     min={0.1}
@@ -526,12 +671,13 @@ export function SettingsPanel({
                     step={0.01}
                     fallback={1.1}
                     format={TWO}
+                    unsetLabel="Default"
                 />
                 <StopControl settings={settings} onChange={change} />
                 <OptionalNumberField
                     id="playground-seed"
                     label="Seed"
-                    help="The same seed and inputs sample the same way, as far as the engine allows. Unset samples freshly each time."
+                    help="The same seed and inputs sample the same way, as far as the engine allows. Default samples freshly each time."
                     value={settings.seed}
                     onValueChange={(seed) => change({ seed })}
                     min={0}
@@ -540,8 +686,16 @@ export function SettingsPanel({
                     slider={false}
                     fallback={42}
                     format={WHOLE}
+                    unsetLabel="Default"
                 />
             </Group>
+            <Sends
+                target={target}
+                settings={settings}
+                changed={behaviour + output + sampling > 0}
+                onReset={reset}
+                onViewCode={onViewCode}
+            />
         </div>
     );
 }

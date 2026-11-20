@@ -124,6 +124,18 @@ export function settingsOf(saved: Record<string, unknown> | undefined): Settings
     };
 }
 
+function sortedJson(value: unknown): string {
+    return JSON.stringify(value, (_key, item) =>
+        item && typeof item === "object" && !Array.isArray(item)
+            ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+            : item,
+    );
+}
+
+export function sameSettings(a: Settings, b: Settings): boolean {
+    return sortedJson(a) === sortedJson(b);
+}
+
 export function parsedJson(text: string): unknown {
     try {
         return JSON.parse(text);
@@ -282,8 +294,9 @@ export function requestBody(
     if (settings.stop.length > 0) {
         body.stop = settings.stop;
     }
-    if (settings.reasoning) {
-        body.reasoning_effort = settings.reasoning;
+    const reasoning = settings.reasoning;
+    if (reasoning && reasoningOptions(target).some((option) => option.value === reasoning)) {
+        body.reasoning_effort = reasoning;
     }
     const format = formatOf(settings);
     if (format && target?.contract === "text") {

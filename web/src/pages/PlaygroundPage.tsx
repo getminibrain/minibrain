@@ -384,15 +384,15 @@ export function PlaygroundPage() {
           ? `${openedGone} is not available any more, ${answeredBy}`
           : null;
     const panelBody = (
-        <fieldset disabled={!target} className="m-0 min-w-0 border-0 p-0">
-            <SettingsPanel
-                target={target}
-                settings={settings}
-                onSettings={loadSettings}
-                preset={preset}
-                onPreset={setPreset}
-            />
-        </fieldset>
+        <SettingsPanel
+            target={target}
+            settings={settings}
+            onSettings={loadSettings}
+            preset={preset}
+            onPreset={setPreset}
+            disabled={!target}
+            onViewCode={() => setCode(true)}
+        />
     );
     const newChatButton = (wideButton: boolean) => (
         <Button
