@@ -21,6 +21,7 @@ import {
 } from "~/api/authQueries";
 import { signOutReason } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
+import { BrandLockup } from "~/components/brand/BrandMark";
 import { ACCOUNT_PATH } from "~/components/navigation";
 
 const MIN_PASSWORD = 12;
@@ -39,7 +40,7 @@ function AuthFrame({
     return (
         <main className="flex min-h-dvh flex-col items-center bg-background px-4 pt-[12vh] pb-8">
             <div className="flex w-full max-w-sm flex-col gap-4">
-                <span className="text-base font-semibold">minibrain</span>
+                <BrandLockup />
                 <Card>
                     <CardHeader>
                         <CardTitle>

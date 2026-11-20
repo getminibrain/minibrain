@@ -32,6 +32,7 @@ import { SettingsLayout } from "~/components/SettingsLayout";
 import { SettingsSection, SettingsSections } from "~/components/SettingsSection";
 import { SoftwareMark } from "~/components/SoftwareMark";
 import { When } from "~/components/When";
+import { BrandMark } from "~/components/brand/BrandMark";
 import { count } from "~/lib/format";
 import { bytes, relativeTime } from "~/lib/time";
 import { INSTALL, type Setting } from "~/pages/settings/settingsIndex";
@@ -150,7 +151,11 @@ function Software({ info }: { info: InstallInfo }) {
             description="Versions of minibrain and the libraries it runs on."
         >
             <SettingsGroup>
-                <SoftwareRow text={SOFTWARE.minibrain} mark="minibrain">
+                <SoftwareRow
+                    text={SOFTWARE.minibrain}
+                    mark="minibrain"
+                    fallback={<BrandMark size={16} />}
+                >
                     <Text>{software.minibrain}</Text>
                 </SoftwareRow>
                 <SoftwareRow

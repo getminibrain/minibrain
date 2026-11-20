@@ -20,6 +20,7 @@ import {
 import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
 import { SettingsSearch } from "~/components/SettingsSearch";
+import { BrandLockup } from "~/components/brand/BrandMark";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
 import {
     ACCOUNT_PATH,
@@ -183,7 +184,7 @@ export function Shell() {
     }, [settings, href]);
     const rail = (
         <Rail
-            brand={<span className="text-base font-semibold">minibrain</span>}
+            brand={<BrandLockup />}
             brandHref="/"
             brandLabel="Home"
             toggleIcon="panel"
