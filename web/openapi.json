@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "minibrain",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "paths": {
     "/api/auth/session": {
@@ -30748,6 +30748,18 @@
           },
           "methods": {
             "$ref": "#/components/schemas/SignInMethods"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The installed minibrain version, for signed-in people only"
           }
         },
         "type": "object",
@@ -30755,7 +30767,8 @@
           "setup",
           "person",
           "csrf_token",
-          "methods"
+          "methods",
+          "version"
         ],
         "title": "SessionInfo"
       },

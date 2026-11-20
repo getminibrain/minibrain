@@ -1,6 +1,8 @@
 import {
     IconArrowLeft,
     IconBook,
+    IconHelp,
+    IconInfoCircle,
     IconLogout,
     IconSettings,
     IconSunMoon,
@@ -20,9 +22,11 @@ import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
 import { SettingsSearch } from "~/components/SettingsSearch";
 import { BrandLockup, BrandMark } from "~/components/brand/BrandMark";
+import { PRODUCT_NAME } from "~/components/brand/mark";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
 import {
     ACCOUNT_PATH,
+    DOCS_URL,
     SETTINGS_PAGES,
     isSettingsPath,
     sectionsFor,
@@ -119,6 +123,7 @@ function Account() {
     const signsOut = person != null && person.source !== "proxy";
     const name = person?.name || person?.email || "";
     const sub = person?.role ? ROLE_LABELS[person.role] : "No role";
+    const version = session.data?.version;
     const items: AccountMenuItem[] = [
         {
             icon: <IconSettings />,
@@ -128,15 +133,32 @@ function Account() {
         ...(person?.role
             ? [{ icon: <IconBook />, label: "API reference", href: API_REFERENCE_PATH }]
             : []),
+        {
+            icon: <IconHelp />,
+            label: "Docs",
+            onSelect: () => window.open(DOCS_URL, "_blank", "noopener,noreferrer"),
+        },
         { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
-        ...(signsOut
+        signsOut
+            ? {
+                  icon: <IconLogout />,
+                  label: "Sign out",
+                  separatorBefore: true,
+                  disabled: signOut.isPending,
+                  onSelect: () => signOut.mutate(),
+              }
+            : {
+                  kind: "note",
+                  icon: <IconInfoCircle />,
+                  label: "Signed in through your organisation",
+                  separatorBefore: true,
+              },
+        ...(version
             ? [
                   {
-                      icon: <IconLogout />,
-                      label: "Sign out",
+                      kind: "note" as const,
+                      label: `${PRODUCT_NAME} ${version}`,
                       separatorBefore: true,
-                      disabled: signOut.isPending,
-                      onSelect: () => signOut.mutate(),
                   },
               ]
             : []),

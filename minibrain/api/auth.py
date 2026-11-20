@@ -33,6 +33,7 @@ from minibrain.auth.identity import Person
 from minibrain.auth.oidc import PENDING_COOKIE, PENDING_PATH, PENDING_SECONDS, OidcClient, OidcError, seal, unseal
 from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent, LoginSession, User, peer_address
+from minibrain.versions import library_version
 
 router = APIRouter(prefix="/api/auth")
 log = logging.getLogger("minibrain.auth")
@@ -69,6 +70,7 @@ class SessionInfo(BaseModel):
     person: PersonInfo | None
     csrf_token: str | None
     methods: SignInMethods
+    version: str | None = Field(description="The installed minibrain version, for signed-in people only")
 
 
 class SignInBody(BaseModel):
@@ -113,6 +115,7 @@ def session_info(request: Request, setup: bool, person: Person | None, csrf_subj
         person=person_info(person),
         csrf_token=csrf_for(key, csrf_subject) if csrf_subject else None,
         methods=methods_of(request),
+        version=library_version("minibrain") if person is not None else None,
     )
 
 

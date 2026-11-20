@@ -9748,6 +9748,11 @@ export interface components {
             /** Csrf Token */
             csrf_token: string | null;
             methods: components["schemas"]["SignInMethods"];
+            /**
+             * Version
+             * @description The installed minibrain version, for signed-in people only
+             */
+            version: string | null;
         };
         /** SessionsEnded */
         SessionsEnded: {

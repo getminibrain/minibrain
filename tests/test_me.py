@@ -205,3 +205,9 @@ def test_a_name_drops_control_and_direction_characters(install: Install) -> None
     assert renamed.json()["name"] == "Ada King \U0001f469\u200d\U0001f52c"
     only_controls = admin.patch("/api/me", json={"name": "\u202e\u0007"}, headers=csrf(admin))
     assert only_controls.status_code == 422
+
+
+def test_the_session_names_the_version_only_once_signed_in(install: Install) -> None:
+    assert install.client.get("/api/auth/session").json()["version"] is None
+    admin = set_up(install)
+    assert admin.get("/api/auth/session").json()["version"]
