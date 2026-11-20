@@ -1,4 +1,5 @@
-import { type ReactNode, useId } from "react";
+import { cn } from "obp-ui";
+import { type ReactNode, useId, useState } from "react";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 
@@ -11,6 +12,8 @@ type Palette = {
     ground: string;
 };
 
+type Colour = { id: string; name: string; light: string; dark: string };
+
 type Mark = {
     id: string;
     name: string;
@@ -20,10 +23,37 @@ type Mark = {
 
 const MODES: Mode[] = ["light", "dark"];
 
-const PALETTES: Record<Mode, Palette> = {
-    light: { brand: "#1b1c1d", glyph: "#feffff", ink: "#202121", ground: "#f4f5f5" },
-    dark: { brand: "#34373d", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
+const GROUNDS: Record<Mode, { ground: string; ink: string }> = {
+    light: { ground: "#f4f5f5", ink: "#202121" },
+    dark: { ground: "#010101", ink: "#e8e9ea" },
 };
+
+const COLOURS: Colour[] = [
+    { id: "ink", name: "Ink", light: "#1b1c1d", dark: "#3a3d44" },
+    { id: "graphite", name: "Graphite", light: "#3a3f4b", dark: "#565c69" },
+    { id: "slate", name: "Slate", light: "#45566b", dark: "#617590" },
+    { id: "cobalt", name: "Cobalt", light: "#026ecd", dark: "#2f6ff0" },
+    { id: "sky", name: "Sky", light: "#0567a8", dark: "#1585c8" },
+    { id: "ultramarine", name: "Ultramarine", light: "#2b3ad6", dark: "#4f5df2" },
+    { id: "indigo", name: "Indigo", light: "#4332c4", dark: "#6450ea" },
+    { id: "violet", name: "Violet", light: "#6a2bd1", dark: "#8550ea" },
+    { id: "plum", name: "Plum", light: "#7d1f8c", dark: "#a03bb0" },
+    { id: "magenta", name: "Magenta", light: "#b0185a", dark: "#d6347a" },
+    { id: "crimson", name: "Crimson", light: "#b5162b", dark: "#dd3343" },
+    { id: "oxblood", name: "Oxblood", light: "#7a1824", dark: "#a52a37" },
+    { id: "vermilion", name: "Vermilion", light: "#c2380f", dark: "#e2531f" },
+    { id: "copper", name: "Copper", light: "#9a4a1a", dark: "#bf6229" },
+    { id: "ochre", name: "Ochre", light: "#8f5f00", dark: "#ad7a06" },
+    { id: "olive", name: "Olive", light: "#4f6b12", dark: "#668a1a" },
+    { id: "forest", name: "Forest", light: "#1d5c34", dark: "#2a7a46" },
+    { id: "emerald", name: "Emerald", light: "#04704f", dark: "#0b8f65" },
+    { id: "teal", name: "Teal", light: "#0b6b69", dark: "#118a86" },
+    { id: "petrol", name: "Petrol", light: "#0f5a73", dark: "#1a7896" },
+];
+
+function paletteFor(colour: Colour, mode: Mode): Palette {
+    return { brand: colour[mode], glyph: "#ffffff", ...GROUNDS[mode] };
+}
 
 const BRAIN = [
     "M32 18.81A7.49 7.49 0 0 0 18.12 23.35A1.7 1.7 0 0 1 17.02 25.09A7.92 7.92 0 0 0 16.83 39.85",
@@ -153,7 +183,7 @@ const MARKS: Mark[] = [
     {
         id: "05",
         name: "Badge",
-        note: "The brain in a circle, for places that crop to round: GitHub, social avatars, app badges.",
+        note: "The brain in a circle, for places that crop to round.",
         draw: (p, uid) => (
             <>
                 <circle cx="32" cy="32" r="32" fill={p.brand} />
@@ -202,8 +232,8 @@ const MARKS: Mark[] = [
     },
     {
         id: "24",
-        name: "Ink",
-        note: "The classic bolt on the ink squircle.",
+        name: "Classic",
+        note: "The classic bolt on the squircle.",
         draw: (p, uid) => (
             <>
                 <path d={TILE} fill={p.brand} />
@@ -215,10 +245,15 @@ const MARKS: Mark[] = [
 
 function Logo({
     mark,
-    mode,
+    palette,
     size,
     label,
-}: { mark: Mark; mode: Mode; size: number; label?: string }) {
+}: {
+    mark: Mark;
+    palette: Palette;
+    size: number;
+    label?: string;
+}) {
     const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
     return (
         <svg
@@ -229,23 +264,30 @@ function Logo({
             aria-label={label}
             aria-hidden={label ? undefined : true}
         >
-            {mark.draw(PALETTES[mode], uid)}
+            {mark.draw(palette, uid)}
         </svg>
     );
 }
 
-function Ground({ mode, children }: { mode: Mode; children: ReactNode }) {
+function Ground({
+    mode,
+    className,
+    children,
+}: { mode: Mode; className?: string; children: ReactNode }) {
     return (
         <div
-            className="flex items-center justify-center gap-6 rounded-md border border-border py-8"
-            style={{ background: PALETTES[mode].ground }}
+            className={cn(
+                "flex items-center justify-center rounded-md border border-border",
+                className,
+            )}
+            style={{ background: GROUNDS[mode].ground }}
         >
             {children}
         </div>
     );
 }
 
-function MarkPreview({ mark }: { mark: Mark }) {
+function MarkPreview({ mark, colour }: { mark: Mark; colour: Colour }) {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
@@ -259,28 +301,38 @@ function MarkPreview({ mark }: { mark: Mark }) {
             </div>
             <div className="grid grid-cols-2 gap-3">
                 {MODES.map((mode) => (
-                    <Ground key={mode} mode={mode}>
-                        <Logo mark={mark} mode={mode} size={128} label={`${mark.name}, ${mode}`} />
+                    <Ground key={mode} mode={mode} className="py-8">
+                        <Logo
+                            mark={mark}
+                            palette={paletteFor(colour, mode)}
+                            size={128}
+                            label={`${mark.name}, ${colour.name}, ${mode}`}
+                        />
                     </Ground>
                 ))}
             </div>
             <div className="grid grid-cols-2 gap-3">
                 {MODES.map((mode) => (
-                    <Ground key={mode} mode={mode}>
+                    <Ground key={mode} mode={mode} className="gap-6 py-8">
                         {PREVIEW_SIZES.map((size) => (
-                            <Logo key={size} mark={mark} mode={mode} size={size} />
+                            <Logo
+                                key={size}
+                                mark={mark}
+                                palette={paletteFor(colour, mode)}
+                                size={size}
+                            />
                         ))}
                     </Ground>
                 ))}
             </div>
             <div className="grid grid-cols-2 gap-3">
                 {MODES.map((mode) => (
-                    <Ground key={mode} mode={mode}>
+                    <Ground key={mode} mode={mode} className="py-8">
                         <span className="flex items-center gap-2.5">
-                            <Logo mark={mark} mode={mode} size={32} />
+                            <Logo mark={mark} palette={paletteFor(colour, mode)} size={32} />
                             <span
                                 className="font-display text-2xl font-semibold tracking-tight"
-                                style={{ color: PALETTES[mode].ink }}
+                                style={{ color: GROUNDS[mode].ink }}
                             >
                                 minibrain
                             </span>
@@ -292,7 +344,96 @@ function MarkPreview({ mark }: { mark: Mark }) {
     );
 }
 
+function ColourPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {COLOURS.map((colour) => {
+                const selected = colour.id === value;
+                return (
+                    <button
+                        key={colour.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => onChange(colour.id)}
+                        className={cn(
+                            "flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-sm hover:bg-secondary",
+                            selected
+                                ? "border-primary bg-accent text-accent-foreground"
+                                : "border-border",
+                        )}
+                    >
+                        <span className="flex">
+                            <span
+                                className="size-3.5 rounded-l-full"
+                                style={{ background: colour.light }}
+                            />
+                            <span
+                                className="size-3.5 rounded-r-full"
+                                style={{ background: colour.dark }}
+                            />
+                        </span>
+                        {colour.name}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+function ColourMatrix({
+    selected,
+    onSelect,
+}: { selected: string; onSelect: (id: string) => void }) {
+    return (
+        <div className="overflow-x-auto">
+            <div className="grid min-w-[60rem] grid-cols-[8rem_repeat(8,minmax(0,1fr))] items-center gap-x-3 gap-y-2">
+                <span />
+                {MARKS.map((mark) => (
+                    <span
+                        key={mark.id}
+                        className="truncate text-center text-sm text-muted-foreground"
+                    >
+                        <span className="font-mono tabular-nums">{mark.id}</span> {mark.name}
+                    </span>
+                ))}
+                {COLOURS.map((colour) => (
+                    <div key={colour.id} className="contents">
+                        <button
+                            type="button"
+                            onClick={() => onSelect(colour.id)}
+                            className={cn(
+                                "flex h-full cursor-pointer flex-col items-start justify-center rounded-md px-2 text-left hover:bg-secondary",
+                                colour.id === selected && "bg-accent text-accent-foreground",
+                            )}
+                        >
+                            <span className="text-sm font-medium">{colour.name}</span>
+                            <span className="font-mono text-sm text-muted-foreground">
+                                {colour.light}
+                            </span>
+                        </button>
+                        {MARKS.map((mark) => (
+                            <div key={mark.id} className="grid grid-cols-2 gap-1">
+                                {MODES.map((mode) => (
+                                    <Ground key={mode} mode={mode} className="py-2">
+                                        <Logo
+                                            mark={mark}
+                                            palette={paletteFor(colour, mode)}
+                                            size={32}
+                                        />
+                                    </Ground>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function LogosPage() {
+    const [colourId, setColourId] = useState("ink");
+    const colour = COLOURS.find((c) => c.id === colourId) ?? COLOURS[0];
     return (
         <Page wide>
             <PageHeader
@@ -300,14 +441,26 @@ export function LogosPage() {
                 caption="Prototype, development only. Directions for the minibrain mark."
             />
             <Section
+                title="Colour"
+                caption="Each colour has a light and a dark value; the white brain stays above 3.7:1 on both."
+            >
+                <ColourPicker value={colour.id} onChange={setColourId} />
+            </Section>
+            <Section
                 title="Shortlist"
-                caption="Prime, my recommendation, then your six picks, in ink."
+                caption={`Prime, my recommendation, then your picks, in ${colour.name}.`}
             >
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10">
                     {MARKS.map((mark) => (
-                        <MarkPreview key={mark.id} mark={mark} />
+                        <MarkPreview key={mark.id} mark={mark} colour={colour} />
                     ))}
                 </div>
+            </Section>
+            <Section
+                title="Every colour"
+                caption="All twenty colours on every mark, light and dark. Pick a row to preview it above."
+            >
+                <ColourMatrix selected={colour.id} onSelect={setColourId} />
             </Section>
         </Page>
     );
