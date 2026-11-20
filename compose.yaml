@@ -14,8 +14,8 @@ services:
       - minibrain-data:/data
       - ${MINIBRAIN_MODELS_DIR:-./models}:/models:ro
     environment:
-      MINIBRAIN_OFFLINE: ${MINIBRAIN_OFFLINE:-1}
-      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
+      MINIBRAIN_OFFLINE: ${MINIBRAIN_OFFLINE:-0}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
       MINIBRAIN_DATABASE_URL: ${MINIBRAIN_DATABASE_URL:-}
     shm_size: 8gb
     deploy:

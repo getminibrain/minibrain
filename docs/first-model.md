@@ -78,10 +78,6 @@ In **Add model**, **Dataset → Upload new…** uploads a file and makes the dat
 7. **Licence**: tick **I accept the … for this install** when the base is downloaded.
 8. Click **Create model**. The model page opens.
 
-The Docker image starts with outbound calls off ([Docker → Environment](install.md#environment)), so it cannot
-download a base. Start the container with `-e MINIBRAIN_OFFLINE=0 -e HF_HUB_OFFLINE=0`, or mount the weights and import
-them from **Base → Your imports → Server folder** ([Model weights](install.md#model-weights)).
-
 ## 4. Read the baseline
 
 Creating the model makes **v0**, the untrained baseline: the base with the preset's instructions and a few examples

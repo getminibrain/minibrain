@@ -91,11 +91,8 @@ COPY --from=extensions /extensions /opt/duckdb-extensions
 RUN --mount=type=bind,from=wheel,target=/dist \
     uv pip install --no-deps /dist/minibrain-*.whl
 ENV MINIBRAIN_HOME=/data \
-    MINIBRAIN_OFFLINE=1 \
     MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY=/opt/duckdb-extensions \
     HF_HOME=/data/huggingface \
-    HF_HUB_OFFLINE=1 \
-    HF_DATASETS_OFFLINE=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     PYTHONUNBUFFERED=1
 USER minibrain

@@ -395,8 +395,6 @@ Set in the image:
 | Variable | Value | Effect |
 |---|---|---|
 | `MINIBRAIN_HOME` | `/data` | Everything minibrain writes |
-| `MINIBRAIN_OFFLINE` | `1` | No outbound calls; the network policy is locked to Offline |
-| `HF_HUB_OFFLINE`, `HF_DATASETS_OFFLINE` | `1` | Hugging Face libraries read local files only |
 | `HF_HUB_DISABLE_TELEMETRY` | `1` | No Hugging Face telemetry |
 | `HF_HOME` | `/data/huggingface` | The Hugging Face cache lives on the volume |
 | `MINIBRAIN_DUCKDB_EXTENSION_REPOSITORY` | `/opt/duckdb-extensions` | DuckDB extensions bundled in the image |
@@ -407,7 +405,8 @@ Often added with `-e`:
 |---|---|
 | `MINIBRAIN_DATABASE_URL` | Metadata in Postgres (the image includes the `postgres` and `qlora` extras) |
 | `MINIBRAIN_MODELS_S3_URL`, `AWS_*` | Models from an S3-compatible bucket |
-| `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror. Also set `MINIBRAIN_OFFLINE=0` and `HF_HUB_OFFLINE=0`, and allow the host in Settings → Security |
+| `MINIBRAIN_HF_ENDPOINT` | An internal Hugging Face mirror; with the Allowlist network policy, allow its host in Settings → Security |
+| `MINIBRAIN_OFFLINE`, `HF_HUB_OFFLINE`, `HF_DATASETS_OFFLINE` | `1` for an air-gapped install: no outbound calls, the network policy locked to Offline, and Hugging Face libraries reading local files only ([Offline and air-gapped](#offline-and-air-gapped)) |
 | `MINIBRAIN_TRAIN_DEVICE` | Force `cuda`, `xpu`, `mps` or `cpu` for training |
 | `MINIBRAIN_ADMIN_EMAIL`, `MINIBRAIN_ADMIN_PASSWORD_FILE` | Create the first admin on the first start, with the password in a mounted secret file ([First admin](#first-admin)) |
 | `MINIBRAIN_LOG_FORMAT` | `json` for one JSON object per log line on standard output ([observability](observability.md#json-logs)) |
@@ -515,8 +514,9 @@ admin](security.md#first-admin).
 
 ## Offline and air-gapped
 
-minibrain makes no outbound calls with `MINIBRAIN_OFFLINE=1` (set in the image). Everything it needs is carried
-across on disk.
+Air-gapped installs are an option: by default minibrain downloads base models and the catalogue. With
+`MINIBRAIN_OFFLINE=1` it makes no outbound calls, and everything it needs is carried across on disk. In Docker, add
+`-e MINIBRAIN_OFFLINE=1 -e HF_HUB_OFFLINE=1 -e HF_DATASETS_OFFLINE=1`; with Compose, set them in `.env`.
 
 ### The app
 
