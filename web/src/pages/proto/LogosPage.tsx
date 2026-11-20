@@ -287,6 +287,178 @@ const MANY: Mark[] = [
     },
 ];
 
+const STRIKE = "M33.6 6L30.9 33H33.1L30.4 58";
+const ZIGZAG = "M35.4 6L31.4 23.5H34.4L29.6 40.5H32.6L28.6 58";
+const OFFSET_BOLT = "M39 6L30.6 31.5H34.4L25 58";
+const LONG_BOLT = "M35.6 2L30.5 32.5H33.5L28.4 62";
+const AMBER = "#fbbf24";
+const INK = "#1b1c1d";
+const HAIRLINE = "#d3d4d5";
+
+function BoltCut({ d = BOLT, width = FISSURE }: { d?: string; width?: number }) {
+    return (
+        <path
+            d={d}
+            fill="none"
+            stroke="black"
+            strokeWidth={width}
+            strokeLinejoin="miter"
+            strokeMiterlimit="12"
+        />
+    );
+}
+
+function SplitBrain({
+    uid,
+    fill,
+    d,
+    width,
+}: { uid: string; fill: string; d?: string; width?: number }) {
+    return (
+        <Carved uid={uid} cut={<BoltCut d={d} width={width} />}>
+            <path d={BRAIN} fill={fill} />
+        </Carved>
+    );
+}
+
+const BOLTS: Mark[] = [
+    {
+        id: "16",
+        name: "Strike",
+        note: "A steeper, narrower bolt: the split reads first as a fissure, then as lightning.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} d={STRIKE} />
+            </>
+        ),
+    },
+    {
+        id: "17",
+        name: "Zigzag",
+        note: "Two kinks instead of one: more electric, still one clean cut.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} d={ZIGZAG} width={3.4} />
+            </>
+        ),
+    },
+    {
+        id: "18",
+        name: "Wide",
+        note: "A heavier bolt that stays legible at favicon size.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} width={5.2} />
+            </>
+        ),
+    },
+    {
+        id: "19",
+        name: "Fine",
+        note: "A hairline bolt: the quietest, best large and in print.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} width={2.4} />
+            </>
+        ),
+    },
+    {
+        id: "20",
+        name: "Offset",
+        note: "A diagonal strike that splits the halves unevenly: motion, a thought arriving.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} d={OFFSET_BOLT} />
+            </>
+        ),
+    },
+    {
+        id: "21",
+        name: "Bolt badge",
+        note: "The bolt-split brain on the round badge.",
+        draw: (p, uid) => (
+            <>
+                <circle cx="32" cy="32" r="32" fill={p.brand} />
+                <g transform="translate(32 32) scale(0.92) translate(-32 -31.6)">
+                    <SplitBrain uid={uid} fill={p.glyph} />
+                </g>
+            </>
+        ),
+    },
+    {
+        id: "22",
+        name: "Echo bolt",
+        note: "The Echo brain on the badge, with the bolt cutting through the ring as well.",
+        draw: (p, uid) => (
+            <>
+                <circle cx="32" cy="32" r="32" fill={p.brand} />
+                <Carved uid={uid} cut={<BoltCut d={LONG_BOLT} />}>
+                    <path d={BRAIN} fill={p.glyph} />
+                    <path
+                        d={ECHO}
+                        fill="none"
+                        stroke={p.glyph}
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                    />
+                </Carved>
+            </>
+        ),
+    },
+    {
+        id: "23",
+        name: "Amber",
+        note: "The split glows: an amber bolt inside the cut, clipped to the brain.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={p.brand} />
+                <SplitBrain uid={uid} fill={p.glyph} width={4.6} />
+                <defs>
+                    <clipPath id={`amber-${uid}`}>
+                        <path d={BRAIN} />
+                    </clipPath>
+                </defs>
+                <path
+                    d={BOLT}
+                    fill="none"
+                    stroke={AMBER}
+                    strokeWidth="1.8"
+                    strokeLinejoin="miter"
+                    strokeMiterlimit="12"
+                    clipPath={`url(#amber-${uid})`}
+                />
+            </>
+        ),
+    },
+    {
+        id: "24",
+        name: "Ink",
+        note: "Near-black tile, white brain: the most serious, for print and enterprise decks.",
+        draw: (p, uid) => (
+            <>
+                <Squircle fill={INK} />
+                <SplitBrain uid={uid} fill={p.glyph} />
+            </>
+        ),
+    },
+    {
+        id: "25",
+        name: "Inverse",
+        note: "White tile, cobalt brain: for dark backgrounds and light, airy pages.",
+        draw: (p, uid) => (
+            <>
+                <path d={TILE} fill={p.glyph} stroke={HAIRLINE} strokeWidth="1" />
+                <SplitBrain uid={uid} fill={p.brand} />
+            </>
+        ),
+    },
+];
+
 const MARKS: Mark[] = [
     {
         id: "00",
@@ -491,6 +663,16 @@ export function LogosPage() {
             >
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10">
                     {MANY.map((mark) => (
+                        <MarkPreview key={mark.id} mark={mark} />
+                    ))}
+                </div>
+            </Section>
+            <Section
+                title="Bolt"
+                caption="Brains split by a lightning bolt: power, carved into the shape itself."
+            >
+                <div className="grid grid-cols-3 gap-x-8 gap-y-10">
+                    {BOLTS.map((mark) => (
                         <MarkPreview key={mark.id} mark={mark} />
                     ))}
                 </div>
