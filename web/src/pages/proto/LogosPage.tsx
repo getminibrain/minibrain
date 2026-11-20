@@ -1,5 +1,5 @@
-import { cn } from "obp-ui";
-import { type ReactNode, useId, useState } from "react";
+import { Badge, Button, cn, getTheme, onThemeChange } from "obp-ui";
+import { type ReactNode, useId, useState, useSyncExternalStore } from "react";
 import { PageHeader } from "~/components/PageHeader";
 import { Page, Section } from "~/components/Section";
 
@@ -12,7 +12,7 @@ type Palette = {
     ground: string;
 };
 
-type Colour = { id: string; name: string; light: string; dark: string };
+type Colour = { id: string; name: string; light: string; dark: string; glyph?: string };
 
 type Mark = {
     id: string;
@@ -50,10 +50,14 @@ const COLOURS: Colour[] = [
     { id: "orchid", name: "Orchid", light: "#cd00f9", dark: "#d636ff" },
     { id: "magenta", name: "Magenta", light: "#df00c5", dark: "#f300d7" },
     { id: "pink", name: "Pink", light: "#ea0094", dark: "#fe00a2" },
+    { id: "sky", name: "Sky", light: "#00ace7", dark: "#54c9ff", glyph: "#1b1c1d" },
+    { id: "aqua", name: "Aqua", light: "#00becd", dark: "#00ddef", glyph: "#1b1c1d" },
+    { id: "turquoise", name: "Turquoise", light: "#00c5b6", dark: "#00e5d4", glyph: "#1b1c1d" },
+    { id: "volt", name: "Volt", light: "#a6d900", dark: "#bcf600", glyph: "#1b1c1d" },
 ];
 
 function paletteFor(colour: Colour, mode: Mode): Palette {
-    return { brand: colour[mode], glyph: "#ffffff", ...GROUNDS[mode] };
+    return { brand: colour[mode], glyph: colour.glyph ?? "#ffffff", ...GROUNDS[mode] };
 }
 
 const BRAIN = [
@@ -345,6 +349,40 @@ function MarkPreview({ mark, colour }: { mark: Mark; colour: Colour }) {
     );
 }
 
+const FIT_CANDIDATES = ["sky", "aqua", "turquoise", "volt"];
+const FIT_MARK = "27";
+
+function ThemeFit({ colour }: { colour: Colour }) {
+    const mode = useSyncExternalStore(onThemeChange, getTheme);
+    const mark = MARKS.find((m) => m.id === FIT_MARK) ?? MARKS[0];
+    return (
+        <div className="flex flex-col gap-4 rounded-md border border-border p-panel">
+            <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2.5">
+                    <Logo mark={mark} palette={paletteFor(colour, mode)} size={32} />
+                    <span className="font-display text-xl font-semibold tracking-tight">
+                        minibrain
+                    </span>
+                </span>
+                <span className="text-sm text-muted-foreground">
+                    {colour.name} <span className="font-mono">{colour[mode]}</span>
+                </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm">Deploy</Button>
+                <Button size="sm" variant="outline">
+                    Cancel
+                </Button>
+                <Badge variant="success">Live</Badge>
+                <Badge variant="warning">Degraded</Badge>
+                <Badge variant="destructive">Failed</Badge>
+                <Badge variant="info">Queued</Badge>
+                <Badge variant="approval">In review</Badge>
+            </div>
+        </div>
+    );
+}
+
 function ColourPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
     return (
         <div className="flex flex-wrap gap-2">
@@ -443,9 +481,20 @@ export function LogosPage() {
             />
             <Section
                 title="Colour"
-                caption="Vivid colours at full saturation, with Ink as the reference. The white brain stays at 4.2:1 or more in light mode and 3.6:1 in dark."
+                caption="Vivid colours at full saturation, with Ink as the reference. The white brain stays at 4.2:1 or more in light mode and 3.6:1 in dark; Sky, Aqua, Turquoise and Volt are bright tiles with an ink brain."
             >
                 <ColourPicker value={colour.id} onChange={setColourId} />
+            </Section>
+            <Section
+                title="Theme fit"
+                caption="Bright tiles with an ink brain, next to the theme's own button and status colours. Switch the app between light and dark to see both."
+            >
+                <div className="grid grid-cols-2 gap-4">
+                    {FIT_CANDIDATES.map((id) => {
+                        const candidate = COLOURS.find((c) => c.id === id);
+                        return candidate ? <ThemeFit key={id} colour={candidate} /> : null;
+                    })}
+                </div>
             </Section>
             <Section
                 title="Shortlist"
