@@ -439,6 +439,7 @@ async def api_time_while_polling(harness: Harness) -> tuple[int, float]:
     return measured[0]
 
 
+@pytest.mark.serial
 def test_long_polls_leave_threads_for_other_requests(harness: Harness) -> None:
     status, took = anyio.run(api_time_while_polling, harness)
     assert status == 200

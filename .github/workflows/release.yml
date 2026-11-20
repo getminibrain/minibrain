@@ -24,10 +24,12 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       publish: ${{ steps.version.outputs.publish }}
+      tested: ${{ steps.tested.outputs.tested }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,17 +64,43 @@ jobs:
           else
             echo "Dry run of ${version}: builds everything, publishes nothing" >> "${GITHUB_STEP_SUMMARY}"
           fi
+      - name: Look for a passing CI run on this commit
+        id: tested
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          runs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&status=success" \
+            --jq '.total_count')
+          if [ "${runs}" -gt 0 ]; then
+            echo "tested=true" >> "${GITHUB_OUTPUT}"
+            echo "CI already passed on ${SHA}: the tests are not run again" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "tested=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+  package:
+    name: Package
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      part: package
+    permissions:
+      contents: read
 
   ci:
     name: CI
     needs: version
     uses: ./.github/workflows/ci.yml
+    with:
+      part: checks
+      skip-tests: ${{ needs.version.outputs.tested == 'true' }}
     permissions:
       contents: read
 
   images:
     name: Image ${{ matrix.variant }} ${{ matrix.arch }}
-    needs: [version, ci]
+    needs: [version, package]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     permissions:
@@ -180,7 +208,7 @@ jobs:
 
   image-tags:
     name: Image tags
-    needs: [version, images]
+    needs: [version, images, ci]
     if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -232,7 +260,7 @@ jobs:
 
   assets:
     name: Release assets
-    needs: [version, ci, images]
+    needs: [version, ci, package, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

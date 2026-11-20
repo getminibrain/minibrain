@@ -5,12 +5,21 @@ on:
     branches: ["**"]
   pull_request:
   workflow_call:
+    inputs:
+      part:
+        description: "all, checks (lint, types, tests) or package (wheel, sdist, SBOMs)"
+        type: string
+        default: all
+      skip-tests:
+        description: "Skip pytest, for a commit that already passed CI"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.part }}
   cancel-in-progress: true
 
 env:
@@ -22,6 +31,7 @@ env:
 jobs:
   python:
     name: Python ${{ matrix.python }}
+    if: inputs.part != 'package'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -50,10 +60,15 @@ jobs:
       - name: Pyright
         run: uv run pyright
       - name: Tests
-        run: uv run pytest -q
+        if: inputs.skip-tests != true
+        run: uv run pytest -q -n auto -m "not serial"
+      - name: Wall-clock tests, alone
+        if: inputs.skip-tests != true
+        run: uv run pytest -q -m serial
 
   web:
     name: Web
+    if: inputs.part != 'package'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
@@ -84,6 +99,7 @@ jobs:
 
   licences:
     name: Dependency licences
+    if: inputs.part != 'package'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -111,6 +127,7 @@ jobs:
 
   shell:
     name: Shell scripts
+    if: inputs.part != 'package'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -124,7 +141,7 @@ jobs:
 
   package:
     name: Wheel and sdist
-    needs: [python, web]
+    if: inputs.part != 'checks'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

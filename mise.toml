@@ -49,12 +49,13 @@ run = "pnpm --dir web gen:api"
 
 [tasks.test]
 description = "Backend tests"
-run = "uv run pytest -q"
+run = ["uv run pytest -q -n auto -m 'not serial'", "uv run pytest -q -m serial"]
 
 [tasks.check]
 description = "Tests, lint, format, crypto rules, product inventory and type checks for backend and web; CI runs the same"
 run = [
-    "uv run pytest -q",
+    "uv run pytest -q -n auto -m 'not serial'",
+    "uv run pytest -q -m serial",
     "uv run ruff check .",
     "uv run ruff format --check .",
     "uv run python scripts/check_crypto.py",

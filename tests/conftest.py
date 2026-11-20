@@ -1,6 +1,7 @@
 import io
 import os
 import secrets
+import shutil
 import tarfile
 import tempfile
 from collections.abc import Iterator
@@ -23,10 +24,11 @@ from minibrain.auth.roles import Role
 from minibrain.data.splits import read_split
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
+from minibrain.registry.db import migrate
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import Job
 from minibrain.serve.backend import CompletionRequest
-from minibrain.settings import Settings
+from minibrain.settings import DATABASE_FILE, Settings
 from minibrain.tasks.service import version_contract
 from minibrain.worker import MainClient, Worker, WorkerConfig
 from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
@@ -250,9 +252,26 @@ def use_bucket(harness: Harness, server: FakeS3) -> str:
     return bucket
 
 
+@pytest.fixture(scope="session")
+def migrated_database(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    path = tmp_path_factory.mktemp("template") / DATABASE_FILE
+    migrate(f"sqlite:///{path}")
+    return path
+
+
+def seed_database(settings: Settings, template: Path) -> None:
+    if settings.database is not None:
+        return
+    for source in template.parent.glob(f"{template.name}*"):
+        shutil.copyfile(source, settings.home / source.name)
+
+
 @pytest.fixture
-def harness(settings: Settings, store_kind: str, request: pytest.FixtureRequest) -> Iterator[Harness]:
+def harness(
+    settings: Settings, store_kind: str, migrated_database: Path, request: pytest.FixtureRequest
+) -> Iterator[Harness]:
     settings.home.mkdir(parents=True)
+    seed_database(settings, migrated_database)
     backend = FakeBackend()
     app = create_app(settings=settings, backend=backend, background=False, config_max_age=0)
     with TestClient(app) as client:

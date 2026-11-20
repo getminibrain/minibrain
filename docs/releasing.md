@@ -1,8 +1,9 @@
 # Releasing
 
 A release is a `v*` tag. Pushing one runs [`.github/workflows/release.yml`](../.github/workflows/release.yml): it
-checks the tag against `pyproject.toml`, runs CI, builds the Docker images from the wheel CI built, and publishes the
-images to GHCR and the files to GitHub Releases. Every file and image is signed keyless through Sigstore and carries
+checks the tag against `pyproject.toml`, builds the wheel and the Docker images while CI runs, and once CI passes
+publishes the images to GHCR and the files to GitHub Releases. When the tagged commit already passed CI, the release
+runs the lint and type checks but not the tests again. Every file and image is signed keyless through Sigstore and carries
 SLSA build provenance ([Signing and provenance](#signing-and-provenance)). After the GitHub Release, the wheel and sdist go to [PyPI](#pypi).
 
 ## Cut a release
@@ -81,10 +82,11 @@ under Other changes; a compare link closes them. Preview them with
 
 | Job | Does | Token permissions |
 |---|---|---|
-| Version | Reads `version` from `pyproject.toml`; on a tag push, fails unless the tag is `v<version>`. A version with `a`, `b`, `rc` or `.dev` is a pre-release | `contents: read` |
-| CI | All of [`ci.yml`](../.github/workflows/ci.yml), called with `workflow_call`: Python checks on 3.12 and 3.13, web checks, the wheel and sdist, the SBOMs | `contents: read` |
-| Image (4) | `cpu` and `cuda`, each on an amd64 (`ubuntu-24.04`) and an arm64 (`ubuntu-24.04-arm`) runner. Installs CI's wheel; on a tag push, pushes the image by digest. Then loads the same build (all cached) into Docker and writes its SBOM with syft | `contents: read`, `packages: write` |
-| Image tags | Joins each variant's two digests into one multi-arch index and tags it. Tag push only | `packages: write` |
+| Version | Reads `version` from `pyproject.toml`; on a tag push, fails unless the tag is `v<version>`. A version with `a`, `b`, `rc` or `.dev` is a pre-release. Looks for a successful CI run of this commit (`push` event) | `contents: read`, `actions: read` |
+| Package | [`ci.yml`](../.github/workflows/ci.yml) with `part: package`: the wheel, the sdist and the SBOMs | `contents: read` |
+| CI | [`ci.yml`](../.github/workflows/ci.yml) with `part: checks`: Python checks on 3.12 and 3.13 and the web checks. `skip-tests` when the commit already passed CI; the lint, types and web build still run | `contents: read` |
+| Image (4) | `cpu` and `cuda`, each on an amd64 (`ubuntu-24.04`) and an arm64 (`ubuntu-24.04-arm`) runner, started by Package so they build while CI runs. Installs that wheel; on a tag push, pushes the image by digest, untagged. Then loads the same build (all cached) into Docker and writes its SBOM with syft | `contents: read`, `packages: write` |
+| Image tags | Waits for CI, then joins each variant's two digests into one multi-arch index and tags it. Tag push only. A run whose CI fails leaves its digests untagged | `packages: write` |
 | Release assets | Checks the wheel, sdist, SBOMs and `install.sh` are there for this version, writes `SHA256SUMS` and the notes | `contents: read` |
 | Sign and attest | Signs every release file and image, attests the SBOMs and the provenance, and checks every signature ([below](#signing-and-provenance)). In a dry run, signs the files with a throwaway key only | `contents: read`, `packages: write`, `id-token: write`, `attestations: write` |
 | GitHub Release | `gh release create` with the assets, their bundles and the notes. Tag push only | `contents: write` |
@@ -123,7 +125,9 @@ with syft take about 30 seconds each for a CPU image and 1.5 minutes each for a 
 3 MB (about 4,200 components, 1,230 to 1,280 of them packages). The CUDA amd64 job ends with 62 GB free, measured on
 the dry run with signing ([run 41738301352](https://github.com/getminibrain/minibrain/actions/runs/41738301352)).
 
-The whole run takes about 15 minutes, half of it CI. The images use no exported layer cache:
+A tag on a commit that already passed CI takes about 15 minutes: the CUDA images are the longest path. When the tests
+run, they take about as long as the images on four parallel pytest workers (`pytest -n auto`); `@pytest.mark.serial`
+tests, which measure wall-clock time, run alone afterwards. The images use no exported layer cache:
 
 - The slow stages never run: the wheel arrives built, so the UI and wheel stages are skipped, and within a job
   BuildKit's uv cache mount serves the `extensions` and `runtime` stages from one download.
