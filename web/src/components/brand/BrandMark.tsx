@@ -20,9 +20,9 @@ export function BrandMark({
     );
 }
 
-export function BrandLockup({ size = 20 }: { size?: number }) {
+export function BrandLockup({ size = 20, className }: { size?: number; className?: string }) {
     return (
-        <span className="flex items-center gap-2">
+        <span className={cn("flex items-center gap-2", className)}>
             <BrandMark size={size} />
             <span className="text-base font-semibold">{PRODUCT_NAME}</span>
         </span>

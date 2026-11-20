@@ -119,7 +119,8 @@ function Account() {
     const person = session.data?.person;
     const signsOut = person != null && person.source !== "proxy";
     const name = person?.name ?? "";
-    const sub = person?.email ?? (person?.role ? ROLE_LABELS[person.role] : "No role");
+    const role = person?.role ? ROLE_LABELS[person.role] : "No role";
+    const sub = person?.email && person.email !== name ? person.email : role;
     const items: AccountMenuItem[] = [
         { icon: <IconUser />, label: "Your account", href: ACCOUNT_PATH },
         ...(person?.role
@@ -184,7 +185,7 @@ export function Shell() {
     }, [settings, href]);
     const rail = (
         <Rail
-            brand={<BrandLockup />}
+            brand={<BrandLockup className="gap-2.5 pl-1" />}
             brandHref="/"
             brandLabel="Home"
             toggleIcon="panel"
