@@ -63,6 +63,18 @@ function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
 }
 
+function prototypePages(): AnyRoute[] {
+    if (!import.meta.env.DEV) {
+        return [];
+    }
+    return [
+        globalPage(
+            "/proto/logos",
+            lazyRouteComponent(() => import("./pages/proto/LogosPage"), "LogosPage"),
+        ),
+    ];
+}
+
 function guarded(role: Role, Component: RouteComponent): RouteComponent {
     return function Guarded() {
         return (
@@ -132,6 +144,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/settings/storage", guarded("admin", StorageSettingsPage)),
     globalPage("/settings/connections", guarded("admin", ConnectionsSettingsPage)),
     globalPage("/settings/install", guarded("admin", InstallSettingsPage)),
+    ...prototypePages(),
 ]);
 
 export const router = createRouter({
