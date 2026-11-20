@@ -3,6 +3,7 @@ import {
     Card,
     CardContent,
     CardDescription,
+    CardFooter,
     CardHeader,
     CardTitle,
     CodeBlock,
@@ -38,9 +39,9 @@ function AuthFrame({
     footer?: ReactNode;
 }) {
     return (
-        <main className="flex min-h-dvh flex-col items-center bg-background px-4 pt-[12vh] pb-8">
-            <div className="flex w-full max-w-sm flex-col gap-4">
-                <BrandLockup />
+        <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 pt-8 pb-[10vh]">
+            <div className="flex w-full max-w-sm flex-col gap-panel">
+                <BrandLockup large className="justify-center" />
                 <Card>
                     <CardHeader>
                         <CardTitle>
@@ -49,8 +50,12 @@ function AuthFrame({
                         {description && <CardDescription>{description}</CardDescription>}
                     </CardHeader>
                     <CardContent>{children}</CardContent>
+                    {footer && (
+                        <CardFooter className="border-t text-sm text-muted-foreground">
+                            {footer}
+                        </CardFooter>
+                    )}
                 </Card>
-                {footer && <div className="text-sm text-muted-foreground">{footer}</div>}
             </div>
         </main>
     );
@@ -178,7 +183,7 @@ export function SignInPage({ session }: { session?: SessionInfo }) {
     return (
         <AuthFrame
             title="Sign in"
-            footer="Forgot your password? Ask an admin for a new password link."
+            footer="Forgot your password? Ask an admin for a new link."
         >
             <form onSubmit={submit}>
                 <FieldGroup>
