@@ -11,3 +11,4 @@ sbom/
 CLAUDE.md
 CLAUDE.local.md
 demo_data/large/
+.claude/worktrees/
