@@ -135,7 +135,7 @@ const MANY: Mark[] = [
     {
         id: "06",
         name: "Quad",
-        note: "Four minibrains, one tile: a specialist for every job.",
+        note: "Four models, one tile: a specialist for every job.",
         draw: (p) => (
             <>
                 <Squircle fill={p.brand} />
@@ -176,7 +176,7 @@ const MANY: Mark[] = [
     {
         id: "09",
         name: "Split",
-        note: "A minibrain budding off a larger one: a specialist made from a base model.",
+        note: "A small model budding off a larger one: a specialist made from a base model.",
         draw: (p) => (
             <>
                 <Squircle fill={p.brand} />
@@ -206,7 +206,7 @@ const MANY: Mark[] = [
     {
         id: "11",
         name: "Orbit",
-        note: "A minibrain orbiting a larger mind: the specialist beside the private frontier model.",
+        note: "A small model orbiting a larger one: the specialist beside the private frontier model.",
         draw: (p) => (
             <>
                 <Squircle fill={p.brand} />
@@ -234,7 +234,7 @@ const MANY: Mark[] = [
     {
         id: "13",
         name: "Ring",
-        note: "Six minibrains in a circle: a council of specialists with no single centre.",
+        note: "Six models in a circle: a council of specialists with no single centre.",
         draw: (p) => (
             <>
                 <Squircle fill={p.brand} />
@@ -247,7 +247,7 @@ const MANY: Mark[] = [
     {
         id: "14",
         name: "Flock",
-        note: "Five minibrains flying in formation: coordinated, each with its own job.",
+        note: "Five models flying in formation: coordinated, each with its own job.",
         draw: (p) => (
             <>
                 <Squircle fill={p.brand} />
@@ -266,7 +266,7 @@ const MANY: Mark[] = [
     {
         id: "15",
         name: "Deck",
-        note: "Stacked tiles, one minibrain on top: many models, one install.",
+        note: "Stacked tiles, one model on top: many models, one install.",
         draw: (p) => (
             <>
                 {[
@@ -487,7 +487,7 @@ export function LogosPage() {
             </Section>
             <Section
                 title="Many minds"
-                caption="A minibrain for every job: many specialists, one centre, like an octopus with a brain in every arm."
+                caption="A model for every job: many specialists, one centre, like an octopus with a brain in every arm."
             >
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10">
                     {MANY.map((mark) => (
