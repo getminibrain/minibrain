@@ -1,6 +1,6 @@
 [project]
 name = "minibrain"
-version = "0.1.1"
+version = "0.1.2"
 description = "Private AI platform: train, evaluate and serve models of any size on your own data and hardware"
 license = "Apache-2.0"
 requires-python = ">=3.12,<3.14"
