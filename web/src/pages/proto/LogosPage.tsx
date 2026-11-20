@@ -378,7 +378,7 @@ const DARK_OPTIONS = [
 const DARK_SIZES = [128, 48, 32, 20, 16];
 
 function DarkOption({ option }: { option: (typeof DARK_OPTIONS)[number] }) {
-    const mark = MARKS.find((m) => m.id === FIT_MARK) ?? MARKS[0];
+    const mark = MARKS.find((m) => m.id === STUDY_MARK) ?? MARKS[0];
     const palette: Palette = { brand: option.tile, glyph: option.glyph, ...GROUNDS.dark };
     return (
         <div className="flex flex-col gap-3">
@@ -470,7 +470,7 @@ function Ratio({ mode, value }: { mode: Mode; value: number }) {
 }
 
 function BrainColourCard({ tile, glyph }: { tile: BrainTile; glyph: BrainTile["glyphs"][number] }) {
-    const mark = MARKS.find((m) => m.id === FIT_MARK) ?? MARKS[0];
+    const mark = MARKS.find((m) => m.id === STUDY_MARK) ?? MARKS[0];
     return (
         <div className="flex flex-col gap-3 rounded-md border border-border p-4">
             <div className="flex items-center justify-between gap-3">
@@ -518,6 +518,7 @@ function BrainColourCard({ tile, glyph }: { tile: BrainTile; glyph: BrainTile["g
 
 const FIT_CANDIDATES = ["sky", "aqua", "turquoise", "volt"];
 const FIT_MARK = "27";
+const STUDY_MARK = "05";
 
 function ThemeFit({ colour }: { colour: Colour }) {
     const mode = useSyncExternalStore(onThemeChange, getTheme);
@@ -654,7 +655,7 @@ export function LogosPage() {
             </Section>
             <Section
                 title="Dark mode"
-                caption="The Volt Prime badge on a dark background, four ways."
+                caption="The 05 badge in Volt on a dark background, four ways."
             >
                 <div className="grid grid-cols-2 gap-x-8 gap-y-10">
                     {DARK_OPTIONS.map((option) => (
