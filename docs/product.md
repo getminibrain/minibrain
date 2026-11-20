@@ -457,7 +457,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Copy ready configs, create a key and see the first request.
   UI: Models › model › Use › API Connect · API: POST /api/keys, GET /api/requests, POST /v1/chat/completions
 - **Playground** · shipped · product, engineer
-  Chat with any model, streamed, with every API setting and its code.
+  Chat with any model, streamed, with every API setting and its code. Saved chats outlive their model; with no model
+  installed the page stays, read-only, and the model picker offers a download.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
 - **Playground functions** · shipped · product, engineer
   Define tools in a form or JSON; paste OpenAI tool definitions.

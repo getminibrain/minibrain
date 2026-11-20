@@ -1,3 +1,5 @@
+import { IconDownload } from "@tabler/icons-react";
+import { Button, Link } from "obp-ui";
 import { type ChatModel, ChatModelPicker } from "obp-ui/chat";
 import { useMemo } from "react";
 import type { ModelRow } from "~/api/client";
@@ -57,5 +59,15 @@ export function ModelPicker({
             ...targets.filter((item) => item.kind === "base"),
         ].map((target) => chatModel(target, byKey));
     }, [targets, rows]);
+    if (targets.length === 0) {
+        return (
+            <Button asChild size="sm" variant="outline">
+                <Link href="/discover">
+                    <IconDownload />
+                    Download a model
+                </Link>
+            </Button>
+        );
+    }
     return <ChatModelPicker models={models} value={model} onValueChange={onModel} hint={HINT} />;
 }

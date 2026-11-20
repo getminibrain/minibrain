@@ -16,8 +16,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
-    EmptyState,
-    Link,
     Sheet,
     SheetContent,
     SheetDescription,
@@ -377,20 +375,24 @@ export function PlaygroundPage() {
         !picked && requested && models.data && !listed(requested) ? requested : null;
     const gone = openedGone ?? requestedGone;
     const reserved = useReservedName(gone);
-    const answeredBy = `so answers now come from ${target?.model_name ?? "another model"}.`;
+    const answeredBy = target
+        ? `so answers now come from ${target.model_name}.`
+        : "and no model is left to answer: download one from the model picker.";
     const missing = reserved.data
         ? `${reserved.data.message}, ${answeredBy}`
         : openedGone
           ? `${openedGone} is not available any more, ${answeredBy}`
           : null;
-    const panelBody = target && (
-        <SettingsPanel
-            target={target}
-            settings={settings}
-            onSettings={loadSettings}
-            preset={preset}
-            onPreset={setPreset}
-        />
+    const panelBody = (
+        <fieldset disabled={!target} className="m-0 min-w-0 border-0 p-0">
+            <SettingsPanel
+                target={target}
+                settings={settings}
+                onSettings={loadSettings}
+                preset={preset}
+                onPreset={setPreset}
+            />
+        </fieldset>
     );
     const newChatButton = (wideButton: boolean) => (
         <Button
@@ -423,7 +425,7 @@ export function PlaygroundPage() {
                 title="Playground"
                 caption="Chat with any of your models or installed bases, with the settings the API takes."
                 actions={
-                    target && (
+                    models.data && (
                         <div className="flex gap-2">
                             {!recentColumn && newChatButton(false)}
                             <DropdownMenu>
@@ -479,20 +481,7 @@ export function PlaygroundPage() {
                 }
             />
             <ErrorLine error={models.error ?? openChat.error ?? saveChat.error} />
-            {models.data && targets.length === 0 && (
-                <EmptyState
-                    variant="panel"
-                    title="Nothing to chat with yet"
-                    action={
-                        <Button asChild>
-                            <Link href="/models/new">Add a model</Link>
-                        </Button>
-                    }
-                >
-                    Add a model, or download a base from Discover, then try it here.
-                </EmptyState>
-            )}
-            {target && (
+            {models.data && (
                 <div className={gridColumns(recentColumn, settingsColumn)}>
                     {recentColumn && (
                         <Card className="flex min-h-0 flex-col overflow-hidden p-0">
@@ -512,10 +501,17 @@ export function PlaygroundPage() {
                             }
                             isEmpty={turns.length === 0}
                             empty={
-                                <ChatEmptyState
-                                    title={`Send a message to ${target.model_name}`}
-                                    description="Answers stream in as the model writes them, with any reasoning and tool calls shown apart."
-                                />
+                                target ? (
+                                    <ChatEmptyState
+                                        title={`Send a message to ${target.model_name}`}
+                                        description="Answers stream in as the model writes them, with any reasoning and tool calls shown apart."
+                                    />
+                                ) : (
+                                    <ChatEmptyState
+                                        title="No model to chat with yet"
+                                        description="Download one from the model picker below, then send a message."
+                                    />
+                                )
                             }
                             composer={
                                 <ChatComposer
@@ -530,7 +526,7 @@ export function PlaygroundPage() {
                                     tools={
                                         <ModelPicker
                                             targets={targets}
-                                            model={target.name}
+                                            model={target?.name ?? ""}
                                             onModel={pick}
                                         />
                                     }
