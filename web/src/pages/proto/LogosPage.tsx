@@ -7,9 +7,7 @@ type Mode = "light" | "dark";
 type Palette = {
     brand: string;
     glyph: string;
-    tint: string;
     ink: string;
-    spark: string;
     ground: string;
 };
 
@@ -23,303 +21,172 @@ type Mark = {
 const MODES: Mode[] = ["light", "dark"];
 
 const PALETTES: Record<Mode, Palette> = {
-    light: {
-        brand: "#026ecd",
-        glyph: "#feffff",
-        tint: "#a9cdf2",
-        ink: "#202121",
-        spark: "#f59e0b",
-        ground: "#f4f5f5",
-    },
-    dark: {
-        brand: "#346bf1",
-        glyph: "#feffff",
-        tint: "#b3c8ff",
-        ink: "#e8e9ea",
-        spark: "#fbbf24",
-        ground: "#010101",
-    },
+    light: { brand: "#026ecd", glyph: "#feffff", ink: "#202121", ground: "#f4f5f5" },
+    dark: { brand: "#346bf1", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
 };
 
-const LEFT_HALF =
+const ORIGINAL_LEFT =
     "M30.4 18.67A7 7 0 0 0 18.11 24.72A7.5 7.5 0 0 0 17.54 39.12A7 7 0 0 0 30.4 44.11Z";
-const RIGHT_HALF =
+const ORIGINAL_RIGHT =
     "M33.6 18.67A7 7 0 0 1 45.89 24.72A7.5 7.5 0 0 1 46.46 39.12A7 7 0 0 1 33.6 44.11Z";
-const BOLT = "M37 2L24.5 17H32L28.5 27L41.5 12H34Z";
-const BREAKOUT_BOLT = "M40 1L29 15H35.5L32.5 25L44 11H37.5Z";
+
+const BRAIN = [
+    "M32 18.81A7.49 7.49 0 0 0 18.12 23.35A1.7 1.7 0 0 1 17.02 25.09A7.92 7.92 0 0 0 16.83 39.85",
+    "A1.7 1.7 0 0 1 17.89 41.52A7.28 7.28 0 0 0 32 44.38Z",
+    "M32 18.81A7.49 7.49 0 0 1 45.88 23.35A1.7 1.7 0 0 0 46.98 25.09A7.92 7.92 0 0 1 47.17 39.85",
+    "A1.7 1.7 0 0 0 46.11 41.52A7.28 7.28 0 0 1 32 44.38Z",
+].join("");
+
+const HOLLOW = [
+    "M27.2 18.48A4.49 4.49 0 0 0 21.11 23.07A4.7 4.7 0 0 1 18.08 27.9A4.92 4.92 0 0 0 17.96 37.07",
+    "A4.7 4.7 0 0 1 20.88 41.69A4.28 4.28 0 0 0 27.2 45.68Z",
+    "M36.8 18.48A4.49 4.49 0 0 1 42.89 23.07A4.7 4.7 0 0 0 45.92 27.9A4.92 4.92 0 0 1 46.04 37.07",
+    "A4.7 4.7 0 0 0 43.12 41.69A4.28 4.28 0 0 1 36.8 45.68Z",
+].join("");
+
+const ECHO = [
+    "M32 13.38A11.29 11.29 0 0 0 14.3 22.16A11.72 11.72 0 0 0 14.11 42.75A11.08 11.08 0 0 0 32 50.63",
+    "M32 13.38A11.29 11.29 0 0 1 49.7 22.16A11.72 11.72 0 0 1 49.89 42.75A11.08 11.08 0 0 1 32 50.63",
+].join("");
+
+const FISSURE = 3.6;
+const BOLT = "M34.6 6L30.5 32.5H33.5L29.4 58";
 const PREVIEW_SIZES = [48, 32, 16];
 
-function star(cx: number, cy: number, r: number): string {
-    const k = r * 0.16;
-    return [
-        `M${cx} ${cy - r}`,
-        `Q${cx + k} ${cy - k} ${cx + r} ${cy}`,
-        `Q${cx + k} ${cy + k} ${cx} ${cy + r}`,
-        `Q${cx - k} ${cy + k} ${cx - r} ${cy}`,
-        `Q${cx - k} ${cy - k} ${cx} ${cy - r}Z`,
-    ].join("");
+function squircle(n = 5, steps = 144): string {
+    const points = Array.from({ length: steps }, (_, i) => {
+        const t = (2 * Math.PI * i) / steps;
+        const along = (v: number) => Math.sign(v) * Math.abs(v) ** (2 / n);
+        return `${(32 + 32 * along(Math.cos(t))).toFixed(2)} ${(32 + 32 * along(Math.sin(t))).toFixed(2)}`;
+    });
+    return `M${points.join("L")}Z`;
 }
 
-function ray(angle: number, from: number, to: number): string {
-    const t = (angle * Math.PI) / 180;
-    const point = (r: number) =>
-        `${(32 + r * Math.cos(t)).toFixed(2)} ${(24 + r * Math.sin(t)).toFixed(2)}`;
-    return `M${point(from)}L${point(to)}`;
+const TILE = squircle();
+
+function Fissure() {
+    return <rect x={32 - FISSURE / 2} y="0" width={FISSURE} height="64" fill="black" />;
 }
 
-const FIREWORK_RAYS = [
-    ray(-90, 6, 21),
-    ray(-50, 6, 16),
-    ray(-130, 6, 16),
-    ray(-18, 6, 12),
-    ray(-162, 6, 12),
-];
-
-function Tile({ palette, rx = 16 }: { palette: Palette; rx?: number }) {
-    return <rect width="64" height="64" rx={rx} fill={palette.brand} />;
-}
-
-function Brain({ left, right }: { left: string; right: string }) {
+function Carved({ uid, cut, children }: { uid: string; cut: ReactNode; children: ReactNode }) {
+    const id = `carve-${uid}`;
     return (
         <>
-            <path d={LEFT_HALF} fill={left} />
-            <path d={RIGHT_HALF} fill={right} />
+            <defs>
+                <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+                    <rect width="64" height="64" fill="white" />
+                    {cut}
+                </mask>
+            </defs>
+            <g mask={`url(#${id})`}>{children}</g>
         </>
     );
 }
 
-function Layers({ palette }: { palette: Palette }) {
-    return (
-        <>
-            <path
-                d="M32 28L52 36L32 44L12 36Z"
-                fill={palette.brand}
-                stroke={palette.brand}
-                strokeWidth="2"
-                strokeLinejoin="round"
-            />
-            <g
-                fill="none"
-                stroke={palette.brand}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            >
-                <path d="M12 43L32 51L52 43" />
-                <path d="M12 50L32 58L52 50" />
-            </g>
-        </>
-    );
-}
-
-const CORTEX: Mark[] = [
+const MARKS: Mark[] = [
     {
         id: "00",
         name: "Cortex",
-        note: "The current pick: two hemispheres cut from a cobalt tile.",
+        note: "The one you picked: two hemispheres cut from a cobalt tile.",
         draw: (p) => (
             <>
-                <Tile palette={p} />
-                <Brain left={p.glyph} right={p.glyph} />
+                <rect width="64" height="64" rx="16" fill={p.brand} />
+                <path d={ORIGINAL_LEFT} fill={p.glyph} />
+                <path d={ORIGINAL_RIGHT} fill={p.glyph} />
             </>
         ),
     },
     {
         id: "01",
-        name: "Folds",
-        note: "One fold in each half, so it reads as a brain before it reads as a cloud.",
-        draw: (p) => (
+        name: "Cortex, refined",
+        note: "The same idea, drawn properly: a squircle tile, smooth folds between the lobes and a fissure that holds at 16 px.",
+        draw: (p, uid) => (
             <>
-                <Tile palette={p} />
-                <Brain left={p.glyph} right={p.glyph} />
-                <g fill="none" stroke={p.brand} strokeWidth="2.4" strokeLinecap="round">
-                    <path d="M24 27.5C21.5 29 21.5 35 24 36.5" />
-                    <path d="M40 27.5C42.5 29 42.5 35 40 36.5" />
-                </g>
+                <path d={TILE} fill={p.brand} />
+                <Carved uid={uid} cut={<Fissure />}>
+                    <path d={BRAIN} fill={p.glyph} />
+                </Carved>
             </>
         ),
     },
     {
         id: "02",
-        name: "Line",
-        note: "The same brain drawn as an outline in an open box. Lighter, for docs and print.",
-        draw: (p) => (
+        name: "Bolt",
+        note: "The fissure becomes a lightning bolt: brain power, without adding anything to the shape.",
+        draw: (p, uid) => (
             <>
-                <rect
-                    x="3"
-                    y="3"
-                    width="58"
-                    height="58"
-                    rx="15"
-                    fill="none"
-                    stroke={p.ink}
-                    strokeWidth="3"
-                />
-                <g fill="none" stroke={p.brand} strokeWidth="3" strokeLinejoin="round">
-                    <path d={LEFT_HALF} />
-                    <path d={RIGHT_HALF} />
-                </g>
+                <path d={TILE} fill={p.brand} />
+                <Carved
+                    uid={uid}
+                    cut={
+                        <path
+                            d={BOLT}
+                            fill="none"
+                            stroke="black"
+                            strokeWidth={FISSURE}
+                            strokeLinejoin="miter"
+                            strokeMiterlimit="12"
+                        />
+                    }
+                >
+                    <path d={BRAIN} fill={p.glyph} />
+                </Carved>
             </>
         ),
     },
     {
         id: "03",
-        name: "Duo",
-        note: "Two tones: the base model and what you trained on top of it.",
-        draw: (p) => (
+        name: "Hollow",
+        note: "The brain as one even line, the width of the fissure. Lighter, and it still reads small.",
+        draw: (p, uid) => (
             <>
-                <Tile palette={p} />
-                <Brain left={p.glyph} right={p.tint} />
+                <path d={TILE} fill={p.brand} />
+                <Carved
+                    uid={uid}
+                    cut={
+                        <>
+                            <Fissure />
+                            <path d={HOLLOW} fill="black" />
+                        </>
+                    }
+                >
+                    <path d={BRAIN} fill={p.glyph} />
+                </Carved>
             </>
         ),
     },
     {
         id: "04",
-        name: "Bleed",
-        note: "The brain fills the tile and runs off its edges. The boldest at small sizes.",
+        name: "Echo",
+        note: "A second outline around the brain, like a pulse: a mind at work, or a model wrapped around it.",
         draw: (p, uid) => (
             <>
-                <defs>
-                    <clipPath id={`bleed-${uid}`}>
-                        <rect width="64" height="64" rx="12" />
-                    </clipPath>
-                </defs>
-                <Tile palette={p} rx={12} />
-                <g clipPath={`url(#bleed-${uid})`}>
-                    <g transform="translate(32 34) scale(1.42) translate(-32 -31.4)">
-                        <Brain left={p.glyph} right={p.glyph} />
-                    </g>
-                </g>
+                <path d={TILE} fill={p.brand} />
+                <Carved uid={uid} cut={<Fissure />}>
+                    <path d={BRAIN} fill={p.glyph} />
+                    <path
+                        d={ECHO}
+                        fill="none"
+                        stroke={p.glyph}
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                    />
+                </Carved>
             </>
         ),
     },
     {
         id: "05",
-        name: "Spark",
-        note: "Cortex with a spark in the corner: brain power, and a nod to the fireworks set below.",
-        draw: (p) => (
+        name: "Badge",
+        note: "Refined Cortex in a circle, for places that crop to round: GitHub, social avatars, app badges.",
+        draw: (p, uid) => (
             <>
-                <Tile palette={p} />
-                <g transform="translate(-2 3)">
-                    <Brain left={p.glyph} right={p.glyph} />
+                <circle cx="32" cy="32" r="32" fill={p.brand} />
+                <g transform="translate(32 32) scale(0.92) translate(-32 -31.6)">
+                    <Carved uid={uid} cut={<Fissure />}>
+                        <path d={BRAIN} fill={p.glyph} />
+                    </Carved>
                 </g>
-                <path d={star(50.5, 12.5, 6.5)} fill={p.spark} />
-            </>
-        ),
-    },
-];
-
-const STACK: Mark[] = [
-    {
-        id: "06",
-        name: "Spark",
-        note: "A stack of layers with sparks rising from the top.",
-        draw: (p) => (
-            <>
-                <Layers palette={p} />
-                <path d={star(32, 14, 10)} fill={p.spark} />
-                <path d={star(46.5, 7.5, 3.6)} fill={p.spark} />
-            </>
-        ),
-    },
-    {
-        id: "07",
-        name: "Surge",
-        note: "A bolt charging the stack: power going into the model.",
-        draw: (p) => (
-            <>
-                <Layers palette={p} />
-                <path
-                    d={BOLT}
-                    fill={p.spark}
-                    stroke={p.spark}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                />
-            </>
-        ),
-    },
-    {
-        id: "08",
-        name: "Fireworks",
-        note: "A stepped stack that bursts at the top, like a launcher going off.",
-        draw: (p) => (
-            <>
-                <rect x="12" y="50" width="40" height="8" rx="3" fill={p.brand} />
-                <rect x="17" y="40" width="30" height="8" rx="3" fill={p.brand} />
-                <rect x="22" y="30" width="20" height="8" rx="3" fill={p.brand} />
-                <g stroke={p.spark} strokeWidth="3.5" strokeLinecap="round">
-                    {FIREWORK_RAYS.map((d) => (
-                        <path key={d} d={d} />
-                    ))}
-                </g>
-            </>
-        ),
-    },
-    {
-        id: "09",
-        name: "Ascent",
-        note: "Layers rising as chevrons, a spark at the peak.",
-        draw: (p) => (
-            <>
-                <g
-                    fill="none"
-                    stroke={p.brand}
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M14 40L32 30L50 40" />
-                    <path d="M14 50L32 40L50 50" />
-                    <path d="M14 60L32 50L50 60" />
-                </g>
-                <path d={star(32, 15, 8)} fill={p.spark} />
-                <circle cx="20" cy="20" r="2" fill={p.spark} />
-                <circle cx="44" cy="20" r="2" fill={p.spark} />
-            </>
-        ),
-    },
-    {
-        id: "10",
-        name: "Breakout",
-        note: "The stack inside a box, and a bolt breaking out through its lid.",
-        draw: (p) => (
-            <>
-                <rect
-                    x="5"
-                    y="9"
-                    width="54"
-                    height="50"
-                    rx="14"
-                    fill="none"
-                    stroke={p.ink}
-                    strokeWidth="3"
-                />
-                <path
-                    d="M32 30L46 36L32 42L18 36Z"
-                    fill={p.brand}
-                    stroke={p.brand}
-                    strokeWidth="1.5"
-                    strokeLinejoin="round"
-                />
-                <g
-                    fill="none"
-                    stroke={p.brand}
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M18 41.5L32 47.5L46 41.5" />
-                    <path d="M18 47L32 53L46 47" />
-                </g>
-                <path
-                    d={BREAKOUT_BOLT}
-                    fill={p.spark}
-                    stroke={p.ground}
-                    strokeWidth="4"
-                    strokeLinejoin="round"
-                    paintOrder="stroke"
-                />
             </>
         ),
     },
@@ -400,16 +267,6 @@ function MarkPreview({ mark }: { mark: Mark }) {
     );
 }
 
-function MarkGrid({ marks }: { marks: Mark[] }) {
-    return (
-        <div className="grid grid-cols-3 gap-x-8 gap-y-10">
-            {marks.map((mark) => (
-                <MarkPreview key={mark.id} mark={mark} />
-            ))}
-        </div>
-    );
-}
-
 export function LogosPage() {
     return (
         <Page wide>
@@ -417,17 +274,12 @@ export function LogosPage() {
                 title="Logos"
                 caption="Prototype, development only. Directions for the minibrain mark."
             />
-            <Section
-                title="Cortex"
-                caption="A brain inside a box: the current pick and five variations."
-            >
-                <MarkGrid marks={CORTEX} />
-            </Section>
-            <Section
-                title="Stack and sparks"
-                caption="A stack of layers with sparks or bolts: brain power, fireworks."
-            >
-                <MarkGrid marks={STACK} />
+            <Section title="Cortex" caption="The mark you picked, and five refinements of it.">
+                <div className="grid grid-cols-3 gap-x-8 gap-y-10">
+                    {MARKS.map((mark) => (
+                        <MarkPreview key={mark.id} mark={mark} />
+                    ))}
+                </div>
             </Section>
         </Page>
     );
