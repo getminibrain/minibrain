@@ -21,8 +21,8 @@ type Mark = {
 const MODES: Mode[] = ["light", "dark"];
 
 const PALETTES: Record<Mode, Palette> = {
-    light: { brand: "#026ecd", glyph: "#feffff", ink: "#202121", ground: "#f4f5f5" },
-    dark: { brand: "#346bf1", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
+    light: { brand: "#1b1c1d", glyph: "#feffff", ink: "#202121", ground: "#f4f5f5" },
+    dark: { brand: "#1b1c1d", glyph: "#feffff", ink: "#e8e9ea", ground: "#010101" },
 };
 
 const ORIGINAL_LEFT =
@@ -50,7 +50,8 @@ const ECHO = [
 ].join("");
 
 const FISSURE = 3.6;
-const BOLT = "M34.6 6L30.5 32.5H33.5L29.4 58";
+const BOLT = "M36.8 6L29.2 32.5H34.8L27.2 58";
+const BOLT_WIDTH = 4.8;
 const PREVIEW_SIZES = [48, 32, 16];
 
 function squircle(n = 5, steps = 144): string {
@@ -287,15 +288,15 @@ const MANY: Mark[] = [
     },
 ];
 
-const STRIKE = "M33.6 6L30.9 33H33.1L30.4 58";
-const ZIGZAG = "M35.4 6L31.4 23.5H34.4L29.6 40.5H32.6L28.6 58";
-const OFFSET_BOLT = "M39 6L30.6 31.5H34.4L25 58";
-const LONG_BOLT = "M35.6 2L30.5 32.5H33.5L28.4 62";
+const STRIKE = "M35 6L29.9 33H34.1L29 58";
+const ZIGZAG = "M36.4 6L30.8 23.5H35L29 40.5H33.2L27.6 58";
+const OFFSET_BOLT = "M40 6L29.8 31.5H35.2L24 58";
+const LONG_BOLT = "M37.95 2L29.2 32.5H34.8L26.05 62";
 const AMBER = "#fbbf24";
 const INK = "#1b1c1d";
 const HAIRLINE = "#d3d4d5";
 
-function BoltCut({ d = BOLT, width = FISSURE }: { d?: string; width?: number }) {
+function BoltCut({ d = BOLT, width = BOLT_WIDTH }: { d?: string; width?: number }) {
     return (
         <path
             d={d}
@@ -340,7 +341,7 @@ const BOLTS: Mark[] = [
         draw: (p, uid) => (
             <>
                 <Squircle fill={p.brand} />
-                <SplitBrain uid={uid} fill={p.glyph} d={ZIGZAG} width={3.4} />
+                <SplitBrain uid={uid} fill={p.glyph} d={ZIGZAG} width={4.4} />
             </>
         ),
     },
@@ -351,7 +352,7 @@ const BOLTS: Mark[] = [
         draw: (p, uid) => (
             <>
                 <Squircle fill={p.brand} />
-                <SplitBrain uid={uid} fill={p.glyph} width={5.2} />
+                <SplitBrain uid={uid} fill={p.glyph} width={6} />
             </>
         ),
     },
@@ -362,7 +363,7 @@ const BOLTS: Mark[] = [
         draw: (p, uid) => (
             <>
                 <Squircle fill={p.brand} />
-                <SplitBrain uid={uid} fill={p.glyph} width={2.4} />
+                <SplitBrain uid={uid} fill={p.glyph} width={3.2} />
             </>
         ),
     },
@@ -417,7 +418,7 @@ const BOLTS: Mark[] = [
         draw: (p, uid) => (
             <>
                 <Squircle fill={p.brand} />
-                <SplitBrain uid={uid} fill={p.glyph} width={4.6} />
+                <SplitBrain uid={uid} fill={p.glyph} width={5.8} />
                 <defs>
                     <clipPath id={`amber-${uid}`}>
                         <path d={BRAIN} />
@@ -427,7 +428,7 @@ const BOLTS: Mark[] = [
                     d={BOLT}
                     fill="none"
                     stroke={AMBER}
-                    strokeWidth="1.8"
+                    strokeWidth="2.4"
                     strokeLinejoin="miter"
                     strokeMiterlimit="12"
                     clipPath={`url(#amber-${uid})`}
@@ -438,7 +439,7 @@ const BOLTS: Mark[] = [
     {
         id: "24",
         name: "Ink",
-        note: "Near-black tile, white brain: the most serious, for print and enterprise decks.",
+        note: "The ink tile you picked, now used across every mark on this page.",
         draw: (p, uid) => (
             <>
                 <Squircle fill={INK} />
@@ -449,7 +450,7 @@ const BOLTS: Mark[] = [
     {
         id: "25",
         name: "Inverse",
-        note: "White tile, cobalt brain: for dark backgrounds and light, airy pages.",
+        note: "White tile, ink brain: for dark backgrounds and light, airy pages.",
         draw: (p, uid) => (
             <>
                 <path d={TILE} fill={p.glyph} stroke={HAIRLINE} strokeWidth="1" />
@@ -463,7 +464,7 @@ const MARKS: Mark[] = [
     {
         id: "00",
         name: "Cortex",
-        note: "The one you picked: two hemispheres cut from a cobalt tile.",
+        note: "The one you picked: two hemispheres cut from an ink tile.",
         draw: (p) => (
             <>
                 <rect width="64" height="64" rx="16" fill={p.brand} />
@@ -499,7 +500,7 @@ const MARKS: Mark[] = [
                             d={BOLT}
                             fill="none"
                             stroke="black"
-                            strokeWidth={FISSURE}
+                            strokeWidth={BOLT_WIDTH}
                             strokeLinejoin="miter"
                             strokeMiterlimit="12"
                         />
