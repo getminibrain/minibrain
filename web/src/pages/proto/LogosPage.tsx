@@ -42,6 +42,9 @@ const BOLT = "M36.8 6L29.2 32.5H34.8L27.2 58";
 const STRIKE = "M35 6L29.9 33H34.1L29 58";
 const BOLT_WIDTH = 4.8;
 const BADGE_TRANSFORM = "translate(32 32) scale(0.92) translate(-32 -31.6)";
+const PRIME_TRANSFORM = "translate(32 32) scale(1.18) translate(-32 -31.6)";
+const PRIME_BADGE_TRANSFORM = "translate(32 32) scale(1.06) translate(-32 -31.6)";
+const PRIME_BOLT_WIDTH = 5.4;
 const PREVIEW_SIZES = [48, 32, 16];
 
 function squircle(n = 5, steps = 144): string {
@@ -101,6 +104,32 @@ function SplitBrain({
 }
 
 const MARKS: Mark[] = [
+    {
+        id: "26",
+        name: "Prime",
+        note: "Wide, perfected: the brain fills more of the tile and the bolt is cut to read at 16 px.",
+        draw: (p, uid) => (
+            <>
+                <path d={TILE} fill={p.brand} />
+                <g transform={PRIME_TRANSFORM}>
+                    <SplitBrain uid={uid} fill={p.glyph} width={PRIME_BOLT_WIDTH} />
+                </g>
+            </>
+        ),
+    },
+    {
+        id: "27",
+        name: "Prime badge",
+        note: "Prime on the round badge, for avatars and anywhere that crops to a circle.",
+        draw: (p, uid) => (
+            <>
+                <circle cx="32" cy="32" r="32" fill={p.brand} />
+                <g transform={PRIME_BADGE_TRANSFORM}>
+                    <SplitBrain uid={uid} fill={p.glyph} width={PRIME_BOLT_WIDTH} />
+                </g>
+            </>
+        ),
+    },
     {
         id: "04",
         name: "Echo",
@@ -270,7 +299,10 @@ export function LogosPage() {
                 title="Logos"
                 caption="Prototype, development only. Directions for the minibrain mark."
             />
-            <Section title="Shortlist" caption="Your six picks, in ink.">
+            <Section
+                title="Shortlist"
+                caption="Prime, my recommendation, then your six picks, in ink."
+            >
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10">
                     {MARKS.map((mark) => (
                         <MarkPreview key={mark.id} mark={mark} />
