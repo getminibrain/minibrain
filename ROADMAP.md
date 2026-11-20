@@ -2,7 +2,8 @@
 
 Private platform for building models of any size on your own data, task-specific or general purpose. Point at a data
 source → build examples → train a LoRA → eval against the base → serve an OpenAI-compatible API. Many models per
-install. On-prem / VPC, fully offline by default. One deployable in v1, split into services later.
+install. On-prem, VPC or cloud: connected by default, air-gapped as an option. One deployable in v1, split into
+services later.
 
 Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factory.
 
@@ -1639,7 +1640,9 @@ Off by default, and only ever towards systems the customer runs. Details: `docs/
 
 ## Offline
 
-Fully offline by default. Nothing in the data, labelling, training, serving or gateway path calls out.
+Air-gapped installs are an option, not the main audience (2026-11-20): most installs are connected and download base
+models from Hugging Face, and the UI may link to online docs. With `MINIBRAIN_OFFLINE=1`, nothing in the data,
+labelling, training, serving or gateway path calls out, and everything below holds.
 
 - Teacher: a larger open model on local GPUs. An API teacher is opt-in per install and off by default; the UI marks
   every model whose data went to one.

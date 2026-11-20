@@ -108,7 +108,7 @@ ENTRYPOINT ["tini", "--", "minibrain"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]
 ARG COMMIT=""
 LABEL org.opencontainers.image.title="minibrain" \
-      org.opencontainers.image.description="Private AI platform: train, evaluate and serve models of any size on your own data, fully offline" \
+      org.opencontainers.image.description="Private AI platform: train, evaluate and serve models of any size on your own data and hardware" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/getminibrain/minibrain" \
       org.opencontainers.image.revision="${COMMIT}"

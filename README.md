@@ -3,7 +3,7 @@
 # minibrain
 
 **Train, evaluate and serve models of any size on your own data.**<br>
-On your own hardware, fully offline.
+On your own hardware or cloud, under your control.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/getminibrain/minibrain/ci.yml?branch=main&label=CI)](https://github.com/getminibrain/minibrain/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/getminibrain/minibrain?label=release)](https://github.com/getminibrain/minibrain/releases)
@@ -21,11 +21,11 @@ On your own hardware, fully offline.
 ---
 
 minibrain turns your data into models you own. Point it at a dataset, score a prompt-only baseline, train only when
-the numbers say it pays, and serve the winner on an OpenAI-compatible endpoint. Nothing leaves your network.
+the numbers say it pays, and serve the winner on an OpenAI-compatible endpoint. Your data stays on your infrastructure.
 
 - **Any size.** From a fast task model to a private frontier endpoint, on the base model that fits the job.
 - **Eval first.** Every model starts as a scored baseline; each trained version is compared on the same held-out rows.
-- **Private by default.** Runs air-gapped, with no outbound calls and no telemetry. Releases are signed.
+- **Private by default.** No telemetry and signed releases; it runs fully air-gapped when you need it to.
 - **Yours to keep.** Weights, data, scores and logs stay on your servers; export a model at any time.
 
 ## Quick start
