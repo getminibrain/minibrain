@@ -2138,7 +2138,7 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
 - [x] Prototype pages (`/proto/*`, such as `/proto/logos`) were reachable in production builds. Their routes are
   registered only in development (`import.meta.env.DEV`), and the build leaves them and their code out. Since
   2026-11-14 they are deleted (`web/src/pages/proto`): UX is built in the real product. `/proto/logos` came back on
-  2026-11-20 for logo exploration, the same way: development only.
+  2026-11-20 for logo exploration, development only, and went again the same day once the logo was chosen.
 - [x] Add model offered six tasks but only Classify works: the others are listed under Coming and cannot be picked.
   "Preview of 5–10 examples" is unticked (the preview is a table of rows, not chat transcripts) and "Eval vs base" says
   what it is (a prompt-only version on the base; no teacher yet).
