@@ -4,7 +4,6 @@ import {
     IconLogout,
     IconSettings,
     IconSunMoon,
-    IconUser,
 } from "@tabler/icons-react";
 import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { ToastProvider, type UILinkProps, UIProvider } from "obp-ui";
@@ -20,7 +19,7 @@ import {
 import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
 import { SettingsSearch } from "~/components/SettingsSearch";
-import { BrandLockup } from "~/components/brand/BrandMark";
+import { BrandLockup, BrandMark } from "~/components/brand/BrandMark";
 import { TeardownToasts } from "~/components/models/TeardownToasts";
 import {
     ACCOUNT_PATH,
@@ -118,16 +117,16 @@ function Account() {
     const signOut = useSignOut();
     const person = session.data?.person;
     const signsOut = person != null && person.source !== "proxy";
-    const name = person?.name ?? "";
-    const role = person?.role ? ROLE_LABELS[person.role] : "No role";
-    const sub = person?.email && person.email !== name ? person.email : role;
+    const name = person?.name || person?.email || "";
+    const sub = person?.role ? ROLE_LABELS[person.role] : "No role";
     const items: AccountMenuItem[] = [
-        { icon: <IconUser />, label: "Your account", href: ACCOUNT_PATH },
+        {
+            icon: <IconSettings />,
+            label: "Settings",
+            href: person?.role ? "/settings" : ACCOUNT_PATH,
+        },
         ...(person?.role
-            ? [
-                  { icon: <IconSettings />, label: "Settings", href: "/settings" },
-                  { icon: <IconBook />, label: "API reference", href: API_REFERENCE_PATH },
-              ]
+            ? [{ icon: <IconBook />, label: "API reference", href: API_REFERENCE_PATH }]
             : []),
         { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
         ...(signsOut
@@ -186,6 +185,7 @@ export function Shell() {
     const rail = (
         <Rail
             brand={<BrandLockup className="gap-2.5 pl-1" />}
+            brandCollapsed={<BrandMark size={20} />}
             brandHref="/"
             brandLabel="Home"
             toggleIcon="panel"
