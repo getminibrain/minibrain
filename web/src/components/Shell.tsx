@@ -5,6 +5,7 @@ import {
     IconInfoCircle,
     IconLogout,
     IconSettings,
+    IconSparkles,
     IconSunMoon,
 } from "@tabler/icons-react";
 import { Navigate, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
@@ -29,6 +30,7 @@ import {
     ACCOUNT_PATH,
     DOCS_URL,
     SETTINGS_PAGES,
+    changelogUrl,
     isSettingsPath,
     sectionsFor,
     visibleTo,
@@ -121,6 +123,7 @@ function Account() {
     const session = useSession();
     const signOut = useSignOut();
     const person = session.data?.person;
+    const version = session.data?.version;
     const signsOut = person != null && person.source !== "proxy";
     const name = person?.name || person?.email || "";
     const sub = person?.role ? ROLE_LABELS[person.role] : "No role";
@@ -137,6 +140,11 @@ function Account() {
             icon: <IconHelp />,
             label: "Docs",
             onSelect: () => window.open(DOCS_URL, "_blank", "noopener,noreferrer"),
+        },
+        {
+            icon: <IconSparkles />,
+            label: "What's new",
+            onSelect: () => window.open(changelogUrl(version), "_blank", "noopener,noreferrer"),
         },
         { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
         signsOut
@@ -170,7 +178,14 @@ function Version() {
         return null;
     }
     return (
-        <p className="truncate px-1.5 text-sm text-faint tabular-nums">{`${PRODUCT_NAME} ${version}`}</p>
+        <a
+            href={changelogUrl(version)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block truncate px-1.5 text-sm text-faint tabular-nums transition-colors duration-150 hover:text-muted-foreground"
+        >
+            {`${PRODUCT_NAME} ${version}`}
+        </a>
     );
 }
 

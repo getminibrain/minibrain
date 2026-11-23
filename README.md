@@ -14,7 +14,7 @@ On your own hardware or cloud, under your control.
 [![License](https://img.shields.io/github/license/getminibrain/minibrain)](LICENSE)
 
 [Docs](https://getminibrain.com/docs) · [Install](https://getminibrain.com/docs/get-started/installation) · [Your first model](https://getminibrain.com/docs/get-started/first-model) ·
-[API](https://getminibrain.com/docs/api/overview) · [Roadmap](ROADMAP.md)
+[API](https://getminibrain.com/docs/api/overview) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md)
 
 </div>
 

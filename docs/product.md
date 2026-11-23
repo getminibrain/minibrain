@@ -743,6 +743,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **API reference** · shipped · engineer, ml
   Browse /v1 and /api with this install's examples and try calls.
   UI: User menu › API reference, Models › model › API · API: GET /api/openapi/v1.json, GET /api/openapi/api.json
+- **What's new** · shipped · product, engineer, admin
+  Read what changed in each release, from the app.
+  UI: User menu › What's new, Sidebar › Version
 - **OpenAPI schema** · shipped · engineer
   Print the /api and /v1 schema for generated clients.
   CLI: minibrain openapi

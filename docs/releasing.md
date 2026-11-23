@@ -9,11 +9,14 @@ SLSA build provenance ([Signing and provenance](#signing-and-provenance)). After
 ## Cut a release
 
 1. Set the version. `uv version` writes `pyproject.toml` and `uv.lock` together; CI's `uv sync --locked` fails if
-   only one changes. Pre-releases use PEP 440 (`0.2.0rc1`, `0.2.0b1`).
+   only one changes. Pre-releases use PEP 440 (`0.2.0rc1`, `0.2.0b1`). In [`CHANGELOG.md`](../CHANGELOG.md), rename
+   `## Unreleased` to `## 0.1.0 - YYYY-MM-DD` with today's date and read it as a user would: a few plain sentences on
+   what changed for them, not the commit list. A stable version without an entry fails the release's first job;
+   pre-releases may skip it.
 
    ```sh
    uv version 0.1.0
-   git commit -m "chore(release): v0.1.0" pyproject.toml uv.lock
+   git commit -m "chore(release): v0.1.0" pyproject.toml uv.lock CHANGELOG.md
    git push origin main
    ```
 
@@ -72,11 +75,13 @@ A pre-release gets only its version tags (`0.2.0rc1`, `0.2.0rc1-cuda`), and the 
 pre-release; `latest` and `cuda` stay on the last stable release. Each index and each per-architecture image is signed
 and carries SBOM attestations; each index carries SLSA provenance.
 
-The notes come from [`scripts/release_notes.py`](../scripts/release_notes.py): install lines for the version, then
+The notes come from [`scripts/release_notes.py`](../scripts/release_notes.py): the version's `CHANGELOG.md` entry
+under What's new, with a link to [getminibrain.com/changelog](https://getminibrain.com/changelog), which the site
+builds from the same file at the latest release; then install lines for the version, then
 every commit since the previous `v*` tag (all commits for the first release) grouped by Conventional Commit type.
 Breaking changes (`type!:` or a `BREAKING CHANGE:` footer) come first; subjects that are not Conventional Commits go
 under Other changes; a compare link closes them. Preview them with
-`uv run python scripts/release_notes.py --version 0.1.0`. Edit the release on GitHub to add highlights.
+`uv run python scripts/release_notes.py --version 0.1.0`.
 
 ## The jobs
 

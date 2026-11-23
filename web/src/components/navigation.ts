@@ -63,6 +63,14 @@ export const ACCOUNT_PATH = "/settings/account";
 
 export const DOCS_URL = "https://getminibrain.com/docs";
 
+const CHANGELOG_URL = "https://getminibrain.com/changelog";
+
+export function changelogUrl(version?: string | null): string {
+    return version && /^\d+\.\d+\.\d+$/.test(version)
+        ? `${CHANGELOG_URL}#v${version}`
+        : CHANGELOG_URL;
+}
+
 export const SETTINGS_PAGES: NavEntry[] = [
     { label: "Your account", path: ACCOUNT_PATH, icon: IconUser },
     { label: "General", path: "/settings", icon: IconAdjustmentsHorizontal, role: "viewer" },

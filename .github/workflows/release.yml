@@ -64,6 +64,10 @@ jobs:
           else
             echo "Dry run of ${version}: builds everything, publishes nothing" >> "${GITHUB_STEP_SUMMARY}"
           fi
+      - name: Check CHANGELOG.md has this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python3 scripts/release_notes.py --version "${VERSION}" --check
       - name: Look for a passing CI run on this commit
         id: tested
         env:

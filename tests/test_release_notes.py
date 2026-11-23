@@ -1,9 +1,23 @@
+import datetime
 import os
 from pathlib import Path
 
 import pytest
 
-from scripts.release_notes import BREAKING, OTHER, Change, changes, git, parse, previous_tag, render
+from scripts.release_notes import (
+    BREAKING,
+    CHANGELOG,
+    OTHER,
+    Change,
+    changes,
+    git,
+    highlights,
+    main,
+    parse,
+    previous_tag,
+    releases,
+    render,
+)
 
 IDENTITY = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -75,3 +89,67 @@ def test_a_first_release_lists_every_commit_without_a_comparison() -> None:
     notes = render([Change("a1", "Features", None, "first")], version="0.1.0", since=None, repo="o/m", image="i")
     assert "## Changes\n" in notes
     assert "compare" not in notes
+
+
+CHANGELOG_TEXT = """# Changelog
+
+Newest first.
+
+## Unreleased
+
+- not out yet
+
+## 0.2.0 - 2026-12-01
+
+- tool calling
+
+### Data
+
+- folders
+
+## 0.1.0 - 2026-11-04
+
+The first release.
+"""
+
+
+def test_the_changelog_splits_into_releases_and_skips_unreleased() -> None:
+    found = releases(CHANGELOG_TEXT)
+    assert [(release.version, release.date) for release in found] == [
+        ("0.2.0", datetime.date(2026, 12, 1)),
+        ("0.1.0", datetime.date(2026, 11, 4)),
+    ]
+    assert found[0].notes == "- tool calling\n\n### Data\n\n- folders"
+    assert found[1].notes == "The first release."
+
+
+@pytest.mark.parametrize("heading", ["## v0.2.0 - 2026-12-01", "## 0.2.0", "## 0.2.0 - 2026-13-01", "## Next"])
+def test_a_changelog_heading_that_is_not_a_release_is_refused(heading: str) -> None:
+    with pytest.raises(ValueError, match="line 3"):
+        releases(f"# Changelog\n\n{heading}\n")
+
+
+def test_the_repository_changelog_is_well_formed_and_newest_first() -> None:
+    found = releases(CHANGELOG.read_text())
+    versions = [release.version for release in found]
+    assert len(versions) == len(set(versions))
+    assert [release.date for release in found] == sorted((release.date for release in found), reverse=True)
+    assert all(release.notes for release in found)
+
+
+def test_notes_lead_with_the_changelog_entry_when_there_is_one() -> None:
+    notes = render([], version="0.2.0", since="v0.1.0", repo="o/m", image="i", notes="- tool calling")
+    assert notes.startswith("## What's new\n\n- tool calling\n\n[Changelog](https://getminibrain.com/changelog#v0.2.0)")
+    assert render([], version="0.2.0", since="v0.1.0", repo="o/m", image="i").startswith("## Install")
+
+
+def test_a_release_needs_a_changelog_entry_but_a_prerelease_does_not(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(CHANGELOG_TEXT)
+    assert highlights("0.2.0", changelog) == "- tool calling\n\n### Data\n\n- folders"
+    assert main(["--version", "0.2.0", "--changelog", str(changelog), "--check"]) == 0
+    assert main(["--version", "0.3.0", "--changelog", str(changelog), "--check"]) == 1
+    assert "no '## 0.3.0 - YYYY-MM-DD' entry" in capsys.readouterr().err
+    assert main(["--version", "0.3.0rc1", "--changelog", str(changelog), "--check"]) == 0

@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import re
 import shutil
 import subprocess
@@ -7,8 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+CHANGELOG = ROOT / "CHANGELOG.md"
 SERVER = "https://github.com"
-DOCS = "https://getminibrain.com/docs"
+SITE = "https://getminibrain.com"
+DOCS = f"{SITE}/docs"
+CHANGELOG_PAGE = f"{SITE}/changelog"
 OIDC_ISSUER = "https://token.actions.githubusercontent.com"
 HEADER = re.compile(r"^(?P<kind>[a-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?: (?P<summary>.+)$")
 BREAKING_FOOTER = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
@@ -30,6 +34,9 @@ SECTIONS = {
 ORDER = [BREAKING, *SECTIONS.values(), OTHER]
 FIELD = "\x1f"
 RECORD = "\x1e"
+UNRELEASED = "## Unreleased"
+RELEASE_HEADING = re.compile(r"^## (?P<version>\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?) - (?P<date>\d{4}-\d{2}-\d{2})$")
+PRERELEASE = re.compile(r"(a|b|rc|\.dev)\d+")
 
 
 @dataclass(frozen=True)
@@ -42,6 +49,49 @@ class Change:
     def render(self) -> str:
         scope = f"**{self.scope}:** " if self.scope else ""
         return f"- {scope}{self.summary} ({self.sha})"
+
+
+@dataclass(frozen=True)
+class Release:
+    version: str
+    date: datetime.date
+    notes: str
+
+
+def releases(text: str) -> list[Release]:
+    found: list[Release] = []
+    heading: tuple[str, datetime.date] | None = None
+    lines: list[str] = []
+
+    def close() -> None:
+        if heading is not None:
+            found.append(Release(heading[0], heading[1], "\n".join(lines).strip()))
+
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.startswith("## "):
+            lines.append(line)
+            continue
+        close()
+        lines = []
+        if line == UNRELEASED:
+            heading = None
+            continue
+        match = RELEASE_HEADING.match(line)
+        if match is None:
+            raise ValueError(f"CHANGELOG.md line {number}: expected '## X.Y.Z - YYYY-MM-DD' or '{UNRELEASED}'")
+        try:
+            heading = (match["version"], datetime.date.fromisoformat(match["date"]))
+        except ValueError as error:
+            raise ValueError(f"CHANGELOG.md line {number}: {error}") from error
+    close()
+    return found
+
+
+def highlights(version: str, path: Path = CHANGELOG) -> str | None:
+    if not path.exists():
+        return None
+    entry = next((release for release in releases(path.read_text()) if release.version == version), None)
+    return entry.notes if entry else None
 
 
 def parse(sha: str, subject: str, body: str = "") -> Change:
@@ -105,8 +155,11 @@ def install_lines(version: str, repo: str, image: str) -> list[str]:
     ]
 
 
-def render(found: list[Change], *, version: str, since: str | None, repo: str, image: str) -> str:
-    lines = install_lines(version, repo, image)
+def render(
+    found: list[Change], *, version: str, since: str | None, repo: str, image: str, notes: str | None = None
+) -> str:
+    lines = ["## What's new", "", notes, "", f"[Changelog]({CHANGELOG_PAGE}#v{version})", ""] if notes else []
+    lines += install_lines(version, repo, image)
     lines += ["", f"## Changes since {since}" if since else "## Changes", ""]
     for section in ORDER:
         entries = [change.render() for change in found if change.section == section]
@@ -125,10 +178,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ref", default="HEAD", help="the commit or tag being released")
     parser.add_argument("--repo", default="getminibrain/minibrain", help="owner/name on GitHub")
     parser.add_argument("--image", default="ghcr.io/getminibrain/minibrain", help="the container image name")
+    parser.add_argument("--changelog", type=Path, default=CHANGELOG, help="the changelog to take the highlights from")
+    parser.add_argument("--check", action="store_true", help="only check the changelog has this version")
     args = parser.parse_args(argv)
+    try:
+        notes = highlights(args.version, args.changelog)
+    except ValueError as error:
+        sys.stderr.write(f"{error}\n")
+        return 1
+    if notes is None and not PRERELEASE.search(args.version):
+        entry = f"## {args.version} - YYYY-MM-DD"
+        sys.stderr.write(f"{args.changelog.name} has no '{entry}' entry: write one before releasing\n")
+        return 1
+    if args.check:
+        return 0
     since = previous_tag(args.ref)
-    notes = render(changes(args.ref, since), version=args.version, since=since, repo=args.repo, image=args.image)
-    sys.stdout.write(notes)
+    body = render(
+        changes(args.ref, since), version=args.version, since=since, repo=args.repo, image=args.image, notes=notes
+    )
+    sys.stdout.write(body)
     return 0
 
 
