@@ -1268,8 +1268,8 @@ keys, and `/v1` stays key-only.
 
 - obp-ui, operator-console style.
 - Sidebar (2026-11-11): Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations,
-  Feedback) · Operate (Monitoring, Jobs, Infrastructure, API keys) · Settings, with the user menu (Settings, API reference,
-  Theme, Sign out) below. It follows the role: Viewers see Home, Models, Playground, Monitoring and Settings; Builders
+  Feedback) · Operate (Monitoring, Jobs, Infrastructure, API keys) · Settings, with the release ("minibrain 0.1.2",
+  hidden while collapsed) and the user menu (Settings, API reference, Theme, Sign out) below. It follows the role: Viewers see Home, Models, Playground, Monitoring and Settings; Builders
   add the rest; Admins add Infrastructure and the admin settings. Sidebar links are plain paths; no page carries a
   model into another. Deployments and Pipelines left it: a model's endpoint and keys are on its API tab, and
   `/deployments` redirects to Models, `/deployments/<slug>` to `/models/<slug>/api` and `/pipelines` to Home.

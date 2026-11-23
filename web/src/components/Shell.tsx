@@ -17,6 +17,7 @@ import {
     NavItem,
     Rail,
     SectionLabel,
+    useRailCollapsed,
 } from "obp-ui/shell";
 import { type MouseEvent, type ReactNode, useEffect } from "react";
 import { usePerson, useSession, useSignOut } from "~/api/authQueries";
@@ -123,7 +124,6 @@ function Account() {
     const signsOut = person != null && person.source !== "proxy";
     const name = person?.name || person?.email || "";
     const sub = person?.role ? ROLE_LABELS[person.role] : "No role";
-    const version = session.data?.version;
     const items: AccountMenuItem[] = [
         {
             icon: <IconSettings />,
@@ -153,15 +153,6 @@ function Account() {
                   label: "Signed in through your organisation",
                   separatorBefore: true,
               },
-        ...(version
-            ? [
-                  {
-                      kind: "note" as const,
-                      label: `${PRODUCT_NAME} ${version}`,
-                      separatorBefore: true,
-                  },
-              ]
-            : []),
     ];
     return (
         <AccountMenu
@@ -169,6 +160,17 @@ function Account() {
             items={items}
             spacing="comfortable"
         />
+    );
+}
+
+function Version() {
+    const version = useSession().data?.version;
+    const collapsed = useRailCollapsed();
+    if (!version || collapsed) {
+        return null;
+    }
+    return (
+        <p className="truncate px-1.5 text-sm text-faint tabular-nums">{`${PRODUCT_NAME} ${version}`}</p>
     );
 }
 
@@ -212,7 +214,12 @@ export function Shell() {
             brandLabel="Home"
             toggleIcon="panel"
             togglePlacement="header"
-            footer={<Account />}
+            footer={
+                <>
+                    <Version />
+                    <Account />
+                </>
+            }
         >
             {settings ? (
                 <SettingsNavigation pathname={pathname} />
