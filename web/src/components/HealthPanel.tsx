@@ -1,4 +1,4 @@
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconHeartbeat } from "@tabler/icons-react";
 import { Button, Link, StatusDot, useToast } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { useMachineAction } from "~/api/machineQueries";
@@ -210,10 +210,10 @@ function HealthyLine({ loading }: { loading: boolean }) {
     );
 }
 
-export function NeedsAttention({
+export function HealthPanel({
     scope,
     model,
-    title = "Needs attention",
+    title = "Health",
     description,
     compact = false,
 }: ProblemFilter & { title?: string; description?: string; compact?: boolean }) {
@@ -237,7 +237,7 @@ export function NeedsAttention({
     return (
         <PanelSection
             flush
-            icon={IconAlertTriangle}
+            icon={IconHeartbeat}
             title={title}
             description={description}
             actions={toggle}

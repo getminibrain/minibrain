@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
-import { NeedsAttention } from "~/components/NeedsAttention";
+import { HealthPanel } from "~/components/HealthPanel";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { Page, PanelSections } from "~/components/Section";
 import { ModelNotFound } from "~/components/models/ModelNotFound";
@@ -179,9 +179,7 @@ function Overview({
         <OverviewLayout
             main={
                 <>
-                    {row.kind === "base" && (
-                        <NeedsAttention scope="model" model={row.key} compact />
-                    )}
+                    {row.kind === "base" && <HealthPanel scope="model" model={row.key} compact />}
                     <UsagePanel row={row} />
                     {row.kind === "base" ? (
                         <>
@@ -199,7 +197,7 @@ function Overview({
             side={
                 row.kind === "custom" ? (
                     <>
-                        <NeedsAttention scope="model" model={row.key} compact />
+                        <HealthPanel scope="model" model={row.key} compact />
                         <VersionsPanel row={row} versions={versions} />
                     </>
                 ) : undefined

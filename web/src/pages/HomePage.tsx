@@ -1,124 +1,39 @@
-import { IconListCheck } from "@tabler/icons-react";
-import type { ColumnDef } from "@tanstack/react-table";
-import { DataGrid, Link } from "obp-ui";
-import type { JobInfo } from "~/api/client";
-import { useJobFacets } from "~/api/jobQueries";
-import { useModels, useRecentJobs } from "~/api/queries";
-import { SectionError } from "~/components/ErrorState";
-import { ModelName } from "~/components/ModelName";
-import { NeedsAttention } from "~/components/NeedsAttention";
+import { IconPlus } from "@tabler/icons-react";
+import { Button, Link } from "obp-ui";
+import { HealthPanel } from "~/components/HealthPanel";
 import { PageHeader } from "~/components/PageHeader";
-import {
-    FLUSH_GRID,
-    Page,
-    PanelColumns,
-    PanelSection,
-    PanelSections,
-    Stat,
-} from "~/components/Section";
-import { JobStatus, jobStatusRank } from "~/components/StatusBadge";
+import { Page, PanelColumns, PanelSections } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { count, dateTime, percent } from "~/lib/format";
-import { jobTitle } from "~/lib/jobs";
-import { jobHref } from "~/lib/modelLinks";
-import { isLiveRow } from "~/lib/teardown";
-import { Checklist } from "./home/Checklist";
-
-function jobModelName(job: JobInfo): string {
-    return job.model_name ?? job.base_model_name ?? job.base_model ?? "Install";
-}
-
-const JOB_COLUMNS: ColumnDef<JobInfo, unknown>[] = [
-    {
-        header: "Model",
-        id: "model",
-        accessorFn: (job) => jobModelName(job).toLowerCase(),
-        cell: ({ row }) => (
-            <Link className="text-primary" href={jobHref(row.original)}>
-                <ModelName name={jobModelName(row.original)} deleted={row.original.deleted} />
-            </Link>
-        ),
-    },
-    {
-        header: "Job",
-        id: "job",
-        accessorFn: (job) => jobTitle(job).toLowerCase(),
-        cell: ({ row }) => jobTitle(row.original),
-    },
-    {
-        header: "Status",
-        id: "status",
-        accessorFn: (job) => jobStatusRank(job.status),
-        cell: ({ row }) => <JobStatus job={row.original} />,
-    },
-    {
-        header: "Progress",
-        id: "progress",
-        accessorFn: (job) => job.progress,
-        cell: ({ row }) => percent(row.original.progress),
-    },
-    {
-        header: "Created",
-        id: "created",
-        accessorFn: (job) => Date.parse(job.created_at),
-        cell: ({ row }) => dateTime(row.original.created_at),
-    },
-];
-
-function Overview({
-    models,
-    serving,
-    running,
-}: { models: number | undefined; serving: number; running: number | undefined }) {
-    return (
-        <div className="flex gap-6">
-            <Stat label="Models" value={count(models)} />
-            <Stat label="Serving" value={count(serving)} />
-            <Stat label="Jobs running" value={count(running)} />
-        </div>
-    );
-}
+import { JobsPanel } from "./home/JobsPanel";
+import { JourneyStrip } from "./home/JourneyStrip";
+import { ModelsPanel } from "./home/ModelsPanel";
+import { useHomeData } from "./home/data";
 
 export function HomePage() {
     const can = useCan();
-    const { data: models } = useModels();
-    const recentJobs = useRecentJobs(10);
-    const jobs = recentJobs.data;
-    const serving = (models ?? []).filter(isLiveRow).length;
-    const active = (models ?? []).some((item) => item.active_jobs > 0);
-    const statuses = useJobFacets({}, active).data?.statuses;
-    const running = statuses ? (statuses.running ?? 0) : undefined;
+    const data = useHomeData();
     return (
         <Page wide>
             <PageHeader
                 title="Home"
-                caption="Models of any size, trained on your data and served on an OpenAI-compatible endpoint. Everything runs on your own hardware."
-                actions={<Overview models={models?.length} serving={serving} running={running} />}
+                actions={
+                    can.build && (
+                        <Button asChild>
+                            <Link href="/models/new">
+                                <IconPlus aria-hidden="true" />
+                                Add model
+                            </Link>
+                        </Button>
+                    )
+                }
             />
             <PanelSections>
+                <JourneyStrip data={data} />
+                <ModelsPanel data={data} />
                 <PanelColumns>
-                    {can.build && models && <Checklist models={models} />}
-                    <NeedsAttention description="Problems across models, machines and training runs." />
+                    <JobsPanel data={data} />
+                    <HealthPanel description="Problems across models, machines and training runs." />
                 </PanelColumns>
-                <PanelSection flush icon={IconListCheck} title="Recent jobs">
-                    <div className={FLUSH_GRID}>
-                        <DataGrid
-                            columns={JOB_COLUMNS}
-                            rows={jobs ?? []}
-                            loading={recentJobs.isLoading}
-                            empty={
-                                recentJobs.error ? (
-                                    <SectionError
-                                        error={recentJobs.error}
-                                        retry={recentJobs.refetch}
-                                    />
-                                ) : (
-                                    "No jobs yet."
-                                )
-                            }
-                        />
-                    </div>
-                </PanelSection>
             </PanelSections>
         </Page>
     );

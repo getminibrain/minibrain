@@ -5,7 +5,7 @@ sidebar:
   order: 9
 ---
 
-**Infrastructure › Machines** shows every machine with its status, and **Home › Needs attention** warns about the ones
+**Infrastructure › Machines** shows every machine with its status, and **Home › Health** warns about the ones
 that need you. Click a machine's row to open its sheet: problems with **How to fix**, hardware, what runs there, live
 usage, library versions, the last heartbeat and, for admins, the actions to drain or remove it.
 
@@ -18,7 +18,7 @@ hardware and a usage sample. A machine that goes quiet is taken out of use in st
 |---|---|
 | 30 seconds | Its engines leave gateway routing; replicas move to other online machines of the pool |
 | 60 seconds | A job it runs is queued again while it has attempts left |
-| 2 minutes | Offline: Status reads "Offline" and for how long, and Needs attention warns "gpu-01 is offline" |
+| 2 minutes | Offline: Status reads "Offline" and for how long, and Health warns "gpu-01 is offline" |
 | 24 hours | The warning offers admins **Remove** |
 | 7 days | Forgotten, except machines that joined by approval: they stay listed until removed |
 
@@ -43,7 +43,7 @@ the NVIDIA driver, or ROCm. Its sheet lists them under **Versions** beside main'
 peft are compared with main, ignoring a build tag such as `+cu132`.
 
 A difference does not stop the machine, but its Status reads **Version drift**, its row under **Versions** is
-highlighted, and Needs attention warns "gpu-01 runs other library versions than main: torch 2.8.0 (main has 2.9.0)".
+highlighted, and Health warns "gpu-01 runs other library versions than main: torch 2.8.0 (main has 2.9.0)".
 
 To fix it, install main's versions on the machine, then restart the worker with the command under **How to fix**. In
 Docker, run main's image tag. A native install resolves torch, transformers and peft when it installs, so pin them:
@@ -71,7 +71,7 @@ machine that joined by approval must be approved again. Main cannot be drained o
 
 ## Troubleshooting
 
-Problems show in a machine's Status and its sheet, as a badge on the pool's row, and under Needs attention:
+Problems show in a machine's Status and its sheet, as a badge on the pool's row, and under Health:
 
 | Problem | Shown as | Fix |
 |---|---|---|

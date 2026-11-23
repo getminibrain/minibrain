@@ -493,7 +493,11 @@ export function usageOf(model: ListModel): ModelUsage | null {
     if (model.kind === "custom") {
         return model.row.usage ?? null;
     }
-    const used = model.variants.map((row) => row.usage).filter((usage) => usage != null);
+    return combinedUsage(model.variants.map((row) => row.usage));
+}
+
+export function combinedUsage(usages: (ModelUsage | null | undefined)[]): ModelUsage | null {
+    const used = usages.filter((usage): usage is ModelUsage => usage != null);
     if (used.length < 2) {
         return used[0] ?? null;
     }

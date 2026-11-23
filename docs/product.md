@@ -15,7 +15,7 @@ Principles: any size, own hardware or cloud, private, gated on scores
   UI: Data › Add › Upload file, Data › Add › Demo data · API: POST /api/sources, POST /api/demo-data/{file}
 - **Demo data** · shipped · product
   Try the whole flow on bundled demo data in minutes.
-  UI: Home › Get started, Models › Try with demo data, Models › Add model › Dataset › Demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
+  UI: Home › From data to an app, Models › Try with demo data, Models › Add model › Dataset › Demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
 - **Large demo data** · shipped · ml
   Build 630,000- and 4,000,000-row demo sets for realistic runs.
   UI: Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}
@@ -537,9 +537,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Compute pools** · shipped · admin
   See each machine's memory use, current work and the setup.
   UI: Infrastructure › Machines, Infrastructure › Setup · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
-- **Needs attention** · shipped · admin
+- **Health** · shipped · admin
   What is wrong now, worst first, each with its fix.
-  UI: Home › Needs attention, Models › model › Overview › Needs attention · API: GET /api/problems
+  UI: Home › Health, Models › model › Overview › Health · API: GET /api/problems
 - **Machine list** · shipped · admin
   Status, per-GPU memory and running work per machine; sort, filter, resize.
   UI: Infrastructure › Machines · API: GET /api/compute/pools
@@ -649,16 +649,16 @@ Principles: any size, own hardware or cloud, private, gated on scores
   UI: Settings › Security › Audit integrity, Settings › Audit log · API: GET /api/audit/chain · CLI: minibrain audit verify
 - **Automatic audit checks** · shipped · admin
   Verify the chain hourly and in full nightly; raise every break.
-  UI: Home › Needs attention, Settings › Audit log · API: GET /api/problems, GET /api/audit/chain
+  UI: Home › Health, Settings › Audit log · API: GET /api/problems, GET /api/audit/chain
 - **Audit break history** · shipped · admin
   Keep every chain break until an admin acknowledges it with a note.
-  UI: Home › Needs attention, Settings › Security › Audit integrity · API: GET /api/audit/chain, POST /api/audit/chain/breaks/{break_id}/acknowledge
+  UI: Home › Health, Settings › Security › Audit integrity · API: GET /api/audit/chain, POST /api/audit/chain/breaks/{break_id}/acknowledge
 - **Audit access record** · shipped · admin
   Record every audit export and who viewed the log, hourly.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/{event_id}, GET /api/audit/export
 - **Logging failure alert** · shipped · admin
   Warn when the SIEM fails or falls 15 minutes behind.
-  UI: Home › Needs attention, Settings › Security › Audit integrity · API: GET /api/problems · Policy: siem_host
+  UI: Home › Health, Settings › Security › Audit integrity · API: GET /api/problems · Policy: siem_host
 - **SIEM export** · shipped · admin
   Stream audit events to your SIEM as RFC 5424 syslog.
   UI: Settings › Security › Audit log export · Policy: siem_protocol, siem_host, siem_port, siem_ca_bundle
@@ -693,11 +693,11 @@ Principles: any size, own hardware or cloud, private, gated on scores
 
 ## Operations
 - **Home** · shipped · product
-  See models, serving and running jobs at a glance.
-  UI: Home
-- **Getting-started checklist** · shipped · product
-  Six steps from data to a connected app, checked from real state.
-  UI: Home › Get started
+  See models, their next steps, running jobs and health at a glance.
+  UI: Home › Models, Home › Jobs, Home › Health
+- **Journey strip** · shipped · product
+  Seven steps from data to requests, counted live, next one marked.
+  UI: Home › From data to an app
 - **Monitoring overview** · shipped · engineer, admin
   Chart requests, errors, latency and tokens per model, live.
   UI: Monitoring › Overview · API: GET /api/requests/overview

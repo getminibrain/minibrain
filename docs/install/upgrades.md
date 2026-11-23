@@ -145,7 +145,7 @@ While main is down:
 
 Run every worker, engine and standalone gateway on main's release ([Add machines](machines.md)). There is no
 version-skew policy yet: mixed releases are not tested, and main does not turn a machine away for its version. Until it
-matches, **Infrastructure** › **Machines** marks the machine **Version drift**, and **Needs attention** says, for
+matches, **Infrastructure** › **Machines** marks the machine **Version drift**, and **Health** says, for
 example, `gpu-01 runs other library versions than main: minibrain 0.1.1 (main has 0.1.2)`. The check compares
 minibrain, torch, transformers and peft, ignoring local build tags such as `+cu132`. For each worker machine, after
 main:

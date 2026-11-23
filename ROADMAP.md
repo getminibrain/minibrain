@@ -248,13 +248,15 @@ runs it as a `score` job, so versions stay comparable; changing the promotion ru
 
 ## The core journey
 
-Every UI change serves one of these steps or questions itself (2026-11-13). Home's checklist, empty states and each
-model's next-step line follow them.
+Every UI change serves one of these steps or questions itself (2026-11-13). Home's journey strip, empty states and
+each model's next-step line follow them.
 
-Home's checklist (built 2026-11-14, Builders): Get started lists Add data, Add a model, Train, Evaluate, Deploy and
-Connect an app, each done or not from real state (a dataset, a custom model, a ready trained version, a scored trained
-version, a live version, an API key on a model) with a link to where it is done, the next one as the primary button,
-and "N of 6 done". It hides once every step is done or when Dismiss is clicked (kept in the browser).
+Home (2026-11-23, replaces the 2026-11-14 Get started checklist): a strip "From data to an app" that never hides, with
+Data, Models, Trained, Evaluated, Live, Connected and Requests, each a live count from real state (datasets, custom
+models, models with a ready trained version, with a scored trained version, deployed, API keys on models, requests in
+the last 7 days) that links to its page. The first step not yet run is marked and carries its action (Builders; Viewers
+see the counts without Data). Below it: Models (live first, then the most recently changed; state, score against v0,
+requests over 7 days, p50 and each model's next step) and, side by side, Jobs (running first) and Health.
 
 1. **Install** on one server; sign in with the setup link as the admin.
 2. **Add data**: upload a CSV or JSONL, or connect Postgres; it becomes a dataset with held-out rows set aside.
@@ -1958,7 +1960,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       (no table, no per-user state), filtered by role and by scope (`infrastructure`, `model`, one model): live models
       with no running replica and failed engines (critical), then low disk on main and on machines, library versions
       that differ from main, training that failed in the last 24 hours and offline machines (warnings; past a day,
-      admins get Remove). One Needs attention component shows it, same-kind problems grouped on one line, four lines
+      admins get Remove). One Health panel shows it, same-kind problems grouped on one line, four lines
       then Show all. Done on Infrastructure › Machines; the model page and Home are next
 - [x] Hash-chained audit log with SIEM export; encryption at rest: hash chain sealed by the leader, prune anchors,
       verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP; every stored file

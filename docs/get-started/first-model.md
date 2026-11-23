@@ -7,7 +7,7 @@ sidebar:
 
 This walkthrough builds a classifier that sorts support messages into labels such as `billing`, `bug` and `refund`.
 The same steps make a chat assistant or a model that answers in JSON; only the Output choice in step 3 changes. Home's
-**Get started** checklist follows the same steps and ticks each one off from what is on the install.
+**From data to an app** strip follows the same steps and counts what each one has made on the install.
 
 You need:
 

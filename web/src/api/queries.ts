@@ -114,8 +114,12 @@ export function usePreview(slug: string, enabled: boolean) {
     });
 }
 
-export function useDatasets() {
-    return useQuery({ queryKey: keys.datasets, queryFn: () => unwrap(api.GET("/api/datasets")) });
+export function useDatasets(enabled = true) {
+    return useQuery({
+        queryKey: keys.datasets,
+        queryFn: () => unwrap(api.GET("/api/datasets")),
+        enabled,
+    });
 }
 
 export function useDemoData() {
