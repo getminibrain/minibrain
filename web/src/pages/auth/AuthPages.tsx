@@ -41,7 +41,7 @@ function AuthFrame({
     return (
         <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 pt-8 pb-[10vh]">
             <div className="flex w-full max-w-sm flex-col gap-panel">
-                <BrandLockup large className="justify-center" />
+                <BrandLockup large className="self-center" />
                 <Card>
                     <CardHeader>
                         <CardTitle>

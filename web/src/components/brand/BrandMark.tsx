@@ -1,6 +1,7 @@
 import { cn, getTheme, onThemeChange } from "obp-ui";
 import { useSyncExternalStore } from "react";
 import { MARK_URLS, PRODUCT_NAME } from "./mark";
+import { LOCKUP_MARK, LOCKUP_VIEWBOX, WORDMARK, WORDMARK_OFFSET } from "./wordmark";
 
 export function BrandMark({
     size = 20,
@@ -21,12 +22,22 @@ export function BrandMark({
 }
 
 export function BrandLockup({ large = false, className }: { large?: boolean; className?: string }) {
+    const theme = useSyncExternalStore(onThemeChange, getTheme);
     return (
-        <span className={cn("flex items-center", large ? "gap-3" : "gap-2", className)}>
-            <BrandMark size={large ? 28 : 20} />
-            <span className={cn("font-semibold", large ? "text-xl" : "text-base")}>
-                {PRODUCT_NAME}
-            </span>
-        </span>
+        <svg
+            viewBox={LOCKUP_VIEWBOX}
+            role="img"
+            aria-label={PRODUCT_NAME}
+            className={cn("w-auto shrink-0 text-foreground", large ? "h-6.5" : "h-4.5", className)}
+        >
+            <image
+                href={MARK_URLS[theme]}
+                x={LOCKUP_MARK.x}
+                y={LOCKUP_MARK.y}
+                width={LOCKUP_MARK.size}
+                height={LOCKUP_MARK.size}
+            />
+            <path fill="currentColor" transform={`translate(${WORDMARK_OFFSET} 0)`} d={WORDMARK} />
+        </svg>
     );
 }

@@ -206,7 +206,7 @@ export function Shell() {
     }, [settings, href]);
     const rail = (
         <Rail
-            brand={<BrandLockup className="gap-2.5 pl-1" />}
+            brand={<BrandLockup className="ml-1" />}
             brandCollapsed={<BrandMark size={20} />}
             brandHref="/"
             brandLabel="Home"
