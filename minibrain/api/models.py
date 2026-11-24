@@ -473,7 +473,7 @@ def update_contract(name: str, body: ContractUpdate, session: SessionDep, settin
     contract = contract_from(body.contract)
     found = contract_check(model, contract)
     if found.breaking and not body.breaking:
-        raise ConflictError("This contract removes or renames what apps rely on; confirm it as a breaking change")
+        raise ConflictError("This answer format removes or renames what apps rely on; confirm it as a breaking change")
     before = {"from": contract_of(model).as_dict(), "preset_from": model.preset}
     switch_preset(model, contract)
     model_graders(session, model, contract)

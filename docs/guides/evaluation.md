@@ -81,7 +81,7 @@ version, one under the other. Filter by model and status; the column picker adds
 Click a version for its details:
 
 - A headline such as `v0 64% → v1 92%`, then Status, the held-out score, **vs live**, **Data vs live**, **Test set**,
-  **Breaks the contract** (answers outside the contract), **p50** and **p95** latency, **GPU time / 1M tokens** and,
+  **Invalid answers** (answers outside the model's labels or JSON schema), **p50** and **p95** latency, **GPU time / 1M tokens** and,
   when an admin prices the pool, **Cost / 1M tokens**.
 - The score of each grader, and **Can it go live?** with each check of the deploy rule, met or not.
 - For a classifier, recall and precision per label and the confusion between labels. For free text, **Answers**: each

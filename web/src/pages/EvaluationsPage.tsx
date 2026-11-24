@@ -489,7 +489,7 @@ function VersionDetail({ line, onDone }: { line: Line; onDone: () => void }) {
                     }
                 />
                 <Stat label="Test set" value={percent(metricOf(info?.golden, info?.main_metric))} />
-                <Stat label="Breaks the contract" value={percent(info?.held_out?.invalid_rate)} />
+                <Stat label="Invalid answers" value={percent(info?.held_out?.invalid_rate)} />
                 <Stat label="p50" value={milliseconds(info?.latency_p50_ms)} />
                 <Stat label="p95" value={milliseconds(info?.latency_p95_ms)} />
                 <Stat

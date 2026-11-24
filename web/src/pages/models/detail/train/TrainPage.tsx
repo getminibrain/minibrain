@@ -505,7 +505,7 @@ function TrainForm({
             <ConfirmDialog
                 open={run.breaking !== null}
                 onOpenChange={(open) => !open && run.setBreaking(null)}
-                title="This version breaks the contract"
+                title="This version changes the answers apps rely on"
                 description={run.breaking ?? ""}
                 confirmLabel={training ? "Train it anyway" : "Create it anyway"}
                 destructive

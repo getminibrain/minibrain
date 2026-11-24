@@ -210,7 +210,7 @@ function ReasoningControl({
     const explain = !target
         ? null
         : target.contract !== "text"
-          ? "This model answers with its contract, so it does not reason."
+          ? "This model answers in a fixed format, labels or JSON, so it does not reason."
           : fixed
             ? "This model always reasons; it has no setting."
             : options.length === 0
@@ -250,10 +250,10 @@ function ReasoningControl({
 
 function contractNote(target: Target | undefined): string | null {
     if (target?.contract === "labels") {
-        return "This model answers with one of its labels, its contract; formats and functions do not apply.";
+        return "This model answers with one of its labels; formats and functions do not apply.";
     }
     if (target?.contract === "json") {
-        return "This model answers with its own JSON schema, its contract; formats and functions do not apply.";
+        return "This model answers in its own JSON schema; formats and functions do not apply.";
     }
     return null;
 }

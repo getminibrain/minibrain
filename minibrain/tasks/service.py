@@ -133,7 +133,7 @@ def checked_contract(model: Model, contract: Contract, breaking: bool) -> int:
     found = breaking_changes(version_contract(previous), contract)
     if found and went_live(model) and not breaking and not model.breaking_confirmed:
         raise BreakingChangeError(
-            f"This changes the contract apps use: {described(found)}. Confirm it as a breaking change to go on."
+            f"This changes the answers apps rely on: {described(found)}. Confirm it as a breaking change to go on."
         )
     return previous.contract_number + 1
 

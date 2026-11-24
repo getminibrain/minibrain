@@ -21,6 +21,8 @@ What changed in each minibrain release, newest first. To move to a new version, 
 - Every usage bar looks the same, the one Train uses, including on Infrastructure › Storage.
 - The user menu groups Settings and Theme, then the API reference, docs and What's new, then Sign out.
 - In the Playground, Enter sends and Shift+Enter starts a new line.
+- Plainer words: **Invalid answers** on Evaluations, and the Playground and Train say what a model answers with
+  instead of "its contract".
 - Only live models keep a model loaded in memory. A model you only tried in the Playground or scored is unloaded
   after 15 minutes without requests; before, every model with a version stayed loaded until restart.
 
