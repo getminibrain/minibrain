@@ -5,6 +5,9 @@ __pycache__/
 .minibrain*/
 web/node_modules/
 web/dist/
+web/.e2e/
+web/test-results/
+web/playwright-report/
 dist/
 sbom/
 

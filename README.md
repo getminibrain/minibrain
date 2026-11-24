@@ -123,6 +123,7 @@ mise run setup    # install Python and web dependencies
 mise run dev      # API and worker on :8000, UI with hot reload on :5173
 mise run check    # tests, ruff, pyright, biome, tsc
 mise run build    # wheel with the built UI inside
+mise run e2e      # the core journey in a browser, with fake serving and jobs (pnpm --dir web e2e)
 ```
 
 `mise run setup-link` prints a fresh link to create the first admin; `mise run api-types` regenerates the TypeScript

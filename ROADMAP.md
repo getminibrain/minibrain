@@ -2058,7 +2058,13 @@ it finds:
       the app and on getminibrain.com
 - [ ] Website: product page, docs, install, contact (built: getminibrain.com in its own repo; deploying on Coolify is
       left)
-- [ ] Core journey end to end on a fresh install, scripted as a release check
+- [x] Core journey end to end on a fresh install, scripted as a release check: `web/e2e/core-journey.spec.ts`
+      (Playwright, Chromium; `mise run e2e`, and the CI job Core journey in a browser) takes the setup link, adds the
+      demo travel intents, adds a model on Qwen3 0.6B with v0 scored, trains v1 (scored against v0), deploys it,
+      creates a key on the model's API keys tab, calls `/v1/chat/completions` with it and checks Home's strip shows
+      every step done. `scripts/e2e_server.py` runs main on a free port with a fresh `MINIBRAIN_HOME`, a fake serving
+      backend and a worker whose download, train and score jobs are `scripts/e2e_jobs.py` (placeholder weights, v0 at
+      60% and trained versions at 90%), so it needs no model download and no GPU
 - [ ] A real GPU run: gpt-oss-20b serving and LoRA training on an NVIDIA box
 - [ ] Backup and restore, tested and documented
 - [ ] Licences: third-party notices, model licences shown before download, LICENSE and the CLA
