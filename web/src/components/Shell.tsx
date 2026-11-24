@@ -133,12 +133,21 @@ function Account() {
             label: "Settings",
             href: person?.role ? "/settings" : ACCOUNT_PATH,
         },
+        { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
         ...(person?.role
-            ? [{ icon: <IconBook />, label: "API reference", href: API_REFERENCE_PATH }]
+            ? [
+                  {
+                      icon: <IconBook />,
+                      label: "API reference",
+                      href: API_REFERENCE_PATH,
+                      separatorBefore: true,
+                  },
+              ]
             : []),
         {
             icon: <IconHelp />,
             label: "Docs",
+            separatorBefore: !person?.role,
             onSelect: () => window.open(DOCS_URL, "_blank", "noopener,noreferrer"),
         },
         {
@@ -146,7 +155,6 @@ function Account() {
             label: "What's new",
             onSelect: () => window.open(changelogUrl(version), "_blank", "noopener,noreferrer"),
         },
-        { kind: "theme", icon: <IconSunMoon />, label: "Theme" },
         signsOut
             ? {
                   icon: <IconLogout />,
