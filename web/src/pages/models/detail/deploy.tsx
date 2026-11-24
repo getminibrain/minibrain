@@ -1,6 +1,7 @@
 import {
     IconChevronDown,
     IconPlayerPlay,
+    IconPlayerStop,
     IconPlug,
     IconRocket,
     IconSchool,
@@ -30,10 +31,17 @@ import { FormRows } from "~/components/FormRows";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
-import { setDeployed } from "~/lib/teardown";
-import { useModelsRefresh } from "../dialogs";
+import { busyTearingDown, setDeployed } from "~/lib/teardown";
+import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
 import { ConnectDialog } from "./connect";
-import { DeploymentStatus, Tip, deployBlock, isDeployed, trainBlock } from "./header";
+import {
+    DeploymentStatus,
+    Tip,
+    deployBlock,
+    deployConfirmation,
+    isDeployed,
+    trainBlock,
+} from "./header";
 import { DeployVersionDialog, ModelCard, deployable } from "./makeLive";
 import {
     PoolRow,
@@ -313,6 +321,35 @@ function TrainButton({
     );
 }
 
+function UndeployButton({ row }: { row: ModelRow }) {
+    const client = useQueryClient();
+    const refresh = useModelsRefresh();
+    const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+    const busy = busyTearingDown(row) ? (row.teardown?.label ?? "Busy") : null;
+    const reload = async () => {
+        await refresh();
+        await client.invalidateQueries({ queryKey: keys.modelPage(row.key) });
+    };
+    return (
+        <>
+            <Tip tip={busy}>
+                <Button
+                    variant="outline"
+                    disabled={Boolean(busy)}
+                    onClick={() => setConfirmation(deployConfirmation(row, true, reload))}
+                >
+                    <IconPlayerStop />
+                    Undeploy
+                </Button>
+            </Tip>
+            <ConfirmAction
+                confirmation={confirmation}
+                onOpenChange={(open) => !open && setConfirmation(null)}
+            />
+        </>
+    );
+}
+
 export function ModelActions({
     row,
     detail,
@@ -341,6 +378,7 @@ export function ModelActions({
                 </Button>
             )}
             <DeployButton row={row} base={base} versions={versions} />
+            {isDeployed(row) && <UndeployButton row={row} />}
             <UseMenu row={row} />
         </>
     );
