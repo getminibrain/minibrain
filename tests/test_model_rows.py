@@ -287,7 +287,7 @@ def announce(harness: Harness, number: int, base: str) -> None:
         "pool": "rack",
     }
     response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def test_a_deployed_model_lists_the_engines_serving_it_in_its_pool(harness: Harness) -> None:

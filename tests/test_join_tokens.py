@@ -68,7 +68,7 @@ def test_a_pool_token_admits_its_own_pool_only(harness: Harness) -> None:
 def test_one_token_serves_workers_and_engines(harness: Harness) -> None:
     token = issue(harness)["secret"]
     assert register(harness, token, "gpu").status_code == 204
-    assert announce(harness, token, "gpu").status_code == 204
+    assert announce(harness, token, "gpu").status_code == 200
     elsewhere = announce(harness, token, "rack")
     assert elsewhere.status_code == 403 and "pool gpu only" in elsewhere.json()["detail"]
     assert harness.client.get("/internal/gateway/config", headers=bearer(token)).status_code == 403
@@ -78,7 +78,7 @@ def test_a_pool_has_one_token_and_rotating_cuts_off_the_old_one(harness: Harness
     first = issue(harness)
     rack = issue(harness, "rack")
     engine = engine_token_for(harness, first["secret"], "gpu")
-    assert announce(harness, engine, "gpu").status_code == 204
+    assert announce(harness, engine, "gpu").status_code == 200
     second = issue(harness)
     assert second["replaced"] == first["prefix"] and second["secret"] != first["secret"]
     listed = harness.client.get(TOKENS).json()

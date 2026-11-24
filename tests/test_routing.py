@@ -7,6 +7,7 @@ from minibrain.base_models import QWEN3_0_6B
 from minibrain.gateway.balance import BUSY_AT, DOWN_SECONDS, Balancer, sticky_key
 from minibrain.serve.backend import AdapterRef, CompletionRequest, EngineUnavailableError
 from minibrain.serve.engines import EngineBackend
+from tests.conftest import GATEWAY_TOKEN
 
 A, B, C = "http://a:8200", "http://b:8200", "http://c:8200"
 
@@ -108,7 +109,7 @@ def request(adapter: str | None = None) -> CompletionRequest:
 def test_gateway_fails_over_when_a_replica_dies() -> None:
     engines = {"qwen3-0.6b": replicas(A, B)}
     fake = FakeEngines(failing={A})
-    backend = EngineBackend(lambda: engines, http=fake)
+    backend = EngineBackend(lambda: engines, GATEWAY_TOKEN, http=fake)
     backend.balancer.bind(sticky_key("qwen3-0.6b", "s@1", [{"role": "user", "content": "hi"}]), A)
     assert backend.complete(request("s@1")).text == B
     assert backend.balancer.state({"url": A}) == "down"
@@ -120,7 +121,7 @@ def test_gateway_fails_over_when_a_replica_dies() -> None:
 def test_health_checks_mark_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
     engines = {"qwen3-0.6b": replicas(A, B, C)}
     fake = FakeEngines(failing={A}, loading={B})
-    backend = EngineBackend(lambda: engines, http=fake)
+    backend = EngineBackend(lambda: engines, GATEWAY_TOKEN, http=fake)
     backend.probe = fake
     backend.check_all()
     states = {url: backend.balancer.state({"url": url}) for url in (A, B, C)}
@@ -130,4 +131,4 @@ def test_health_checks_mark_replicas(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_no_replicas_is_unavailable() -> None:
     with pytest.raises(EngineUnavailableError):
-        EngineBackend(dict, http=FakeEngines(set())).complete(request())
+        EngineBackend(dict, GATEWAY_TOKEN, http=FakeEngines(set())).complete(request())

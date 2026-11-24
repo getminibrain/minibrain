@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 
 from minibrain.app import create_app
+from minibrain.auth.engine_calls import call_token
 from minibrain.auth.roles import Role
 from minibrain.base_models import base_model
 from minibrain.gateway.standalone import create_gateway_app
 from minibrain.ml.completion import Completion
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ApiKey,
@@ -28,7 +30,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import create_model
 from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
-from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, blank_dataset, give_data
+from tests.conftest import ADMIN_EMAIL, ENGINE_CALL_TOKEN, ENGINE_CALLS, FakeBackend, Harness, blank_dataset, give_data
 from tests.test_flow import SLUG, add_key, add_version, bearer, create_with_dataset, deploy, finish
 
 pytestmark = pytest.mark.both_stores
@@ -163,7 +165,7 @@ def report_gateway(harness: Harness, routes: list[str], host: str = "edge-1") ->
 def register_engine(harness: Harness, base: str, managed: bool = False, state: str = "ready") -> None:
     body = ENGINE | {"base_model": base, "managed": managed, "state": state}
     response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def age(harness: Harness, minutes: int) -> None:
@@ -421,9 +423,11 @@ def test_who_can_delete_and_undeploy(harness: Harness) -> None:
 
 def test_engines_finish_requests_in_flight_before_unloading_an_adapter(tmp_path: Path) -> None:
     backend = BlockingBackend(adapters={"foo-v1"})
-    app = create_engine_app(base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=backend)
+    app = create_engine_app(
+        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=backend, call_token=ENGINE_CALL_TOKEN
+    )
     body = {"messages": CHAT["messages"], "route": "foo", "adapter": {"name": "foo-v1", "artifact": {}}}
-    with TestClient(app) as engine:
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
         flying = threading.Thread(target=lambda: engine.post("/generate", json=body))
         flying.start()
         assert backend.started.wait(5)
@@ -434,6 +438,28 @@ def test_engines_finish_requests_in_flight_before_unloading_an_adapter(tmp_path:
         flying.join(5)
         assert engine.post("/drain", json=drain).json() == {"in_flight": 0, "total": 0, "loaded": []}
         assert backend.unloaded == ["foo-v1"]
+
+
+def test_teardowns_drain_engines_with_the_call_token_of_their_pool(harness: Harness, tmp_path: Path) -> None:
+    trained_and_live(harness)
+    adapter = f"{SLUG}-v1"
+    backend = BlockingBackend(adapters={adapter})
+    expected = call_token(harness.settings.secret("gateway_token"), LOCAL_POOL)
+    app = create_engine_app(
+        base_model("qwen3-0.6b"), "http://main", "t", tmp_path, backend=backend, call_token=expected
+    )
+    body = ENGINE | {"url": "http://testserver", "base_model": "qwen3-0.6b"}
+    assert (
+        harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers).status_code == 200
+    )
+    with TestClient(app) as engine:
+        assert engine.post("/drain", json={"adapters": [adapter]}).status_code == 401
+        assert backend.unloaded == []
+        harness.app.state.teardowns.http = engine
+        assert harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False}).status_code == 202
+        harness.app.state.teardowns.run_once()
+    assert backend.unloaded == [adapter]
+    assert shown(harness, SLUG)["teardown"] is None
 
 
 def test_standalone_gateways_report_what_they_route(harness: Harness, tmp_path: Path) -> None:

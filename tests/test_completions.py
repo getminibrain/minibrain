@@ -15,7 +15,7 @@ from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from minibrain.serve.llamacpp_backend import LlamaCppBackend
 from minibrain.serve.sglang_backend import SglangBackend
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_flow import SLUG, add_key, add_version, create_with_dataset, deploy, finish
 from tests.test_keys import headers
 from tests.test_policies import set_policy
@@ -222,9 +222,13 @@ def test_raw_prompts_skip_the_chat_template_on_every_engine() -> None:
 def test_engines_carry_the_prompt_over_their_api(harness: Harness, tmp_path: Path) -> None:
     fake = FakeBackend(output="    return n")
     spec = base_model("qwen3-0.6b")
-    app = create_engine_app(spec, "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client)
-    with TestClient(app) as engine:
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+    app = create_engine_app(
+        spec, "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client, call_token=ENGINE_CALL_TOKEN
+    )
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         assert backend.complete(CompletionRequest(spec, [], None, 8, prompt=CODE)).text == "    return n"
     assert (fake.requests[-1].prompt, fake.requests[-1].messages) == (CODE, [])
 

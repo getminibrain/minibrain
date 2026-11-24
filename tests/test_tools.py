@@ -31,7 +31,7 @@ from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from minibrain.serve.sglang_backend import SglangBackend, launch_command
 from minibrain.serve.vllm_backend import launch_command as vllm_command
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_flow import add_key
 from tests.test_gateway import servable
 from tests.test_general import create_assistant
@@ -360,9 +360,13 @@ class Calling(FakeBackend):
 def test_engines_carry_tools_and_return_calls(harness: Harness, tmp_path: Path) -> None:
     fake = Calling()
     key = base_model("qwen3-0.6b")
-    app = create_engine_app(key, "http://main", "t", tmp_path / "e", backend=fake, http=harness.client)
-    with TestClient(app) as engine:
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+    app = create_engine_app(
+        key, "http://main", "t", tmp_path / "e", backend=fake, http=harness.client, call_token=ENGINE_CALL_TOKEN
+    )
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         request = CompletionRequest(key, ASK, None, 8, tools=use(choice="required", parallel=False))
         assert backend.complete(request) == fake.called
     assert fake.requests[-1].tools == use(choice="required", parallel=False)

@@ -14,7 +14,7 @@ from minibrain.serve import engines as engines_module
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_flow import SLUG, add_version, bearer, create_on_data, deploy, finish
 
 CHAT = {"model": SLUG, "messages": [{"role": "user", "content": "I was charged twice"}]}
@@ -112,11 +112,19 @@ def test_standalone_gateway_keeps_serving_while_main_is_down(harness: Harness, t
 def test_engine_serves_generate_and_health(harness: Harness, tmp_path: Path) -> None:
     fake = FakeBackend(output="bug")
     app = create_engine_app(
-        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client
+        base_model("qwen3-0.6b"),
+        "http://main",
+        "t",
+        tmp_path / "engine",
+        backend=fake,
+        http=harness.client,
+        call_token=ENGINE_CALL_TOKEN,
     )
-    with TestClient(app) as engine:
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
         assert engine.get("/health").json()["base_model"] == "qwen3-0.6b"
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         request = CompletionRequest(base_model("qwen3-0.6b"), [{"role": "user", "content": "x"}], None, 8)
         assert backend.complete(request).text == "bug"
         assert fake.requests[-1].max_tokens == 8
@@ -124,7 +132,7 @@ def test_engine_serves_generate_and_health(harness: Harness, tmp_path: Path) -> 
 
 def test_unknown_engine_is_a_503(harness: Harness) -> None:
     headers = servable(harness)
-    harness.app.state.backend = EngineBackend(dict)
+    harness.app.state.backend = EngineBackend(dict, GATEWAY_TOKEN)
     assert harness.client.post("/v1/chat/completions", headers=headers, json=CHAT).status_code == 503
 
 
@@ -140,7 +148,7 @@ def test_an_engine_that_reports_ready_but_cannot_be_reached_fails_fast_naming_it
     headers = servable(harness)
     monkeypatch.setattr(engines_module, "UNREACHABLE_SECONDS", 0.5)
     replica = {"url": f"http://127.0.0.1:{closed_port()}", "state": "ready", "pool": "local"}
-    harness.app.state.backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]})
+    harness.app.state.backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]}, GATEWAY_TOKEN)
     started = time.monotonic()
     reply = harness.client.post("/v1/chat/completions", headers=headers, json=CHAT)
     assert reply.status_code == 503
@@ -154,7 +162,7 @@ def test_an_engine_still_starting_is_waited_for_past_the_unreachable_limit(monke
     monkeypatch.setattr(engines_module, "UNREACHABLE_SECONDS", 0.0)
     monkeypatch.setattr(engines_module, "STARTUP_SECONDS", 1.5)
     replica = {"url": f"http://127.0.0.1:{closed_port()}", "state": "loading", "pool": "gpu-east"}
-    backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]})
+    backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]}, GATEWAY_TOKEN)
     request = CompletionRequest(base_model("qwen3-0.6b"), [{"role": "user", "content": "x"}], None, 8)
     started = time.monotonic()
     with pytest.raises(EngineUnavailableError, match=r"no engine for qwen3-0\.6b is reachable"):

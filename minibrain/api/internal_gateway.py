@@ -13,6 +13,7 @@ from minibrain.api.bases import base_file as file_of
 from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import MetricsDep, SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
+from minibrain.auth.engine_calls import call_token
 from minibrain.auth.engine_tokens import engine_caller as derived_caller
 from minibrain.auth.join_requests import credential_caller
 from minibrain.auth.join_tokens import ENGINE, Caller, address_of, admit, bearer, refuse
@@ -124,6 +125,10 @@ class EngineBody(BaseModel):
     metrics: MachineSample | None = None
 
 
+class EngineRegistered(BaseModel):
+    call_token: str
+
+
 class GatewayBody(BaseModel):
     id: str
     host: str
@@ -132,10 +137,15 @@ class GatewayBody(BaseModel):
     bases: list[str] = []
 
 
-@router.post("/engines", status_code=204)
+@router.post("/engines")
 def register_engine(
-    body: EngineBody, request: Request, session: SessionDep, caller: EngineCaller, metrics: MetricsDep
-) -> None:
+    body: EngineBody,
+    request: Request,
+    session: SessionDep,
+    caller: EngineCaller,
+    metrics: MetricsDep,
+    settings: SettingsDep,
+) -> EngineRegistered:
     if caller is not None:
         admit(session, caller, body.pool, body.host, ENGINE, address_of(request))
     record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code", "metrics"})))
@@ -147,6 +157,8 @@ def register_engine(
         record_loaded(session, body.base_model)
         touch(session, body.base_model)
     session.commit()
+    pool = caller.pool if caller is not None else body.pool
+    return EngineRegistered(call_token=call_token(settings.secret("gateway_token"), pool))
 
 
 @router.post("/gateways", status_code=204, dependencies=GatewayOnly)

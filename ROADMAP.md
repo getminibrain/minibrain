@@ -1155,7 +1155,10 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - Requests carry OpenAI's sampling fields plus `top_k`, `min_p` and `repetition_penalty`, passed to every engine
   (`docs/api/chat-completions.md`, Sampling); unset fields keep the model's default, custom models answer at temperature 0, and
   `max_tokens` unset runs to the context limit. An engine that cannot honour a field refuses it with a 400.
-- Engines are never exposed; the gateway proxies every call.
+- Engines are never exposed; the gateway proxies every call. Every engine endpoint, health included, needs a call
+  token for the engine's pool (HMAC-SHA256 of the pool keyed with the gateway token, compared in constant time):
+  main and gateways derive it, engines learn it from main when they announce, and anything else gets 401
+  (2026-11-24). Details: `docs/security/network.md`.
 
 ### GPUs on one machine
 
@@ -1756,6 +1759,9 @@ v1, the evidence regulated buyers ask for first:
   `minibrain keys status | rotate | encrypt-existing` and Settings → Security re-wrap headers without re-encrypting
   bodies and encrypt older files in place. Format, providers and measurements: `docs/security/encryption.md`,
   `docs/security/key-providers.md` and `docs/notes/security.md`.
+- Engines answer only main and gateways: a per-pool call token on every call, so nobody on the GPU network skips API
+  keys, safety models and request logs, drains an engine or unloads its adapters, and one pool's machines cannot call
+  another pool's engines (see Serving).
 - Model card and validation report generated per version from the eval data: purpose, data, metrics, limits, who
   promoted it. This is the model-risk documentation US banks owe under SR 11-7.
 - PII and PHI handling as in Data; access to every model is scoped and audited.
@@ -2157,6 +2163,10 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   a loop. Each engine and GPU job on an NVIDIA machine now gets its own GPU, or a share sized to its model, with
   `CUDA_VISIBLE_DEVICES` and an explicit memory fraction; a job with no room stays queued and says why
   (2026-11-24).
+- [x] Engines answered `/generate`, `/drain` and `/health` without any credential, so anyone who could reach an engine
+  on a joined machine (`--engine-bind 0.0.0.0`) could skip API keys, safety models and request logs, or unload
+  adapters. Every engine endpoint now needs a call token for the engine's pool, derived from the gateway token;
+  main, gateways and teardown drains send it, and anything else gets 401 and runs nothing (2026-11-24).
 - [x] Engines for models that were not live never stopped: every ready version has a pinned route, so main counted its
   base as needed and the idle stop never applied. Main now keeps engines running only for live models (and their
   safety models); the rest start on the first request and stop after 15 minutes idle (2026-11-24).

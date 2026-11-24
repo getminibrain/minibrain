@@ -52,7 +52,7 @@ def announce(harness: Harness, **overrides: Any) -> None:
         "hardware": RACK.as_dict(),
     } | overrides
     response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def by_name(harness: Harness) -> dict[str, dict[str, Any]]:

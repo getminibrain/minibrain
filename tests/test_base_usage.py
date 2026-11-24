@@ -40,7 +40,7 @@ def test_loading_or_testing_a_base_marks_it_used(harness: Harness) -> None:
     announced = harness.client.post(
         "/internal/gateway/engines", json=body | {"state": "ready"}, headers=harness.gateway_headers
     )
-    assert announced.status_code == 204
+    assert announced.status_code == 200
     assert harness.client.post("/api/models/old/test", json={"text": "hi"}).status_code == 200
     with harness.sessions() as session:
         moments = [model.last_used_at for model in session.query(BaseModel)]

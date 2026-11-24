@@ -10,11 +10,12 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from minibrain.auth.engine_calls import call_headers, call_token
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
 from minibrain.models import copies
 from minibrain.models.copies import BUCKET, CopyError, Progress, ensure
 from minibrain.models.files import sha256_of
-from minibrain.models.hardware import GIB, Gpu, NodeReport
+from minibrain.models.hardware import GIB, LOCAL_POOL, Gpu, NodeReport
 from minibrain.registry.models import BaseModel
 from minibrain.serve import engine as engine_module
 from minibrain.serve import engines as engines_module
@@ -26,7 +27,7 @@ from minibrain.serve.select import NoEngineError, choose_engine, installed_engin
 from minibrain.serve.sglang_backend import SglangBackend
 from minibrain.serve.structured import TokenTrie
 from minibrain.supervise import Supervisor
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_models import FILES, add_tiny, download_tiny, hub  # noqa: F401
 
 LINUX_GPU = NodeReport(
@@ -232,8 +233,12 @@ def test_an_engine_fetches_its_weights_before_it_loads_and_says_so(
 
     monkeypatch.setattr(engine_module, "make_backend", lambda _engine, _materialize: Loading())
     node = with_engines(CPU, "transformers")
-    app = create_engine_app(QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch)
-    with TestClient(app) as engine:
+    gateway = harness.settings.secret("gateway_token")
+    expected = call_token(gateway, LOCAL_POOL)
+    app = create_engine_app(
+        QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch, call_token=expected
+    )
+    with TestClient(app, headers=call_headers(gateway, LOCAL_POOL)) as engine:
         waiting = engine.get("/health")
         assert waiting.status_code == 503 and waiting.json()["detail"]["state"] == FETCHING
         assert "fetching its weights in pool local (cpu-01): 1.0 of 4.0 GB" in waiting.json()["detail"]["message"]
@@ -241,7 +246,9 @@ def test_an_engine_fetches_its_weights_before_it_loads_and_says_so(
         manager = EngineManager(harness.settings, "http://main")
         manager.engines[QWEN3_0_6B.key] = ("http://testserver", Supervisor("engine", [], {}))
         assert manager.health(QWEN3_0_6B.key, engine) == FETCHING
-        backend = EngineBackend(lambda: {QWEN3_0_6B.key: [{"url": "http://testserver", "state": "loading"}]}, engine)
+        backend = EngineBackend(
+            lambda: {QWEN3_0_6B.key: [{"url": "http://testserver", "state": "loading"}]}, gateway, engine
+        )
         request = CompletionRequest(QWEN3_0_6B, [{"role": "user", "content": "x"}], None, 8)
         with monkeypatch.context() as patch:
             patch.setattr(engines_module, "FETCH_WAIT_SECONDS", 0.0)
@@ -254,14 +261,63 @@ def test_an_engine_fetches_its_weights_before_it_loads_and_says_so(
         assert backend.complete(request).text == "billing"
 
 
+class Unloading(FakeBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self.unloaded: list[str] = []
+
+    def status(self) -> list[dict[str, Any]]:
+        return [{"base_model": QWEN3_0_6B.key, "adapters": ["support-v1"]}]
+
+    def unload_adapter(self, name: str) -> None:
+        self.unloaded.append(name)
+
+
+def test_engines_answer_only_calls_carrying_the_call_token(tmp_path: Path) -> None:
+    backend = Unloading()
+    app = create_engine_app(
+        QWEN3_0_6B, "http://main", "t", tmp_path / "engine", backend=backend, call_token=ENGINE_CALL_TOKEN
+    )
+    generate = {"messages": [{"role": "user", "content": "hi"}]}
+    drain = {"routes": [], "adapters": ["support-v1"]}
+    forged = [{}, {"Authorization": "Bearer wrong"}, {"Authorization": ENGINE_CALL_TOKEN}]
+    forged.append(call_headers(GATEWAY_TOKEN, "rack"))
+    forged.append({"Authorization": f"Bearer {GATEWAY_TOKEN}"})
+    with TestClient(app) as engine:
+        for headers in forged:
+            for method, path, body in [
+                ("POST", "/generate", generate),
+                ("POST", "/drain", drain),
+                ("GET", "/health", None),
+            ]:
+                refused = engine.request(method, path, json=body, headers=headers)
+                assert refused.status_code == 401, (path, headers)
+                assert refused.json()["detail"] == "this engine answers only gateways that hold main's gateway token"
+        assert backend.requests == [] and backend.unloaded == []
+        assert engine.post("/generate", json=generate, headers=ENGINE_CALLS).json()["text"] == "billing"
+        assert engine.post("/drain", json=drain, headers=ENGINE_CALLS).json()["loaded"] == ["support-v1"]
+        assert backend.unloaded == ["support-v1"]
+
+
+def test_an_engine_that_has_not_heard_from_main_answers_nobody(tmp_path: Path) -> None:
+    backend = Unloading()
+    app = create_engine_app(QWEN3_0_6B, "http://main", "t", tmp_path / "engine", backend=backend)
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
+        assert engine.post("/generate", json={"messages": []}).status_code == 503
+        assert engine.post("/drain", json={"adapters": ["support-v1"]}).status_code == 503
+        assert backend.requests == [] and backend.unloaded == []
+
+
 def test_a_failed_fetch_is_reported_and_nothing_loads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     def fetch(_progress: Progress) -> None:
         raise CopyError("the bucket answered 403 for model.safetensors")
 
     monkeypatch.setattr(engine_module, "make_backend", lambda _engine, _materialize: Broken())
     node = with_engines(CPU, "transformers")
-    app = create_engine_app(QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch)
-    with TestClient(app) as engine:
+    app = create_engine_app(
+        QWEN3_0_6B, "http://main", "t", tmp_path / "engine", node=node, fetch=fetch, call_token=ENGINE_CALL_TOKEN
+    )
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
         assert wait_until(lambda: engine.get("/health").status_code == 500)
         detail = engine.get("/health").json()["detail"]
         assert (

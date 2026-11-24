@@ -29,7 +29,7 @@ from minibrain.serve.structured import (
     unfenced,
     violation,
 )
-from tests.conftest import LABELS, FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, LABELS, FakeBackend, Harness
 from tests.test_flow import bearer
 from tests.test_gateway import CHAT, servable
 from tests.test_general import create_assistant
@@ -269,11 +269,19 @@ def test_an_engine_that_refuses_a_grammar(harness: Harness) -> None:
 def test_engines_carry_the_constraint_and_its_refusal(harness: Harness, tmp_path: Path) -> None:
     fake = FakeBackend(output='{"label": "bug"}')
     app = create_engine_app(
-        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=fake, http=harness.client
+        base_model("qwen3-0.6b"),
+        "http://main",
+        "t",
+        tmp_path / "engine",
+        backend=fake,
+        http=harness.client,
+        call_token=ENGINE_CALL_TOKEN,
     )
     messages = [{"role": "user", "content": "x"}]
-    with TestClient(app) as engine:
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         constrained = CompletionRequest(base_model("qwen3-0.6b"), messages, None, 8, Constraint(json_schema=TICKET))
         assert backend.complete(constrained).text == '{"label": "bug"}'
         assert fake.requests[-1].constraint == Constraint(json_schema=TICKET)
@@ -281,10 +289,18 @@ def test_engines_carry_the_constraint_and_its_refusal(harness: Harness, tmp_path
         backend.complete(labels)
         assert fake.requests[-1].constraint == Constraint(choices=LABELS)
     refusing = create_engine_app(
-        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine2", backend=Refusing(), http=harness.client
+        base_model("qwen3-0.6b"),
+        "http://main",
+        "t",
+        tmp_path / "engine2",
+        backend=Refusing(),
+        http=harness.client,
+        call_token=ENGINE_CALL_TOKEN,
     )
-    with TestClient(refusing) as engine:
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+    with TestClient(refusing, headers=ENGINE_CALLS) as engine:
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         with pytest.raises(OutputFormatError, match="grammar backend is off"):
             backend.complete(constrained)
 

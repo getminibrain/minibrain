@@ -1,23 +1,28 @@
 import time
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 
+from minibrain.auth.engine_calls import call_headers, call_token
 from minibrain.auth.engine_tokens import signed_claim
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import AuditEvent, Worker, now
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
+from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.serve.host import EngineHost
 from minibrain.settings import Settings
 from minibrain.supervise import Supervisor
 from minibrain.worker import MainClient, WorkerConfig
-from tests.conftest import Harness, fake_adapter
+from tests.conftest import GATEWAY_TOKEN, FakeBackend, Harness, fake_adapter
 from tests.test_compute import RACK
+from tests.test_engines import wait_until
 from tests.test_flow import SLUG, add_version, create_model, create_on_data, create_with_dataset, finish
 from tests.test_routing import FakeEngines, replicas
 
@@ -210,10 +215,10 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     token = harness.internal("/engines", worker_body("rack")).json()["engine_token"]
     engine = bearer(token)
     announce = {"id": "e", "host": "h", "url": "http://h:1", "base_model": BASE, "engine": "sglang", "state": "ready"}
-    assert (
-        harness.client.post("/internal/gateway/engines", json=announce | {"pool": "rack"}, headers=engine).status_code
-        == 204
-    )
+    announced = harness.client.post("/internal/gateway/engines", json=announce | {"pool": "rack"}, headers=engine)
+    gateway = harness.settings.secret("gateway_token")
+    assert announced.json() == {"call_token": call_token(gateway, "rack")}
+    assert call_token(gateway, "rack") != call_token(gateway, "local") and gateway not in announced.text
     elsewhere = harness.client.post("/internal/gateway/engines", json=announce, headers=engine)
     assert elsewhere.status_code == 403 and "pool rack only" in elsewhere.json()["detail"]
     assert harness.client.get("/internal/gateway/bases", headers=engine).status_code == 200
@@ -232,6 +237,45 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     forged = bearer(token.replace(".rack.", ".local."))
     assert harness.client.get("/internal/gateway/bases", headers=forged).status_code == 401
     assert harness.client.get("/internal/gateway/bases", headers=bearer("engine.rack.00")).status_code == 401
+
+
+@pytest.mark.parametrize("pool", ["local", "rack"])
+def test_engines_learn_their_call_token_from_main_and_gateways_reach_them(
+    harness: Harness, tmp_path: Path, pool: str
+) -> None:
+    gateway = harness.settings.secret("gateway_token")
+    credential = gateway if pool == "local" else harness.internal("/engines", worker_body(pool)).json()["engine_token"]
+    fake = FakeBackend(output=pool)
+    url = "http://testserver"
+    app = create_engine_app(
+        QWEN3_0_6B,
+        "http://main",
+        credential,
+        tmp_path,
+        backend=fake,
+        http=harness.client,
+        url=url,
+        pool=pool,
+        node=RACK,
+    )
+    elsewhere = "lab" if pool == "local" else "local"
+    with TestClient(app) as engine:
+        assert wait_until(lambda: engine.get("/health", headers=call_headers(gateway, pool)).status_code == 200)
+        assert engine.get("/health", headers=call_headers(gateway, elsewhere)).status_code == 401
+        assert engine.post("/generate", json={"messages": []}).status_code == 401
+        assert engine.post("/drain", json={}).status_code == 401
+        assert fake.requests == []
+        backend = EngineBackend(lambda: {BASE: [{"url": url, "state": "ready", "pool": pool}]}, gateway, http=engine)
+        assert backend.complete(request(pool)).text == pool
+        backend.probe = engine
+        backend.check_all()
+        assert backend.balancer.state({"url": url}) == "ready"
+        wrong = EngineBackend(
+            lambda: {BASE: [{"url": url, "state": "ready", "pool": pool}]}, GATEWAY_TOKEN, http=engine
+        )
+        with pytest.raises(EngineUnavailableError, match="answers only gateways that hold main's gateway token"):
+            wrong.complete(request(pool))
+        assert len(fake.requests) == 1
 
 
 def test_pool_credentials_get_only_the_weights_placed_in_their_pool(harness: Harness) -> None:
@@ -255,7 +299,7 @@ def announce(harness: Harness, state: str, pool: str = "rack") -> None:
     body = {"id": f"e-{pool}", "host": RACK.host, "url": f"http://{pool}:9000", "base_model": BASE}
     body |= {"engine": "sglang", "state": state, "pool": pool, "managed": True}
     response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def test_status_says_where_it_runs_and_waits_for_a_machine(harness: Harness) -> None:
@@ -307,7 +351,7 @@ def test_gateway_routes_a_deployment_only_to_healthy_engines_in_its_pool() -> No
     pools = ["local", "rack", "rack"]
     engines = {BASE: [entry | {"pool": pool} for entry, pool in zip(replicas(A, B, C), pools, strict=True)]}
     fake = FakeEngines(failing={B})
-    backend = EngineBackend(lambda: engines, http=fake)
+    backend = EngineBackend(lambda: engines, GATEWAY_TOKEN, http=fake)
     answers = {backend.complete(request("rack")).text for _ in range(4)}
     assert answers == {C}
     assert backend.balancer.state({"url": B}) == "down"

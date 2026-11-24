@@ -11,6 +11,7 @@ import httpx
 from sqlalchemy import ColumnElement, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from minibrain.auth.engine_calls import call_headers
 from minibrain.data.dataset_versions import cleanup
 from minibrain.gateway.config import LocalConfig, served_bases
 from minibrain.jobs.removal import Leftovers, remove_job
@@ -692,7 +693,8 @@ class Teardowns:
             needed = self.needed(replica.base_model)
             host = f"pool {replica.pool} ({host_of(replica.node_id)})"
             try:
-                report = drain_engine(self.http, replica.url, routes, adapters)
+                headers = call_headers(self.settings.secret("gateway_token"), replica.pool)
+                report = drain_engine(self.http, replica.url, headers, routes, adapters)
             except Exception as error:
                 waiting.append(f"the engine in {host} to answer ({short(error)})")
                 continue

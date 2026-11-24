@@ -674,6 +674,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **External key managers** · shipped · admin
   Wrap keys with Vault Transit, a PKCS#11 HSM or AWS KMS.
   UI: Settings › Security › Encryption at rest · Policy: vault_address, vault_mount, vault_key, vault_namespace, vault_auth, vault_role_id, vault_auth_mount, vault_ca_bundle, hsm_library, hsm_token, hsm_key, kms_key, kms_region, kms_endpoint, kms_fips · Config: MINIBRAIN_VAULT_TOKEN, MINIBRAIN_VAULT_TOKEN_FILE, MINIBRAIN_VAULT_SECRET_ID, MINIBRAIN_VAULT_SECRET_ID_FILE, MINIBRAIN_HSM_PIN, MINIBRAIN_HSM_PIN_FILE, MINIBRAIN_POLICY_HSM_LIBRARY
+- **Gateway-only engines** · shipped · admin
+  Engines refuse any call without their pool's call token.
+  CLI: minibrain engine, minibrain gateway · Config: MINIBRAIN_GATEWAY_TOKEN
 - **AI bill of materials** · shipped · admin
   Download a CycloneDX ML-BOM for each version.
   UI: Models › model › Versions › Model card · API: GET /api/models/{name}/versions/{number}/aibom.json

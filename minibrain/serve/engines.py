@@ -13,6 +13,7 @@ from typing import Any, Protocol
 
 import httpx
 
+from minibrain.auth.engine_calls import call_headers
 from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion, Piece
@@ -166,8 +167,9 @@ class EngineManager:
         if found is None:
             return None
         url, supervisor = found
+        headers = call_headers(self.settings.secret("gateway_token"), LOCAL_POOL)
         try:
-            response = http.request("GET", f"{url}/health")
+            response = http.request("GET", f"{url}/health", headers=headers)
         except (httpx.TransportError, OSError):
             response = None
         if response is not None and response.status_code == 200:
@@ -187,8 +189,12 @@ Placements = Callable[[], dict[str, dict[str, int]]]
 DRAIN_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
 
 
+def pool_of(entry: dict[str, str]) -> str:
+    return entry.get("pool", LOCAL_POOL)
+
+
 def in_pool(entry: dict[str, str], pool: str) -> bool:
-    return entry.get("pool", LOCAL_POOL) == pool
+    return pool_of(entry) == pool
 
 
 def nothing_serves(base: str, pool: str | None) -> str:
@@ -214,8 +220,10 @@ def starting(base: str, waiting: str | None) -> EngineUnavailableError:
     return EngineUnavailableError(message, START_RETRY_SECONDS)
 
 
-def drain_engine(http: HttpClient, url: str, routes: list[str], adapters: list[str]) -> dict[str, Any]:
-    response = http.request("POST", f"{url}/drain", json={"routes": routes, "adapters": adapters})
+def drain_engine(
+    http: HttpClient, url: str, headers: dict[str, str], routes: list[str], adapters: list[str]
+) -> dict[str, Any]:
+    response = http.request("POST", f"{url}/drain", json={"routes": routes, "adapters": adapters}, headers=headers)
     response.raise_for_status()
     return dict(response.json())
 
@@ -240,7 +248,7 @@ def engine_detail(response: Any) -> str:
 
 
 def failed(response: Any) -> None:
-    if response.status_code in (FAILED_STATUS, 409):
+    if response.status_code in (FAILED_STATUS, 409, 401):
         raise EngineUnavailableError(engine_detail(response))
     if response.status_code == 400:
         raise refusal(response)
@@ -258,8 +266,11 @@ def refusal(response: Any) -> Exception:
 
 
 class EngineBackend:
-    def __init__(self, engines: Engines, http: HttpClient | None = None, balancer: Balancer | None = None) -> None:
+    def __init__(
+        self, engines: Engines, gateway_token: str, http: HttpClient | None = None, balancer: Balancer | None = None
+    ) -> None:
         self.engines = engines
+        self.gateway_token = gateway_token
         self.http: HttpClient = http or httpx.Client(timeout=GENERATE_TIMEOUT)
         self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
         self.balancer = balancer or Balancer()
@@ -267,6 +278,9 @@ class EngineBackend:
     def replicas(self, base: str, pool: str | None = None) -> list[dict[str, str]]:
         found = self.engines().get(base, [])
         return found if pool is None else [entry for entry in found if in_pool(entry, pool)]
+
+    def headers_for(self, pool: str) -> dict[str, str]:
+        return call_headers(self.gateway_token, pool)
 
     def body_of(self, request: CompletionRequest) -> dict[str, Any]:
         adapter = (
@@ -292,12 +306,14 @@ class EngineBackend:
             body["constraint"] = asdict(request.constraint)
         return body
 
-    def send(self, url: str, body: dict[str, Any], stream: bool) -> tuple[Any, ExitStack]:
+    def send(self, url: str, pool: str, body: dict[str, Any], stream: bool) -> tuple[Any, ExitStack]:
         stack = ExitStack()
+        headers = self.headers_for(pool)
         if not stream:
-            return self.http.request("POST", f"{url}/generate", json=body), stack
+            return self.http.request("POST", f"{url}/generate", json=body, headers=headers), stack
         try:
-            response = stack.enter_context(self.http.stream("POST", f"{url}/generate", json=body | {"stream": True}))
+            streamed = self.http.stream("POST", f"{url}/generate", json=body | {"stream": True}, headers=headers)
+            response = stack.enter_context(streamed)
             if response.status_code != 200:
                 response.read()
         except BaseException:
@@ -335,8 +351,9 @@ class EngineBackend:
                 tried.clear()
                 waiting = None
                 continue
+            pool = next(pool_of(entry) for entry in replicas if entry["url"] == url)
             try:
-                response, stack = self.send(url, body, stream)
+                response, stack = self.send(url, pool, body, stream)
             except (httpx.TransportError, OSError) as error:
                 self.balancer.release(url)
                 self.balancer.mark(url, "down")
@@ -381,17 +398,17 @@ class EngineBackend:
                 else:
                     yield Piece.from_dict(found["piece"])
 
-    def check(self, url: str) -> str:
+    def check(self, url: str, pool: str) -> str:
         try:
-            response = self.probe.request("GET", f"{url}/health")
+            response = self.probe.request("GET", f"{url}/health", headers=self.headers_for(pool))
         except (httpx.TransportError, OSError):
             return "down"
         return "ready" if response.status_code == 200 else "loading" if response.status_code == 503 else "down"
 
     def check_all(self) -> None:
-        urls = {entry["url"] for entries in self.engines().values() for entry in entries}
-        for url in sorted(urls):
-            self.balancer.mark(url, self.check(url))
+        pools = {entry["url"]: pool_of(entry) for entries in self.engines().values() for entry in entries}
+        for url in sorted(pools):
+            self.balancer.mark(url, self.check(url, pools[url]))
 
     def probe_forever(self, stop: threading.Event) -> None:
         while not stop.wait(PROBE_SECONDS):
@@ -412,7 +429,7 @@ class ManagedEngineBackend(EngineBackend):
         http: HttpClient | None = None,
         placements: Placements = dict,
     ) -> None:
-        super().__init__(engines, http)
+        super().__init__(engines, manager.settings.secret("gateway_token"), http)
         self.manager = manager
         self.placements = placements
 
@@ -455,7 +472,7 @@ class ManagedEngineBackend(EngineBackend):
         loaded: list[dict[str, Any]] = []
         for base, (url, _) in list(self.manager.engines.items()):
             try:
-                response = self.http.request("GET", f"{url}/health")
+                response = self.http.request("GET", f"{url}/health", headers=self.headers_for(LOCAL_POOL))
             except (httpx.TransportError, OSError):
                 continue
             if response.status_code == 200:

@@ -20,7 +20,7 @@ from minibrain.serve.mlx_backend import model_defaults
 from minibrain.serve.sampling import GREEDY_SAMPLING, Sampling, UnsupportedParameterError, stopped_at
 from minibrain.serve.sglang_backend import SglangBackend
 from minibrain.serve.vllm_backend import VllmBackend
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_flow import add_key
 from tests.test_gateway import CHAT, servable
 from tests.test_keys import BASE, headers, two_models
@@ -104,11 +104,17 @@ def test_out_of_range_parameters_are_openai_400s(harness: Harness, extra: dict[s
 def test_an_engine_that_cannot_honour_a_parameter_says_which(harness: Harness, tmp_path: Path) -> None:
     auth = servable(harness)
     app = create_engine_app(
-        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "engine", backend=Refusing(), http=harness.client
+        base_model("qwen3-0.6b"),
+        "http://main",
+        "t",
+        tmp_path / "engine",
+        backend=Refusing(),
+        http=harness.client,
+        call_token=ENGINE_CALL_TOKEN,
     )
-    with TestClient(app) as engine:
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
         harness.app.state.backend = EngineBackend(
-            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
         )
         assert chat(harness, auth, top_k=5).status_code == 200
         refused = chat(harness, auth, min_p=0.1)
@@ -121,10 +127,18 @@ def test_an_engine_that_cannot_honour_a_parameter_says_which(harness: Harness, t
 def test_the_engine_protocol_carries_sampling_and_an_open_budget(harness: Harness, tmp_path: Path) -> None:
     fake = FakeBackend()
     app = create_engine_app(
-        base_model("qwen3-0.6b"), "http://main", "t", tmp_path / "e", backend=fake, http=harness.client
+        base_model("qwen3-0.6b"),
+        "http://main",
+        "t",
+        tmp_path / "e",
+        backend=fake,
+        http=harness.client,
+        call_token=ENGINE_CALL_TOKEN,
     )
-    with TestClient(app) as engine:
-        backend = EngineBackend(lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine)
+    with TestClient(app, headers=ENGINE_CALLS) as engine:
+        backend = EngineBackend(
+            lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
+        )
         sampling = Sampling(temperature=0.3, stop=("x",), seed=1)
         backend.complete(CompletionRequest(base_model("qwen3-0.6b"), MESSAGES, None, None, sampling=sampling))
     assert (fake.requests[-1].sampling, fake.requests[-1].max_tokens) == (sampling, None)

@@ -221,7 +221,7 @@ def announce(harness: Harness, base: str, pool: str) -> None:
     body = {"id": f"e-{base}-{pool}", "host": f"{pool}-1", "url": f"http://{pool}-{base}:9000", "base_model": base}
     body |= {"engine": "sglang", "state": "ready", "pool": pool}
     response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
 
 
 def test_monitoring_lists_the_replicas_of_the_live_base_in_its_pool(harness: Harness) -> None:

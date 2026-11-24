@@ -134,7 +134,9 @@ def test_a_call_to_an_engine_still_starting_answers_503_with_retry_after(
     key = servable(harness)
     monkeypatch.setattr(capacity, "START_WAIT_SECONDS", 0.5)
     replica = {"url": "http://127.0.0.1:9", "state": "loading", "pool": "local"}
-    harness.app.state.backend = EngineBackend(lambda: {"qwen3-0.6b": [replica]}, http=Loading())
+    harness.app.state.backend = EngineBackend(
+        lambda: {"qwen3-0.6b": [replica]}, harness.settings.secret("gateway_token"), http=Loading()
+    )
     for body in (CHAT, CHAT | {"stream": True}):
         started = time.monotonic()
         reply = harness.client.post("/v1/chat/completions", headers=key, json=body)

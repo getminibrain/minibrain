@@ -6,7 +6,7 @@ from sqlalchemy import select, update
 from minibrain.gateway.config import GatewayConfig
 from minibrain.registry.models import AuditEvent, Model, Worker, now
 from minibrain.serve.engines import EngineBackend
-from tests.conftest import Harness
+from tests.conftest import GATEWAY_TOKEN, Harness
 from tests.test_deploy_pools import (
     BASE,
     BIG_LAPTOP,
@@ -77,7 +77,7 @@ def test_requests_keep_reaching_the_old_pool_during_the_move(harness: Harness) -
     announce(harness, "loading")
     config = rebuild(harness)
     engines = {BASE: [{"url": "http://old:1", "pool": "local"}, {"url": "http://new:1", "pool": "rack"}]}
-    backend = EngineBackend(lambda: engines, http=FakeEngines(set()))
+    backend = EngineBackend(lambda: engines, GATEWAY_TOKEN, http=FakeEngines(set()))
     answers = {backend.complete(request(config.routes[SLUG].pool)).text for _ in range(4)}
     assert answers == {"http://old:1"}
 

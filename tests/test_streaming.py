@@ -22,7 +22,7 @@ from minibrain.serve.engine import create_engine_app
 from minibrain.serve.engines import EngineBackend
 from minibrain.serve.sampling import StopCutter
 from minibrain.serve.sglang_backend import SglangBackend
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, GATEWAY_TOKEN, FakeBackend, Harness
 from tests.test_reasoning import THINKING_TEMPLATE
 from tests.test_tools import ASK, QWEN_CALLS, WEATHER, loose, sdk, tool_base
 
@@ -145,11 +145,17 @@ def test_engines_stream_events_over_their_api(harness: Harness, tmp_path: Path) 
     for fake in (Streaming(), FakeBackend(output="whole answer")):
         spec = base_model("qwen3-0.6b")
         app = create_engine_app(
-            spec, "http://main", "t", tmp_path / type(fake).__name__, backend=fake, http=harness.client
+            spec,
+            "http://main",
+            "t",
+            tmp_path / type(fake).__name__,
+            backend=fake,
+            http=harness.client,
+            call_token=ENGINE_CALL_TOKEN,
         )
-        with TestClient(app) as engine:
+        with TestClient(app, headers=ENGINE_CALLS) as engine:
             backend = EngineBackend(
-                lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, http=engine
+                lambda: {"qwen3-0.6b": [{"url": "http://testserver", "state": "ready"}]}, GATEWAY_TOKEN, http=engine
             )
             events = list(backend.stream(CompletionRequest(spec, ASK, None, 8)))
         final = events[-1]

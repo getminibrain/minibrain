@@ -102,7 +102,7 @@ sequenceDiagram
     participant MA as main
     App->>GW: POST /v1/chat/completions (API key)
     GW->>GW: Check key, pick engine (fewest in flight, sticky by adapter)
-    GW->>EN: Generate (model, adapter)
+    GW->>EN: Generate (model, adapter, call token for the engine's pool)
     opt Adapter not loaded yet
         EN->>MA: Pull adapter
     end
@@ -153,6 +153,7 @@ sequenceDiagram
     participant MA as main
     participant GW as Gateway
     EN->>MA: Announce pool, hardware, engine, models
+    MA-->>EN: Call token for its pool
     MA-->>GW: Snapshot with the new engine
     EN->>EN: Fetch base weights from the bucket or main, check SHA-256
     loop Every 10 s
@@ -160,3 +161,10 @@ sequenceDiagram
     end
     Note over MA,GW: No announcement for 30 s: out of routing
 ```
+
+Engines answer only main and gateways. Every call to an engine, its health check included, carries a call token for the
+engine's pool: an HMAC-SHA256 of the pool name keyed with the gateway token, so main and gateways work it out
+themselves and an engine learns it from main's answer to its announcement. A call without it, or with another
+pool's, gets 401 and runs nothing; an engine that has not heard from main yet answers 503. The token is not the
+gateway token, so a machine that holds it can call the engines of its own pool but cannot read main's configuration
+or another pool's engines.

@@ -86,8 +86,8 @@ def test_an_approved_machine_joins_the_pool_the_admin_picked(harness: Harness) -
     other_host = register(harness, found.credential, "rack", "elsewhere")
     assert other_host.status_code == 403 and f"for {HOST} only" in other_host.json()["detail"]
     engine = engine_token_for(harness, found.credential, "rack", HOST)
-    assert engine.startswith("engine.m") and announce(harness, engine, "rack").status_code == 204
-    assert announce(harness, found.credential, "rack").status_code == 204
+    assert engine.startswith("engine.m") and announce(harness, engine, "rack").status_code == 200
+    assert announce(harness, found.credential, "rack").status_code == 200
     assert actions(harness, request.code)[:2] == ["join_request.create", "join_request.approve"]
     with harness.sessions() as session:
         row = session.scalars(select(JoinRequest)).one()

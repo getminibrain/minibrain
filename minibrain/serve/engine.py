@@ -7,14 +7,15 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from minibrain.artifacts import ArtifactStore, StreamReader
+from minibrain.auth.engine_calls import REFUSED, presents
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion, Piece
 from minibrain.models.copies import BUCKET, Progress, bucket_client, ensure, opener_for, prune
@@ -232,17 +233,21 @@ class Announcer:
         body: Callable[[], dict[str, Any]],
         tick: Callable[[], Any] | None = None,
         phase: Callable[[], str] = lambda: LOADING,
+        answered: Callable[[dict[str, Any]], None] = lambda _reply: None,
     ) -> None:
         self.client = client
         self.headers = {"Authorization": f"Bearer {token}"}
         self.body = body
         self.tick = tick
         self.phase = phase
+        self.answered = answered
         self.count = 0
 
     def announce(self, state: str) -> None:
         body = self.body() | {"state": state}
-        self.client.request("POST", "/internal/gateway/engines", json=body, headers=self.headers).raise_for_status()
+        response = self.client.request("POST", "/internal/gateway/engines", json=body, headers=self.headers)
+        response.raise_for_status()
+        self.answered(response.json())
 
     def forever(self, ready: threading.Event, stop: threading.Event, failed: threading.Event | None = None) -> None:
         while True:
@@ -359,6 +364,7 @@ def create_engine_app(
     managed: bool = False,
     fetch: Fetch | None = None,
     sampler: Sampler | None = None,
+    call_token: str | None = None,
 ) -> FastAPI:
     base = spec.key
     store = ArtifactStore(home / "artifacts", home / "cache")
@@ -374,7 +380,18 @@ def create_engine_app(
         "backend": backend,
         "failure": None,
         "host": f"pool {pool}",
+        "call_token": call_token,
     }
+
+    def learn(reply: dict[str, Any]) -> None:
+        current["call_token"] = reply.get("call_token") or current["call_token"]
+
+    def gateways_only(authorization: Annotated[str, Header()] = "") -> None:
+        expected: str | None = current["call_token"]
+        if expected is None:
+            raise HTTPException(status_code=503, detail=LOADING)
+        if not presents(authorization, expected):
+            raise HTTPException(status_code=401, detail=REFUSED)
 
     def announced() -> dict[str, Any]:
         measured = {"metrics": sampler.body()} if sampler is not None else {}
@@ -431,6 +448,7 @@ def create_engine_app(
                 lambda: body | announced(),
                 lambda: prune_engines(client, token, home.parent),
                 lambda: phase["now"],
+                learn,
             )
             threading.Thread(target=announcer.forever, args=(ready, stop, failed), daemon=True).start()
         if fetch is None and current["backend"] is not None:
@@ -445,7 +463,14 @@ def create_engine_app(
         if closing is not None:
             closing()
 
-    app = FastAPI(title=f"minibrain engine {base}", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app = FastAPI(
+        title=f"minibrain engine {base}",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+        dependencies=[Depends(gateways_only)],
+    )
 
     @app.get("/health")
     def health() -> dict[str, Any]:

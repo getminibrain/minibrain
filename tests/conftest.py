@@ -20,10 +20,12 @@ from minibrain.app import create_app
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth import join_tokens
 from minibrain.auth.accounts import CSRF_HEADER, SESSION_COOKIE, create_local, csrf_for, find_local, start_session
+from minibrain.auth.engine_calls import call_headers, call_token
 from minibrain.auth.roles import Role
 from minibrain.data.splits import read_split
 from minibrain.jobs.queue import SqlJobQueue
 from minibrain.ml.completion import Completion
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.db import migrate
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import Job
@@ -38,6 +40,9 @@ ADMIN_EMAIL = "admin@example.com"
 FOLDER = "folder"
 BUCKET = "s3"
 BOTH_STORES = "both_stores"
+GATEWAY_TOKEN = secrets.token_urlsafe(32)
+ENGINE_CALL_TOKEN = call_token(GATEWAY_TOKEN, LOCAL_POOL)
+ENGINE_CALLS = call_headers(GATEWAY_TOKEN, LOCAL_POOL)
 
 
 def pytest_configure(config: pytest.Config) -> None:

@@ -18,7 +18,7 @@ from minibrain.registry.models import AuditEvent, BaseModel, BaseModelStatus, Ca
 from minibrain.serve.engine import create_engine_app, load_failure
 from minibrain.serve.select import NoEngineError
 from minibrain.settings import Settings
-from tests.conftest import FakeBackend, Harness, blank_dataset, give_data, tickets_csv
+from tests.conftest import ENGINE_CALL_TOKEN, ENGINE_CALLS, FakeBackend, Harness, blank_dataset, give_data, tickets_csv
 from tests.test_flow import SLUG, add_version, bearer, build_dataset, deploy, finish
 from tests.test_models import FILES, REPO, REVISION, Quiet, add_tiny, download_tiny, hub, manifest
 
@@ -238,8 +238,10 @@ def test_adapter_refuses_a_base_whose_files_changed(harness: Harness, hub: Path,
     assert (version["health"]["state"], version["health"]["label"]) == ("base_changed", "Base changed")
     assert harness.client.post(f"/api/models/{SLUG}/versions/1/promote").status_code == 409
     spec = BaseModelSpec(key="tiny", repo=REPO, revision=REVISION, license="apache-2.0", content_hash="b" * 64)
-    engine = create_engine_app(spec, "http://main", "t", tmp_path / "engine", backend=FakeBackend())
-    with TestClient(engine) as client:
+    engine = create_engine_app(
+        spec, "http://main", "t", tmp_path / "engine", backend=FakeBackend(), call_token=ENGINE_CALL_TOKEN
+    )
+    with TestClient(engine, headers=ENGINE_CALLS) as client:
         adapter = {"name": f"{SLUG}-v0", "artifact": {}, "base_hash": "a" * 64}
         body = {"messages": [{"role": "user", "content": "hi"}], "adapter": adapter}
         assert client.post("/generate", json=body).status_code == 409
@@ -262,7 +264,7 @@ def test_engine_load_failures_become_a_state_with_a_way_out(harness: Harness, hu
         "state": "failed",
     }
     response = harness.client.post("/internal/gateway/engines", json=body | oom, headers=harness.gateway_headers)
-    assert response.status_code == 204
+    assert response.status_code == 200
     found = row(harness)
     assert (found["health"]["state"], found["health"]["label"]) == ("no_memory", "Failed to start")
     assert actions(found) == ["find_smaller", "try_again"] and "smaller" in found["health"]["detail"]

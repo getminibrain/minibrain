@@ -101,7 +101,7 @@ def create_gateway_app(
     app.state.request_logs = logs
     app.state.generations = Generations(concurrency)
     app.state.feedback = send_feedback
-    serving = backend or EngineBackend(lambda: source.current().engines)
+    serving = backend or EngineBackend(lambda: source.current().engines, token)
     app.state.backend = serving
     app.state.metrics_access = load_metrics_access()
     app.state.telemetry = gateway_telemetry(app.state.metrics_access)

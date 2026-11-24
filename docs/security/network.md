@@ -33,7 +33,8 @@ main, gateways and engines serve plain HTTP. Put TLS in front:
 
 - A TLS reverse proxy or load balancer in front of main and gateways. Give workers main's `https://` address: that
   channel carries tokens, data, adapters and data keys.
-- Engines answer gateways over plain HTTP: keep them on a private network.
+- Engines answer gateways over plain HTTP: keep them on a private network. They refuse calls without their pool's call
+  token, but that token, prompts and answers cross the network in the clear.
 - Sign-in needs HTTPS anywhere but localhost ([Sessions](accounts.md#sessions)).
 
 For the TLS connections minibrain makes itself, these settings trust an internal CA; empty trusts the system's CAs:
@@ -69,6 +70,12 @@ database credentials, and there is no switch that lets machines join unchecked. 
   read adapters of models served in that pool. They never get the gateway token, whose configuration carries routes
   and API key digests. Rotating the pool token or removing the approved machine ends its engines' tokens at once
   (401), in that pool only.
+- Engines answer only main and gateways. Every call, health checks included, carries a call token for the engine's
+  pool: an HMAC-SHA256 of the pool name keyed with the gateway token, so main and gateways work it out themselves and
+  an engine learns it from main when it announces. Without it, or with another pool's, an engine answers 401 and runs
+  nothing: no generation, drain, adapter unload or health detail. So nobody on the GPU network can skip API keys,
+  safety models and request logs by calling an engine directly, and a machine in one pool cannot call another pool's
+  engines. The token is checked in constant time.
 - A worker downloads only what the jobs it holds need: main serves only the dataset version, adapter and base model
   named in a running job leased to a worker of the same pool. Anything else, including another pool's dataset or the
   same job's inputs after its lease ends, answers 403. An engine gets an adapter only when a version on a base model
