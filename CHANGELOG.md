@@ -30,6 +30,7 @@ What changed in each minibrain release, newest first. To move to a new version, 
   (`minibrain gateway`) together with the engines, or their requests to upgraded engines fail.
 - Only live models keep a model loaded in memory. A model you only tried in the Playground or scored is unloaded
   after 15 minutes without requests; before, every model with a version stayed loaded until restart.
+- **Train** waits for its estimate before it can be clicked; a click while the estimate loaded used to do nothing.
 
 ## 0.1.2 - 2026-11-20
 

@@ -491,7 +491,7 @@ function TrainForm({
                         {training ? `Train v${run.number}` : `Create v${run.number}`}
                     </>
                 }
-                disabled={run.create.isPending}
+                disabled={run.create.isPending || run.planning}
                 status={
                     attempted && marked.length > 1
                         ? `Fix the ${marked.length} fields marked in red`
