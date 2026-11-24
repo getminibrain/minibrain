@@ -299,8 +299,6 @@ def deploy_custom(session: Session, model: Model, deployed: bool, local: NodeRep
     if not deployed:
         return undeploy_custom(session, model, current_actor()) is not None
     cancel_stop(session, model.teardown, model.name)
-    if not model.deployed:
-        model.deployed_base = model.base_model
     facts = place_custom(session, model, local, asked)
     if facts is not None:
         audit_deploy(session, model, facts)

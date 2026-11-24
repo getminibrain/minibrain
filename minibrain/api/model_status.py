@@ -12,12 +12,13 @@ from minibrain.api.model_traffic import Subject, overall, subject_of, usual_erro
 from minibrain.api.numbers import percent_text, points_text
 from minibrain.api.request_logs import aware
 from minibrain.api.views import teardown_label
-from minibrain.models.handover import moving_to, serving_pool
+from minibrain.models.deployments import is_deployed, live_version, moving_to, serving_base, serving_pool
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     BaseModelStatus,
+    Deployment,
     Job,
     JobKind,
     Model,
@@ -32,7 +33,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly
-from minibrain.tasks.service import decision, held_out_score, live_version, serving_base, upcoming_version_number
+from minibrain.tasks.service import decision, held_out_score, upcoming_version_number
 
 StatusKind = Literal[
     "promote",
@@ -77,7 +78,7 @@ def baseline(version: Version) -> bool:
 
 
 def passing_candidate(model: Model) -> int | None:
-    current = model.current_version if model.deployed and model.current_version is not None else -1
+    current = model.current_version if is_deployed(model) and model.current_version is not None else -1
     ready = [
         v
         for v in model.versions
@@ -219,24 +220,25 @@ def trained(model: Model) -> bool:
     return any(v.kind == VersionKind.LORA and v.status == VersionStatus.READY for v in model.versions)
 
 
-def settled(session: Session, model: Model) -> ModelStatus:
+def settled(session: Session, model: Model, found: Deployment) -> ModelStatus:
     live = live_version(model)
-    pool = serving_pool(model)
+    pool = serving_pool(found)
     serving = replicas_text(replica_count(session, serving_base(model), pool))
     where = f"v{live.number}" if live is not None else "base weights"
     return ModelStatus(tone="success", text=f"Live: {where}{pool_part(pool)} · {serving}", action=None)
 
 
 def move_status(row: Model | BaseRow) -> ModelStatus | None:
-    if not row.deployed:
+    found = row.deployment
+    if found is None:
         return None
-    target = moving_to(row)
+    target = moving_to(found)
     if target is not None:
         return ModelStatus(
-            tone="info", text=f"Moving to {target} · {serving_pool(row)} serves until it is ready", action=None
+            tone="info", text=f"Moving to {target} · {serving_pool(found)} serves until it is ready", action=None
         )
-    if row.move_failure:
-        return ModelStatus(tone="warning", text=row.move_failure, action=StatusAction(kind="deploy", label="Deploy"))
+    if found.move_failure:
+        return ModelStatus(tone="warning", text=found.move_failure, action=StatusAction(kind="deploy", label="Deploy"))
     return None
 
 
@@ -260,12 +262,13 @@ def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly
     if limit is None and not trained(model):
         upcoming = upcoming_version_number(model)
         return neutral("Ready to train", StatusAction(kind="train", label=f"Train v{upcoming}", version=upcoming))
-    if not model.deployed:
+    found = model.deployment
+    if found is None:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))
     if limit is not None and limit.target is not None:
         move = StatusAction(kind="switch_base", label=f"Move to {limit.target.name} to train", base=limit.target.key)
         return neutral(f"{limit.format.upper()} weights can't be trained", move)
-    return settled(session, model)
+    return settled(session, model, found)
 
 
 def transfer_status(session: Session, base: BaseRow) -> ModelStatus | None:
@@ -289,9 +292,10 @@ def base_status(session: Session, settings: Settings, base: BaseRow) -> ModelSta
         return found
     if base.status != BaseModelStatus.AVAILABLE:
         return neutral("Not ready", None)
-    if not base.deployed:
+    found = base.deployment
+    if found is None:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))
-    pool = serving_pool(base)
+    pool = serving_pool(found)
     count = replica_count(session, base.id, pool)
     return ModelStatus(
         tone="success",

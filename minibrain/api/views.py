@@ -51,6 +51,7 @@ from minibrain.data.shared import table_of
 from minibrain.data.sources import SourceError, describe
 from minibrain.data.templates import cleanup_of, plain_columns, skips_empty
 from minibrain.jobs.removal import kept_by
+from minibrain.models.deployments import is_deployed
 from minibrain.models.safety import model_safety
 from minibrain.policy import bodies_choice
 from minibrain.presets import answer_preset
@@ -513,7 +514,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         preset=model.preset,
         base_model=model.base_model,
         current_version=model.current_version,
-        deployed=model.deployed,
+        deployed=is_deployed(model),
         main_metric=model_metric(model),
         current_score=current_score(model),
         versions=len(model.versions),

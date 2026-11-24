@@ -36,6 +36,7 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
 from minibrain.models.copies import BUCKET
+from minibrain.models.deployments import is_deployed
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, pool_fit
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health
 from minibrain.models.inspect import inspect_location, source_type_of
@@ -169,7 +170,7 @@ def detail_of(session: Session, settings: Settings, request: Request, model: Bas
         license_ack_by=model.license_ack_by,
         license_ack_at=model.license_ack_at,
         variant_id=model.variant_id,
-        deployed=model.deployed,
+        deployed=is_deployed(model),
         verified=model.verified,
         verified_at=model.verified_at,
         content_hash=content_hash(model.files),

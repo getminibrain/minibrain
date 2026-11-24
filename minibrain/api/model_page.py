@@ -15,6 +15,7 @@ from minibrain.api.request_logs import model_match
 from minibrain.api.schemas import ModelAvatar
 from minibrain.api.views import avatar_of
 from minibrain.data import feedback as feedback_store
+from minibrain.models.deployments import is_deployed, live_version
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     AuditEvent,
@@ -33,7 +34,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import latest_dataset_version, no_model
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
-from minibrain.tasks.service import live_version, upcoming_version_number
+from minibrain.tasks.service import upcoming_version_number
 
 router = APIRouter(prefix="/api")
 
@@ -163,7 +164,7 @@ def custom_next(
     if candidate is not None:
         label = f"v{candidate} is better than live, deploy it" if live_version(model) else f"Deploy v{candidate}"
         return NextAction(kind="promote", label=label, version=candidate)
-    if not model.deployed:
+    if not is_deployed(model):
         return undeployed_next(model, limit)
     if pending > 0:
         return NextAction(kind="review_feedback", label=rows_text(pending), count=pending)
@@ -176,7 +177,7 @@ def custom_next(
 def base_next(model: BaseRow) -> NextAction | None:
     if model.teardown is not None or model.health or model.status != BaseModelStatus.AVAILABLE:
         return None
-    if not model.deployed:
+    if not is_deployed(model):
         return NextAction(kind="deploy", label="Deploy")
     return NextAction(kind="create_custom", label="Create a custom model from it")
 

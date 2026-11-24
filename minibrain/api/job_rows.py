@@ -9,6 +9,7 @@ from minibrain.api.job_facts import number
 from minibrain.api.schemas import DeviceTime, ScoreReference, TrainedOn
 from minibrain.data.dataset_versions import version_number
 from minibrain.jobs.metrics import STEP
+from minibrain.models.deployments import model_deployed
 from minibrain.registry.models import (
     BaseModel,
     Job,
@@ -40,7 +41,7 @@ def base_names(session: Session, keys: set[str]) -> dict[str, str]:
 def peers_of(session: Session, model_ids: set[int]) -> dict[int, Peers]:
     if not model_ids:
         return {}
-    live = and_(Model.deployed, Version.number == Model.current_version)
+    live = and_(model_deployed(), Version.number == Model.current_version)
     query = (
         select(Version, live)
         .join(Model, Version.model_id == Model.id)

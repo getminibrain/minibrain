@@ -9,6 +9,7 @@ from minibrain.models import hardware
 from minibrain.models.hardware import GIB, Gpu, NodeReport, fit
 from minibrain.registry.models import (
     Artifact,
+    Deployment,
     EngineReplica,
     Job,
     JobAttempt,
@@ -141,9 +142,8 @@ def serve_on_rack(harness: Harness) -> None:
             name="Ticket Triage",
             preset="classify",
             base_model="qwen3-0.6b",
-            deployed=True,
             current_version=4,
-            pool="rack",
+            deployment=Deployment(pool="rack"),
         )
         session.add(model)
         session.flush()

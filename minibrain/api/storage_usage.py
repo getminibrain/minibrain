@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from minibrain.api.schemas import FreeUpItem, StoreInfo, UsageGroup, UsageItem, UsageKind, UsageRef
 from minibrain.data.dataset_versions import latest_ids
 from minibrain.jobs.retention import SUGGEST_DAYS, job_folders, old_logs
+from minibrain.models.deployments import is_deployed
 from minibrain.models.machine_metrics import folder_bytes
 from minibrain.models.safety import install_safety
 from minibrain.registry.models import (
@@ -69,7 +70,7 @@ def base_items(session: Session) -> list[UsageItem]:
             size_bytes=base.size_bytes,
             used_by=sorted(users.get(base.id, {}).values(), key=lambda ref: ref.name.lower()),
             checks=base.id in checks,
-            deployed=base.deployed,
+            deployed=is_deployed(base),
         )
         for base in stored_bases(session)
     ]
@@ -184,7 +185,7 @@ def unused_bases(session: Session) -> list[FreeUpItem]:
     return [
         FreeUpItem(kind="base", key=base.id, name=base.name, size_bytes=base.size_bytes)
         for base in stored_bases(session)
-        if base.id not in needed and not base.deployed
+        if base.id not in needed and not is_deployed(base)
     ]
 
 

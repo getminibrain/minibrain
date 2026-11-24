@@ -27,7 +27,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import avatar_of, cost_info, refusal_of, serve_only_info, teardown_info
 from minibrain.artifacts import ArtifactStore
-from minibrain.models.handover import moving_to, serving_pool
+from minibrain.models.deployments import is_deployed, moving_to, serving_base, serving_pool
 from minibrain.models.hardware import LOCAL_POOL, needed_bytes
 from minibrain.models.health import content_hash
 from minibrain.models.registry import base_publisher, files_present
@@ -60,7 +60,7 @@ from minibrain.registry.prices import DevicePrices, load_prices
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
-from minibrain.tasks.service import decision, held_out_score, serving_base, upcoming_version_number, version_metric
+from minibrain.tasks.service import decision, held_out_score, upcoming_version_number, version_metric
 
 FAILED_LABELS: dict[str, str] = {
     JobKind.TRAIN: "Training failed",
@@ -261,7 +261,7 @@ def version_rows(
                 number=version.number,
                 kind=version.kind,
                 status=version.status,
-                live=model.deployed and model.current_version == version.number,
+                live=is_deployed(model) and model.current_version == version.number,
                 score=held_out_score(version),
                 metric=version_metric(version),
                 promotion=promotion_of(model, version),
@@ -327,12 +327,21 @@ class Placed:
     move_failure: str | None = None
 
 
-def placed(row: Model | BaseModel) -> Placed:
-    return Placed(serving_pool(row), row.replicas, moving_to(row), row.move_failure)
+def placed(row: Model | BaseModel) -> Placed | None:
+    found = row.deployment
+    if found is None:
+        return None
+    return Placed(serving_pool(found), found.replicas, moving_to(found), found.move_failure)
+
+
+def served_health(health: EngineHealth, key: str, row: Model | BaseModel) -> str | None:
+    found = row.deployment
+    return health(key, serving_pool(found)) if found is not None else None
 
 
 def shown_pools(row: Model | BaseModel) -> str | None:
-    return None if row.moving_from else serving_pool(row)
+    found = row.deployment
+    return None if found is None or found.moving_from else serving_pool(found)
 
 
 def deployment(
@@ -411,9 +420,9 @@ def custom_row(
         activity=custom_activity(model, jobs),
         deployment=deployment(
             f"v{current}" if current is not None else "Base model",
-            model.deployed,
-            health(serving_base(model), serving_pool(model)) if model.deployed else None,
-            [current] if model.deployed and current is not None else [],
+            is_deployed(model),
+            served_health(health, serving_base(model), model),
+            [current] if is_deployed(model) and current is not None else [],
             found,
             placed(model),
         ),
@@ -493,8 +502,8 @@ def base_row(
         activity=activity,
         deployment=deployment(
             "",
-            model.deployed,
-            health(model.id, serving_pool(model)) if model.deployed else None,
+            is_deployed(model),
+            served_health(health, model.id, model),
             [],
             teardown,
             placed(model),
@@ -576,14 +585,14 @@ def serving_facts(
     limits = {key: serve_only(session, settings, key) for key in {m.base_model for m in models} | {b.id for b in bases}}
     facts: dict[str, dict[str, Any]] = {
         f"custom:{model.slug}": {
-            "replicas": replicas_of(engines, serving_base(model) if model.deployed else None, shown_pools(model)),
+            "replicas": replicas_of(engines, serving_base(model) if is_deployed(model) else None, shown_pools(model)),
             "serve_only": serve_only_info(limits.get(model.base_model)),
         }
         for model in models
     }
     for base in bases:
         facts[f"base:{base.id}"] = {
-            "replicas": replicas_of(engines, base.id, shown_pools(base) if base.deployed else None),
+            "replicas": replicas_of(engines, base.id, shown_pools(base)),
             "serve_only": serve_only_info(limits.get(base.id)),
             "catalog_name": names.get(base.catalog_id or ""),
             "variant_label": variant_label(base, limits.get(base.id)),

@@ -3,11 +3,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from minibrain.auth.identity import current_actor
-from minibrain.models.handover import begin_move
-from minibrain.models.hardware import LOCAL_POOL, NodeReport
+from minibrain.models.deployments import current_pool, deployment_for, owner_key, place, served_base
+from minibrain.models.hardware import NodeReport
 from minibrain.models.placement import Asked, replica_count, resolve_pool
-from minibrain.registry.models import AuditEvent, BaseModel, Model
-from minibrain.tasks.service import serving_base
+from minibrain.registry.models import AuditEvent, BaseModel, Deployment, Model
 
 
 def changes(before: str | None, pool: str, replicas: int, had: int) -> dict[str, Any] | None:
@@ -18,23 +17,28 @@ def changes(before: str | None, pool: str, replicas: int, had: int) -> dict[str,
 
 
 def chosen_replicas(
-    session: Session, pool: str, key: str, row: Model | BaseModel, asked: Asked, before: str | None
+    session: Session, pool: str, key: str, name: str, found: Deployment, asked: Asked, before: str | None
 ) -> int:
-    kept = row.replicas if before is not None else 1
+    kept = found.replicas if before is not None else 1
     if asked.replicas is None and before == pool:
         return kept
-    return replica_count(session, pool, key, row.name, asked.replicas, kept)
+    return replica_count(session, pool, key, name, asked.replicas, kept)
+
+
+def placed(
+    session: Session, row: Model | BaseModel, local: NodeReport, asked: Asked
+) -> tuple[Deployment, str | None, str, int]:
+    before = current_pool(row)
+    found = deployment_for(row)
+    key = served_base(row)
+    pool = resolve_pool(session, local, key, owner_key(row), row.name, asked.pool, before)
+    return found, before, pool, chosen_replicas(session, pool, key, row.name, found, asked, before)
 
 
 def place_custom(session: Session, model: Model, local: NodeReport, asked: Asked) -> dict[str, Any] | None:
-    before = (model.pool or LOCAL_POOL) if model.deployed else None
-    model.deployed = True
-    key = serving_base(model)
-    pool = resolve_pool(session, local, key, f"model:{model.id}", model.name, asked.pool, before)
-    replicas = chosen_replicas(session, pool, key, model, asked, before)
-    facts = changes(before, pool, replicas, model.replicas)
-    begin_move(model, before, pool)
-    model.pool, model.replicas = pool, replicas
+    found, before, pool, replicas = placed(session, model, local, asked)
+    facts = changes(before, pool, replicas, found.replicas)
+    place(found, before, pool, replicas)
     return facts
 
 
@@ -44,13 +48,9 @@ def audit_deploy(session: Session, model: Model, facts: dict[str, Any]) -> None:
 
 
 def place_base(session: Session, base: BaseModel, local: NodeReport, asked: Asked) -> None:
-    before = (base.pool or LOCAL_POOL) if base.deployed else None
-    pool = resolve_pool(session, local, base.id, f"base:{base.id}", base.name, asked.pool, before)
-    replicas = chosen_replicas(session, pool, base.id, base, asked, before)
-    facts = changes(before, pool, replicas, base.replicas)
+    found, before, pool, replicas = placed(session, base, local, asked)
+    facts = changes(before, pool, replicas, found.replicas)
     if facts is not None:
         detail = {"name": base.name} | facts
         session.add(AuditEvent(actor=current_actor(), action="model.deploy", target=base.id, detail=detail))
-    begin_move(base, before, pool)
-    base.pool, base.replicas = pool, replicas
-    base.deployed = True
+    place(found, before, pool, replicas)

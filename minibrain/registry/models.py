@@ -3,7 +3,19 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, Column, ForeignKey, Index, Table, UniqueConstraint, event, false, text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    CheckConstraint,
+    Column,
+    ForeignKey,
+    Index,
+    Table,
+    UniqueConstraint,
+    event,
+    false,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from minibrain.redaction import redact
@@ -218,7 +230,6 @@ class Model(Base):
     promotion: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     dataset_id: Mapped[int | None] = mapped_column(ForeignKey("datasets.id", ondelete="SET NULL"), default=None)
     current_version: Mapped[int | None] = mapped_column(default=None)
-    deployed: Mapped[bool] = mapped_column(default=False)
     last_version: Mapped[int] = mapped_column(default=-1)
     description: Mapped[str] = mapped_column(default="")
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -229,19 +240,16 @@ class Model(Base):
     first_live_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     labels_dismissed: Mapped[list[int] | None] = mapped_column(JSON, default=None)
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
-    deployed_base: Mapped[str | None] = mapped_column(default=None)
     avatar: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
-    pool: Mapped[str | None] = mapped_column(default=None)
-    replicas: Mapped[int] = mapped_column(server_default="1")
-    moving_from: Mapped[str | None] = mapped_column(default=None)
-    moving_since: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    move_failure: Mapped[str | None] = mapped_column(default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
     jobs: Mapped[list["Job"]] = relationship(back_populates="model", passive_deletes=True)
     key_scopes: Mapped[list["KeyScope"]] = relationship(back_populates="model", cascade="all, delete-orphan")
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
+    deployment: Mapped["Deployment | None"] = relationship(
+        back_populates="model", cascade="all, delete-orphan", lazy="selectin"
+    )
 
 
 class DatasetVersion(Base):
@@ -655,7 +663,6 @@ class BaseModel(Base):
     license: Mapped[str | None] = mapped_column(default=None)
     license_ack_by: Mapped[str | None] = mapped_column(default=None)
     license_ack_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    deployed: Mapped[bool] = mapped_column(default=False)
     verified: Mapped[bool] = mapped_column(default=False)
     path: Mapped[str | None] = mapped_column(default=None)
     store: Mapped[str] = mapped_column(default="folder")
@@ -665,14 +672,37 @@ class BaseModel(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
-    pool: Mapped[str | None] = mapped_column(default=None)
-    replicas: Mapped[int] = mapped_column(server_default="1")
-    moving_from: Mapped[str | None] = mapped_column(default=None)
-    moving_since: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
-    move_failure: Mapped[str | None] = mapped_column(default=None)
 
     variant: Mapped[CatalogVariant | None] = relationship()
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
+    deployment: Mapped["Deployment | None"] = relationship(
+        back_populates="base_model", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+ONE_OWNER = "(model_id IS NULL) <> (base_model_id IS NULL)"
+
+
+class Deployment(Base):
+    __tablename__ = "deployments"
+    __table_args__ = (CheckConstraint(ONE_OWNER, name="ck_deployments_one_owner"), {"sqlite_autoincrement": True})
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model_id: Mapped[int | None] = mapped_column(ForeignKey("models.id", ondelete="CASCADE"), unique=True, default=None)
+    base_model_id: Mapped[str | None] = mapped_column(
+        ForeignKey("base_models.id", ondelete="CASCADE"), unique=True, default=None
+    )
+    base: Mapped[str | None] = mapped_column(default=None)
+    pool: Mapped[str]
+    replicas: Mapped[int] = mapped_column(default=1)
+    moving_from: Mapped[str | None] = mapped_column(default=None)
+    moving_since: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    move_failure: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+
+    model: Mapped[Model | None] = relationship(back_populates="deployment")
+    base_model: Mapped[BaseModel | None] = relationship(back_populates="deployment")
 
 
 class ReservedName(Base):

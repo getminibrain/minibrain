@@ -1085,7 +1085,7 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - Live traffic never breaks: every version records the base it was made on (`versions.base_model`, migration 0010,
   backfilled from the model), and the gateway routes each version on its own base. The live version keeps serving on
   its old base, with its adapter, until a version on the new base is deployed. A model deployed with no version live
-  keeps serving the base it was deployed on (`models.deployed_base`) until a version goes live or it is deployed
+  keeps serving the base it was deployed on (`deployments.base`) until a version goes live or it is deployed
   again. Chosen over refusing the switch while a LoRA version is live, which would have blocked the common case: a
   serve-only model already in production moving to its trainable variant.
 - Versions made on another base stay as history, grouped under their base on the Versions tab, and cannot be
@@ -2158,6 +2158,13 @@ it finds:
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [x] Where a model is deployed was stored twice, as the same columns on `models` and `base_models` (`deployed`,
+  `pool`, `replicas`, `moving_from`, `moving_since`, `move_failure`, plus `models.deployed_base`), so the gateway
+  config, placement, pool moves, teardown, the deploy endpoints, problems and the model rows each read both. One
+  `deployments` row per deployed custom or base model now holds it (owner `model_id` or `base_model_id`, one of the
+  two, unique per owner; `base` is what a custom model serves with no version live); deployed means the row exists,
+  and every reader and writer goes through `minibrain/models/deployments.py`. Migration 0039 copies the rows and
+  drops the columns. Teardowns stay their own table: they also cover deletes and outlive the deployment (2026-11-24).
 - [x] `/v1` calls held a thread of main's shared pool (about 40) for their whole generation, up to 300 s, or up to
   600 s while an engine started, so a burst of model traffic could stall the UI, worker check-ins and lease renewals
   until 60 s job leases ran out. Chat and text completions now run on their own bounded threads

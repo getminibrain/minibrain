@@ -38,6 +38,7 @@ from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
 from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state, refuse_orphan
 from minibrain.jobs.removal import DeleteRefused, Leftovers, active_refusal, kept_by, remove_job
+from minibrain.models.deployments import is_deployed
 from minibrain.registry.compute import pool_of_host
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -212,7 +213,7 @@ def job_facets(session: SessionDep, filters: FilterDep) -> JobFacets:
 
 def serving(job: Job) -> bool:
     model, version = job.model, job.version
-    return model is not None and version is not None and model.deployed and model.current_version == version.number
+    return model is not None and version is not None and is_deployed(model) and model.current_version == version.number
 
 
 def worker_place(session: Session, job: Job) -> dict[str, str | None]:

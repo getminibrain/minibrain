@@ -5,10 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
+from minibrain.models.deployments import live_version
 from minibrain.registry.models import Job, JobKind, JobStatus, JudgeScore, Model, Version
 from minibrain.tasks.examples import Example
 from minibrain.tasks.graders import Grader, Judge, digest
-from minibrain.tasks.service import graders_of, live_version, split_examples, version_metric
+from minibrain.tasks.service import graders_of, split_examples, version_metric
 
 SPLIT = "eval"
 

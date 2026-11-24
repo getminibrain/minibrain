@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
-from minibrain.models.handover import advance_moves, moving_to, serving_pool
+from minibrain.models.deployments import deployed_base, deployed_bases, moving_to, owner_row, served_name, serving_pool
+from minibrain.models.handover import advance_moves
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
 from minibrain.models.registry import missing_files, resolve_spec
@@ -30,6 +31,7 @@ from minibrain.registry.models import (
     ApiKey,
     BaseModel,
     BaseModelStatus,
+    Deployment,
     Model,
     ReservedName,
     Teardown,
@@ -151,6 +153,7 @@ def routes_for(session: Session, model: Model, bodies: bool) -> list[Route]:
 def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
     ready = sorted((v for v in model.versions if v.status == VersionStatus.READY), key=lambda v: v.number)
     routes: list[Route] = []
+    deployment = model.deployment
     for version in ready:
         adapter = None
         if version.kind == VersionKind.LORA and version.adapter_artifact_id is not None:
@@ -175,19 +178,19 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
             request_bodies=bodies,
         )
         routes.append(route)
-        if model.deployed and version.number == model.current_version:
-            routes.append(replace(route, name=model.slug, pool=serving_pool(model)))
-    if model.deployed and not any(route.name == model.slug for route in routes):
+        if deployment is not None and version.number == model.current_version:
+            routes.append(replace(route, name=model.slug, pool=serving_pool(deployment)))
+    if deployment is not None and not any(route.name == model.slug for route in routes):
         routes.append(
             replace(
-                base_route_for(model.deployed_base or model.base_model),
+                base_route_for(deployed_base(model)),
                 name=model.slug,
                 owner=owner_of(model.id, None),
                 model_id=model.id,
                 base_model_id=None,
                 slug=model.slug,
                 request_bodies=bodies,
-                pool=serving_pool(model),
+                pool=serving_pool(deployment),
             )
         )
     return routes
@@ -231,17 +234,19 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
             continue
         bodies = policy.keeps_bodies(model.request_bodies)
         routes |= {route.name: route for route in routes_for(session, model, bodies)}
-    deployed = select(BaseModel).where(BaseModel.deployed.is_(True), BaseModel.status == BaseModelStatus.AVAILABLE)
+    available = deployed_bases().where(BaseModel.status == BaseModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
     guarded = install_safety(session).as_route()
-    deployed_bases = [base for base in session.scalars(deployed) if base.id not in dropped]
-    routes |= {
-        base.id: replace(base_route(base), request_bodies=default, safety=guarded, pool=serving_pool(base))
-        for base in deployed_bases
+    for base in session.scalars(available):
+        found = base.deployment
+        if found is not None and base.id not in dropped:
+            routes[base.id] = replace(
+                base_route(base), request_bodies=default, safety=guarded, pool=serving_pool(found)
+            )
+    wanted = {
+        served_name(owner_row(found)): (found.replicas, moving_to(found))
+        for found in session.scalars(select(Deployment))
     }
-    wanted = {base.id: (base.replicas, moving_to(base)) for base in deployed_bases}
-    deployed_models = session.scalars(select(Model).where(Model.deployed.is_(True)))
-    wanted |= {model.slug: (model.replicas, moving_to(model)) for model in deployed_models}
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     guards = {str(route.safety["model"]) for route in routes.values() if route.safety}

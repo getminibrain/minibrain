@@ -13,12 +13,11 @@ from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.overview import Partition, aligned, bucket_of, failed, integer, partitions, ranked, shared_columns
 from minibrain.api.request_logs import CLIENT_ERROR, aware
-from minibrain.models.placement import pools_of
+from minibrain.models.deployments import is_deployed, pools_of, serving_base
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog, now
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
-from minibrain.tasks.service import serving_base
 
 router = APIRouter(prefix="/api")
 
@@ -135,12 +134,13 @@ class Subject:
     @property
     def pools(self) -> set[str]:
         found = self.custom or self.base
-        return pools_of(found) if found is not None else set()
+        deployment = found.deployment if found is not None else None
+        return pools_of(deployment) if deployment is not None else set()
 
     @property
     def deployed(self) -> bool:
         found = self.custom or self.base
-        return bool(found and found.deployed)
+        return found is not None and is_deployed(found)
 
     def live(self, version: int | None) -> bool:
         if not self.deployed:

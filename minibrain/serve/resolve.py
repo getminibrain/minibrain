@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.models.deployments import is_deployed
 from minibrain.registry.models import Model, Version, VersionStatus
 from minibrain.registry.service import find_version
 
@@ -44,5 +45,5 @@ def resolve(session: Session, name: str) -> Target | None:
 
 def model_names(model: Model) -> list[str]:
     ready = sorted(version.number for version in model.versions if version.status == VersionStatus.READY)
-    names = [model.slug] if model.deployed else []
+    names = [model.slug] if is_deployed(model) else []
     return names + [f"{model.slug}@{number}" for number in ready]

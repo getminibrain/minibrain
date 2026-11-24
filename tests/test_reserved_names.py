@@ -4,7 +4,7 @@ from typing import Any
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, insert, select
+from sqlalchemy import create_engine, insert, select, text
 from sqlalchemy.orm import sessionmaker
 
 from minibrain.gateway.logs import LogEntry, database_sink
@@ -192,6 +192,14 @@ def migrate_to(url: str, revision: str) -> None:
     engine.dispose()
 
 
+MODEL_AT_0013 = """
+INSERT INTO models (slug, name, preset, base_model, contract, breaking_confirmed, graders, promotion, deployed,
+    last_version, description, tags, request_bodies, created_at)
+VALUES ('kept', 'Kept', 'general', 'tiny', '{}', 0, '[]', '{}', 0, -1, '', '[]', 0, CURRENT_TIMESTAMP)
+RETURNING id
+"""
+
+
 def test_the_migration_reserves_names_that_history_still_mentions(tmp_path: Path) -> None:
     url = f"sqlite:///{tmp_path / 'old.db'}"
     migrate_to(url, "0013")
@@ -199,9 +207,7 @@ def test_the_migration_reserves_names_that_history_still_mentions(tmp_path: Path
     seen = now() - timedelta(days=5)
     sessions = sessionmaker(create_engine(url))
     with sessions() as session:
-        kept = session.scalar(
-            insert(Model).values(slug="kept", name="Kept", preset="general", base_model="tiny").returning(Model.id)
-        )
+        kept = session.scalar(text(MODEL_AT_0013))
         done = {"kind": "train", "status": "succeeded"}
         session.execute(
             insert(Job),

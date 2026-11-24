@@ -31,12 +31,11 @@ from minibrain.api.schemas import (
 )
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import LABELS, Role, allows
-from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.deployments import owner_key, served_base
 from minibrain.models.placement import Asked, automatic, pool_options
 from minibrain.registry.models import BaseModel, Model
 from minibrain.registry.service import no_model
 from minibrain.settings import Settings
-from minibrain.tasks.service import serving_base
 from minibrain.teardown import delete_base, delete_custom
 
 router = APIRouter(prefix="/api/models")
@@ -177,15 +176,12 @@ def deploy_model(
 )
 def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
     model = find(session, name)
-    if isinstance(model, Model):
-        key, owner = serving_base(model) if model.deployed else model.base_model, f"model:{model.id}"
-    else:
-        key, owner = model.id, f"base:{model.id}"
-    options = pool_options(session, node, key, owner)
+    deployment = model.deployment
+    options = pool_options(session, node, served_base(model), owner_key(model))
     chosen = automatic(options)
     return Placement(
-        pool=(model.pool or LOCAL_POOL) if model.deployed else None,
-        moving_from=model.moving_from if model.deployed else None,
+        pool=deployment.pool if deployment is not None else None,
+        moving_from=deployment.moving_from if deployment is not None else None,
         automatic=chosen.name if chosen is not None else None,
         pools=[
             PoolPlacement(

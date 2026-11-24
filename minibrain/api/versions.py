@@ -38,6 +38,7 @@ from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.ml.completion import Completion
 from minibrain.ml.planner import Plan
+from minibrain.models.deployments import current_pool, is_deployed
 from minibrain.models.health import base_changed
 from minibrain.models.placement import Asked
 from minibrain.models.registry import base_hash, base_readiness, require_usable
@@ -288,7 +289,7 @@ def delete_version(
             stop_jobs(jobs, cancel, refusal)
             session.commit()
         return deleting(model, version)
-    if model.deployed and model.current_version == number:
+    if is_deployed(model) and model.current_version == number:
         raise ConflictError(f"{name}@{number} is deployed; undeploy it first")
     stop_jobs(jobs, cancel, refusal)
     if model.current_version == number:
@@ -386,7 +387,7 @@ def promote_version(
 ) -> ModelDetail:
     model = get_model(session, name)
     version = get_version(model, number)
-    already = model.deployed and model.current_version == number
+    already = is_deployed(model) and model.current_version == number
     refusal = other_base(session, model, version)
     if refusal is not None and not already:
         raise ConflictError(refusal)
@@ -402,16 +403,15 @@ def promote_version(
         found = decision(model, version)
         if not found.passed:
             raise ConflictError(f"{name}@{number} does not meet the deploy rule: {found.reason()}")
-    previous, was_deployed = model.current_version, model.deployed
+    previous, was_deployed = model.current_version, is_deployed(model)
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number
-    model.deployed_base = model.deployed_base if was_deployed else model.base_model
     asked = Asked(body.pool, body.replicas) if body is not None else Asked()
     facts = place_custom(session, model, node, asked)
     version.live_at = version.live_at or now()
     model.first_live_at = model.first_live_at or version.live_at
     if (previous, was_deployed) != (number, True):
-        placed = facts or {"pool": model.pool}
+        placed = facts or {"pool": current_pool(model)}
         audit_version(
             session,
             model,

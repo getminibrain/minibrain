@@ -17,6 +17,7 @@ from minibrain.gateway.config import LocalConfig, served_bases
 from minibrain.jobs.removal import Leftovers, remove_job
 from minibrain.leader import Leader
 from minibrain.models.bucket import drop_weights, sweep_weights
+from minibrain.models.deployments import is_deployed, remove_deployment, serving_base
 from minibrain.models.registry import model_dir
 from minibrain.registry.compute import live_engines, live_gateways
 from minibrain.registry.files import store_for
@@ -44,7 +45,6 @@ from minibrain.registry.service import ConflictError, adapter_name, reserve_name
 from minibrain.serve.engines import DRAIN_TIMEOUT, drain_engine
 from minibrain.settings import Settings
 from minibrain.tasks.exports import export_artifacts
-from minibrain.tasks.service import serving_base
 from minibrain.worker import HttpClient
 
 STOP_TIMEOUT = timedelta(minutes=10)
@@ -303,10 +303,10 @@ def undeploy_custom(session: Session, model: Model, actor: str) -> Teardown | No
         raise being_deleted(model.name)
     if existing is not None:
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
-    if not model.deployed:
+    if not is_deployed(model):
         return None
     detail = custom_targets(model)
-    model.deployed = False
+    remove_deployment(model)
     model.updated_at = now()
     facts = {"name": model.name, "version": model.current_version}
     session.add(AuditEvent(actor=actor, action="model.undeploy", target=model.slug, detail=facts))
@@ -319,9 +319,9 @@ def undeploy_base(session: Session, base: BaseModel, actor: str) -> Teardown | N
         raise being_deleted(base.name)
     if existing is not None and existing.kind == TeardownKind.UNDEPLOY:
         return restart(session, existing, actor) if existing.status == TeardownStatus.FAILED else existing
-    if not base.deployed:
+    if not is_deployed(base):
         return None
-    base.deployed = False
+    remove_deployment(base)
     base.updated_at = now()
     session.add(AuditEvent(actor=actor, action="model.undeploy", target=base.id, detail={"name": base.name}))
     if existing is not None:
@@ -358,14 +358,14 @@ def delete_custom(
             stop_jobs(jobs, cancel, refusal)
         return existing
     stopping = existing is not None and existing.status == TeardownStatus.RUNNING
-    if model.deployed and not undeploy:
+    if is_deployed(model) and not undeploy:
         raise ConflictError(f"{model.name} is deployed; undeploy it first")
     stop_jobs(jobs, cancel, refusal)
-    live = model.deployed or stopping
+    live = is_deployed(model) or stopping
     if existing is not None:
         drop(session, existing)
     detail = custom_targets(model) | {"live": live, "jobs": still_active(jobs)}
-    model.deployed = False
+    remove_deployment(model)
     model.updated_at = now()
     facts: dict[str, Any] = {"name": model.name, "kind": "custom", "versions": len(model.versions), "undeploy": live}
     if jobs:
@@ -378,7 +378,9 @@ def delete_custom(
 
 def dependents_of(session: Session, base: BaseModel) -> list[Model]:
     models = session.scalars(select(Model).order_by(Model.name))
-    return [model for model in models if base.id in (model.base_model, serving_base(model) if model.deployed else "")]
+    return [
+        model for model in models if base.id in (model.base_model, serving_base(model) if is_deployed(model) else "")
+    ]
 
 
 class NewDependentsError(ConflictError):
@@ -433,8 +435,8 @@ def delete_base(
         )
     if cancel is None:
         stop_base_jobs(session, base, dependents, cascade, None)
-    live = [model.name for model in dependents if model.deployed]
-    if base.deployed and not undeploy:
+    live = [model.name for model in dependents if is_deployed(model)]
+    if is_deployed(base) and not undeploy:
         raise ConflictError(f"{base.name} is deployed; undeploy it first")
     if live and not undeploy:
         them = "it" if len(live) == 1 else "them"
@@ -446,7 +448,7 @@ def delete_base(
     detail = base_targets(base) | {
         "cascade": cascade,
         "models": built,
-        "live": len(live) + int(base.deployed or stopping),
+        "live": len(live) + int(is_deployed(base) or stopping),
         "undeploy": undeploy,
         "jobs": still_active([job for job in stopped if job.base_model_id == base.id]),
     }
@@ -454,7 +456,7 @@ def delete_base(
     facts |= {"kept": base.path} if base.path else {}
     facts |= {"cascade": [model.slug for model in dependents]} if cascade else {}
     facts |= {"jobs": [job.id for job in stopped]} if stopped else {}
-    base.deployed = False
+    remove_deployment(base)
     base.updated_at = now()
     session.add(AuditEvent(actor=actor, action="model.delete", target=base.id, detail=facts))
     teardown = begin(session, TeardownKind.DELETE, actor, base.name, detail, base_model=base)

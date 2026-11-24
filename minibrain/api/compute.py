@@ -13,6 +13,7 @@ from minibrain.api.job_facts import TRAIN_START
 from minibrain.auth.identity import current_actor
 from minibrain.auth.join_requests import approved_machines, revoke_machine
 from minibrain.jobs.metrics import latest_data
+from minibrain.models.deployments import deployed_rows, live_version, pools_of, served_base, served_name
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, needed_bytes
 from minibrain.models.machine_metrics import (
     DiskSample,
@@ -23,7 +24,7 @@ from minibrain.models.machine_metrics import (
     largest_free,
     measured_memory,
 )
-from minibrain.models.placement import pools_of, weights_of
+from minibrain.models.placement import weights_of
 from minibrain.models.room import Free, pool_room
 from minibrain.registry.compute import ACTIVE, REMOVED, Pool, PoolNode, node_id, pools, replica_host
 from minibrain.registry.machines import drain, remove, undrain
@@ -40,7 +41,6 @@ from minibrain.registry.models import (
     Version,
     Worker,
 )
-from minibrain.registry.models import BaseModel as BaseModel_
 from minibrain.registry.pool_settings import (
     ANY,
     DESCRIPTION_LIMIT,
@@ -53,7 +53,6 @@ from minibrain.registry.pool_settings import (
     settings_of,
 )
 from minibrain.registry.prices import KEY, DevicePrices, load_prices, locked_pools, save_prices
-from minibrain.tasks.service import live_version, serving_base
 
 router = APIRouter(prefix="/api/compute")
 
@@ -286,20 +285,16 @@ def adapter_bytes(session: Session, version: Version | None) -> int | None:
 
 def served_models(session: Session) -> dict[tuple[str, str], list[ServedModel]]:
     found: dict[tuple[str, str], list[ServedModel]] = {}
-    for model in session.scalars(select(Model).where(Model.deployed.is_(True)).order_by(Model.name)):
-        live = live_version(model)
+    for row, deployment in deployed_rows(session):
+        live = live_version(row) if isinstance(row, Model) else None
         served = ServedModel(
-            model=model.slug,
-            name=model.name,
+            model=served_name(row),
+            name=row.name,
             version=live.number if live is not None else None,
             adapter_bytes=adapter_bytes(session, live),
         )
-        for pool in pools_of(model):
-            found.setdefault((pool, serving_base(model)), []).append(served)
-    for base in session.scalars(select(BaseModel_).where(BaseModel_.deployed.is_(True)).order_by(BaseModel_.name)):
-        served = ServedModel(model=base.id, name=base.name, version=None, adapter_bytes=None)
-        for pool in pools_of(base):
-            found.setdefault((pool, base.id), []).append(served)
+        for pool in pools_of(deployment):
+            found.setdefault((pool, served_base(row)), []).append(served)
     return found
 
 

@@ -10,7 +10,7 @@ from minibrain.auth.roles import Role
 from minibrain.models.hardware import GIB
 from minibrain.models.machine_metrics import MachineSample
 from minibrain.registry.compute import main_node_id
-from minibrain.registry.models import Job, JobKind, JobStatus, JoinRequest, Model, Node, now
+from minibrain.registry.models import Deployment, Job, JobKind, JobStatus, JoinRequest, Model, Node, now
 from minibrain.storage import Space
 from tests.conftest import Harness
 from tests.test_compute import RACK, announce, by_name
@@ -51,8 +51,8 @@ def last_seen(harness: Harness, host: str, ago: timedelta) -> None:
 
 def deploy(harness: Harness, slug: str = "triage", pool: str = "rack") -> None:
     with harness.sessions() as session:
-        model = Model(slug=slug, name="Ticket Triage", preset="classify", base_model="qwen3-0.6b", deployed=True)
-        model.pool = pool
+        model = Model(slug=slug, name="Ticket Triage", preset="classify", base_model="qwen3-0.6b")
+        model.deployment = Deployment(pool=pool)
         session.add(model)
         session.commit()
 

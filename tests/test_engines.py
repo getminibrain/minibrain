@@ -16,7 +16,7 @@ from minibrain.models import copies
 from minibrain.models.copies import BUCKET, CopyError, Progress, ensure
 from minibrain.models.files import sha256_of
 from minibrain.models.hardware import GIB, LOCAL_POOL, Gpu, NodeReport
-from minibrain.registry.models import BaseModel
+from minibrain.registry.models import BaseModel, Deployment
 from minibrain.serve import engine as engine_module
 from minibrain.serve import engines as engines_module
 from minibrain.serve import select
@@ -168,7 +168,7 @@ def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harne
     with harness.sessions() as session:
         model = session.get(BaseModel, "tiny")
         assert model is not None
-        model.deployed, model.pool = True, "rack"
+        model.deployment = Deployment(pool="rack")
         session.commit()
     seen: list[dict] = []
 

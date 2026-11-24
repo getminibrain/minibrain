@@ -7,6 +7,7 @@ from minibrain.api.models import first_version
 from minibrain.api.schemas import BaseChoice, BaseOptions, BaseSwitch, ModelDetail
 from minibrain.api.views import detail, target_info
 from minibrain.auth.identity import current_actor
+from minibrain.models.deployments import is_deployed, live_version, serving_base
 from minibrain.models.registry import base_readiness, require_usable
 from minibrain.registry.models import AuditEvent, Model, now
 from minibrain.registry.service import ConflictError, get_model
@@ -19,7 +20,6 @@ from minibrain.tasks.rebase import (
     require_switchable,
     trainable_target,
 )
-from minibrain.tasks.service import live_version, serving_base
 from minibrain.teardown import require_idle
 
 router = APIRouter(prefix="/api/models")
@@ -81,7 +81,7 @@ def switch_base(
     require_usable(session, settings, body.base_model)
     old = model.base_model
     live = live_version(model)
-    serving = serving_base(model) if model.deployed else None
+    serving = serving_base(model) if is_deployed(model) else None
     model.base_model = body.base_model
     model.updated_at = now()
     first_version(session, settings, store, model)

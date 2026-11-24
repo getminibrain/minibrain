@@ -14,6 +14,7 @@ from minibrain.registry.models import (
     BaseModelStatus,
     Dataset,
     DatasetVersion,
+    Deployment,
     Job,
     JobAttempt,
     JobEvent,
@@ -36,7 +37,7 @@ def add_base(harness: Harness, key: str, size: int, deployed: bool = False) -> N
                 name=key,
                 status=BaseModelStatus.AVAILABLE,
                 size_bytes=size,
-                deployed=deployed,
+                deployment=Deployment(pool="local") if deployed else None,
             )
         )
         session.commit()

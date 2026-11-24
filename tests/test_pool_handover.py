@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import select, update
 
 from minibrain.gateway.config import GatewayConfig
-from minibrain.registry.models import AuditEvent, Model, Worker, now
+from minibrain.registry.models import AuditEvent, Deployment, Model, Worker, now
 from minibrain.serve.engines import EngineBackend
 from tests.conftest import GATEWAY_TOKEN, Harness
 from tests.test_deploy_pools import (
@@ -107,7 +107,7 @@ def test_no_machine_in_the_new_pool_rolls_back_after_a_while(harness: Harness) -
     rebuild(harness)
     assert deployment(harness)["moving_to"] == "rack"
     with harness.sessions() as session:
-        session.execute(update(Model).values(moving_since=now() - timedelta(minutes=6)))
+        session.execute(update(Deployment).values(moving_since=now() - timedelta(minutes=6)))
         session.commit()
     rebuild(harness)
     found = deployment(harness)
@@ -129,4 +129,4 @@ def test_undeploying_during_a_move_drops_it(harness: Harness) -> None:
     rebuild(harness)
     with harness.sessions() as session:
         model = session.scalars(select(Model)).one()
-        assert (model.moving_from, model.moving_since) == (None, None)
+        assert model.deployment is None and session.scalars(select(Deployment)).all() == []

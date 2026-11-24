@@ -38,6 +38,7 @@ from minibrain.artifacts import ArtifactError
 from minibrain.base_models import BASE_MODELS
 from minibrain.data.dataset_versions import version_number
 from minibrain.data.splits import SPLITS, DatasetVersionError, read_split
+from minibrain.models.deployments import live_version
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
 from minibrain.registry.compute import pool_of_host
@@ -62,7 +63,7 @@ from minibrain.registry.prices import DevicePrices, eval_cost, load_prices
 from minibrain.settings import Settings
 from minibrain.tasks.examples import Example
 from minibrain.tasks.graders import metric_values
-from minibrain.tasks.service import decision, live_version, version_contract, version_metric
+from minibrain.tasks.service import decision, version_contract, version_metric
 
 CARD_ACTIONS = ("version.create", "version.promote", "model.deploy", "model.undeploy")
 FEW_TRAINING_ROWS = 10

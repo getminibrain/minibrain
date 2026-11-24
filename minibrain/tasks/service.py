@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
 from minibrain.data.splits import DatasetVersionError, read_split
+from minibrain.models.deployments import live_version
 from minibrain.presets import Preset, preset, render
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import DatasetVersion, JudgeScore, Model, Version, VersionKind, VersionStatus
@@ -61,19 +62,6 @@ def held_out_score(version: Version) -> float | None:
     metric = version_metric(version)
     values = held_out(version)
     return None if metric is None or values is None else values.get(metric)
-
-
-def live_version(model: Model) -> Version | None:
-    if not model.deployed or model.current_version is None:
-        return None
-    return next((item for item in model.versions if item.number == model.current_version), None)
-
-
-def serving_base(model: Model) -> str:
-    live = live_version(model)
-    if live is not None:
-        return live.base_model
-    return model.deployed_base or model.base_model
 
 
 def decision(model: Model, version: Version) -> Decision:

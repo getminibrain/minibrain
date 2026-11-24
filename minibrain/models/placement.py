@@ -7,11 +7,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.models.deployments import owner_key, owner_row, pools_of, served_base
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, fit, needed_bytes, pool_fit
 from minibrain.registry.compute import DRAINING, Pool, held_hosts, live_engines, node_id, node_state, pools
-from minibrain.registry.models import BaseModel, CatalogVariant, Model, Node, Worker, now
+from minibrain.registry.models import BaseModel, CatalogVariant, Deployment, Node, Worker, now
 from minibrain.registry.pool_settings import ANY, SERVING, all_workloads, refusal
-from minibrain.tasks.service import serving_base
 
 AUTO = "auto"
 RUNS = ("fits", "limited")
@@ -50,17 +50,14 @@ def weights_of(session: Session, key: str) -> tuple[int, dict[str, Any]]:
     return (variant.weights_bytes, dict(variant.requires)) if variant is not None else (0, {})
 
 
-def pools_of(row: Model | BaseModel) -> set[str]:
-    return {row.pool or LOCAL_POOL} | ({row.moving_from} if row.moving_from else set())
+def key_of(found: Deployment) -> str:
+    return served_base(owner_row(found))
 
 
 def deployments(session: Session) -> Iterable[tuple[str, str, str]]:
-    for model in session.scalars(select(Model).where(Model.deployed.is_(True))):
-        for pool in pools_of(model):
-            yield f"model:{model.id}", serving_base(model), pool
-    for base in session.scalars(select(BaseModel).where(BaseModel.deployed.is_(True))):
-        for pool in pools_of(base):
-            yield f"base:{base.id}", base.id, pool
+    for found in session.scalars(select(Deployment).order_by(Deployment.id)):
+        for pool in pools_of(found):
+            yield owner_key(owner_row(found)), key_of(found), pool
 
 
 def placed_bytes(session: Session, skip: str) -> dict[str, int]:

@@ -2,49 +2,20 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from minibrain.models import deployments
+from minibrain.models.deployments import moving, owner_row, served_name, stop_moving
 from minibrain.models.hardware import LOCAL_POOL
-from minibrain.models.placement import assigned, engine_hosts
+from minibrain.models.placement import assigned, engine_hosts, key_of
 from minibrain.registry.compute import live_engines
-from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, BaseModel, Model, now
-from minibrain.tasks.service import serving_base
+from minibrain.registry.models import SYSTEM_ACTOR, AuditEvent, BaseModel, Deployment, now
 
 MOVE_WAIT = timedelta(minutes=5)
 READY = "ready"
 FAILED = "failed"
 
 log = logging.getLogger("minibrain.handover")
-
-Deployed = Model | BaseModel
-
-
-def serving_pool(row: Deployed) -> str:
-    return row.moving_from or row.pool or LOCAL_POOL
-
-
-def moving_to(row: Deployed) -> str | None:
-    return (row.pool or LOCAL_POOL) if row.moving_from else None
-
-
-def stop_moving(row: Deployed) -> None:
-    row.moving_from = None
-    row.moving_since = None
-
-
-def begin_move(row: Deployed, before: str | None, pool: str) -> None:
-    row.move_failure = None
-    if before is None:
-        stop_moving(row)
-        return
-    if before == pool:
-        return
-    if row.moving_from == pool:
-        stop_moving(row)
-        return
-    row.moving_from = row.moving_from or before
-    row.moving_since = now()
 
 
 @dataclass(frozen=True)
@@ -78,54 +49,39 @@ def progress(session: Session, key: str, pool: str, replicas: int, since: dateti
     return Progress()
 
 
-def key_of(row: Deployed) -> str:
-    return serving_base(row) if isinstance(row, Model) else row.id
+def record(session: Session, found: Deployment, detail: dict[str, object]) -> None:
+    owner = owner_row(found)
+    facts = {"name": owner.name, "from_pool": found.moving_from, "pool": found.pool} | detail
+    session.add(AuditEvent(actor=SYSTEM_ACTOR, action="model.move", target=served_name(owner), detail=facts))
 
 
-def target_of(row: Deployed) -> str:
-    return row.slug if isinstance(row, Model) else row.id
+def finish(session: Session, found: Deployment) -> None:
+    log.info("%s now serves from pool %s; pool %s stops", owner_row(found).name, found.pool, found.moving_from)
+    record(session, found, {"outcome": "moved"})
+    stop_moving(found)
 
 
-def record(session: Session, row: Deployed, detail: dict[str, object]) -> None:
-    facts = {"name": row.name, "from_pool": row.moving_from, "pool": row.pool or LOCAL_POOL} | detail
-    session.add(AuditEvent(actor=SYSTEM_ACTOR, action="model.move", target=target_of(row), detail=facts))
+def roll_back(session: Session, found: Deployment, failure: str) -> None:
+    target, back = found.pool, found.moving_from or LOCAL_POOL
+    log.warning("moving %s to pool %s failed: %s; it stays on %s", owner_row(found).name, target, failure, back)
+    record(session, found, {"outcome": "rolled_back", "error": failure})
+    deployments.roll_back(found, failure)
 
 
-def finish(session: Session, row: Deployed) -> None:
-    log.info("%s now serves from pool %s; pool %s stops", row.name, row.pool, row.moving_from)
-    record(session, row, {"outcome": "moved"})
-    stop_moving(row)
-
-
-def roll_back(session: Session, row: Deployed, failure: str) -> None:
-    target, back = row.pool or LOCAL_POOL, row.moving_from or LOCAL_POOL
-    log.warning("moving %s to pool %s failed: %s; it stays on %s", row.name, target, failure, back)
-    record(session, row, {"outcome": "rolled_back", "error": failure})
-    row.move_failure = f"Moving to {target} failed: {failure}. It stays on {back}."
-    row.pool = back
-    stop_moving(row)
-
-
-def advance(session: Session, row: Deployed) -> bool:
-    if not row.deployed or row.moving_since is None:
-        stop_moving(row)
+def advance(session: Session, found: Deployment) -> bool:
+    if found.moving_since is None:
+        stop_moving(found)
         return True
-    found = progress(session, key_of(row), row.pool or LOCAL_POOL, row.replicas, row.moving_since)
-    if found.done:
-        finish(session, row)
-    elif found.failure is not None:
-        roll_back(session, row, found.failure)
-    return found.done or found.failure is not None
-
-
-def moving_rows(session: Session) -> list[Deployed]:
-    models: list[Deployed] = list(session.scalars(select(Model).where(Model.moving_from.is_not(None))))
-    bases: list[Deployed] = list(session.scalars(select(BaseModel).where(BaseModel.moving_from.is_not(None))))
-    return models + bases
+    step = progress(session, key_of(found), found.pool, found.replicas, found.moving_since)
+    if step.done:
+        finish(session, found)
+    elif step.failure is not None:
+        roll_back(session, found, step.failure)
+    return step.done or step.failure is not None
 
 
 def advance_moves(session: Session) -> bool:
-    changed = [row for row in moving_rows(session) if advance(session, row)]
+    changed = [found for found in moving(session) if advance(session, found)]
     if changed:
         session.commit()
     return bool(changed)

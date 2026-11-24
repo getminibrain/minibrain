@@ -16,7 +16,7 @@ from minibrain.api.system import main_stores
 from minibrain.auth.identity import current_role
 from minibrain.auth.roles import Role, allows
 from minibrain.ml.planner import gigabytes
-from minibrain.models.handover import serving_pool
+from minibrain.models.deployments import deployed_rows, served_base, served_name, serving_pool
 from minibrain.models.hardware import GIB, NodeReport
 from minibrain.models.machine_metrics import UNIFIED as UNIFIED_MEMORY
 from minibrain.models.machine_metrics import DiskSample, MetricsHistory, measured_memory
@@ -32,12 +32,10 @@ from minibrain.registry.models import (
     Job,
     JobKind,
     JobStatus,
-    Model,
     now,
 )
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.siem import target_of, waiting
-from minibrain.tasks.service import serving_base
 
 router = APIRouter(prefix="/api")
 
@@ -290,15 +288,11 @@ Deployed = tuple[str, str, str, str]
 
 
 def deployed(session: Session) -> list[Deployed]:
-    found: list[Deployed] = []
-    for model in session.scalars(select(Model).where(Model.deployed.is_(True)).order_by(Model.name)):
-        if model.teardown is None:
-            found.append((model.slug, model.name, serving_base(model), serving_pool(model)))
-    query = select(BaseRow).where(BaseRow.deployed.is_(True), BaseRow.status == BaseModelStatus.AVAILABLE)
-    for base in session.scalars(query.order_by(BaseRow.name)):
-        if base.teardown is None:
-            found.append((base.id, base.name, base.id, serving_pool(base)))
-    return found
+    return [
+        (served_name(row), row.name, served_base(row), serving_pool(found))
+        for row, found in deployed_rows(session, BaseRow.status == BaseModelStatus.AVAILABLE)
+        if row.teardown is None
+    ]
 
 
 def last_seen(session: Session, base: str, pool: str) -> datetime | None:
