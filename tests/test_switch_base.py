@@ -152,7 +152,7 @@ def test_the_live_version_keeps_serving_on_its_own_base(harness: Harness) -> Non
     assert routes(harness)[SLUG]["base_model"] == FULL
     deploy(harness, newest)
     assert routes(harness)[SLUG]["base_model"] == BASE
-    assert page(harness)["next"]["kind"] != "promote"
+    assert page(harness)["next"] is None
 
 
 def test_deploying_a_version_from_another_base_is_refused(harness: Harness) -> None:

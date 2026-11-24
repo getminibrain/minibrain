@@ -265,7 +265,7 @@ def summary(session: Session, model: Model) -> Summary:
     )
 
 
-def untrained(session: Session) -> dict[int, int]:
+def untrained(session: Session, model_ids: list[int] | None = None) -> dict[int, int]:
     newest = (
         select(func.max(Version.created_at))
         .where(Version.model_id == Feedback.model_id)
@@ -279,6 +279,7 @@ def untrained(session: Session) -> dict[int, int]:
             Feedback.label.is_not(None),
             or_(Feedback.split.is_(None), Feedback.split != HELD_OUT),
             or_(newest.is_(None), Feedback.reviewed_at > newest),
+            *([] if model_ids is None else [Feedback.model_id.in_(model_ids)]),
         )
         .group_by(Feedback.model_id)
     )

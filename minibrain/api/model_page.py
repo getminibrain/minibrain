@@ -24,6 +24,9 @@ from minibrain.registry.models import (
     Job,
     Model,
     RequestLog,
+    Version,
+    VersionKind,
+    VersionStatus,
     now,
 )
 from minibrain.registry.models import BaseModel as BaseRow
@@ -113,10 +116,10 @@ def busy(session: Session, model: Model) -> bool:
     return bool(session.scalar(active))
 
 
-def train_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
+def train_next(model: Model, limit: ServeOnly | None, reason: str = "") -> NextAction | None:
     if limit is None:
         upcoming = upcoming_version_number(model)
-        return NextAction(kind="train", label=f"Train v{upcoming}", version=upcoming)
+        return NextAction(kind="train", label=f"Train v{upcoming}{reason}", version=upcoming)
     if limit.target is None:
         return None
     return NextAction(kind="switch_base", label=f"Move to {limit.target.name} to train", base=limit.target.key)
@@ -130,7 +133,30 @@ def undeployed_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
     return NextAction(kind="deploy", label="Deploy")
 
 
-def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | None = None) -> NextAction | None:
+def newest_trained(model: Model) -> Version | None:
+    ready = [item for item in model.versions if item.kind == VersionKind.LORA and item.status == VersionStatus.READY]
+    return max(ready, key=lambda item: item.number, default=None)
+
+
+def new_data(model: Model) -> bool:
+    latest = latest_dataset_version(model)
+    newest = newest_trained(model)
+    if latest is None or newest is None or newest.dataset_version is None:
+        return False
+    return latest.id not in (newest.dataset_version.id, newest.dataset_version.base_id)
+
+
+def training_reason(model: Model, untrained: int) -> str | None:
+    if not trained(model):
+        return ""
+    if untrained > 0:
+        return f" with {untrained:,} new {'answer' if untrained == 1 else 'answers'}"
+    return " on new data" if new_data(model) else None
+
+
+def custom_next(
+    model: Model, pending: int, untrained: int, working: bool, limit: ServeOnly | None = None
+) -> NextAction | None:
     if model.teardown is not None or working:
         return None
     candidate = passing_candidate(model)
@@ -143,7 +169,8 @@ def custom_next(model: Model, pending: int, working: bool, limit: ServeOnly | No
         return NextAction(kind="review_feedback", label=rows_text(pending), count=pending)
     if latest_dataset_version(model) is None:
         return NextAction(kind="add_data", label="Add training data")
-    return train_next(model, limit)
+    reason = training_reason(model, untrained)
+    return train_next(model, limit, reason) if reason is not None else None
 
 
 def base_next(model: BaseRow) -> NextAction | None:
@@ -177,7 +204,13 @@ def model_page_of(session: Session, settings: Settings, name: str) -> ModelPage:
             name=custom.name,
             avatar=avatar_of(custom),
             traffic=traffic(session, name, Identity(custom.slug, None)),
-            next=custom_next(custom, pending, busy(session, custom), limit),
+            next=custom_next(
+                custom,
+                pending,
+                feedback_store.untrained(session, [custom.id]).get(custom.id, 0),
+                busy(session, custom),
+                limit,
+            ),
             status=custom_status(session, custom, pending, limit),
             created_at=custom.created_at,
             created_by=creator(session, custom.slug),

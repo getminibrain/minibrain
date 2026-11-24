@@ -5,6 +5,7 @@ from typing import Any
 from minibrain.registry.models import now
 from minibrain.registry.service import address_taken
 from tests.conftest import Harness, blank_dataset
+from tests.test_feedback import played, review
 from tests.test_flow import SLUG, add_version, create_model, create_with_dataset, deploy, finish
 from tests.test_gateway import servable
 from tests.test_models import FILES
@@ -77,6 +78,24 @@ def test_the_next_step_follows_the_model(harness: Harness) -> None:
         "label": "1 feedback row to review",
         "version": None,
         "count": 1,
+        "base": None,
+    }
+
+
+def test_a_trained_live_model_asks_for_training_only_when_there_is_something_new(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "lora")
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.9)
+    deploy(harness, 1)
+    assert page(harness)["next"] is None
+    correction = played(harness, "charged twice", "down", correction="billing", output="bug")
+    assert review(harness, correction, "accept").status_code == 200
+    assert page(harness)["next"] == {
+        "kind": "train",
+        "label": "Train v2 with 1 new answer",
+        "version": 2,
+        "count": None,
         "base": None,
     }
 
