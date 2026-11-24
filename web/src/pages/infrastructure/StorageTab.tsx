@@ -3,71 +3,12 @@ import { CopyButton } from "~/components/CopyButton";
 import { MiddleTruncate } from "~/components/MiddleTruncate";
 import { PoolLink } from "~/components/PoolLink";
 import { PanelColumns, PanelSection, PanelSections } from "~/components/Section";
-import { type GaugeKind, type GaugeSegment, UsageGauge } from "~/components/UsageGauge";
-import { StatusText } from "~/components/models/StatusText";
+import { UsageGauge } from "~/components/UsageGauge";
 import { bytes, relativeTime } from "~/lib/time";
 import { FreeUpSection } from "./FreeUpSection";
 import { UsageSection } from "./UsageSection";
-import {
-    type InfrastructureInfo,
-    MachineName,
-    type NodeInfo,
-    type PoolInfo,
-    type StoreInfo,
-} from "./parts";
-
-const CATEGORY_KIND: Record<string, GaugeKind> = {
-    Database: "database",
-    "Model files": "weights",
-    "Dataset versions": "datasets",
-    "Uploads, adapters and results": "uploads",
-};
-
-const LOW_FREE_SHARE = 0.1;
-const LOW_FREE_BYTES = 10 * 1024 ** 3;
-
-type Disk = { key: string; free: number; total: number; stores: StoreInfo[] };
-
-function disksOf(stores: StoreInfo[]): Disk[] {
-    const found = new Map<string, Disk>();
-    for (const store of stores) {
-        if (store.free_bytes === null || store.free_bytes === undefined || !store.total_bytes) {
-            continue;
-        }
-        const key = store.disk ?? `${store.total_bytes}`;
-        const disk = found.get(key) ?? {
-            key,
-            free: store.free_bytes,
-            total: store.total_bytes,
-            stores: [],
-        };
-        disk.stores.push(store);
-        found.set(key, disk);
-    }
-    return [...found.values()];
-}
-
-function shareSegments(disk: Disk): GaugeSegment[] {
-    return disk.stores.map((store) => ({
-        key: store.name,
-        kind: CATEGORY_KIND[store.name] ?? "other",
-        label: store.name,
-        legend: store.name,
-        bytes: store.used_bytes ?? 0,
-    }));
-}
-
-function diskSegments(free: number, total: number, ours: number): GaugeSegment[] {
-    return [
-        { key: "minibrain", kind: "minibrain", label: "minibrain", bytes: ours },
-        {
-            key: "other",
-            kind: "other",
-            label: "Other files on the disk",
-            bytes: Math.max(0, total - free - ours),
-        },
-    ];
-}
+import { type Disk, diskSegments, disksOf, lowSpace, shareSegments } from "./disks";
+import { type InfrastructureInfo, MachineName, type NodeInfo, type PoolInfo } from "./parts";
 
 function commonFolder(paths: string[]): string {
     const split = paths.map((path) => path.split("/"));
@@ -80,30 +21,6 @@ function commonFolder(paths: string[]): string {
         shared.push(part);
     }
     return shared.join("/") || "/";
-}
-
-function lowSpace(free: number, total: number): boolean {
-    return total > 0 && (free < LOW_FREE_BYTES || free / total < LOW_FREE_SHARE);
-}
-
-function usedText(free: number, total: number): string {
-    return `${total > 0 ? Math.round(((total - free) / total) * 100) : 0}% used`;
-}
-
-function freeText(free: number, total: number): string {
-    return `${bytes(free)} free of ${bytes(total)}`;
-}
-
-function DiskSpace({ free, total, text }: { free: number; total: number; text: string }) {
-    return (
-        <span className="shrink-0 text-sm tabular-nums">
-            {lowSpace(free, total) ? (
-                <StatusText tone="warning">{text}</StatusText>
-            ) : (
-                <span className="text-muted-foreground">{text}</span>
-            )}
-        </span>
-    );
 }
 
 function PathLine({ path, label, tail = 20 }: { path: string; label: string; tail?: number }) {
@@ -122,17 +39,9 @@ function MainDisk({ disk }: { disk: Disk }) {
     const ours = share.reduce((sum, segment) => sum + segment.bytes, 0);
     return (
         <div className="flex min-w-0 flex-col gap-2 px-4 py-3">
-            <div className="flex min-w-0 items-baseline justify-between gap-4">
-                <span className="min-w-0 truncate font-mono font-medium">{mount}</span>
-                <DiskSpace
-                    free={disk.free}
-                    total={disk.total}
-                    text={`${usedText(disk.free, disk.total)} · ${freeText(disk.free, disk.total)}`}
-                />
-            </div>
+            <span className="min-w-0 truncate font-mono font-medium">{mount}</span>
             <PathLine path={where} label={`Copy the path of minibrain's files on ${mount}`} />
             <UsageGauge
-                size="sm"
                 segments={diskSegments(disk.free, disk.total, ours)}
                 capacity={disk.total}
                 low={lowSpace(disk.free, disk.total)}
@@ -144,7 +53,6 @@ function MainDisk({ disk }: { disk: Disk }) {
                         {`minibrain's share · ${bytes(ours)}`}
                     </p>
                     <UsageGauge
-                        size="sm"
                         segments={share}
                         capacity={ours}
                         free={false}
@@ -235,15 +143,8 @@ function MachineDiskRow({ disk }: { disk: MachineDisk }) {
                         </span>
                     )}
                 </span>
-                <DiskSpace
-                    free={disk.free}
-                    total={disk.total}
-                    text={usedText(disk.free, disk.total)}
-                />
             </div>
             <UsageGauge
-                size="sm"
-                legend={false}
                 segments={diskSegments(disk.free, disk.total, disk.ours)}
                 capacity={disk.total}
                 low={lowSpace(disk.free, disk.total)}
@@ -255,9 +156,7 @@ function MachineDiskRow({ disk }: { disk: MachineDisk }) {
                     tail={12}
                     label={`Copy the disk path of ${disk.node.host}`}
                 />
-                <span className="shrink-0 tabular-nums">
-                    {`${freeText(disk.free, disk.total)} · ${cacheText(disk.cache)}`}
-                </span>
+                <span className="shrink-0 tabular-nums">{cacheText(disk.cache)}</span>
             </div>
         </div>
     );

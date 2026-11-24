@@ -182,7 +182,7 @@ Principles: any size, own hardware or cloud, private, gated on scores
   UI: Models › model › Overview · API: GET /api/models/{name}/overview, GET /api/models/{name}/traffic, GET /api/models/{name}/versions, GET /api/problems
 - **Model activity** · shipped · product, ml, admin
   Who changed or trained this model, by day, with bursts folded.
-  UI: Models › model › Activity · API: GET /api/models/{name}/activity
+  UI: Models › model › Activity, Models › model › Overview › Activity · API: GET /api/models/{name}/activity
 - **Model monitoring** · shipped · engineer, admin
   Four traffic charts, recent requests, latency, errors, versions and callers.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
@@ -538,8 +538,8 @@ Principles: any size, own hardware or cloud, private, gated on scores
   See each machine's memory use, current work and the setup.
   UI: Infrastructure › Machines, Infrastructure › Setup · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
 - **Health** · shipped · admin
-  What is wrong now, worst first, each with its fix.
-  UI: Home › Health, Models › model › Overview › Health · API: GET /api/problems
+  Each area's check and what it found; problems replace it, worst first.
+  UI: Home › Health, Models › model › Overview › Health · API: GET /api/problems, GET /api/problems/checks
 - **Machine list** · shipped · admin
   Status, per-GPU memory and running work per machine; sort, filter, resize.
   UI: Infrastructure › Machines · API: GET /api/compute/pools

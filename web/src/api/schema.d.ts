@@ -1863,6 +1863,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/problems/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run the health checks
+         * @description One line per area with what its check found, and the problems it found.
+         */
+        get: operations["health_checks_api_problems_checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/compute/join-tokens": {
         parameters: {
             query?: never;
@@ -3583,6 +3603,26 @@ export interface components {
             /** Reason */
             reason: string | null;
         };
+        /** AreaCheck */
+        AreaCheck: {
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "serving" | "machines" | "memory" | "storage" | "training" | "audit";
+            /** Label */
+            label: string;
+            /**
+             * Text
+             * @description What the check found on main, worded for when nothing is wrong.
+             */
+            text: string;
+            /**
+             * Others
+             * @description The fullest of the other machines, when there are any.
+             */
+            others?: string | null;
+        };
         /** AssignRequest */
         AssignRequest: {
             /** Mine */
@@ -4802,6 +4842,21 @@ export interface components {
              * @description Examples, one list of cells per row.
              */
             table?: string[][];
+        };
+        /** Checks */
+        Checks: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /**
+             * Areas
+             * @description One line per area Health checks, in a fixed order.
+             */
+            areas: components["schemas"]["AreaCheck"][];
+            /** Problems */
+            problems: components["schemas"]["Problem"][];
         };
         /** Cleanup */
         Cleanup: {
@@ -15361,6 +15416,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    health_checks_api_problems_checks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Checks"];
                 };
             };
         };

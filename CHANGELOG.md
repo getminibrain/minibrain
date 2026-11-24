@@ -12,6 +12,13 @@ What changed in each minibrain release, newest first. To move to a new version, 
 - The sidebar shows the installed version above the user menu, and both link to this changelog from **What's new**.
 - The logo is one drawing in the sidebar and on the sign-in pages, the same as on getminibrain.com.
 - Dark mode is a little lighter, with borders you can see.
+- Health on Home shows every check, not only problems: serving, machines, memory and disk of this machine (with the
+  fullest other one), training and the audit log. Memory splits model weights from everything else.
+- A model asks you to train again only when there is a reason, and says which: new answers from feedback or new data.
+- A model's overview shows its latest activity above its versions.
+- Every usage bar looks the same, the one Train uses, including on Infrastructure › Storage.
+- The user menu groups Settings and Theme, then the API reference, docs and What's new, then Sign out.
+- In the Playground, Enter sends and Shift+Enter starts a new line.
 
 ## 0.1.2 - 2026-11-20
 

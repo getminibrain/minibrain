@@ -18,7 +18,7 @@ from minibrain.auth.roles import Role, allows
 from minibrain.ml.planner import gigabytes
 from minibrain.models.handover import serving_pool
 from minibrain.models.hardware import GIB, NodeReport
-from minibrain.models.machine_metrics import DiskSample, MetricsHistory
+from minibrain.models.machine_metrics import DiskSample, MetricsHistory, measured_memory
 from minibrain.policy import load as load_policy
 from minibrain.registry.audit_chain import head_of
 from minibrain.registry.compute import DRAINING, Pool, PoolNode, live_engines, pools, replica_host
@@ -52,6 +52,7 @@ Kind = Literal[
     "machine_offline",
 ]
 View = Literal["infrastructure", "model"]
+Area = Literal["serving", "machines", "memory", "storage", "training", "audit"]
 
 SEVERITY_ORDER: dict[Severity, int] = {"critical": 0, "warning": 1, "info": 2}
 KIND_ORDER: dict[Kind, int] = {
@@ -74,6 +75,7 @@ LOW_FREE_BYTES = 10 * GIB
 STALE_AFTER = timedelta(hours=24)
 FAILED_WITHIN = timedelta(hours=24)
 FAILED = "failed"
+READY = "ready"
 AUDIT_HREF = "/settings/audit"
 SIEM_HREF = "/settings/security#audit-integrity"
 SIEM_LAG = timedelta(minutes=15)
@@ -99,6 +101,19 @@ class Problem(BaseModel):
     machine: str | None = Field(default=None, description="The machine involved, as pool/host.")
     models: list[str] = Field(default=[], description="Keys of the models it affects.")
     actions: list[ProblemAction] = []
+
+
+class AreaCheck(BaseModel):
+    area: Area
+    label: str
+    text: str = Field(description="What the check found on main, worded for when nothing is wrong.")
+    others: str | None = Field(default=None, description="The fullest of the other machines, when there are any.")
+
+
+class Checks(BaseModel):
+    checked_at: datetime
+    areas: list[AreaCheck] = Field(description="One line per area Health checks, in a fixed order.")
+    problems: list[Problem]
 
 
 def machine_href(machine: str) -> str:
@@ -417,6 +432,139 @@ def collect(
     return sorted(problems, key=order_key)
 
 
+def counted(count: int, one: str, many: str) -> str:
+    return f"{count:,} {one if count == 1 else many}"
+
+
+def serving_text(session: Session) -> str:
+    live = deployed(session)
+    if not live:
+        return "No live models"
+    served = {(pool, base) for _, _, base, pool in live}
+    states = [
+        replica.state
+        for replica in live_engines(session)
+        if replica.state != FAILED and (replica.pool, replica.base_model) in served
+    ]
+    running = states.count(READY)
+    starting = len(states) - running
+    models = counted(len(live), "live model", "live models")
+    replicas = counted(len(states), "replica", "replicas")
+    if running and starting:
+        return f"{models}, {replicas}: {running:,} running, {starting:,} starting"
+    return f"{models}, {replicas} {'starting' if starting else 'running'}"
+
+
+def machines_text(found: list[Pool], main: dict[str, str]) -> str:
+    online = sum(1 for pool in found for item in pool.nodes if item.online or is_main(item))
+    release_part = f", minibrain {release(main['minibrain'])}" if main.get("minibrain") else ""
+    return f"{counted(online, 'machine', 'machines')} online{release_part}"
+
+
+Usage = tuple[str, int, int]
+
+
+def share_used(usage: Usage) -> float:
+    return (usage[2] - usage[1]) / usage[2]
+
+
+def fullest_other(found: list[Usage]) -> str | None:
+    if not found:
+        return None
+    host, _, _ = fullest = max(found, key=share_used)
+    others = counted(len(found), "other machine", "other machines")
+    return f"{others}, fullest {host} at {round(100 * share_used(fullest))}%"
+
+
+def usage_text(usage: Usage, used_word: str) -> str:
+    _, free, _ = usage
+    return f"{round(100 * share_used(usage))}% {used_word}, {gigabytes(free)} free"
+
+
+def memory_of(item: PoolNode, metrics: MetricsHistory) -> Usage | None:
+    point = metrics.latest(item.id)
+    if point is None:
+        return None
+    sample = point.sample
+    ram = (sample.ram_used_bytes, sample.ram_total_bytes)
+    memory = measured_memory(sample, item.report.accelerator) or ram
+    used, total = memory
+    if used is None or not total:
+        return None
+    return item.host, max(0, total - used), total
+
+
+def memory_check(found: list[Pool], metrics: MetricsHistory) -> AreaCheck:
+    main = next((memory_of(item, metrics) for pool in found for item in pool.nodes if is_main(item)), None)
+    others = [usage for _, item in remote_nodes(found) if (usage := memory_of(item, metrics)) is not None]
+    text = f"This machine {usage_text(main, 'in use')}" if main is not None else "Not measured on this machine yet"
+    return AreaCheck(area="memory", label="Memory", text=text, others=fullest_other(others))
+
+
+def main_disks(stores: list[StoreInfo]) -> list[Usage]:
+    disks: dict[str, Usage] = {}
+    for store in stores:
+        if store.free_bytes is not None and store.total_bytes:
+            disks.setdefault(store.disk or store.name, ("main", store.free_bytes, store.total_bytes))
+    return list(disks.values())
+
+
+def other_disks(found: list[Pool], metrics: MetricsHistory) -> list[Usage]:
+    fullest: dict[str, Usage] = {}
+    for _, item in remote_nodes(found):
+        for disk in machine_disks(metrics, item):
+            if disk.free_bytes is None or not disk.total_bytes:
+                continue
+            usage = (item.host, disk.free_bytes, disk.total_bytes)
+            if item.id not in fullest or share_used(usage) > share_used(fullest[item.id]):
+                fullest[item.id] = usage
+    return list(fullest.values())
+
+
+def storage_check(stores: list[StoreInfo], found: list[Pool], metrics: MetricsHistory) -> AreaCheck:
+    disks = main_disks(stores)
+    text = (
+        f"This machine's disk {usage_text(max(disks, key=share_used), 'used')}"
+        if disks
+        else "No local disk to measure on this machine"
+    )
+    return AreaCheck(area="storage", label="Storage", text=text, others=fullest_other(other_disks(found, metrics)))
+
+
+def training_text(session: Session, moment: datetime) -> str:
+    train = Job.kind == JobKind.TRAIN
+    running = session.scalar(select(func.count()).select_from(Job).where(train, Job.status == JobStatus.RUNNING)) or 0
+    recent = Job.finished_at >= moment - FAILED_WITHIN
+    finished = (
+        session.scalar(select(func.count()).select_from(Job).where(train, Job.status == JobStatus.SUCCEEDED, recent))
+        or 0
+    )
+    parts = ([f"{running:,} running"] if running else []) + ([f"{finished:,} finished in 24 h"] if finished else [])
+    return ", ".join(parts) if parts else "No runs in the last 24 h"
+
+
+def audit_text(session: Session) -> str:
+    siem = target_of(load_policy(session))
+    return "Chain intact, SIEM up to date" if siem is not None else "Chain intact"
+
+
+def area_checks(
+    session: Session, local: NodeReport, metrics: MetricsHistory, stores: list[StoreInfo], admin: bool
+) -> list[AreaCheck]:
+    moment = now()
+    found = pools(session, local)
+    areas = [
+        AreaCheck(area="serving", label="Serving", text=serving_text(session)),
+        AreaCheck(area="machines", label="Machines", text=machines_text(found, local.versions)),
+        memory_check(found, metrics),
+        storage_check(stores, found, metrics),
+        AreaCheck(area="training", label="Training", text=training_text(session, moment)),
+    ]
+    if admin:
+        areas.append(AreaCheck(area="audit", label="Audit log", text=audit_text(session)))
+    return areas
+
+
 def narrowed(problems: list[Problem], view: View | None, model: str | None) -> list[Problem]:
     scopes = VIEWS[view] if view is not None else None
     return [
@@ -439,3 +587,21 @@ def list_problems(
     stores = main_stores(session, settings, store)
     admin = allows(current_role(), Role.ADMIN)
     return narrowed(collect(session, node, metrics, stores, admin), scope, model)
+
+
+@router.get(
+    "/problems/checks",
+    dependencies=[Depends(viewer)],
+    summary="Run the health checks",
+    description="One line per area with what its check found, and the problems it found.",
+)
+def health_checks(
+    session: SessionDep, settings: SettingsDep, store: StoreDep, node: LocalNodeDep, metrics: MetricsDep
+) -> Checks:
+    stores = main_stores(session, settings, store)
+    admin = allows(current_role(), Role.ADMIN)
+    return Checks(
+        checked_at=now(),
+        areas=area_checks(session, node, metrics, stores, admin),
+        problems=collect(session, node, metrics, stores, admin),
+    )

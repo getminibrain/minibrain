@@ -258,6 +258,21 @@ the last 7 days) that links to its page. The first step not yet run is marked an
 see the counts without Data). Below it: Models (live first, then the most recently changed; state, score against v0,
 requests over 7 days, p50 and each model's next step) and, side by side, Jobs (running first) and Health.
 
+A model's next step offers training only with a reason (2026-11-24): never trained, a dataset version newer than the
+one its newest trained version used, or accepted feedback no version has trained on. The label says which ("Train v2
+with 3 new answers", "Train v2 on new data"). A live model with none of these has no next step: a finished model
+serves and is not trained again for its own sake.
+
+Health on Home (2026-11-24) always lists its checks, one line per area with what it found: Serving (live models and
+their replicas, running or starting), Machines (online, the release), Memory and Storage (this machine, as the same
+usage bar Train uses: model weights, adapters and training against everything else, and minibrain's files against
+other files; plus the fullest other machine), Training (running and finished in 24 h) and, for admins, Audit log. A
+problem replaces its area's line, worst first, with "+N more" and Show all. `GET /api/problems/checks` returns the
+areas and the problems from one pass. Every usage bar in the app is that one gauge at one size.
+
+A model's Overview (2026-11-24) shows its last five activity entries above Versions, at the same height, with All
+activity opening the Activity tab.
+
 1. **Install** on one server; sign in with the setup link as the admin.
 2. **Add data**: upload a CSV or JSONL, or connect Postgres; it becomes a dataset with held-out rows set aside.
 3. **Add a model**: base (downloads or imports in the background if missing), dataset, name, output (labels, JSON or
@@ -1961,7 +1976,7 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
       with no running replica and failed engines (critical), then low disk on main and on machines, library versions
       that differ from main, training that failed in the last 24 hours and offline machines (warnings; past a day,
       admins get Remove). One Health panel shows it, same-kind problems grouped on one line, four lines
-      then Show all. Done on Infrastructure › Machines; the model page and Home are next
+      then Show all. Done on Infrastructure › Machines, the model page and Home (per-area checks since 2026-11-24)
 - [x] Hash-chained audit log with SIEM export; encryption at rest: hash chain sealed by the leader, prune anchors,
       verify in the UI, API and `minibrain audit verify`, RFC 5424 syslog over TLS, TCP or UDP; every stored file
       under its own AES-256-GCM data key wrapped by a local key file, Vault Transit, a PKCS#11 HSM or AWS KMS, with

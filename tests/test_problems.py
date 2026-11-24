@@ -7,6 +7,8 @@ import pytest
 from minibrain.api import system
 from minibrain.auth.roles import Role
 from minibrain.models.hardware import GIB
+from minibrain.models.machine_metrics import MachineSample
+from minibrain.registry.compute import main_node_id
 from minibrain.registry.models import Job, JobKind, JobStatus, JoinRequest, Model, Node, now
 from minibrain.storage import Space
 from tests.conftest import Harness
@@ -221,3 +223,52 @@ def test_machines_say_how_they_joined(harness: Harness) -> None:
         )
         session.commit()
     assert by_name(harness)["rack"]["nodes"][0]["joined"] == "approval"
+
+
+def checks(client: Any) -> dict[str, Any]:
+    response = client.get(f"{PROBLEMS}/checks")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_health_says_what_each_check_found_even_when_nothing_is_wrong(harness: Harness) -> None:
+    found = checks(harness.client)
+    lines = {area["area"]: area["text"] for area in found["areas"]}
+    areas = ["serving", "machines", "memory", "storage", "training", "audit"]
+    assert [area["area"] for area in found["areas"]] == areas
+    assert lines["serving"] == "No live models"
+    assert lines["machines"].startswith("1 machine online, minibrain ")
+    assert lines["memory"] == "Not measured on this machine yet"
+    assert lines["storage"] == "This machine's disk 50% used, 500 GB free"
+    assert all(area["others"] is None for area in found["areas"])
+    assert lines["training"] == "No runs in the last 24 h"
+    assert lines["audit"] == "Chain intact"
+    assert found["problems"] == [] and found["checked_at"]
+    join(harness)
+    deploy(harness)
+    announce(harness, state="loading")
+    again = {area["area"]: area["text"] for area in checks(harness.client)["areas"]}
+    assert again["serving"] == "1 live model, 1 replica starting"
+    assert again["machines"].startswith("2 machines online, ")
+    announce(harness, state="ready")
+    assert checks(harness.client)["areas"][0]["text"] == "1 live model, 1 replica running"
+
+
+def test_viewers_see_every_check_but_the_audit_log(harness: Harness) -> None:
+    found = checks(harness.person(Role.VIEWER))
+    assert [area["area"] for area in found["areas"]] == ["serving", "machines", "memory", "storage", "training"]
+    assert harness.person(None).get(f"{PROBLEMS}/checks").status_code == 403
+
+
+def test_memory_and_disks_name_this_machine_then_the_fullest_other(harness: Harness) -> None:
+    main = harness.app.state.machine_metrics
+    main.record(main_node_id(), MachineSample(ram_used_bytes=24 * GIB, ram_total_bytes=32 * GIB))
+    gpu = {"index": 0, "memory_used_bytes": 72 * GIB, "memory_total_bytes": 80 * GIB}
+    body = {"id": "w-gpu-01", "host": RACK.host, "kinds": ["train"], "pool": "rack", "hardware": RACK.as_dict()}
+    assert harness.internal("/register", body | {"metrics": {"gpus": [gpu]}}).status_code == 204
+    report_disk(harness, 100 * GIB)
+    found = {area["area"]: area for area in checks(harness.client)["areas"]}
+    assert found["memory"]["text"] == "This machine 75% in use, 8.0 GB free"
+    assert found["memory"]["others"] == "1 other machine, fullest gpu-01 at 90%"
+    assert found["storage"]["others"] == "1 other machine, fullest gpu-01 at 90%"
+    assert found["storage"]["text"] == "This machine's disk 50% used, 500 GB free"

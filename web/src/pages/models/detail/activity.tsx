@@ -1,4 +1,4 @@
-import { IconHistory } from "@tabler/icons-react";
+import { IconHistory, IconTimelineEvent } from "@tabler/icons-react";
 import {
     Link,
     StatusDot,
@@ -411,5 +411,47 @@ export function ActivityTab({ row }: { row: ModelRow }) {
                 </div>
             </PanelSection>
         </PanelSections>
+    );
+}
+
+const RECENT = 5;
+
+function RecentBody({ row }: { row: ModelRow }) {
+    const activity = useModelActivity(row.key, 40);
+    const shown = entries(activity.data?.events ?? []).slice(0, RECENT);
+    if (activity.isLoading) {
+        return <p className="text-muted-foreground">Loading…</p>;
+    }
+    if (shown.length === 0) {
+        return activity.error ? (
+            <SectionError error={activity.error} retry={activity.refetch} />
+        ) : (
+            <p className="text-muted-foreground">
+                Nothing yet. Training, deploys and keys show here.
+            </p>
+        );
+    }
+    return <Timeline row={row} shown={shown} />;
+}
+
+export function ActivityPanel({ row }: { row: ModelRow }) {
+    return (
+        <PanelSection
+            flush
+            icon={IconTimelineEvent}
+            title="Activity"
+            actions={
+                <Link
+                    href={modelPageHref(row.key, "activity")}
+                    className="text-sm text-primary hover:underline"
+                >
+                    All activity
+                </Link>
+            }
+        >
+            <div className="h-51 overflow-y-auto px-4 py-3">
+                <RecentBody row={row} />
+            </div>
+        </PanelSection>
     );
 }

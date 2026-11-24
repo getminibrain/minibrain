@@ -170,10 +170,8 @@ export function UsageGauge({
     legend = true,
     free = true,
     basis,
-    size = "md",
     className,
 }: {
-    size?: "md" | "sm";
     label: string;
     capacity: number;
     segments: GaugeSegment[];
@@ -192,7 +190,7 @@ export function UsageGauge({
     return (
         <div className={cn("flex min-w-0 flex-col gap-2", className)}>
             <div className="flex flex-col gap-1">
-                {size === "md" && free && (
+                {free && (
                     <span
                         aria-hidden
                         className={cn(
@@ -210,10 +208,7 @@ export function UsageGauge({
                     aria-valuemax={Math.max(capacity, 1)}
                     aria-valuenow={Math.min(total, capacity)}
                     aria-valuetext={gaugeSummary(segments, capacity)}
-                    className={cn(
-                        "relative w-full rounded-sm bg-secondary",
-                        size === "md" ? "h-5" : "h-2",
-                    )}
+                    className="relative h-5 w-full rounded-sm bg-secondary"
                 >
                     <div className="flex h-full w-full overflow-hidden rounded-sm">
                         {shown.map((segment) => (

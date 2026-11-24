@@ -31,8 +31,8 @@ export function HomePage() {
                 <JourneyStrip data={data} />
                 <ModelsPanel data={data} />
                 <PanelColumns>
+                    <HealthPanel />
                     <JobsPanel data={data} />
-                    <HealthPanel description="Problems across models, machines and training runs." />
                 </PanelColumns>
             </PanelSections>
         </Page>

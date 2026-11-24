@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "minibrain",
-    "version": "0.1.1"
+    "version": "0.1.2"
   },
   "paths": {
     "/api/auth/session": {
@@ -5699,6 +5699,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/problems/checks": {
+      "get": {
+        "tags": [
+          "Infrastructure"
+        ],
+        "summary": "Run the health checks",
+        "description": "One line per area with what its check found, and the problems it found.",
+        "operationId": "health_checks_api_problems_checks_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checks"
                 }
               }
             }
@@ -12264,6 +12286,50 @@
         ],
         "title": "AnswerSide"
       },
+      "AreaCheck": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "enum": [
+              "serving",
+              "machines",
+              "memory",
+              "storage",
+              "training",
+              "audit"
+            ],
+            "title": "Area"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "What the check found on main, worded for when nothing is wrong."
+          },
+          "others": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Others",
+            "description": "The fullest of the other machines, when there are any."
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "label",
+          "text"
+        ],
+        "title": "AreaCheck"
+      },
       "AssignRequest": {
         "properties": {
           "mine": {
@@ -16283,6 +16349,37 @@
           "dismissed"
         ],
         "title": "CheckInfo"
+      },
+      "Checks": {
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaCheck"
+            },
+            "type": "array",
+            "title": "Areas",
+            "description": "One line per area Health checks, in a fixed order."
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_at",
+          "areas",
+          "problems"
+        ],
+        "title": "Checks"
       },
       "Cleanup": {
         "properties": {

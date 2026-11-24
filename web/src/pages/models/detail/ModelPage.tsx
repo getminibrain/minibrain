@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
-import { HealthPanel } from "~/components/HealthPanel";
+import { ModelHealth } from "~/components/HealthPanel";
 import { PageCrumbs } from "~/components/PageCrumbs";
 import { Page, PanelSections } from "~/components/Section";
 import { ModelNotFound } from "~/components/models/ModelNotFound";
@@ -19,7 +19,7 @@ import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
 import type { Entry } from "../entries";
 import { useHealthActions } from "../healthActions";
 import { About, BaseAbout, BaseDetails, Details } from "./about";
-import { ActivityTab } from "./activity";
+import { ActivityPanel, ActivityTab } from "./activity";
 import { CompareView } from "./compare";
 import { ModelActions } from "./deploy";
 import { EvaluationTab } from "./evaluation/EvaluationTab";
@@ -179,7 +179,7 @@ function Overview({
         <OverviewLayout
             main={
                 <>
-                    {row.kind === "base" && <HealthPanel scope="model" model={row.key} compact />}
+                    {row.kind === "base" && <ModelHealth model={row.key} />}
                     <UsagePanel row={row} />
                     {row.kind === "base" ? (
                         <>
@@ -197,7 +197,8 @@ function Overview({
             side={
                 row.kind === "custom" ? (
                     <>
-                        <HealthPanel scope="model" model={row.key} compact />
+                        <ModelHealth model={row.key} />
+                        <ActivityPanel row={row} />
                         <VersionsPanel row={row} versions={versions} />
                     </>
                 ) : undefined

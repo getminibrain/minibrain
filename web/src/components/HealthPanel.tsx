@@ -3,17 +3,23 @@ import { Button, Link, StatusDot, useToast } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { useMachineAction } from "~/api/machineQueries";
 import {
+    type Area,
+    type AreaCheck,
     type Problem,
-    type ProblemFilter,
     type ProblemKind,
     type ProblemSeverity,
+    useHealthChecks,
     useProblems,
 } from "~/api/problemQueries";
+import { useInfrastructure, usePools } from "~/api/queries";
 import { PoolLink } from "~/components/PoolLink";
 import { RemoveMachineDialog } from "~/components/RemoveMachine";
 import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
 import { When } from "~/components/When";
 import { count } from "~/lib/format";
+import type { InfrastructureInfo, PoolInfo } from "~/pages/infrastructure/parts";
+import { UsageGauge } from "./UsageGauge";
+import { type HealthGauge, diskGauge, memoryGauge } from "./healthGauges";
 
 const COLLAPSED_LINES = 4;
 const LINE = "flex h-10 min-w-0 items-center gap-3 px-4";
@@ -54,6 +60,17 @@ const GROUPS: Record<ProblemKind, { many: (n: number) => string; href: string }>
         many: (n) => `${count(n)} machines offline`,
         href: "/infrastructure/machines?status=offline",
     },
+};
+
+const AREA_OF: Record<ProblemKind, Area> = {
+    audit_chain_broken: "audit",
+    siem_behind: "audit",
+    model_down: "serving",
+    engine_failed: "serving",
+    disk_low: "storage",
+    version_mismatch: "machines",
+    training_failed: "training",
+    machine_offline: "machines",
 };
 
 type Line = { key: string; problems: Problem[] };
@@ -113,21 +130,30 @@ function Meta({ children }: { children: ReactNode }) {
     );
 }
 
-function ProblemLine({ line }: { line: Line }) {
+function Severity({ severity }: { severity: ProblemSeverity }) {
+    return (
+        <>
+            <StatusDot tone={TONES[severity]} className="shrink-0" />
+            <span className="sr-only">{`${SEVERITY_WORDS[severity]}: `}</span>
+        </>
+    );
+}
+
+function ProblemParts({ line, more = 0 }: { line: Line; more?: number }) {
     const [first] = line.problems;
     const many = line.problems.length > 1;
-    const severity = worst(line.problems);
     const group = GROUPS[first.kind];
     const text = many
         ? `${group.many(line.problems.length)}: ${line.problems.map((problem) => problem.subject).join(", ")}`
         : first.text;
     return (
-        <li className={LINE}>
-            <StatusDot tone={TONES[severity]} className="shrink-0" />
-            <span className="sr-only">{`${SEVERITY_WORDS[severity]}: `}</span>
+        <>
             <span className="min-w-0 flex-1 truncate" title={text}>
                 {text}
             </span>
+            {more > 0 && (
+                <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{`+${count(more)} more`}</span>
+            )}
             {!many && first.pool && (
                 <Meta>
                     <PoolLink name={first.pool} />
@@ -152,8 +178,79 @@ function ProblemLine({ line }: { line: Line }) {
             >
                 Open
             </Link>
+        </>
+    );
+}
+
+function ProblemLine({ line }: { line: Line }) {
+    return (
+        <li className={LINE}>
+            <Severity severity={worst(line.problems)} />
+            <ProblemParts line={line} />
         </li>
     );
+}
+
+function AreaFacts({ check, gauge }: { check: AreaCheck; gauge: HealthGauge | null }) {
+    return (
+        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+            {gauge ? (
+                <UsageGauge
+                    label={gauge.label}
+                    capacity={gauge.capacity}
+                    segments={gauge.segments}
+                    low={gauge.low}
+                />
+            ) : (
+                <span className="truncate" title={check.text}>
+                    {check.text}
+                </span>
+            )}
+            {check.others && (
+                <span className="truncate text-sm text-muted-foreground">{check.others}</span>
+            )}
+        </span>
+    );
+}
+
+function AreaLine({
+    check,
+    problems,
+    gauge,
+}: {
+    check: AreaCheck;
+    problems: Problem[];
+    gauge: HealthGauge | null;
+}) {
+    const [first] = grouped(problems);
+    if (first) {
+        return (
+            <li className={LINE}>
+                <Severity severity={worst(first.problems)} />
+                <span className="w-20 shrink-0 text-muted-foreground">{check.label}</span>
+                <ProblemParts line={first} more={problems.length - first.problems.length} />
+            </li>
+        );
+    }
+    const tall = gauge !== null || check.others;
+    return (
+        <li className={tall ? "flex min-w-0 items-start gap-3 px-4 py-2.5" : LINE}>
+            <span className={tall ? "flex h-5 shrink-0 items-center" : "contents"}>
+                <StatusDot tone="success" className="shrink-0" />
+            </span>
+            <span className="w-20 shrink-0 text-muted-foreground">{check.label}</span>
+            <AreaFacts check={check} gauge={gauge} />
+        </li>
+    );
+}
+
+type Sources = { pools: PoolInfo[] | undefined; info: InfrastructureInfo | undefined };
+
+function gaugeOf(area: Area, { pools, info }: Sources): HealthGauge | null {
+    if (area === "memory") {
+        return pools ? memoryGauge(pools) : null;
+    }
+    return area === "storage" && info ? diskGauge(info) : null;
 }
 
 function Lines({
@@ -177,14 +274,6 @@ function Lines({
     if (!problems) {
         return <p className={`${LINE} text-muted-foreground`}>{loading ? "Checking…" : ""}</p>;
     }
-    if (problems.length === 0) {
-        return (
-            <p className={LINE}>
-                <StatusDot tone="success" className="shrink-0" />
-                All healthy
-            </p>
-        );
-    }
     const lines = expanded ? single(problems) : grouped(problems).slice(0, COLLAPSED_LINES);
     return (
         <ul className="@container flex flex-col divide-y">
@@ -192,6 +281,28 @@ function Lines({
                 <ProblemLine key={line.key} line={line} />
             ))}
         </ul>
+    );
+}
+
+function ShowAll({
+    total,
+    more,
+    expanded,
+    onToggle,
+}: {
+    total: number;
+    more: boolean;
+    expanded: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <span className="flex h-8 items-center">
+            {more && (
+                <Button variant="ghost" onClick={onToggle}>
+                    {expanded ? "Show less" : `Show all (${count(total)})`}
+                </Button>
+            )}
+        </span>
     );
 }
 
@@ -210,37 +321,92 @@ function HealthyLine({ loading }: { loading: boolean }) {
     );
 }
 
-export function HealthPanel({
-    scope,
-    model,
-    title = "Health",
-    description,
-    compact = false,
-}: ProblemFilter & { title?: string; description?: string; compact?: boolean }) {
-    const found = useProblems({ scope, model });
+function inArea(problems: Problem[], area: Area): Problem[] {
+    return problems.filter((problem) => AREA_OF[problem.kind] === area);
+}
+
+function areaLines(areas: AreaCheck[], problems: Problem[]): number {
+    return areas.reduce((shown, check) => {
+        const [first] = grouped(inArea(problems, check.area));
+        return shown + (first?.problems.length ?? 0);
+    }, 0);
+}
+
+export function HealthPanel() {
+    const found = useHealthChecks();
+    const sources = { pools: usePools().data, info: useInfrastructure().data };
     const [expanded, setExpanded] = useState(false);
-    const problems = found.data;
-    if (compact && !found.error && (problems?.length ?? 0) === 0) {
-        return <HealthyLine loading={!problems} />;
-    }
-    const shown = problems ? Math.min(grouped(problems).length, COLLAPSED_LINES) : 0;
-    const more = (problems?.length ?? 0) > shown;
-    const toggle = (
-        <span className="flex h-8 items-center">
-            {more && (
-                <Button variant="ghost" onClick={() => setExpanded((open) => !open)}>
-                    {expanded ? "Show less" : `Show all (${count(problems?.length ?? 0)})`}
-                </Button>
-            )}
-        </span>
-    );
+    const areas = found.data?.areas ?? [];
+    const problems = found.data?.problems ?? [];
+    const more = problems.length > areaLines(areas, problems);
+    const open = expanded && more;
     return (
         <PanelSection
             flush
             icon={IconHeartbeat}
-            title={title}
-            description={description}
-            actions={toggle}
+            title="Health"
+            description={
+                found.data ? (
+                    <>
+                        {"Checked "}
+                        <When value={found.data.checked_at} />
+                    </>
+                ) : undefined
+            }
+            actions={
+                <ShowAll
+                    total={problems.length}
+                    more={more}
+                    expanded={open}
+                    onToggle={() => setExpanded((value) => !value)}
+                />
+            }
+        >
+            {found.error || !found.data || open ? (
+                <Lines
+                    problems={found.data?.problems}
+                    expanded={open}
+                    loading={found.isLoading}
+                    error={found.error}
+                />
+            ) : (
+                <ul className="@container flex flex-col divide-y">
+                    {areas.map((check) => (
+                        <AreaLine
+                            key={check.area}
+                            check={check}
+                            problems={inArea(problems, check.area)}
+                            gauge={gaugeOf(check.area, sources)}
+                        />
+                    ))}
+                </ul>
+            )}
+        </PanelSection>
+    );
+}
+
+export function ModelHealth({ model }: { model: string }) {
+    const found = useProblems({ scope: "model", model });
+    const [expanded, setExpanded] = useState(false);
+    const problems = found.data;
+    if (!found.error && (problems?.length ?? 0) === 0) {
+        return <HealthyLine loading={!problems} />;
+    }
+    const shown = problems ? Math.min(grouped(problems).length, COLLAPSED_LINES) : 0;
+    const more = (problems?.length ?? 0) > shown;
+    return (
+        <PanelSection
+            flush
+            icon={IconHeartbeat}
+            title="Health"
+            actions={
+                <ShowAll
+                    total={problems?.length ?? 0}
+                    more={more}
+                    expanded={expanded}
+                    onToggle={() => setExpanded((open) => !open)}
+                />
+            }
         >
             <Lines
                 problems={problems}
