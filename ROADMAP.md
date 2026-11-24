@@ -2167,6 +2167,9 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   on a joined machine (`--engine-bind 0.0.0.0`) could skip API keys, safety models and request logs, or unload
   adapters. Every engine endpoint now needs a call token for the engine's pool, derived from the gateway token;
   main, gateways and teardown drains send it, and anything else gets 401 and runs nothing (2026-11-24).
+- [x] Create model made a free-text model when clicked while the Output field was still reading the dataset's answers:
+  the suggested labels were dropped without a word (the core journey test hit it under load). Create now waits for
+  the suggestion (2026-11-24).
 - [x] Train vN ignored a click made while its plan was still loading: nothing started and nothing said why (the core
   journey test hit it). The button is now disabled until the plan is in (2026-11-24).
 - [x] Engines for models that were not live never stopped: every ready version has a pinned route, so main counted its

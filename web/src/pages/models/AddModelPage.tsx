@@ -280,6 +280,8 @@ export function AddModelPage() {
             setOutput(suggestedDraft(chosenSlug, suggestion.data));
         }
     }, [chosenSlug, suggestion.data, output.dataset]);
+    const outputPending =
+        chosenSlug !== null && output.dataset !== chosenSlug && !suggestion.isError;
     const picks = recommend(entries, rows, "general");
     const top = picks.here[0] ?? picks.unchecked[0] ?? picks.more[0];
     const fallback: Picked | null = top?.entry
@@ -428,7 +430,7 @@ export function AddModelPage() {
     const shown = attempted ? blocked : [];
     const shownFor = (field: keyof Problems) => (attempted ? problems[field] : undefined);
     const submit = () => {
-        if (add.isPending) {
+        if (add.isPending || outputPending) {
             return;
         }
         if (!ready || !chosenDataset) {
@@ -636,7 +638,7 @@ export function AddModelPage() {
                         {add.isPending ? "Creating…" : "Create model"}
                     </>
                 }
-                disabled={add.isPending || shown.length > 0}
+                disabled={add.isPending || outputPending || shown.length > 0}
                 status={
                     shown.length > 1
                         ? `Fix the ${shown.length} fields marked in red`

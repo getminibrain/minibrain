@@ -31,6 +31,8 @@ What changed in each minibrain release, newest first. To move to a new version, 
 - Only live models keep a model loaded in memory. A model you only tried in the Playground or scored is unloaded
   after 15 minutes without requests; before, every model with a version stayed loaded until restart.
 - **Train** waits for its estimate before it can be clicked; a click while the estimate loaded used to do nothing.
+- **Create model** waits until the dataset's answers are read, so a quick click no longer makes a free-text model
+  instead of one with the suggested labels.
 
 ## 0.1.2 - 2026-11-20
 
