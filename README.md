@@ -71,7 +71,7 @@ Try it with the demo datasets under **Data › Add › Demo data** ([`demo_data/
 
 ## Call your model
 
-Create a key on the model's **Endpoint** tab, then use any OpenAI client:
+Create a key on the model's **API keys** tab, then use any OpenAI client:
 
 ```python
 from openai import OpenAI
