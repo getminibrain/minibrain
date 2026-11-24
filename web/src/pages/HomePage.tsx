@@ -30,7 +30,7 @@ export function HomePage() {
             <PanelSections>
                 <JourneyStrip data={data} />
                 <ModelsPanel data={data} />
-                <PanelColumns>
+                <PanelColumns stretch>
                     <HealthPanel />
                     <JobsPanel data={data} />
                 </PanelColumns>

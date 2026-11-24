@@ -1,6 +1,7 @@
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 
@@ -239,7 +240,7 @@ def test_health_says_what_each_check_found_even_when_nothing_is_wrong(harness: H
     assert lines["serving"] == "No live models"
     assert lines["machines"].startswith("1 machine online, minibrain ")
     assert lines["memory"] == "Not measured on this machine yet"
-    assert lines["storage"] == "This machine's disk 50% used, 500 GB free"
+    assert lines["storage"] == "50% used · 500 GB free · minibrain 0.0 GB"
     assert all(area["others"] is None for area in found["areas"])
     assert lines["training"] == "No runs in the last 24 h"
     assert lines["audit"] == "Chain intact"
@@ -268,7 +269,15 @@ def test_memory_and_disks_name_this_machine_then_the_fullest_other(harness: Harn
     assert harness.internal("/register", body | {"metrics": {"gpus": [gpu]}}).status_code == 204
     report_disk(harness, 100 * GIB)
     found = {area["area"]: area for area in checks(harness.client)["areas"]}
-    assert found["memory"]["text"] == "This machine 75% in use, 8.0 GB free"
+    assert found["memory"]["text"] == "75% used · no models loaded"
+    assert found["memory"]["tone"] == "success"
+    assert found["memory"]["href"] == f"/infrastructure/machines?machine={quote(main_node_id(), safe='')}"
     assert found["memory"]["others"] == "1 other machine, fullest gpu-01 at 90%"
     assert found["storage"]["others"] == "1 other machine, fullest gpu-01 at 90%"
-    assert found["storage"]["text"] == "This machine's disk 50% used, 500 GB free"
+    assert found["storage"]["text"].startswith("50% used · 500 GB free · minibrain ")
+    full_sample = MachineSample(ram_used_bytes=31 * GIB, ram_total_bytes=32 * GIB)
+    assert main.record(main_node_id(), full_sample, now() + timedelta(minutes=1))
+    full = {area["area"]: area for area in checks(harness.client)["areas"]}["memory"]
+    assert full["tone"] == "destructive" and full["text"].startswith("97% used")
+    viewer = {area["area"]: area for area in checks(harness.person(Role.VIEWER))["areas"]}
+    assert viewer["memory"]["href"] is None and viewer["storage"]["href"] is None

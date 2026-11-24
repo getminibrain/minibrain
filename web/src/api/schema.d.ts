@@ -3622,6 +3622,18 @@ export interface components {
              * @description The fullest of the other machines, when there are any.
              */
             others?: string | null;
+            /**
+             * Tone
+             * @description Warning or destructive when the check is close to a limit.
+             * @default success
+             * @enum {string}
+             */
+            tone?: "success" | "warning" | "destructive";
+            /**
+             * Href
+             * @description Where to look closer, for admins.
+             */
+            href?: string | null;
         };
         /** AssignRequest */
         AssignRequest: {

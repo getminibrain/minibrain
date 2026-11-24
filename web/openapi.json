@@ -12320,6 +12320,29 @@
             ],
             "title": "Others",
             "description": "The fullest of the other machines, when there are any."
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "success",
+              "warning",
+              "destructive"
+            ],
+            "title": "Tone",
+            "description": "Warning or destructive when the check is close to a limit.",
+            "default": "success"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href",
+            "description": "Where to look closer, for admins."
           }
         },
         "type": "object",

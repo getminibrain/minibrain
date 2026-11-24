@@ -1,5 +1,5 @@
 import { IconHeartbeat } from "@tabler/icons-react";
-import { Button, Link, StatusDot, useToast } from "obp-ui";
+import { Button, Link, StatusDot, cn, useToast } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { useMachineAction } from "~/api/machineQueries";
 import {
@@ -11,17 +11,21 @@ import {
     useHealthChecks,
     useProblems,
 } from "~/api/problemQueries";
-import { useInfrastructure, usePools } from "~/api/queries";
 import { PoolLink } from "~/components/PoolLink";
 import { RemoveMachineDialog } from "~/components/RemoveMachine";
 import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
 import { When } from "~/components/When";
 import { count } from "~/lib/format";
-import type { InfrastructureInfo, PoolInfo } from "~/pages/infrastructure/parts";
-import { UsageGauge } from "./UsageGauge";
-import { type HealthGauge, diskGauge, memoryGauge } from "./healthGauges";
 
 const COLLAPSED_LINES = 4;
+
+type Tone = NonNullable<AreaCheck["tone"]>;
+
+const TONE_TEXT: Record<Tone, string> = {
+    success: "",
+    warning: "text-warning",
+    destructive: "text-destructive",
+};
 const LINE = "flex h-10 min-w-0 items-center gap-3 px-4";
 
 const TONES: Record<ProblemSeverity, "destructive" | "warning" | "info"> = {
@@ -191,66 +195,37 @@ function ProblemLine({ line }: { line: Line }) {
     );
 }
 
-function AreaFacts({ check, gauge }: { check: AreaCheck; gauge: HealthGauge | null }) {
-    return (
-        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-            {gauge ? (
-                <UsageGauge
-                    label={gauge.label}
-                    capacity={gauge.capacity}
-                    segments={gauge.segments}
-                    low={gauge.low}
-                />
-            ) : (
-                <span className="truncate" title={check.text}>
-                    {check.text}
-                </span>
-            )}
-            {check.others && (
-                <span className="truncate text-sm text-muted-foreground">{check.others}</span>
-            )}
-        </span>
-    );
-}
-
-function AreaLine({
-    check,
-    problems,
-    gauge,
-}: {
-    check: AreaCheck;
-    problems: Problem[];
-    gauge: HealthGauge | null;
-}) {
+function AreaLine({ check, problems }: { check: AreaCheck; problems: Problem[] }) {
     const [first] = grouped(problems);
     if (first) {
         return (
-            <li className={LINE}>
+            <li className={cn(LINE, "h-auto min-h-10 flex-1")}>
                 <Severity severity={worst(first.problems)} />
                 <span className="w-20 shrink-0 text-muted-foreground">{check.label}</span>
                 <ProblemParts line={first} more={problems.length - first.problems.length} />
             </li>
         );
     }
-    const tall = gauge !== null || check.others;
+    const tone: Tone = check.tone ?? "success";
     return (
-        <li className={tall ? "flex min-w-0 items-start gap-3 px-4 py-2.5" : LINE}>
-            <span className={tall ? "flex h-5 shrink-0 items-center" : "contents"}>
-                <StatusDot tone="success" className="shrink-0" />
-            </span>
+        <li className="flex min-h-10 min-w-0 flex-1 items-center gap-3 px-4 py-2.5">
+            <StatusDot tone={tone} className="shrink-0" />
             <span className="w-20 shrink-0 text-muted-foreground">{check.label}</span>
-            <AreaFacts check={check} gauge={gauge} />
+            <span className="flex min-w-0 flex-1 flex-col">
+                <span className={cn("truncate", TONE_TEXT[tone])} title={check.text}>
+                    {check.text}
+                </span>
+                {check.others && (
+                    <span className="truncate text-sm text-muted-foreground">{check.others}</span>
+                )}
+            </span>
+            {check.href && (
+                <Link href={check.href} className="shrink-0 text-primary hover:underline">
+                    Open
+                </Link>
+            )}
         </li>
     );
-}
-
-type Sources = { pools: PoolInfo[] | undefined; info: InfrastructureInfo | undefined };
-
-function gaugeOf(area: Area, { pools, info }: Sources): HealthGauge | null {
-    if (area === "memory") {
-        return pools ? memoryGauge(pools) : null;
-    }
-    return area === "storage" && info ? diskGauge(info) : null;
 }
 
 function Lines({
@@ -334,7 +309,6 @@ function areaLines(areas: AreaCheck[], problems: Problem[]): number {
 
 export function HealthPanel() {
     const found = useHealthChecks();
-    const sources = { pools: usePools().data, info: useInfrastructure().data };
     const [expanded, setExpanded] = useState(false);
     const areas = found.data?.areas ?? [];
     const problems = found.data?.problems ?? [];
@@ -370,13 +344,12 @@ export function HealthPanel() {
                     error={found.error}
                 />
             ) : (
-                <ul className="@container flex flex-col divide-y">
+                <ul className="@container flex flex-1 flex-col divide-y">
                     {areas.map((check) => (
                         <AreaLine
                             key={check.area}
                             check={check}
                             problems={inArea(problems, check.area)}
-                            gauge={gaugeOf(check.area, sources)}
                         />
                     ))}
                 </ul>

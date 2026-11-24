@@ -18,7 +18,9 @@ from minibrain.auth.roles import Role, allows
 from minibrain.ml.planner import gigabytes
 from minibrain.models.handover import serving_pool
 from minibrain.models.hardware import GIB, NodeReport
+from minibrain.models.machine_metrics import UNIFIED as UNIFIED_MEMORY
 from minibrain.models.machine_metrics import DiskSample, MetricsHistory, measured_memory
+from minibrain.models.placement import weights_of
 from minibrain.policy import load as load_policy
 from minibrain.registry.audit_chain import head_of
 from minibrain.registry.compute import DRAINING, Pool, PoolNode, live_engines, pools, replica_host
@@ -53,6 +55,7 @@ Kind = Literal[
 ]
 View = Literal["infrastructure", "model"]
 Area = Literal["serving", "machines", "memory", "storage", "training", "audit"]
+Tone = Literal["success", "warning", "destructive"]
 
 SEVERITY_ORDER: dict[Severity, int] = {"critical": 0, "warning": 1, "info": 2}
 KIND_ORDER: dict[Kind, int] = {
@@ -108,6 +111,8 @@ class AreaCheck(BaseModel):
     label: str
     text: str = Field(description="What the check found on main, worded for when nothing is wrong.")
     others: str | None = Field(default=None, description="The fullest of the other machines, when there are any.")
+    tone: Tone = Field(default="success", description="Warning or destructive when the check is close to a limit.")
+    href: str | None = Field(default=None, description="Where to look closer, for admins.")
 
 
 class Checks(BaseModel):
@@ -476,9 +481,8 @@ def fullest_other(found: list[Usage]) -> str | None:
     return f"{others}, fullest {host} at {round(100 * share_used(fullest))}%"
 
 
-def usage_text(usage: Usage, used_word: str) -> str:
-    _, free, _ = usage
-    return f"{round(100 * share_used(usage))}% {used_word}, {gigabytes(free)} free"
+MEMORY_WARNING = 0.9
+MEMORY_CRITICAL = 0.95
 
 
 def memory_of(item: PoolNode, metrics: MetricsHistory) -> Usage | None:
@@ -487,26 +491,60 @@ def memory_of(item: PoolNode, metrics: MetricsHistory) -> Usage | None:
         return None
     sample = point.sample
     ram = (sample.ram_used_bytes, sample.ram_total_bytes)
-    memory = measured_memory(sample, item.report.accelerator) or ram
-    used, total = memory
+    used, total = measured_memory(sample, item.report.accelerator) or ram
     if used is None or not total:
         return None
     return item.host, max(0, total - used), total
 
 
-def memory_check(found: list[Pool], metrics: MetricsHistory) -> AreaCheck:
-    main = next((memory_of(item, metrics) for pool in found for item in pool.nodes if is_main(item)), None)
-    others = [usage for _, item in remote_nodes(found) if (usage := memory_of(item, metrics)) is not None]
-    text = f"This machine {usage_text(main, 'in use')}" if main is not None else "Not measured on this machine yet"
-    return AreaCheck(area="memory", label="Memory", text=text, others=fullest_other(others))
+def holders_text(session: Session, found: list[Pool], item: PoolNode) -> str:
+    bases = [
+        replica.base_model
+        for pool in found
+        for replica in pool.engines
+        if replica.node_id == item.id and replica.state != FAILED
+    ]
+    if not bases:
+        return "no models loaded"
+    held = gigabytes(sum(weights_of(session, base)[0] for base in bases))
+    if len(bases) > 1:
+        return f"{len(bases)} models hold {held}"
+    base = session.get(BaseRow, bases[0])
+    return f"{base.name if base is not None else bases[0]} holds {held}"
 
 
-def main_disks(stores: list[StoreInfo]) -> list[Usage]:
+def memory_tone(item: PoolNode, usage: Usage) -> Tone:
+    if item.report.accelerator not in UNIFIED_MEMORY:
+        return "success"
+    if share_used(usage) >= MEMORY_CRITICAL:
+        return "destructive"
+    return "warning" if share_used(usage) >= MEMORY_WARNING else "success"
+
+
+def memory_check(session: Session, found: list[Pool], metrics: MetricsHistory, admin: bool) -> AreaCheck:
+    main = next((item for pool in found for item in pool.nodes if is_main(item)), None)
+    usage = memory_of(main, metrics) if main is not None else None
+    others = [found_usage for _, item in remote_nodes(found) if (found_usage := memory_of(item, metrics)) is not None]
+    if main is None or usage is None:
+        return AreaCheck(
+            area="memory", label="Memory", text="Not measured on this machine yet", others=fullest_other(others)
+        )
+    return AreaCheck(
+        area="memory",
+        label="Memory",
+        text=f"{round(100 * share_used(usage))}% used · {holders_text(session, found, main)}",
+        others=fullest_other(others),
+        tone=memory_tone(main, usage),
+        href=machine_href(main.id) if admin else None,
+    )
+
+
+def main_disks(stores: list[StoreInfo]) -> dict[str, Usage]:
     disks: dict[str, Usage] = {}
     for store in stores:
         if store.free_bytes is not None and store.total_bytes:
             disks.setdefault(store.disk or store.name, ("main", store.free_bytes, store.total_bytes))
-    return list(disks.values())
+    return disks
 
 
 def other_disks(found: list[Pool], metrics: MetricsHistory) -> list[Usage]:
@@ -521,14 +559,22 @@ def other_disks(found: list[Pool], metrics: MetricsHistory) -> list[Usage]:
     return list(fullest.values())
 
 
-def storage_check(stores: list[StoreInfo], found: list[Pool], metrics: MetricsHistory) -> AreaCheck:
+def ours_on(stores: list[StoreInfo], disk: str) -> int:
+    return sum(store.used_bytes or 0 for store in stores if (store.disk or store.name) == disk)
+
+
+def storage_check(stores: list[StoreInfo], found: list[Pool], metrics: MetricsHistory, admin: bool) -> AreaCheck:
+    others = fullest_other(other_disks(found, metrics))
     disks = main_disks(stores)
-    text = (
-        f"This machine's disk {usage_text(max(disks, key=share_used), 'used')}"
-        if disks
-        else "No local disk to measure on this machine"
-    )
-    return AreaCheck(area="storage", label="Storage", text=text, others=fullest_other(other_disks(found, metrics)))
+    if not disks:
+        return AreaCheck(
+            area="storage", label="Storage", text="No local disk to measure on this machine", others=others
+        )
+    disk, (_, free, total) = max(disks.items(), key=lambda entry: share_used(entry[1]))
+    used = round(100 * share_used(("main", free, total)))
+    text = f"{used}% used · {gigabytes(free)} free · minibrain {gigabytes(ours_on(stores, disk))}"
+    href = "/infrastructure/storage" if admin else None
+    return AreaCheck(area="storage", label="Storage", text=text, others=others, href=href)
 
 
 def training_text(session: Session, moment: datetime) -> str:
@@ -556,8 +602,8 @@ def area_checks(
     areas = [
         AreaCheck(area="serving", label="Serving", text=serving_text(session)),
         AreaCheck(area="machines", label="Machines", text=machines_text(found, local.versions)),
-        memory_check(found, metrics),
-        storage_check(stores, found, metrics),
+        memory_check(session, found, metrics, admin),
+        storage_check(stores, found, metrics, admin),
         AreaCheck(area="training", label="Training", text=training_text(session, moment)),
     ]
     if admin:

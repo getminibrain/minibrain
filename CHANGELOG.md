@@ -13,7 +13,9 @@ What changed in each minibrain release, newest first. To move to a new version, 
 - The logo is one drawing in the sidebar and on the sign-in pages, the same as on getminibrain.com.
 - Dark mode is a little lighter, with borders you can see.
 - Health on Home shows every check, not only problems: serving, machines, memory and disk of this machine (with the
-  fullest other one), training and the audit log. Memory splits model weights from everything else.
+  fullest other one), training and the audit log. Memory names the loaded models holding it and turns amber when it
+  runs short on a Mac or a machine without a GPU.
+- A live model's page has an **Undeploy** button next to **Deploy**.
 - A model asks you to train again only when there is a reason, and says which: new answers from feedback or new data.
 - A model's overview shows its latest activity above its versions.
 - Every usage bar looks the same, the one Train uses, including on Infrastructure › Storage.

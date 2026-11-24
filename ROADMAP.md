@@ -264,11 +264,13 @@ with 3 new answers", "Train v2 on new data"). A live model with none of these ha
 serves and is not trained again for its own sake.
 
 Health on Home (2026-11-24) always lists its checks, one line per area with what it found: Serving (live models and
-their replicas, running or starting), Machines (online, the release), Memory and Storage (this machine, as the same
-usage bar Train uses: model weights, adapters and training against everything else, and minibrain's files against
-other files; plus the fullest other machine), Training (running and finished in 24 h) and, for admins, Audit log. A
+their replicas, running or starting), Machines (online, the release), Memory (this machine's share used and which
+loaded models hold how much; amber at 90% and red at 95% where memory is RAM or unified, never for GPU memory, which
+engines reserve on purpose), Storage (this machine's fullest disk, what is free and minibrain's share), each with the
+fullest other machine and, for admins, Open; Training (running and finished in 24 h) and, for admins, Audit log. A
 problem replaces its area's line, worst first, with "+N more" and Show all. `GET /api/problems/checks` returns the
-areas and the problems from one pass. Every usage bar in the app is that one gauge at one size.
+areas and the problems from one pass. Home shows no usage bars: they belong where memory or disk is the subject
+(Train, Add model, Infrastructure), and every usage bar there is the one gauge at one size.
 
 A model's Overview (2026-11-24) shows its last five activity entries above Versions, at the same height, with All
 activity opening the Activity tab.
