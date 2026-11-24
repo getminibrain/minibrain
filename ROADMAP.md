@@ -2082,6 +2082,32 @@ it finds:
       and rollback
 - [ ] Trace ids carried across main, gateway and engines in the JSON logs
 
+### Review follow-ups (added 2026-11-24)
+
+From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); these are left.
+
+- [ ] Rent an NVIDIA GPU for a day and run the core journey for real: SGLang serving with adapters, LoRA and QLoRA
+      training, the CUDA image, gpt-oss-20b. Check the GPU split there: fractions honoured, two engines on one GPU,
+      training beside a live model, planning again inside a share, device numbering under Docker `--gpus`.
+- [ ] Real runs as a release gate, not only fakes: a GPU box, Postgres (CI job since 2026-11-24), two machines joined
+      over a network, and the browser test (since 2026-11-24). Every bug the review found surfaced on first contact
+      with the real thing.
+- [ ] Upgrade test: install the previous release, add data and a model, upgrade to the new wheel, check it migrates,
+      serves and trains. Releases are public now, so a migration that shipped in a release is never edited again.
+- [ ] TLS between gateways and engines on other machines: the engine call token and request bodies cross the network
+      in clear.
+- [ ] Models larger than one GPU: tensor-parallel serving (SGLang `--tp`) and multi-GPU training (FSDP or ZeRO, Large
+      datasets). Today an engine and a job each get one GPU, which caps the 30B to 120B sizes in Product priorities.
+- [ ] A pinned version of a model that is not live (`name@2`) starts its engine on the first call and answers 503
+      with `Retry-After` until it is up; say so in the API docs.
+- [ ] The Playground and the model Test buttons still run on main's shared thread pool, outside the `/v1` limit.
+- [ ] Undeploy then delete, with a base switch in between, may not wait for an engine on the old base.
+- [ ] Windows (WSL) install verified.
+- [ ] Measure time from install to the first scored and trained model, on a Mac and on a GPU box.
+- [ ] Decide: labels before more presets. Most new users have data without answers, and Teacher labelling,
+      Distillation data and Upstream routes are all unbuilt. Proposed order: Upstream routes and Distillation data
+      (route existing OpenAI calls through minibrain, log them, train a cheaper model), then Teacher labelling, ahead
+      of Extract and Rebase.
 
 ## v2
 
