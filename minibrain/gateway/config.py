@@ -320,6 +320,12 @@ def remote_only(config: GatewayConfig) -> frozenset[str]:
     return frozenset(key for key, found in config.placements.items() if found and LOCAL_POOL not in found)
 
 
+def kept_running(config: GatewayConfig) -> frozenset[str]:
+    placed = {key for key, found in config.placements.items() if LOCAL_POOL in found}
+    guarded = [route.safety for route in config.routes.values() if route.safety and route.base_model in placed]
+    return frozenset(placed | {str(safety["model"]) for safety in guarded})
+
+
 def local_replicas(config: GatewayConfig, registered: Replicas) -> Replicas:
     placed = {key for key, found in config.placements.items() if LOCAL_POOL in found}
     return {
@@ -390,7 +396,8 @@ class LocalConfig:
             }
             registered = registered_replicas(session, specs)
             elsewhere = remote_only(draft)
-            local = {key: spec for key, spec in specs.items() if key not in elsewhere}
+            kept = kept_running(draft)
+            local = {key: spec for key, spec in specs.items() if key not in elsewhere and key in kept}
             counted = local_replicas(draft, registered)
             managed = self.engines(local, counted, releasing_bases(session) | elsewhere)
             replicas = merge_replicas(managed, registered)

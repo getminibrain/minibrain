@@ -2107,6 +2107,9 @@ it finds:
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [x] Engines for models that were not live never stopped: every ready version has a pinned route, so main counted its
+  base as needed and the idle stop never applied. Main now keeps engines running only for live models (and their
+  safety models); the rest start on the first request and stop after 15 minutes idle (2026-11-24).
 - [ ] `test_long_polls_leave_threads_for_other_requests` is flaky in CI: `/api/jobs` took 2.98 s and 3.87 s (limit 1 s)
   in 2 of its first 4 runs, finishing only when the 3 s long polls did. It always passes locally, even with every CPU
   busy. Ruled out by slowing each step in turn: the gateway config rebuild and its lock, worker check-in, claims, and

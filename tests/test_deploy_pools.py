@@ -1,3 +1,4 @@
+import time
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -13,6 +14,7 @@ from minibrain.serve.backend import CompletionRequest, EngineUnavailableError
 from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineBackend
 from minibrain.serve.host import EngineHost
 from minibrain.settings import Settings
+from minibrain.supervise import Supervisor
 from minibrain.worker import MainClient, WorkerConfig
 from tests.conftest import Harness, fake_adapter
 from tests.test_compute import RACK
@@ -333,3 +335,35 @@ def test_main_never_starts_a_local_engine_for_a_remote_pool(
     with pytest.raises(EngineUnavailableError, match="started"):
         backend.complete(request("local"))
     assert started == [BASE]
+
+
+def test_main_keeps_an_engine_running_only_for_a_live_model(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "lora")
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.9)
+    seen: list[set[str]] = []
+
+    def spawn(specs: dict[str, BaseModelSpec], registered: Any, releasing: frozenset[str]) -> dict[str, str]:
+        seen.append(set(specs))
+        return {}
+
+    harness.app.state.gateway_config.engines = spawn
+    config = harness.app.state.gateway_config.rebuild()
+    assert f"{SLUG}@1" in config.routes and seen[-1] == set()
+    promoted = harness.client.post(f"/api/models/{SLUG}/versions/1/promote")
+    assert promoted.status_code == 200, promoted.text
+    harness.app.state.gateway_config.rebuild()
+    assert seen[-1] == {BASE}
+
+
+def test_an_engine_no_live_model_needs_stops_once_idle(settings: Settings) -> None:
+    manager = EngineManager(settings, "http://main", idle_seconds=60)
+    supervisor = Supervisor(f"engine {BASE}", ["true"], {})
+    manager.engines[BASE] = ("http://127.0.0.1:9", supervisor)
+    manager.used[BASE] = time.monotonic()
+    manager.ensure({}, {})
+    assert BASE in manager.engines
+    manager.used[BASE] -= 61
+    manager.ensure({}, {})
+    assert BASE not in manager.engines and supervisor.stop.is_set()
