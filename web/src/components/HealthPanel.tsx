@@ -77,6 +77,29 @@ const AREA_OF: Record<ProblemKind, Area> = {
     machine_offline: "machines",
 };
 
+const PAGES: [string, string][] = [
+    ["/infrastructure/machines", "Machines"],
+    ["/infrastructure/storage", "Storage"],
+    ["/training/", "Training run"],
+    ["/training", "Training"],
+    ["/settings/audit", "Audit log"],
+    ["/settings/security", "Security"],
+    ["/models/", "Model"],
+    ["/models", "Models"],
+];
+
+function pageName(href: string): string {
+    return PAGES.find(([prefix]) => href.startsWith(prefix))?.[1] ?? "Open";
+}
+
+function PageLink({ href }: { href: string }) {
+    return (
+        <Link href={href} className="shrink-0 text-primary hover:underline">
+            {pageName(href)}
+        </Link>
+    );
+}
+
 type Line = { key: string; problems: Problem[] };
 
 function grouped(problems: Problem[]): Line[] {
@@ -176,12 +199,7 @@ function ProblemParts({ line, more = 0 }: { line: Line; more?: number }) {
                         host={action.host}
                     />
                 ))}
-            <Link
-                href={many ? group.href : first.href}
-                className="shrink-0 text-primary hover:underline"
-            >
-                Open
-            </Link>
+            <PageLink href={many ? group.href : first.href} />
         </>
     );
 }
@@ -219,11 +237,7 @@ function AreaLine({ check, problems }: { check: AreaCheck; problems: Problem[] }
                     <span className="truncate text-sm text-muted-foreground">{check.others}</span>
                 )}
             </span>
-            {check.href && (
-                <Link href={check.href} className="shrink-0 text-primary hover:underline">
-                    Open
-                </Link>
-            )}
+            {check.href && <PageLink href={check.href} />}
         </li>
     );
 }
