@@ -36,6 +36,9 @@ flowchart LR
 | Request log and the key's last use | Buffered and written in batches about every 2 seconds |
 
 - Configuration is up to about a second stale: a revoked key stays valid for at most a second.
+- Chat and text completions run on their own threads, at most `MINIBRAIN_GATEWAY_CONCURRENCY` at once (64 by
+  default), apart from the threads of the UI, workers and jobs. One more gets a 503 with `Retry-After` at once rather
+  than waiting, so model traffic never slows the rest of main ([Errors](../api/overview.md#busy-and-starting-models)).
 - To scale out, add gateways behind HAProxy, Envoy or a cloud load balancer, then add engines. GPUs are the bottleneck
   long before gateways or the database.
 - How a gateway picks among replicas: [Deployments](../guides/deployments.md).
@@ -73,8 +76,8 @@ folder, it reads the files from main. It keeps a working copy under `engines/` i
 size and SHA-256, and removes copies of models main no longer has.
 
 While it fetches, Infrastructure and the Models list say "Fetching weights" and the engine logs its progress every 30
-seconds. A request to a model that is still fetching waits up to 60 seconds, then gets a 503 that says how far the
-fetch is. A fetch that fails says so and loads nothing.
+seconds. A `/v1` call to a model that is still fetching or loading waits up to 5 seconds, then gets a 503 with
+`Retry-After: 10` that says how far the fetch is. A fetch that fails says so and loads nothing.
 
 ## When main is down
 

@@ -11532,7 +11532,15 @@
             }
           },
           "503": {
-            "description": "No engine is serving this model right now.",
+            "description": "No engine can answer yet, or the gateway is answering as many calls as it takes at once (an OpenAI error with code overloaded). Retry-After, when present, says when to try again.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -11644,7 +11652,15 @@
             }
           },
           "503": {
-            "description": "No engine is serving this model right now.",
+            "description": "No engine can answer yet, or the gateway is answering as many calls as it takes at once (an OpenAI error with code overloaded). Retry-After, when present, says when to try again.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before trying again.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

@@ -82,6 +82,7 @@ from minibrain.encryption.keys import EncryptionError, ensure_master_key, keys_f
 from minibrain.encryption.providers import KeyUnavailableError
 from minibrain.encryption.rekey import rekey_forever
 from minibrain.gateway import routes as gateway
+from minibrain.gateway.capacity import Generations
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.errors import OpenAIError, invalid_body, openai_error
 from minibrain.gateway.logs import LogBuffer, database_sink
@@ -307,6 +308,7 @@ def create_app(
     )
     app.state.teardowns = Teardowns(sessions, settings, app.state.gateway_config)
     app.state.request_logs = LogBuffer(database_sink(sessions))
+    app.state.generations = Generations(settings.gateway_concurrency)
     app.state.feedback = database_feedback(sessions)
     app.state.siem = Forwarder(sessions)
     app.state.background = background

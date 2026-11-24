@@ -4,7 +4,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
@@ -375,11 +375,18 @@ def complete(backend: ServingBackend, request: CompletionRequest, requested: boo
         return backend.complete(replace(request, constraint=None))
 
 
+def unavailable(error: Exception) -> HTTPException:
+    cause = error if isinstance(error, EngineUnavailableError) else error.__cause__
+    retry = cause.retry_after if isinstance(cause, EngineUnavailableError) else None
+    headers = {"Retry-After": str(retry)} if retry is not None else None
+    return HTTPException(status_code=503, detail=str(error), headers=headers)
+
+
 def completed(backend: ServingBackend, request: CompletionRequest, requested: bool) -> Completion:
     try:
         return complete(backend, request, requested)
     except EngineUnavailableError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        raise unavailable(error) from error
     except OutputFormatError as error:
         raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
     except UnsupportedParameterError as error:
@@ -410,7 +417,7 @@ def checked(backend: ServingBackend, chat: ChatPlan, answer_text: str | None = N
     try:
         verdict = judged(backend, chat.safety, chat.conversation, answer_text)
     except SafetyUnavailableError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        raise unavailable(error) from error
     chat.verdicts.append(verdict)
     return verdict
 
@@ -521,7 +528,7 @@ def mapped(events: Iterator[Event]) -> Iterator[Event]:
     try:
         yield from events
     except EngineUnavailableError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        raise unavailable(error) from error
     except OutputFormatError as error:
         raise invalid(FORMAT, f"response_format cannot be applied: {error}.") from error
     except UnsupportedParameterError as error:
@@ -609,7 +616,7 @@ class ChatChunks:
 
 def events_sse(
     head: dict[str, Any], first: Event, events: Iterator[Event], chunks: Chunks, finished: Finished | None = None
-) -> Iterator[str]:
+) -> Generator[str]:
     final: Completion | None = None
     failure: BaseException | None = None
     try:
@@ -641,6 +648,6 @@ def sse(
     events: Iterator[Event],
     include_usage: bool = False,
     finished: Finished | None = None,
-) -> Iterator[str]:
+) -> Generator[str]:
     head = {"id": identifier, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
     return events_sse(head, first, events, ChatChunks(include_usage), finished)

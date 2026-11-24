@@ -1,6 +1,6 @@
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -110,6 +110,6 @@ def text_sse(
     events: Iterator[Event],
     include_usage: bool = False,
     finished: Finished | None = None,
-) -> Iterator[str]:
+) -> Generator[str]:
     head = {"id": identifier, "object": "text_completion", "created": int(time.time()), "model": model}
     return events_sse(head, first, events, TextChunks(include_usage), finished)

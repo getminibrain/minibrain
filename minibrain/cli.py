@@ -240,7 +240,8 @@ def gateway(main_url: str, host: str, port: int) -> None:
 
     settings = load_settings()
     token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
-    uvicorn.run(create_gateway_app(main_url, token, settings.home / "gateway"), host=host, port=port)
+    app = create_gateway_app(main_url, token, settings.home / "gateway", concurrency=settings.gateway_concurrency)
+    uvicorn.run(app, host=host, port=port)
 
 
 def refusal(response: "httpx.Response") -> str:

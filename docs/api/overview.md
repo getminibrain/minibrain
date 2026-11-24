@@ -131,11 +131,22 @@ A request the gateway refuses gets an OpenAI `error` object, with the field at f
 | 409 | The version was trained on base weights that have changed since | `detail` |
 | 413 | The body is larger than 32 MiB | `error`, `body_too_large` |
 | 422 | The answer does not match `response_format` or the model's JSON schema | `error` |
+| 503 | The gateway is already answering as many calls as it takes at once; `Retry-After` says when to try again | `error`, `overloaded` |
 | 503 | No engine can answer yet (still loading or fetching weights), or the safety model cannot check the call | `detail` |
 
 The `detail` rows answer with a plain message, such as `{"detail": "this API key does not cover support-triage"}`.
 The OpenAI SDKs raise both kinds as their usual exceptions (`openai.BadRequestError`, `openai.AuthenticationError`
 and so on), with `param` and `code` set when the body has them. Keys are not rate-limited: there is no 429.
+
+### Busy and starting models
+
+- Each gateway answers up to 64 chat and text completions at once, streams included (`MINIBRAIN_GATEWAY_CONCURRENCY`,
+  [Configuration](../install/configuration.md#environment-variables)). One more is refused at once with a 503 and
+  `Retry-After: 5`, so model traffic never slows the UI, workers or jobs on main.
+- A call to a model whose engine is still starting or fetching weights waits up to 5 seconds, then gets a 503 with
+  `Retry-After: 10`; the engine keeps starting.
+- The OpenAI SDKs retry a 503 twice by default and wait as `Retry-After` says. Raise `max_retries` for models that
+  take longer than about half a minute to start.
 
 ## What differs from OpenAI
 

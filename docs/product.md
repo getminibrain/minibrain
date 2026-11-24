@@ -482,6 +482,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Standalone gateways** · shipped · admin
   Keep serving from the last good config while main is down.
   CLI: minibrain gateway · Config: MINIBRAIN_GATEWAY_TOKEN
+- **Gateway call limit** · shipped · engineer, admin
+  Busy models answer 503 with Retry-After; the app stays fast.
+  API: POST /v1/chat/completions, POST /v1/completions · CLI: minibrain gateway · Config: MINIBRAIN_GATEWAY_CONCURRENCY
 - **Teacher pool** · planned · ml, admin
   Keep a larger local teacher loaded; API teachers only by opt-in.
   Roadmap: v2

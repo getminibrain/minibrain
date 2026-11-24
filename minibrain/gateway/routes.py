@@ -1,7 +1,8 @@
 import contextlib
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
+from functools import partial
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -10,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from minibrain.data.feedback import ORIGIN_API, Submission
+from minibrain.gateway.capacity import Answer, Generations
 from minibrain.gateway.chat import (
     ChatPlan,
     Requested,
@@ -34,6 +36,7 @@ from minibrain.gateway.schema import (
     CHAT_RESPONSES,
     FEEDBACK_RESPONSES,
     KEY_ERRORS,
+    LIMITED,
     TEXT_HELP,
     TEXT_RESPONSES,
     ChatCompletionRequest,
@@ -95,7 +98,7 @@ class Surface:
     identifier: Callable[[], str]
     plan: Callable[..., ChatPlan]
     body: Callable[[str, str, Completion, Verdict | None], dict[str, Any]]
-    stream: Callable[..., Iterator[str]]
+    stream: Callable[..., Generator[str]]
     input: Callable[[Any], str | None]
 
 
@@ -195,9 +198,7 @@ def routed(config: GatewayConfig, grant: Grant, model: str) -> Route:
     return route
 
 
-def served(
-    surface: Surface, body: Requested, grant: Grant, config: GatewayConfig, request: Request
-) -> dict | StreamingResponse:
+def served(surface: Surface, body: Requested, grant: Grant, config: GatewayConfig, request: Request) -> Answer:
     started = time.monotonic()
     identifier = surface.identifier()
     route = config.routes.get(body.model)
@@ -216,8 +217,7 @@ def served(
         backend = request.app.state.backend
         if body.stream:
             events = chat_events(backend, chat)
-            stream = surface.stream(identifier, body.model, next(events), events, include_usage(body), finished)
-            return StreamingResponse(stream, media_type="text/event-stream")
+            return surface.stream(identifier, body.model, next(events), events, include_usage(body), finished)
         completion = answer(backend, chat)
     except Exception as error:
         finished(None, error)
@@ -226,18 +226,32 @@ def served(
     return surface.body(identifier, body.model, completion, chat.verdict)
 
 
+async def generated(
+    surface: Surface, body: Requested, grant: Grant, config: GatewayConfig, request: Request
+) -> dict[str, Any] | StreamingResponse:
+    generations: Generations = request.app.state.generations
+    try:
+        slot = generations.admit()
+    except OpenAIError as error:
+        route = config.routes.get(body.model)
+        outcome = Outcome(None, error)
+        log_call(request.app.state.request_logs, surface, body, grant, route, "", time.monotonic(), outcome)
+        raise
+    return await generations.answer(slot, partial(served, surface, body, grant, config, request))
+
+
 @router.post(
     "/chat/completions",
     response_model=None,
     tags=["chat"],
     summary="Create a chat completion",
     description=CHAT_HELP,
-    responses=CHAT_RESPONSES,
+    responses=CHAT_RESPONSES | LIMITED,
 )
-def chat_completions(
+async def chat_completions(
     body: ChatCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
-) -> dict | StreamingResponse:
-    return served(CHAT, body, grant, config, request)
+) -> dict[str, Any] | StreamingResponse:
+    return await generated(CHAT, body, grant, config, request)
 
 
 @router.post(
@@ -246,12 +260,12 @@ def chat_completions(
     tags=["completions"],
     summary="Create a text completion",
     description=TEXT_HELP,
-    responses=TEXT_RESPONSES,
+    responses=TEXT_RESPONSES | LIMITED,
 )
-def completions(
+async def completions(
     body: TextCompletionRequest, grant: GrantDep, config: ConfigDep, request: Request
-) -> dict | StreamingResponse:
-    return served(TEXT, body, grant, config, request)
+) -> dict[str, Any] | StreamingResponse:
+    return await generated(TEXT, body, grant, config, request)
 
 
 def include_usage(body: Requested) -> bool:

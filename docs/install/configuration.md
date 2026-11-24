@@ -143,6 +143,7 @@ such as `MINIBRAIN_POLICY_LOG_RETENTION_DAYS=30`. The UI shows **Set by environm
 | `MINIBRAIN_MODELS_S3_URL`, `AWS_*` | Base models from an S3-compatible bucket ([Base models](../guides/models.md)) |
 | `MINIBRAIN_TRAIN_DEVICE` | Force `cuda`, `xpu`, `mps` or `cpu` for training ([GPUs](gpus.md)) |
 | `MINIBRAIN_SGLANG_PYTHON`, `MINIBRAIN_VLLM_PYTHON` | The Python of a separate SGLang or vLLM environment ([GPUs](gpus.md)) |
+| `MINIBRAIN_GATEWAY_CONCURRENCY` | How many `/v1` calls main, and each standalone gateway, answer at once: 64 by default. One more gets a 503 with `Retry-After` ([Errors](../api/overview.md#errors)) |
 | `MINIBRAIN_ADMIN_EMAIL`, `MINIBRAIN_ADMIN_PASSWORD_FILE` | Create the first admin on the first start ([First admin](first-admin.md)) |
 | `MINIBRAIN_OIDC_CLIENT_SECRET` | The single sign-on client secret ([Accounts and sign-in](../security/accounts.md)) |
 | `MINIBRAIN_LOG_FORMAT` | `json` for one JSON object per log line ([Logs](../observability/logs.md)) |

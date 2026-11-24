@@ -22,6 +22,23 @@ An inference request never touches the database.
   bottleneck long before gateways or the database.
 - Very high log volume moves to ClickHouse or Parquet in object storage, or to sampling.
 
+## Concurrency
+
+`/v1/chat/completions` and `/v1/completions` are `async` handlers; `Generations` in `gateway/capacity.py` runs each
+call's blocking work, and every chunk of a stream, on worker threads under its own `anyio.CapacityLimiter`, never the
+shared default limiter (about 40 threads) that the UI, worker check-ins, lease renewals and long polls use.
+
+- A call takes a slot for its whole life, stream included (`GenerationStream` gives it back after closing the stream,
+  so an abandoned stream is still logged as 499). No slot free: 503 at once, OpenAI `error` with `code: overloaded`,
+  `Retry-After: 5` (`BUSY_RETRY_SECONDS`), logged like any call. Slots: `MINIBRAIN_GATEWAY_CONCURRENCY`, default 64
+  (`Settings.gateway_concurrency`), the same on main and standalone gateways.
+- Engine start: the call sets `START_WAIT` (a context variable in `serve/engines.py`) to 5 s, so `EngineBackend.opened`
+  stops waiting for a loading or fetching replica after 5 s and raises `EngineUnavailableError` with `retry_after` 10;
+  the gateway answers 503 `detail` plus `Retry-After`. A replica that reports ready but cannot be reached still gets
+  its own message after 30 s. Other callers (the Playground, Test on a base or a version) keep the 600 s window and
+  stay on the default limiter.
+- `/v1/models` and `/v1/feedback` are short and stay on the default limiter.
+
 ## Streaming per engine
 
 `stream: true` sends `chat.completion.chunk` events as the engine generates them: `transformers` through a token
@@ -135,7 +152,8 @@ request log `kind` is `completion`.
 ## Gaps found while writing the API pages
 
 - 401, 403, 409 and 503 on `/v1` answer FastAPI's `{"detail": "..."}`, not an OpenAI `error` object (they are
-  `HTTPException`s in `routes.py` and `chat.py`). The pages document this as it is.
+  `HTTPException`s in `routes.py` and `chat.py`), except the busy 503, which is an `error`. The pages document this
+  as it is.
 - Validation errors on `POST /v1/feedback` are FastAPI's default 422 with a `detail` list: `/v1/feedback` is not in
   `CHAT_PATHS` in `gateway/errors.py`.
 - A `reasoning_effort` refused because the model has a labels or JSON contract uses `code: invalid_value`; every

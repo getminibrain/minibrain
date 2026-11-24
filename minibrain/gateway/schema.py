@@ -363,6 +363,18 @@ TEXT_RESPONSES: Responses = (
     | MODEL_ERRORS
     | SERVED
 )
+LIMITED: Responses = {
+    503: {
+        "model": ErrorDetail,
+        "description": (
+            "No engine can answer yet, or the gateway is answering as many calls as it takes at once (an OpenAI error "
+            "with code overloaded). Retry-After, when present, says when to try again."
+        ),
+        "headers": {
+            "Retry-After": {"description": "Seconds to wait before trying again.", "schema": {"type": "integer"}}
+        },
+    }
+}
 FEEDBACK_RESPONSES: Responses = MODEL_ERRORS | {
     422: {"model": ErrorDetail, "description": "The model is a base model, or the body is not valid."},
 }

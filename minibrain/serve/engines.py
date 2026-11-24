@@ -7,6 +7,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack
+from contextvars import ContextVar
 from dataclasses import asdict
 from typing import Any
 
@@ -24,6 +25,8 @@ from minibrain.worker import HttpClient
 
 GENERATE_TIMEOUT = httpx.Timeout(300.0, connect=5.0)
 STARTUP_SECONDS = 600.0
+START_RETRY_SECONDS = 10
+START_WAIT: ContextVar[float | None] = ContextVar("engine_start_wait", default=None)
 UNREACHABLE_SECONDS = 30.0
 UNREACHED = (httpx.ConnectError, httpx.ConnectTimeout, OSError)
 FETCH_WAIT_SECONDS = 60.0
@@ -174,6 +177,11 @@ def unreachable(base: str, replicas: list[dict[str, str]], unreached: set[str]) 
     )
 
 
+def starting(base: str, waiting: str | None) -> EngineUnavailableError:
+    message = waiting or f"the engine for {base} is starting; try again in {START_RETRY_SECONDS} s"
+    return EngineUnavailableError(message, START_RETRY_SECONDS)
+
+
 def drain_engine(http: HttpClient, url: str, routes: list[str], adapters: list[str]) -> dict[str, Any]:
     response = http.request("POST", f"{url}/drain", json={"routes": routes, "adapters": adapters})
     response.raise_for_status()
@@ -272,6 +280,7 @@ class EngineBackend:
         key = sticky_key(base, request.adapter.name if request.adapter else None, history)
         started = time.monotonic()
         deadline = started + STARTUP_SECONDS
+        patience = START_WAIT.get()
         tried: set[str] = set()
         unreached: set[str] = set()
         waiting: str | None = None
@@ -288,6 +297,8 @@ class EngineBackend:
                     raise EngineUnavailableError(stranded)
                 if time.monotonic() > deadline:
                     raise EngineUnavailableError(f"no engine for {base} is reachable")
+                if patience is not None and stranded is None and time.monotonic() - started > patience:
+                    raise starting(base, waiting)
                 time.sleep(1.0)
                 tried.clear()
                 waiting = None

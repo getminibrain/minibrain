@@ -10,7 +10,13 @@ CHAT_PATHS = frozenset({"/v1/chat/completions", "/v1/completions", "/api/playgro
 
 class OpenAIError(Exception):
     def __init__(
-        self, status_code: int, message: str, param: str | None = None, code: str | None = None, kind: str = ""
+        self,
+        status_code: int,
+        message: str,
+        param: str | None = None,
+        code: str | None = None,
+        kind: str = "",
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -18,6 +24,7 @@ class OpenAIError(Exception):
         self.param = param
         self.code = code
         self.kind = kind or "invalid_request_error"
+        self.headers = headers
 
     def body(self) -> dict[str, Any]:
         return {"error": {"message": self.message, "type": self.kind, "param": self.param, "code": self.code}}
@@ -29,7 +36,7 @@ def invalid(param: str, message: str, code: str = "invalid_value") -> OpenAIErro
 
 async def openai_error(_request: Request, error: Exception) -> JSONResponse:
     found = error if isinstance(error, OpenAIError) else OpenAIError(500, str(error), kind="server_error")
-    return JSONResponse(status_code=found.status_code, content=found.body())
+    return JSONResponse(status_code=found.status_code, content=found.body(), headers=found.headers)
 
 
 def openai_validation(error: RequestValidationError) -> OpenAIError:

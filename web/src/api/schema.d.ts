@@ -18641,9 +18641,11 @@ export interface operations {
                     "application/json": components["schemas"]["OpenAIErrorBody"];
                 };
             };
-            /** @description No engine is serving this model right now. */
+            /** @description No engine can answer yet, or the gateway is answering as many calls as it takes at once (an OpenAI error with code overloaded). Retry-After, when present, says when to try again. */
             503: {
                 headers: {
+                    /** @description Seconds to wait before trying again. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -18729,9 +18731,11 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description No engine is serving this model right now. */
+            /** @description No engine can answer yet, or the gateway is answering as many calls as it takes at once (an OpenAI error with code overloaded). Retry-After, when present, says when to try again. */
             503: {
                 headers: {
+                    /** @description Seconds to wait before trying again. */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {

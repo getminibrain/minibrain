@@ -1156,6 +1156,11 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   base models, streamed too; keys, `name@N`, sampling, safety and request logs (kind `completion`) as in chat. A custom
   model applies its adapter but not its instructions or contract. One prompt per call; `logprobs`, `echo` and
   `suffix` are refused with a 400. Details in `docs/api/text-completions.md`.
+- Limits (2026-11-24): chat and text completions run on their own threads, at most `MINIBRAIN_GATEWAY_CONCURRENCY`
+  (64) at once per gateway, main included, streams counted for their whole length; one more gets a 503 at once
+  (`code: overloaded`, `Retry-After: 5`). A call to an engine still starting or fetching waits 5 s, then gets a 503
+  with `Retry-After: 10`. Model traffic never takes the threads the UI, worker check-ins and lease renewals use.
+  Keys are not rate-limited.
 - `response_format` (`json_object`, `json_schema`) passed through and the answer checked against the schema; without
   one, a custom model's contract holds decoding: its labels for a label set, its schema for a JSON contract (checked
   the same way). A request's format only narrows a model whose contract is free text; a label or schema contract
@@ -2107,6 +2112,11 @@ it finds:
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [x] `/v1` calls held a thread of main's shared pool (about 40) for their whole generation, up to 300 s, or up to
+  600 s while an engine started, so a burst of model traffic could stall the UI, worker check-ins and lease renewals
+  until 60 s job leases ran out. Chat and text completions now run on their own bounded threads
+  (`MINIBRAIN_GATEWAY_CONCURRENCY`, 64), streams included; a call past the limit gets a 503 with `Retry-After` at
+  once, and one to an engine still starting gets one after 5 s. Standalone gateways do the same (2026-11-24).
 - [x] Engines for models that were not live never stopped: every ready version has a pinned route, so main counted its
   base as needed and the idle stop never applied. Main now keeps engines running only for live models (and their
   safety models); the rest start on the first request and stop after 15 minutes idle (2026-11-24).

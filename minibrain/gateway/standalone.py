@@ -16,11 +16,13 @@ from fastapi.responses import PlainTextResponse, Response
 from minibrain.body_limit import limit_bodies
 from minibrain.data.feedback import Submission
 from minibrain.gateway import routes
+from minibrain.gateway.capacity import Generations
 from minibrain.gateway.config import REPORT_SECONDS, GatewayConfig, RemoteConfig, gateway_id, served_bases
 from minibrain.gateway.errors import OpenAIError, invalid_body, openai_error
 from minibrain.gateway.logs import LogBuffer, LogEntry
 from minibrain.serve.backend import ServingBackend
 from minibrain.serve.engines import EngineBackend
+from minibrain.settings import GATEWAY_CONCURRENCY
 from minibrain.telemetry.context import RequestContext
 from minibrain.telemetry.logs import configure_logging
 from minibrain.telemetry.prometheus import load_metrics_access, metrics_response
@@ -37,6 +39,7 @@ def create_gateway_app(
     http: HttpClient | None = None,
     backend: ServingBackend | None = None,
     background: bool = True,
+    concurrency: int = GATEWAY_CONCURRENCY,
 ) -> FastAPI:
     client: HttpClient = http or httpx.Client(base_url=main_url, timeout=httpx.Timeout(60.0, connect=10.0))
     headers = {"Authorization": f"Bearer {token}"}
@@ -96,6 +99,7 @@ def create_gateway_app(
     app = FastAPI(title="minibrain gateway", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.gateway_config = source
     app.state.request_logs = logs
+    app.state.generations = Generations(concurrency)
     app.state.feedback = send_feedback
     serving = backend or EngineBackend(lambda: source.current().engines)
     app.state.backend = serving

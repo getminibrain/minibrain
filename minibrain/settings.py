@@ -9,6 +9,8 @@ DATABASE_FILE = "minibrain.db"
 DATABASE_SIDE_FILES = ("-wal", "-shm", "-journal")
 PRIVATE_FOLDER = 0o700
 PRIVATE_FILE = 0o600
+GATEWAY_CONCURRENCY = 64
+GATEWAY_CONCURRENCY_ENV = "MINIBRAIN_GATEWAY_CONCURRENCY"
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,7 @@ class Settings:
     web_dist: Path
     database: str | None = None
     ui_url: str | None = None
+    gateway_concurrency: int = GATEWAY_CONCURRENCY
 
     @property
     def database_url(self) -> str:
@@ -87,6 +90,19 @@ def default_web_dist() -> Path:
     return packaged if (packaged / "index.html").is_file() else REPO_ROOT / "web" / "dist"
 
 
+def gateway_concurrency() -> int:
+    raw = os.environ.get(GATEWAY_CONCURRENCY_ENV, "").strip()
+    if not raw:
+        return GATEWAY_CONCURRENCY
+    try:
+        found = int(raw)
+    except ValueError:
+        found = 0
+    if found < 1:
+        raise ValueError(f"{GATEWAY_CONCURRENCY_ENV} must be a whole number of 1 or more, not {raw}")
+    return found
+
+
 def load_settings() -> Settings:
     home = Path(os.environ.get("MINIBRAIN_HOME", Path.home() / ".minibrain")).expanduser()
     web_dist = Path(os.environ.get("MINIBRAIN_WEB_DIST", default_web_dist()))
@@ -97,4 +113,5 @@ def load_settings() -> Settings:
         web_dist=web_dist,
         database=database,
         ui_url=os.environ.get("MINIBRAIN_UI_URL", "").rstrip("/") or None,
+        gateway_concurrency=gateway_concurrency(),
     )

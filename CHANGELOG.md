@@ -5,6 +5,7 @@ What changed in each minibrain release, newest first. To move to a new version, 
 
 ## Unreleased
 
+- Busy models answer 503 with Retry-After instead of slowing the app, and a model still starting says when to try again.
 - The documentation moves to [getminibrain.com/docs](https://getminibrain.com/docs), rewritten as one short page per
   topic: getting started, install and run, guides, the API, security, observability and reference.
 - Home follows your path from data to requests with live counts and the next step, lists your models with their state,
