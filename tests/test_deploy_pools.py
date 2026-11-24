@@ -61,7 +61,7 @@ def host(harness: Harness, body: dict[str, Any]) -> tuple[EngineHost, list[str]]
         def shutdown(self) -> None:
             started.remove(self.key)
 
-    found = EngineHost(config, MainClient(config, http=harness.client), launch=lambda key, _token: Child(key))
+    found = EngineHost(config, MainClient(config, http=harness.client), launch=lambda key, _token, _env: Child(key))
     return found, started
 
 

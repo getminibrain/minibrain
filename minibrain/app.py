@@ -58,6 +58,7 @@ from minibrain.api import (
 from minibrain.api.access import Identify, SecurityHeaders, TrustedProxy
 from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
+from minibrain.api.deps import local_node
 from minibrain.api.path_ids import ids_in_range
 from minibrain.api.sections import tag_sections
 from minibrain.artifacts import ArtifactError
@@ -93,6 +94,7 @@ from minibrain.leader import Leader, leader_for
 from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
 from minibrain.models.catalog import seed
+from minibrain.models.gpu_book import GpuBook, LocalEngineGpus
 from minibrain.models.health import report_problems
 from minibrain.models.machine_metrics import MetricsHistory, Sampler, sample_forever
 from minibrain.models.placement import PlacementError
@@ -290,12 +292,18 @@ def create_app(
     app.state.store = store_for(settings)
     with sessions() as session:
         apply_storage(app.state.store, session, settings)
-    app.state.queue = SqlJobQueue(sessions, DomainEffects(settings))
+    app.state.gpus = GpuBook(sessions)
+    app.state.queue = SqlJobQueue(sessions, DomainEffects(settings), gpus=app.state.gpus)
     app.state.queue.grace()
     engines = None
     if backend is None:
         main_url = os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000")
-        engines = EngineManager(settings, main_url, hub_allowed=lambda: hub_allowed(sessions))
+        engines = EngineManager(
+            settings,
+            main_url,
+            hub_allowed=lambda: hub_allowed(sessions),
+            gpus=LocalEngineGpus(app.state.gpus, lambda: local_node(app)),
+        )
         backend = ManagedEngineBackend(
             engines,
             lambda: app.state.gateway_config.current().engines,

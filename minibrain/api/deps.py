@@ -2,7 +2,7 @@ import threading
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, FastAPI, Request
 from sqlalchemy.orm import Session
 
 from minibrain.artifacts import ArtifactStore
@@ -15,11 +15,15 @@ from minibrain.settings import Settings
 DETECT_LOCK = threading.Lock()
 
 
-def get_local_node(request: Request) -> NodeReport:
+def local_node(app: FastAPI) -> NodeReport:
     with DETECT_LOCK:
-        if getattr(request.app.state, "node", None) is None:
-            request.app.state.node = report()
-        return request.app.state.node
+        if getattr(app.state, "node", None) is None:
+            app.state.node = report()
+        return app.state.node
+
+
+def get_local_node(request: Request) -> NodeReport:
+    return local_node(request.app)
 
 
 def get_session(request: Request) -> Iterator[Session]:

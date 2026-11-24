@@ -5,9 +5,10 @@ import socket
 import sys
 import threading
 from collections.abc import Callable
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
+from minibrain.models.gpus import Grant
 from minibrain.serve.engines import free_port
 from minibrain.supervise import Supervisor
 from minibrain.worker import MainClient, WorkerConfig, WorkerStoppedError
@@ -96,7 +97,7 @@ class Running(Protocol):
     def shutdown(self) -> None: ...
 
 
-Launch = Callable[[str, str], Running]
+Launch = Callable[[str, str, dict[str, str]], Running]
 
 
 def engine_command(config: WorkerConfig, key: str, port: int, advertise: str, bind: str) -> list[str]:
@@ -137,24 +138,45 @@ class EngineHost:
         self.bind = bind or self.advertise
         self.launch = launch or self.start
         self.running: dict[str, Running] = {}
+        self.waits: dict[str, str] = {}
         self.lock = threading.Lock()
 
-    def start(self, key: str, token: str) -> Running:
+    def start(self, key: str, token: str, env: dict[str, str]) -> Running:
         command = engine_command(self.config, key, free_port(), self.advertise, self.bind)
-        supervisor = Supervisor(f"engine {key}", command, os.environ | {ENGINE_KEY_ENV: token})
+        supervisor = Supervisor(f"engine {key}", command, os.environ | {ENGINE_KEY_ENV: token} | env)
         supervisor.start()
         return supervisor
 
+    def wait(self, key: str, reason: str) -> None:
+        if self.waits.get(key) != reason:
+            log.warning("not starting the engine for %s yet: %s", key, reason)
+        self.waits[key] = reason
+
+    def begin(self, key: str, item: dict[str, Any], token: str) -> None:
+        grant = Grant.from_dict(item["gpu"]) if item.get("gpu") else None
+        where = f" on GPU {grant.device}" if grant is not None else ""
+        log.info("starting an engine for %s in pool %s%s", key, self.config.pool, where)
+        self.running[key] = self.launch(key, token, grant.engine_env(os.environ) if grant is not None else {})
+        self.waits.pop(key, None)
+        if grant is not None:
+            self.config.engine_gpus[key] = grant.as_dict()
+
     def reconcile(self) -> set[str]:
         found = self.client.engines()
-        wanted = {str(item["model"]) for item in found["engines"]}
+        items = {str(item["model"]): item for item in found["engines"]}
+        wanted = set(items)
         with self.lock:
             for key in sorted(wanted - self.running.keys()):
-                log.info("starting an engine for %s in pool %s", key, self.config.pool)
-                self.running[key] = self.launch(key, str(found["engine_token"]))
+                if items[key].get("waiting"):
+                    self.wait(key, str(items[key]["waiting"]))
+                else:
+                    self.begin(key, items[key], str(found["engine_token"]))
             for key in sorted(self.running.keys() - wanted):
                 log.info("stopping the engine for %s; it is no longer placed here", key)
                 self.running.pop(key).shutdown()
+                self.config.engine_gpus.pop(key, None)
+            for key in self.waits.keys() - wanted:
+                self.waits.pop(key)
         return wanted
 
     def forever(self, stop: threading.Event) -> None:
@@ -172,5 +194,6 @@ class EngineHost:
     def stop_all(self) -> None:
         with self.lock:
             running, self.running = self.running, {}
-        for supervisor in running.values():
+        for key, supervisor in running.items():
             supervisor.shutdown()
+            self.config.engine_gpus.pop(key, None)

@@ -374,7 +374,10 @@ function phaseStats(
         return (
             <>
                 <Progress version={version} label="Training" />
-                <Stat label="Status" value="Waiting for a worker" />
+                <Stat
+                    label="Status"
+                    value={run?.waiting ? "Waiting for a free GPU" : "Waiting for a worker"}
+                />
             </>
         );
     }

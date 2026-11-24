@@ -29,7 +29,8 @@ from minibrain.connections.store import get_connection, resolve
 from minibrain.jobs.queue import EventIn, SqlJobQueue, WorkerInfo
 from minibrain.lifecycle import STOPPING
 from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
-from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.gpus import Grant
+from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.models.machine_metrics import MachineSample, MetricsHistory
 from minibrain.models.placement import desired_engines
 from minibrain.models.registry import check_job
@@ -43,6 +44,7 @@ from minibrain.worker import LEASE_HEADER
 
 CLAIM_POLL_SECONDS = 0.5
 MAX_CLAIM_WAIT_SECONDS = 30.0
+MAX_ENGINES = 256
 
 
 def worker_caller(request: Request, session: SessionDep, authorization: Annotated[str, Header()] = "") -> Caller:
@@ -99,6 +101,16 @@ ForKey = [Depends(needed_key)]
 router = APIRouter(prefix="/internal/worker", include_in_schema=False, dependencies=[Depends(worker_caller)])
 
 
+class EngineGpu(pydantic.BaseModel):
+    device: int = Field(ge=0)
+    bytes: int = Field(ge=0)
+    total_bytes: int = Field(gt=0)
+    beside_bytes: int = Field(default=0, ge=0)
+
+    def grant(self) -> Grant:
+        return Grant(self.device, self.bytes, self.total_bytes, self.beside_bytes)
+
+
 class WorkerBody(pydantic.BaseModel):
     id: str
     host: str
@@ -107,9 +119,15 @@ class WorkerBody(pydantic.BaseModel):
     pool: str = LOCAL_POOL
     hardware: dict[str, Any] = Field(default_factory=dict)
     metrics: MachineSample | None = None
+    engine_gpus: dict[str, EngineGpu] = Field(default_factory=dict, max_length=MAX_ENGINES)
 
     def info(self) -> WorkerInfo:
-        return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus, pool=self.pool)
+        return WorkerInfo(
+            id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus, pool=self.pool, hardware=self.hardware
+        )
+
+    def report(self) -> NodeReport:
+        return NodeReport.from_dict(self.hardware | {"host": self.host})
 
 
 class ClaimRequest(pydantic.BaseModel):
@@ -124,11 +142,14 @@ class ClaimResponse(pydantic.BaseModel):
     token: str
     params: dict[str, Any]
     lease_seconds: int
+    gpu: dict[str, int] | None = None
     env: dict[str, str] = Field(default_factory=dict)
 
 
 class HostedEngine(pydantic.BaseModel):
     model: str
+    gpu: dict[str, int] | None = None
+    waiting: str | None = None
 
 
 class EnginesRequest(pydantic.BaseModel):
@@ -219,6 +240,19 @@ def admitted(session: SessionDep, request: Request, caller: Caller, body: Worker
     admit(session, caller, body.pool, body.host, WORKER, address_of(request))
 
 
+def report_engine_gpus(request: Request, body: WorkerBody) -> None:
+    if body.pool == LOCAL_POOL:
+        return
+    running = {key: found.grant() for key, found in body.engine_gpus.items()}
+    request.app.state.gpus.reported(node_id(body.pool, body.host), body.id, running)
+
+
+def hosted(key: str, found: Grant | str | None) -> HostedEngine:
+    if isinstance(found, str):
+        return HostedEngine(model=key, waiting=found)
+    return HostedEngine(model=key, gpu=found.as_dict() if found is not None else None)
+
+
 @router.post("/register", status_code=204)
 def register_worker(
     body: WorkerBody,
@@ -230,6 +264,7 @@ def register_worker(
 ) -> None:
     admitted(session, request, caller, body)
     report_worker(session, metrics, body, rejoin=True)
+    report_engine_gpus(request, body)
     queue.register(body.info())
 
 
@@ -238,6 +273,7 @@ def checked_in(
 ) -> str:
     admitted(session, request, caller, worker)
     state = report_worker(session, metrics, worker)
+    report_engine_gpus(request, worker)
     queue.register(worker.info())
     return state
 
@@ -299,11 +335,14 @@ def hosted_engines(
     worker = body.worker
     admitted(session, request, caller, worker)
     report_worker(session, metrics, worker)
+    report_engine_gpus(request, worker)
     queue.register(worker.info())
     config = request.app.state.gateway_config.current()
     placements = {key: found for key, found in config.placements.items() if key not in config.problems}
     wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)
-    engines = [HostedEngine(model=key) for key in wanted]
+    machine = node_id(worker.pool, worker.host)
+    grants = request.app.state.gpus.hosted(session, worker.report(), machine, wanted)
+    engines = [hosted(key, grants.get(key)) for key in wanted]
     return EnginesResponse(engines=engines, engine_token=engine_token(settings, caller))
 
 

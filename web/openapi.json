@@ -22668,6 +22668,18 @@
             "title": "Pool",
             "description": "Pool the job ran in, or the pool a queued job waits for."
           },
+          "waiting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting",
+            "description": "Why a queued job has not started yet, such as no GPU with room for it."
+          },
           "attempts": {
             "items": {
               "$ref": "#/components/schemas/AttemptInfo"
@@ -23116,6 +23128,18 @@
             ],
             "title": "Pool",
             "description": "Pool the job ran in, or the pool a queued job waits for."
+          },
+          "waiting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting",
+            "description": "Why a queued job has not started yet, such as no GPU with room for it."
           }
         },
         "type": "object",

@@ -2,6 +2,7 @@ import logging
 import secrets
 import threading
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -13,7 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.jobs.output import EVENT, STATE
 from minibrain.jobs.policy import LEASE, backoff, policy
-from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.gpus import GRANT_NODE, Grant, shared
+from minibrain.models.hardware import LOCAL_POOL, NodeReport
 from minibrain.registry.compute import node_id
 from minibrain.registry.models import (
     FINAL_JOB_STATUSES,
@@ -31,6 +33,7 @@ from minibrain.registry.models import (
 from minibrain.registry.pool_settings import TRAINING, TRAINING_KINDS, require, workload_of_job, workloads_of
 
 TERMINAL = tuple(str(status) for status in FINAL_JOB_STATUSES)
+SCAN = 20
 
 logger = logging.getLogger("minibrain.jobs")
 
@@ -51,6 +54,13 @@ class Effects(Protocol):
     def on_retry(self, session: Session, job: Job) -> None: ...
 
 
+class Gpus(Protocol):
+    @property
+    def lock(self) -> AbstractContextManager[Any]: ...
+
+    def job_grant(self, session: Session, job: Job, report: NodeReport, node: str) -> Grant | str: ...
+
+
 @dataclass(frozen=True)
 class Claim:
     job_id: int
@@ -59,6 +69,7 @@ class Claim:
     token: str
     params: dict[str, Any]
     lease_seconds: int
+    gpu: dict[str, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -84,6 +95,10 @@ class WorkerInfo:
     kinds: list[str] = field(default_factory=list)
     gpus: int = 1
     pool: str = LOCAL_POOL
+    hardware: dict[str, Any] = field(default_factory=dict)
+
+    def report(self) -> NodeReport:
+        return NodeReport.from_dict(self.hardware | {"host": self.host})
 
 
 def add_event(
@@ -254,11 +269,13 @@ class SqlJobQueue:
         effects: Effects,
         clock: Callable[[], datetime] = now,
         delay: Callable[[int], timedelta] = backoff,
+        gpus: Gpus | None = None,
     ) -> None:
         self.sessions = sessions
         self.effects = effects
         self.clock = clock
         self.delay = delay
+        self.gpus = gpus
         self.lock = threading.Lock()
 
     def register(self, worker: WorkerInfo) -> None:
@@ -272,34 +289,57 @@ class SqlJobQueue:
             session.add(record)
             session.commit()
 
+    def candidates(self, session: Session, worker: WorkerInfo, moment: datetime) -> Select[Job]:
+        busy = session.scalar(
+            select(func.count(Job.id)).where(
+                Job.status == JobStatus.RUNNING, Job.lease_owner == worker.id, Job.needs_gpu.is_(True)
+            )
+        )
+        candidate = select(Job).where(
+            Job.status == JobStatus.QUEUED,
+            Job.run_after <= moment,
+            Job.kind.in_(worker.kinds),
+            or_(Job.pool.is_(None), Job.pool == worker.pool),
+        )
+        if TRAINING not in workloads_of(session, worker.pool):
+            candidate = candidate.where(Job.kind.not_in(TRAINING_KINDS))
+        if (busy or 0) >= worker.gpus:
+            candidate = candidate.where(Job.needs_gpu.is_(False))
+        return candidate.order_by(Job.priority.desc(), Job.id).with_for_update(skip_locked=True)
+
+    def fitting(
+        self, session: Session, jobs: Sequence[Job], gpus: Gpus, report: NodeReport, machine: str
+    ) -> tuple[Job | None, Grant | None]:
+        for job in jobs:
+            if not job.needs_gpu:
+                return job, None
+            found = gpus.job_grant(session, job, report, machine)
+            if isinstance(found, Grant):
+                return job, found
+            if job.waiting != found:
+                job.waiting = found
+        return None, None
+
     def claim(self, worker: WorkerInfo) -> Claim | None:
-        with self.lock, self.sessions() as session:
+        report = worker.report()
+        machine = node_id(worker.pool, worker.host)
+        gpus = self.gpus if self.gpus is not None and shared(report) else None
+        with self.lock, gpus.lock if gpus is not None else nullcontext(), self.sessions() as session:
             moment = self.clock()
-            busy = session.scalar(
-                select(func.count(Job.id)).where(
-                    Job.status == JobStatus.RUNNING, Job.lease_owner == worker.id, Job.needs_gpu.is_(True)
-                )
-            )
-            candidate = select(Job.id).where(
-                Job.status == JobStatus.QUEUED,
-                Job.run_after <= moment,
-                Job.kind.in_(worker.kinds),
-                or_(Job.pool.is_(None), Job.pool == worker.pool),
-            )
-            if TRAINING not in workloads_of(session, worker.pool):
-                candidate = candidate.where(Job.kind.not_in(TRAINING_KINDS))
-            if (busy or 0) >= worker.gpus:
-                candidate = candidate.where(Job.needs_gpu.is_(False))
-            candidate = (
-                candidate.order_by(Job.priority.desc(), Job.id)
-                .limit(1)
-                .with_for_update(skip_locked=True)
-                .scalar_subquery()
-            )
+            candidate = self.candidates(session, worker, moment)
+            if gpus is None:
+                chosen, grant = session.scalar(candidate.limit(1)), None
+            else:
+                scanned = session.scalars(candidate.limit(SCAN)).all()
+                chosen, grant = self.fitting(session, scanned, gpus, report, machine)
+            if chosen is None:
+                session.commit()
+                return None
             token = secrets.token_urlsafe(24)
+            gpu = grant.as_dict() | {GRANT_NODE: machine} if grant is not None else None
             claimed = session.scalar(
                 update(Job)
-                .where(Job.id == candidate, Job.status == JobStatus.QUEUED)
+                .where(Job.id == chosen.id, Job.status == JobStatus.QUEUED)
                 .values(
                     status=JobStatus.RUNNING,
                     attempt=Job.attempt + 1,
@@ -307,6 +347,8 @@ class SqlJobQueue:
                     lease_token=token,
                     lease_expires_at=moment + LEASE,
                     started_at=func.coalesce(Job.started_at, moment),
+                    gpu=gpu,
+                    waiting=None,
                 )
                 .returning(Job.id)
             )
@@ -317,11 +359,11 @@ class SqlJobQueue:
             if job is None:
                 raise JobStateError(f"job {claimed} vanished during claim")
             session.refresh(job)
-            machine = node_id(worker.pool, worker.host)
             session.add(
                 JobAttempt(job_id=job.id, number=job.attempt, worker=worker.id, node_id=machine, started_at=moment)
             )
-            add_state(session, job, f"attempt {job.attempt} started in pool {worker.pool} ({worker.host})")
+            on_gpu = f" on GPU {grant.device}" if grant is not None else ""
+            add_state(session, job, f"attempt {job.attempt} started in pool {worker.pool} ({worker.host}){on_gpu}")
             session.commit()
             return Claim(
                 job_id=job.id,
@@ -330,6 +372,7 @@ class SqlJobQueue:
                 token=token,
                 params=dict(job.params),
                 lease_seconds=int(LEASE.total_seconds()),
+                gpu=grant.as_dict() if grant is not None else None,
             )
 
     def leased(self, session: Session, job_id: int, token: str) -> Job:

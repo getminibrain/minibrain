@@ -7007,6 +7007,11 @@ export interface components {
              * @description Pool the job ran in, or the pool a queued job waits for.
              */
             pool?: string | null;
+            /**
+             * Waiting
+             * @description Why a queued job has not started yet, such as no GPU with room for it.
+             */
+            waiting?: string | null;
             /** Attempts */
             attempts: components["schemas"]["AttemptInfo"][];
             /** Result */
@@ -7171,6 +7176,11 @@ export interface components {
              * @description Pool the job ran in, or the pool a queued job waits for.
              */
             pool?: string | null;
+            /**
+             * Waiting
+             * @description Why a queued job has not started yet, such as no GPU with room for it.
+             */
+            waiting?: string | null;
         };
         /** JobLogPurge */
         JobLogPurge: {

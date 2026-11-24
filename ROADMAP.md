@@ -788,7 +788,9 @@ from. They have different endpoints and keys, so they are configured apart.
 ## Training
 
 - The worker claims a job and spawns `accelerate launch train.py <job.json>`. Never inside uvicorn.
-- One lock per GPU. Train vs serve contention is a config: dedicated training GPUs, or unload the pool while training.
+- GPUs are divided per machine, not locked per pool: a GPU job gets an idle GPU, or what is left of one beside
+  live engines when its plan fits there (Training memory, Serving › GPUs on one machine). Dedicated training GPUs
+  are a pool used for training only.
 - On a single GPU the worker runs the steps in order: load the teacher pool → label / generate → unload → train → eval
   → load the adapter into the serving pool.
 - Progress: a TRL `TrainerCallback` emits a `train.step` event every step (loss, learning rate, grad norm, epoch,
@@ -856,6 +858,12 @@ Built (2026-11-05). Each run picks how the base fits the memory of the machine t
 - Discover, Add model and the base picker show Memory to run and Memory to train (QLoRA): QLoRA 4-bit with
   checkpointing on an NVIDIA GPU, one 512-token row at a time, with "Trains here" when a worker in the pool can train
   it. Runs here stays about serving.
+- On an NVIDIA machine the job runs on the one GPU main gave it at claim (Serving › GPUs on one machine): it sees
+  only that GPU (`CUDA_VISIBLE_DEVICES`) and plans within the memory it was given (`MINIBRAIN_GPU_BYTES`, the
+  whole GPU when it was idle, else what was left on it). The claim needs the planned peak over 85% (at most the
+  largest GPU's usable memory, so a plan made for a bigger machine plans again on a whole GPU); scoring, judging
+  and exports need the base's serving memory (`weights × 1.2 + 0.5 GB`). A run uses that one GPU; the Trainer no
+  longer spreads it over every visible GPU (multi-GPU training is v2).
 - Measured on an M1 Pro (`docs/findings.md`); QLoRA and the CUDA estimates have not run on an NVIDIA GPU yet.
 
 ### Base model registry
@@ -1148,6 +1156,31 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   (`docs/api/chat-completions.md`, Sampling); unset fields keep the model's default, custom models answer at temperature 0, and
   `max_tokens` unset runs to the context limit. An engine that cannot honour a field refuses it with a 400.
 - Engines are never exposed; the gateway proxies every call.
+
+### GPUs on one machine
+
+Built 2026-11-24, for NVIDIA (CUDA) machines; Apple silicon, the CPU, ROCm and Intel GPUs start engines and jobs as
+before. Not yet run on an NVIDIA GPU.
+
+- Every engine and every GPU job on a machine gets an explicit GPU, so a second engine or a training run next to a
+  live model no longer runs out of memory and restarts in a loop.
+- main keeps the book per machine: engines on its own machine directly, engines on joined machines through the
+  worker that starts them (it reports its engines' GPUs on every call to main), and running jobs on the job row.
+  Each GPU counts 90% of its memory as usable; the rest covers CUDA contexts and activations.
+- Whole GPUs first: an engine or job takes an idle GPU when one has room, else a share of the GPU with the most
+  room, and only when the base fits in what is left.
+- An engine needs the base's serving memory (`weights × 1.2 + 0.5 GB`, as Runs here) and takes that plus a KV
+  cache allowance of a quarter of the weights, at least 2 GB, never the whole GPU, so jobs can run beside it. It
+  starts with `CUDA_VISIBLE_DEVICES` and a memory fraction: SGLang `--mem-fraction-static` (its share plus what
+  others held on that GPU when it started, since SGLang counts every process's memory against the fraction), vLLM
+  `--gpu-memory-utilization` (its own share). One GPU per engine; tensor parallel across GPUs comes later.
+- A GPU job takes all that is left of its GPU (the whole GPU when it was idle) and is claimed only where that is
+  enough (Training memory). Otherwise it stays queued and says why on the job page and the version: "Waiting for
+  a GPU on gpu-01 with 38 GB free for training job 12: GPU 0 has 12 GB free (the engine for qwen3-8b holds
+  24 GB)".
+- An engine with no room waits too: on main the request gets a 503 with the same sentence, on a worker it is
+  logged; it starts once a job or engine frees the GPU. A GPU id in the worker's own `CUDA_VISIBLE_DEVICES` (such
+  as Docker's device list) is kept: grants index into it.
 
 ## API and access
 
@@ -1823,8 +1856,9 @@ Two modes, same code, same adapter format (PEFT safetensors).
 - 8B student, planner estimates at 160-token rows and an effective batch of 16: LoRA in bf16 ~32GB at micro-batch 8
   (~20GB with checkpointing), QLoRA with checkpointing ~10GB; serving ~16GB weights plus KV cache.
 - Teacher: ~30B class ~32GB in FP8 or ~64GB in bf16; ~70B class ~40GB in 4-bit; plus KV cache.
-- Minimum: one 80GB GPU, steps run in order by the worker. Recommended: two (teacher and training on one, serving on
-  the other) so prompt-only versions stay up.
+- Minimum: one 80GB GPU. A live 8B engine holds about 24GB of it and training runs beside it in the remaining
+  ~48GB (Serving › GPUs on one machine); a run that does not fit waits for the GPU. Recommended: two (teacher and
+  training on one, serving on the other) so prompt-only versions stay up.
 - Reference configs: 2–3 tested servers (1× 80GB, 2× 80GB, 8× for many models), each with exact driver, CUDA and
   image versions. A preinstalled appliance comes later.
 
@@ -2117,6 +2151,12 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   until 60 s job leases ran out. Chat and text completions now run on their own bounded threads
   (`MINIBRAIN_GATEWAY_CONCURRENCY`, 64), streams included; a call past the limit gets a 503 with `Retry-After` at
   once, and one to an engine still starting gets one after 5 s. Standalone gateways do the same (2026-11-24).
+- [x] Nothing divided a machine's GPUs between engines and jobs: SGLang and vLLM started with their default memory
+  share and no `CUDA_VISIBLE_DEVICES`, training and scoring loaded onto the first GPU, and GPU job slots counted
+  jobs, not engines, so a second engine or a training run next to a live model ran out of memory and restarted in
+  a loop. Each engine and GPU job on an NVIDIA machine now gets its own GPU, or a share sized to its model, with
+  `CUDA_VISIBLE_DEVICES` and an explicit memory fraction; a job with no room stays queued and says why
+  (2026-11-24).
 - [x] Engines for models that were not live never stopped: every ready version has a pinned route, so main counted its
   base as needed and the idle stop never applied. Main now keeps engines running only for live models (and their
   safety models); the rest start on the first request and stop after 15 minutes idle (2026-11-24).

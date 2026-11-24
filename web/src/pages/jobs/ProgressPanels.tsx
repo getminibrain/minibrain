@@ -93,7 +93,7 @@ function quietNote(job: JobDetail, facts: Fact[]): string | null {
         return null;
     }
     if (job.status === "queued") {
-        return "Waiting for a worker.";
+        return job.waiting ?? "Waiting for a worker.";
     }
     return TRANSFERS.includes(job.kind) && !isActiveJob(job) ? "No files moved in this run." : null;
 }

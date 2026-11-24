@@ -398,6 +398,8 @@ class Job(Base):
     base_model_key: Mapped[str | None] = mapped_column(default=None)
     delete_requested: Mapped[bool] = mapped_column(default=False, server_default=false())
     pool: Mapped[str | None] = mapped_column(default=None)
+    gpu: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    waiting: Mapped[str | None] = mapped_column(default=None)
 
     model: Mapped[Model | None] = relationship(back_populates="jobs")
     version: Mapped[Version | None] = relationship()

@@ -9,13 +9,14 @@ from collections.abc import Callable, Iterator
 from contextlib import ExitStack
 from contextvars import ContextVar
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
 from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion, Piece
+from minibrain.models.gpus import Grant, NoGpuError
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, Event, OutputFormatError
 from minibrain.serve.sampling import UnsupportedParameterError
@@ -44,6 +45,12 @@ def free_port() -> int:
         return probe.getsockname()[1]
 
 
+class EngineGpus(Protocol):
+    def grant(self, key: str) -> Grant | None: ...
+
+    def release(self, key: str) -> None: ...
+
+
 class EngineManager:
     def __init__(
         self,
@@ -51,16 +58,20 @@ class EngineManager:
         main_url: str,
         idle_seconds: float = IDLE_SECONDS,
         hub_allowed: Callable[[], bool] = lambda: True,
+        gpus: EngineGpus | None = None,
     ) -> None:
         self.settings = settings
         self.main_url = main_url
         self.idle_seconds = idle_seconds
         self.hub_allowed = hub_allowed
+        self.gpus = gpus
         self.engines: dict[str, tuple[str, Supervisor]] = {}
         self.used: dict[str, float] = {}
+        self.waits: dict[str, str] = {}
         self.lock = threading.Lock()
 
     def start(self, spec: BaseModelSpec) -> str:
+        grant = self.gpus.grant(spec.key) if self.gpus is not None else None
         port = free_port()
         command = [
             sys.executable,
@@ -79,12 +90,28 @@ class EngineManager:
         env = os.environ | {"MINIBRAIN_GATEWAY_TOKEN": self.settings.secret("gateway_token")}
         if not self.hub_allowed():
             env |= {"HF_HUB_OFFLINE": "1"}
+        if grant is not None:
+            env |= grant.engine_env(os.environ)
         supervisor = Supervisor(f"engine {spec.key}", command, env)
         supervisor.start()
         url = f"http://127.0.0.1:{port}"
         self.engines[spec.key] = (url, supervisor)
         self.used[spec.key] = time.monotonic()
+        self.waits.pop(spec.key, None)
         return url
+
+    def start_or_wait(self, spec: BaseModelSpec) -> None:
+        try:
+            self.start(spec)
+        except NoGpuError as error:
+            if self.waits.get(spec.key) != str(error):
+                log.warning("%s", error)
+            self.waits[spec.key] = str(error)
+
+    def stopped(self, key: str, supervisor: Supervisor) -> None:
+        supervisor.shutdown()
+        if self.gpus is not None:
+            self.gpus.release(key)
 
     def ensure(
         self,
@@ -99,7 +126,7 @@ class EngineManager:
             }
             for key, spec in specs.items():
                 if key not in self.engines and key not in elsewhere:
-                    self.start(spec)
+                    self.start_or_wait(spec)
             self.reap({key for key in specs if key not in elsewhere}, releasing)
             return {key: url for key, (url, _) in self.engines.items()}
 
@@ -109,12 +136,17 @@ class EngineManager:
             if key in releasing or moment - self.used.get(key, 0.0) > self.idle_seconds:
                 _, supervisor = self.engines.pop(key)
                 log.info("stopping the engine for %s", key)
-                supervisor.shutdown()
+                self.stopped(key, supervisor)
 
     def ensure_one(self, spec: BaseModelSpec) -> str:
         with self.lock:
             found = self.engines.get(spec.key)
-            return found[0] if found else self.start(spec)
+            if found:
+                return found[0]
+            try:
+                return self.start(spec)
+            except NoGpuError as error:
+                raise EngineUnavailableError(str(error)) from error
 
     def touch(self, key: str) -> None:
         self.used[key] = time.monotonic()
@@ -123,7 +155,7 @@ class EngineManager:
         with self.lock:
             found = self.engines.pop(key, None)
         if found is not None:
-            found[1].shutdown()
+            self.stopped(key, found[1])
 
     def url(self, base: str) -> str | None:
         found = self.engines.get(base)
@@ -146,8 +178,8 @@ class EngineManager:
         return "unhealthy" if failed or supervisor.restarts > 0 else "starting"
 
     def stop(self) -> None:
-        for _, supervisor in self.engines.values():
-            supervisor.shutdown()
+        for key, (_, supervisor) in list(self.engines.items()):
+            self.stopped(key, supervisor)
 
 
 Engines = Callable[[], dict[str, list[dict[str, str]]]]

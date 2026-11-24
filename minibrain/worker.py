@@ -26,6 +26,7 @@ from minibrain.jobs.output import OutputParser, structured
 from minibrain.jobs.retention import JOB_FOLDER
 from minibrain.ml.context import FINAL_EXIT
 from minibrain.models.copies import BUCKET, bucket_client, ensure, matches, opener_for, prune
+from minibrain.models.gpus import Grant
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import size_problems
 from minibrain.models.machine_metrics import Sampler
@@ -121,6 +122,7 @@ class WorkerConfig:
     models: Path | None = None
     prune: bool = True
     sampler: Sampler | None = None
+    engine_gpus: dict[str, dict[str, int]] = field(default_factory=dict)
 
     @property
     def models_dir(self) -> Path:
@@ -187,6 +189,7 @@ class MainClient:
             "gpus": config.gpus,
             "pool": config.pool,
             "hardware": config.hardware,
+            "engine_gpus": dict(config.engine_gpus),
         } | ({"metrics": config.sampler.body()} if config.sampler is not None else {})
 
     def register(self) -> None:
@@ -370,6 +373,12 @@ class Lease:
     def end(self) -> None:
         self.done.set()
         self.thread.join()
+
+
+def job_env(claim: dict[str, Any]) -> dict[str, str]:
+    gpu = claim.get("gpu")
+    granted = Grant.from_dict(gpu).job_env(os.environ) if gpu else {}
+    return dict(claim.get("env") or {}) | granted
 
 
 def failure_from(tail: list[str], exit_code: int) -> tuple[str, bool, str | None]:
@@ -571,7 +580,7 @@ class Worker:
             publisher = self.publisher(claim)
             started = time.monotonic()
             exit_code, cancelled, tail = self.supervise(
-                job_id, token, lease, arguments, log_path, claim.get("env") or {}, publisher, self.secrets(claim)
+                job_id, token, lease, arguments, log_path, job_env(claim), publisher, self.secrets(claim)
             )
             seconds = time.monotonic() - started
             stored_error = publisher.finish() if publisher is not None else None

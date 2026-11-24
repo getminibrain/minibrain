@@ -567,6 +567,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
   UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
+- **GPU sharing** · shipped · admin, ml
+  Engines and GPU jobs get their own GPU or a fitting share.
+  UI: Jobs › job, Models › model › Versions › version
 - **Remote workers** · shipped · admin
   Join GPU machines that run training and scoring jobs.
   CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_JOIN_TOKEN

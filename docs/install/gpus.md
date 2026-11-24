@@ -65,6 +65,26 @@ the Apple GPU (MPS), then the CPU.
 To force a device for training, set `MINIBRAIN_TRAIN_DEVICE` to `cuda`, `xpu`, `mps` or `cpu`. A forced device has
 no fallback.
 
+## Engines and jobs on one machine
+
+On a machine with NVIDIA GPUs, minibrain gives every engine and every training, scoring, judging or export job its
+own GPU, or its own share of one, so they never load onto the same memory:
+
+- An engine or job takes an idle GPU first. When none is idle it shares the GPU with the most room, if its model
+  fits in what is left. minibrain counts 90% of each GPU's memory as usable.
+- An engine takes the memory its model needs to serve plus room for its KV cache, never the whole GPU, so a
+  training run can share the GPU of a live model. SGLang starts with `--mem-fraction-static` and vLLM with
+  `--gpu-memory-utilization` sized to that share.
+- A job takes what is left of its GPU and plans its training within it.
+- Each one sees only its GPU through `CUDA_VISIBLE_DEVICES`. If the worker already runs with
+  `CUDA_VISIBLE_DEVICES` set, such as a container given some of the host's GPUs, minibrain shares out only those.
+- A job with no GPU left stays queued and its page says why, for example "Waiting for a GPU on gpu-01 with 38 GB
+  free for training job 12: GPU 0 has 12 GB free (the engine for qwen3-8b holds 24 GB)". An engine with no GPU
+  left waits the same way and starts when one frees up.
+
+One engine uses one GPU. Apple silicon, the CPU, AMD and Intel GPUs run engines and jobs as before, without this
+split. GPU sharing has not been run on an NVIDIA GPU yet.
+
 ## Apple silicon
 
 Use a Mac for development and for trying minibrain on smaller models; the native install gets the Metal build of

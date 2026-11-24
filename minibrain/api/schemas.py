@@ -631,6 +631,9 @@ class JobInfo(BaseModel):
     device_time: DeviceTime | None = Field(default=None, description="Device time of a finished run, on job lists.")
     eta_seconds: float | None = Field(default=None, description="Time left a running training run reports.")
     pool: str | None = Field(default=None, description="Pool the job ran in, or the pool a queued job waits for.")
+    waiting: str | None = Field(
+        default=None, description="Why a queued job has not started yet, such as no GPU with room for it."
+    )
 
 
 class JobPage(BaseModel):

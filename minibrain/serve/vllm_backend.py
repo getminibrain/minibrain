@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from minibrain.base_models import BaseModelSpec
+from minibrain.models.gpus import FRACTION_ENV, memory_flags
 from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.dialects import ALWAYS, EFFORT, HARMONY, HERMES, LLAMA3, MISTRAL, TOGGLE
 from minibrain.serve.openai_server import (
@@ -46,6 +47,7 @@ def launch_command(spec: BaseModelSpec, port: int) -> list[str]:
         str(MAX_LORA_RANK),
         "--max-loras",
         str(MAX_LORAS_PER_BATCH),
+        *memory_flags("--gpu-memory-utilization", FRACTION_ENV),
         *parser_flags(spec),
     ]
 

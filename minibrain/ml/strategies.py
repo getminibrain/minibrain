@@ -21,6 +21,7 @@ from minibrain.ml.planner import (
     seq_len_for,
 )
 from minibrain.ml.runtime import load_base_model
+from minibrain.models.gpus import granted_budget
 from minibrain.models.hardware import ram_bytes
 from minibrain.versions import installed_versions
 
@@ -29,6 +30,12 @@ PINNED = ("strategy", "checkpointing", "micro_batch")
 
 
 def device_memory(device: str) -> int | None:
+    found = whole_device_memory(device)
+    budget = granted_budget()
+    return found if found is None or budget is None else min(found, budget)
+
+
+def whole_device_memory(device: str) -> int | None:
     kind = kind_of(device)
     if kind == "cuda" and torch.cuda.is_available():
         return int(torch.cuda.get_device_properties(torch.device(device)).total_memory)

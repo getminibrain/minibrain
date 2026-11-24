@@ -18,6 +18,7 @@ from minibrain.artifacts import ArtifactStore, StreamReader
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.completion import Completion, Piece
 from minibrain.models.copies import BUCKET, Progress, bucket_client, ensure, opener_for, prune
+from minibrain.models.gpus import ran_granted
 from minibrain.models.hardware import LOCAL_POOL, NodeReport, report
 from minibrain.models.health import CANT_RUN, NO_MEMORY, base_changed
 from minibrain.models.machine_metrics import Sampler
@@ -423,7 +424,7 @@ def create_engine_app(
         announcer: Announcer | None = None
         if url is not None:
             body = {"id": uuid.uuid4().hex, "host": hardware.host, "url": url, "base_model": base}
-            body |= {"pool": pool, "hardware": hardware.as_dict(), "managed": managed}
+            body |= {"pool": pool, "hardware": {} if ran_granted() else hardware.as_dict(), "managed": managed}
             announcer = Announcer(
                 client,
                 token,

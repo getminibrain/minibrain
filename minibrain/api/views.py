@@ -258,6 +258,7 @@ def job_fields(job: Job) -> dict:
         "run_after": job.run_after,
         "started_at": job.started_at,
         "finished_at": job.finished_at,
+        "waiting": job.waiting if job.status == JobStatus.QUEUED else None,
     } | job_facts(job)
 
 
