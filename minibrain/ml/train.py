@@ -16,7 +16,7 @@ from trl.trainer.sft_trainer import SFTTrainer
 
 from minibrain.data.splits import read_split
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
-from minibrain.ml.devices import forced_training_device, half_dtype, kind_of, training_device
+from minibrain.ml.devices import cap_to_grant, forced_training_device, half_dtype, kind_of, training_device
 from minibrain.ml.examples import encode_all
 from minibrain.ml.planner import DEFAULT_SEED, EVAL_ROWS, EVAL_SHARE, scheduler_type, train_steps, warmup_steps
 from minibrain.ml.runtime import load_tokenizer
@@ -303,4 +303,5 @@ def main(spec: JobSpec) -> None:
 
 
 if __name__ == "__main__":
+    cap_to_grant()
     run_child(main)

@@ -6,13 +6,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from minibrain.ml.planner import HEADROOM
+from minibrain.ml.planner import HEADROOM, REFERENCE_SEQ, Base, Machine, settings_of, smallest_peak, smallest_run
 from minibrain.models.gpus import (
     GRANT_NODE,
     Grant,
     Hold,
     NoGpuError,
     choose,
+    choose_engine,
     largest_usable,
     serving_bytes,
     shared,
@@ -20,8 +21,11 @@ from minibrain.models.gpus import (
 )
 from minibrain.models.hardware import FIXED_OVERHEAD, LOCAL_POOL, NodeReport, needed_bytes
 from minibrain.models.placement import weights_of
+from minibrain.models.train_facts import base_facts
 from minibrain.registry.compute import node_id
 from minibrain.registry.models import Job, JobKind, JobStatus
+from minibrain.registry.service import NotFoundError
+from minibrain.settings import Settings
 
 FRESH_SECONDS = 60.0
 JOB_NOUNS: dict[str, str] = {
@@ -57,22 +61,56 @@ def planned_peak(params: Mapping[str, Any]) -> int | None:
     return int(peak) if isinstance(peak, int | float) and not isinstance(peak, bool) and peak > 0 else None
 
 
-def job_estimate(session: Session, job: Job) -> int:
+def smallest_training(params: Mapping[str, Any], machine: Machine) -> int | None:
+    recipe = params.get("recipe")
+    found = params.get("plan_base")
+    if not isinstance(recipe, dict) or not isinstance(found, dict):
+        return None
+    try:
+        settings = settings_of(recipe, ())
+        base = Base.from_dict(found)
+    except (KeyError, TypeError, ValueError):
+        return None
+    seq = recipe.get("seq_len")
+    peak = smallest_peak(base, machine, settings, int(seq) if isinstance(seq, int) and seq > 0 else REFERENCE_SEQ)
+    return None if peak is None else int(peak / HEADROOM)
+
+
+def job_estimate(session: Session, job: Job, machine: Machine) -> int:
     params = job.params or {}
-    peak = planned_peak(params) if job.kind == JobKind.TRAIN else None
-    if peak is not None:
-        return int(peak / HEADROOM)
+    if job.kind == JobKind.TRAIN:
+        least = smallest_training(params, machine)
+        peak = planned_peak(params)
+        if least is not None:
+            return least
+        if peak is not None:
+            return int(peak / HEADROOM)
     key = params.get("base_model") or job.base_model_key
     return needed_bytes(weights_of(session, str(key))[0]) if key else FIXED_OVERHEAD
 
 
 def job_least(session: Session, job: Job, report: NodeReport) -> int:
-    return min(job_estimate(session, job), largest_usable(report))
+    return min(job_estimate(session, job, Machine.from_report(report)), largest_usable(report))
+
+
+def reserve_base(session: Session, settings: Settings, key: str, weights: int) -> Base:
+    try:
+        return base_facts(session, settings, key)
+    except NotFoundError:
+        return Base.of(key, None, weights, None, None)
+
+
+def training_reserve(session: Session, settings: Settings, key: str, weights: int, report: NodeReport) -> int:
+    peak = smallest_run(reserve_base(session, settings, key, weights), Machine.from_report(report))
+    return 0 if peak is None else int(peak / HEADROOM)
 
 
 class GpuBook:
-    def __init__(self, sessions: sessionmaker[Session], clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(
+        self, sessions: sessionmaker[Session], settings: Settings, clock: Callable[[], float] = time.monotonic
+    ) -> None:
         self.sessions = sessions
+        self.settings = settings
         self.clock = clock
         self.lock = threading.RLock()
         self.local: dict[str, dict[str, Grant]] = {}
@@ -109,7 +147,8 @@ class GpuBook:
             weights = weights_of(session, key)[0]
             holds = self.holds(session, node)
             least = needed_bytes(weights)
-            grant = choose(report, holds, least, serving_bytes(weights))
+            reserve = training_reserve(session, self.settings, key, weights, report)
+            grant = choose_engine(report, holds, least, serving_bytes(weights), reserve)
             if grant is None:
                 raise NoGpuError(waiting_text(engine_holder(key), least, report, holds))
             return grant

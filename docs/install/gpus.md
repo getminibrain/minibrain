@@ -72,10 +72,15 @@ own GPU, or its own share of one, so they never load onto the same memory:
 
 - An engine or job takes an idle GPU first. When none is idle it shares the GPU with the most room, if its model
   fits in what is left. minibrain counts 90% of each GPU's memory as usable.
-- An engine takes the memory its model needs to serve plus room for its KV cache, never the whole GPU, so a
-  training run can share the GPU of a live model. SGLang starts with `--mem-fraction-static` and vLLM with
-  `--gpu-memory-utilization` sized to that share.
-- A job takes what is left of its GPU and plans its training within it.
+- An engine alone on a GPU takes all of it for its KV cache, except on the last idle GPU of the machine, where it
+  leaves room for the smallest training run of its own model (QLoRA where bitsandbytes is installed, else LoRA,
+  one 512-token row at a time), so you can train the next version beside the live one. On a GPU another engine
+  or job already uses, it takes what its model needs to serve plus a KV cache of a quarter of its weights (at
+  least 2 GB). SGLang starts with `--mem-fraction-static` and vLLM with `--gpu-memory-utilization` sized to that
+  share.
+- A job takes what is left of its GPU and plans its training within it. It waits only until its smallest workable
+  plan fits, not the fastest one, and PyTorch holds it to that memory (`set_per_process_memory_fraction`), so a
+  job that runs over fails itself, not the live model beside it.
 - Each one sees only its GPU through `CUDA_VISIBLE_DEVICES`. If the worker already runs with
   `CUDA_VISIBLE_DEVICES` set, such as a container given some of the host's GPUs, minibrain shares out only those.
 - A job with no GPU left stays queued and its page says why, for example "Waiting for a GPU on gpu-01 with 38 GB

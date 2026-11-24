@@ -1,11 +1,14 @@
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
-from sqlalchemy import select
+import torch
+from sqlalchemy import select, update
 
 from minibrain.base_models import QWEN3_0_6B
 from minibrain.ml import strategies
+from minibrain.ml.devices import cap_to_grant
 from minibrain.models.gpu_book import GpuBook, LocalEngineGpus
 from minibrain.models.gpus import (
     BUDGET_ENV,
@@ -16,6 +19,8 @@ from minibrain.models.gpus import (
     Hold,
     NoGpuError,
     choose,
+    choose_engine,
+    usable,
 )
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import Job
@@ -30,6 +35,7 @@ from tests.test_deploy_pools import deploy, host, join
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
 TWO_GPUS = replace(RACK, gpus=[Gpu("NVIDIA H100 80GB HBM3", 80 * GIB)] * 2, usable_bytes=160 * GIB)
+L4 = replace(RACK, host="gpu-l4", gpus=[Gpu("NVIDIA L4", 24 * GIB)], usable_bytes=24 * GIB)
 SMALL_GPU = replace(RACK, host="gpu-small", gpus=[Gpu("NVIDIA T4", 3 * GIB)], usable_bytes=3 * GIB)
 MAC = replace(RACK, host="mac", system="darwin", arch="arm64", accelerator="mps", gpus=[Gpu("Apple GPU", 12 * GIB)])
 OTHER = replace(QWEN3_0_6B, key="qwen3-other")
@@ -57,18 +63,20 @@ def recorded(monkeypatch: pytest.MonkeyPatch) -> list[Recorded]:
 
 
 def manager_on(harness: Harness, node: NodeReport) -> tuple[EngineManager, GpuBook]:
-    book = GpuBook(harness.sessions)
+    book = GpuBook(harness.sessions, harness.settings)
     return EngineManager(harness.settings, "http://main", gpus=LocalEngineGpus(book, lambda: node)), book
 
 
-def test_whole_gpus_go_first_and_a_share_only_where_the_base_fits() -> None:
-    first = choose(TWO_GPUS, [], 10 * GIB, 20 * GIB)
-    assert first is not None and (first.device, first.bytes, first.beside_bytes) == (0, 20 * GIB, 0)
-    second = choose(TWO_GPUS, [first.hold("a")], 10 * GIB, 20 * GIB)
-    assert second is not None and second.device == 1
-    third = choose(TWO_GPUS, [first.hold("a"), Hold("b", 1, 30 * GIB)], 10 * GIB, 20 * GIB)
-    assert third is not None and (third.device, third.beside_bytes) == (0, 20 * GIB)
-    assert third.fraction == 0.25 and third.ceiling == 0.5
+def test_an_engine_takes_its_whole_gpu_but_leaves_room_to_train_on_the_last_idle_one() -> None:
+    first = choose_engine(TWO_GPUS, [], 10 * GIB, 20 * GIB, 30 * GIB)
+    assert first is not None and (first.device, first.bytes, first.beside_bytes) == (0, usable(80 * GIB), 0)
+    second = choose_engine(TWO_GPUS, [first.hold("a")], 10 * GIB, 20 * GIB, 30 * GIB)
+    assert second is not None and (second.device, second.bytes) == (1, usable(80 * GIB) - 30 * GIB)
+    third = choose_engine(TWO_GPUS, [Hold("a", 0, 70 * GIB), Hold("b", 1, 30 * GIB)], 10 * GIB, 20 * GIB, 30 * GIB)
+    assert third is not None and (third.device, third.bytes, third.beside_bytes) == (1, 20 * GIB, 30 * GIB)
+    assert third.fraction == 0.25 and third.ceiling == 0.62
+    cramped = choose_engine(TWO_GPUS, [Hold("x", 1, 80 * GIB)], 10 * GIB, 50 * GIB, 30 * GIB)
+    assert cramped is not None and (cramped.device, cramped.bytes) == (0, usable(80 * GIB))
     job = choose(TWO_GPUS, [first.hold("a")], 30 * GIB)
     assert job is not None and (job.device, job.bytes) == (1, 80 * GIB)
     assert choose(TWO_GPUS, [Hold("a", 0, 70 * GIB), Hold("b", 1, 70 * GIB)], 10 * GIB) is None
@@ -207,3 +215,32 @@ def test_a_joined_machine_reports_its_engine_gpus_and_jobs_wait_for_them(harness
     engine_host.stop_all()
     claim = MainClient(engine_host.config, http=harness.client).claim(0)
     assert claim is not None and claim["gpu"]["device"] == 0
+
+
+def test_training_runs_beside_a_live_model_in_the_room_its_engine_leaves(harness: Harness) -> None:
+    create_with_dataset(harness)
+    add_version(harness, "lora")
+    job = train_job(harness)
+    planned = dict(job.params) | {"recipe": dict(job.params["recipe"]) | {"plan": {"peak_bytes": 20 * GIB}}}
+    with harness.sessions() as session:
+        session.execute(update(Job).where(Job.id == job.id).values(params=planned))
+        session.commit()
+    engine = LocalEngineGpus(harness.app.state.gpus, lambda: L4)
+    grant = engine.grant(QWEN3_0_6B.key)
+    assert grant is not None and 0 < grant.bytes < usable(24 * GIB)
+    claim = claim_on(harness, L4)
+    assert claim is not None and claim["job_id"] == job.id
+    assert claim["gpu"]["beside_bytes"] == grant.bytes
+    assert claim["gpu"]["bytes"] == usable(24 * GIB) - grant.bytes
+
+
+def test_a_gpu_job_is_held_to_the_memory_it_was_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    capped: list[tuple[float, int]] = []
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _device: SimpleNamespace(total_memory=80 * GIB))
+    monkeypatch.setattr(
+        torch.cuda, "set_per_process_memory_fraction", lambda share, device: capped.append((share, device))
+    )
+    assert cap_to_grant({}) is None and capped == []
+    assert cap_to_grant({BUDGET_ENV: str(20 * GIB)}) == 0.25
+    assert capped == [(0.25, 0)]

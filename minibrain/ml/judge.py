@@ -1,4 +1,5 @@
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
+from minibrain.ml.devices import cap_to_grant
 from minibrain.ml.runtime import Runtime
 from minibrain.serve.dialects import answer_text
 from minibrain.tasks.judge import Item, grade_value, messages_for, reason_of
@@ -46,4 +47,5 @@ def main(spec: JobSpec) -> None:
 
 
 if __name__ == "__main__":
+    cap_to_grant()
     run_child(main)

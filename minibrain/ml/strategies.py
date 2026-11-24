@@ -11,7 +11,7 @@ from minibrain.ml.context import FinalError, JobSpec
 from minibrain.ml.devices import device_name, half_dtype, kind_of
 from minibrain.ml.examples import Encoded, longest, truncated
 from minibrain.ml.planner import (
-    DEFAULT_SEED,
+    PINNED,
     QLORA,
     Base,
     Machine,
@@ -19,6 +19,7 @@ from minibrain.ml.planner import (
     Settings,
     plan_machine,
     seq_len_for,
+    settings_of,
 )
 from minibrain.ml.runtime import load_base_model
 from minibrain.models.gpus import granted_budget
@@ -26,7 +27,6 @@ from minibrain.models.hardware import ram_bytes
 from minibrain.versions import installed_versions
 
 PLAN_BASE = "plan_base"
-PINNED = ("strategy", "checkpointing", "micro_batch")
 
 
 def device_memory(device: str) -> int | None:
@@ -64,29 +64,6 @@ def base_of(spec: JobSpec) -> Base:
     if found:
         return Base.from_dict(found)
     return Base.of(spec.base.key, None, None, None, None)
-
-
-def settings_of(recipe: dict[str, Any], keep: tuple[str, ...]) -> Settings:
-    overrides = set(recipe.get("overrides") or [])
-    pinned = {name: recipe.get(name) for name in PINNED if name in keep or name in overrides}
-    return Settings(
-        strategy=pinned.get("strategy"),
-        checkpointing=pinned.get("checkpointing"),
-        micro_batch=pinned.get("micro_batch"),
-        seq_len=int(recipe["seq_len"]) if "seq_len" in overrides else None,
-        rank=int(recipe["rank"]),
-        learning_rate=float(recipe["learning_rate"]),
-        warmup=float(recipe.get("warmup", Settings.warmup)),
-        scheduler=str(recipe.get("scheduler", Settings.scheduler)),
-        dropout=float(recipe.get("dropout", Settings.dropout)),
-        weight_decay=float(recipe.get("weight_decay", Settings.weight_decay)),
-        epochs=float(recipe["epochs"]),
-        max_rows=int(recipe["max_rows"]),
-        alpha=int(recipe["alpha"]) if "alpha" in overrides else None,
-        grad_accum=int(recipe["grad_accum"]) if "grad_accum" in overrides else None,
-        eval_every=int(recipe["eval_every"]) if recipe.get("eval_every") else None,
-        seed=int(recipe.get("seed", DEFAULT_SEED)),
-    )
 
 
 def fit_here(base: Base, machine: Machine, recipe: dict[str, Any], encoded: list[Encoded]) -> tuple[Plan, bool]:

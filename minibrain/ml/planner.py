@@ -16,6 +16,7 @@ MIN_SEQ = 32
 REFERENCE_SEQ = 512
 MAX_RANK = 64
 DEFAULT_SEED = 7
+PINNED = ("strategy", "checkpointing", "micro_batch")
 EVAL_ROWS = 64
 EVAL_SHARE = 0.1
 SETUP_MINUTES = 2.0
@@ -495,6 +496,29 @@ def seq_len_for(base: Base, settings: Settings, longest_tokens: int) -> int:
     return min(fitted, base.context) if base.context else fitted
 
 
+def settings_of(recipe: dict[str, Any], keep: tuple[str, ...]) -> Settings:
+    overrides = set(recipe.get("overrides") or [])
+    pinned = {name: recipe.get(name) for name in PINNED if name in keep or name in overrides}
+    return Settings(
+        strategy=pinned.get("strategy"),
+        checkpointing=pinned.get("checkpointing"),
+        micro_batch=pinned.get("micro_batch"),
+        seq_len=int(recipe["seq_len"]) if "seq_len" in overrides else None,
+        rank=int(recipe["rank"]),
+        learning_rate=float(recipe["learning_rate"]),
+        warmup=float(recipe.get("warmup", Settings.warmup)),
+        scheduler=str(recipe.get("scheduler", Settings.scheduler)),
+        dropout=float(recipe.get("dropout", Settings.dropout)),
+        weight_decay=float(recipe.get("weight_decay", Settings.weight_decay)),
+        epochs=float(recipe["epochs"]),
+        max_rows=int(recipe["max_rows"]),
+        alpha=int(recipe["alpha"]) if "alpha" in overrides else None,
+        grad_accum=int(recipe["grad_accum"]) if "grad_accum" in overrides else None,
+        eval_every=int(recipe["eval_every"]) if recipe.get("eval_every") else None,
+        seed=int(recipe.get("seed", DEFAULT_SEED)),
+    )
+
+
 def candidates(base: Base, machine: Machine, settings: Settings, seq: int, rows: int) -> list[Option]:
     strategies = [settings.strategy] if settings.strategy else list(STRATEGIES)
     checkpoints = [settings.checkpointing] if settings.checkpointing is not None else [False, True]
@@ -509,6 +533,15 @@ def candidates(base: Base, machine: Machine, settings: Settings, seq: int, rows:
     if settings.grad_accum is None:
         return found
     return [replace(option, grad_accum=settings.grad_accum) for option in found]
+
+
+def smallest_peak(base: Base, machine: Machine, settings: Settings, seq: int) -> int | None:
+    options = [option for option in candidates(base, machine, settings, seq, 1) if option.supported]
+    return min((option.peak_bytes for option in options), default=None)
+
+
+def smallest_run(base: Base, machine: Machine) -> int | None:
+    return smallest_peak(base, machine, Settings(), REFERENCE_SEQ)
 
 
 def fastest(options: list[Option]) -> Option | None:

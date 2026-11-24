@@ -8,7 +8,7 @@ from transformers import GenerationConfig, PreTrainedModel
 from minibrain.artifacts import CHUNK
 from minibrain.base_models import BaseModelSpec
 from minibrain.ml.context import FinalError, JobSpec, emit, run_child, write_result
-from minibrain.ml.devices import device_name, training_device, weights_dtype
+from minibrain.ml.devices import cap_to_grant, device_name, training_device, weights_dtype
 from minibrain.ml.runtime import load_base_model, load_tokenizer
 
 CHECKSUMS = "SHA256SUMS"
@@ -78,4 +78,5 @@ def main(spec: JobSpec) -> None:
 
 
 if __name__ == "__main__":
+    cap_to_grant()
     run_child(main)

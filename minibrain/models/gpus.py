@@ -105,22 +105,41 @@ def room_bytes(report: NodeReport, holds: list[Hold]) -> list[int]:
     return [usable(gpu.memory_bytes) - taken[index] for index, gpu in enumerate(report.gpus)]
 
 
-def choose(report: NodeReport, holds: list[Hold], least: int, most: int | None = None) -> Grant | None:
-    taken = taken_bytes(report, holds)
-    room = room_bytes(report, holds)
+def device_for(taken: list[int], room: list[int], least: int) -> int | None:
     fitting = [index for index, free in enumerate(room) if free >= least]
     if not fitting:
         return None
     idle = [index for index in fitting if taken[index] == 0]
-    device = idle[0] if idle else max(fitting, key=lambda index: (room[index], -index))
+    return idle[0] if idle else max(fitting, key=lambda index: (room[index], -index))
+
+
+def choose(report: NodeReport, holds: list[Hold], least: int) -> Grant | None:
+    taken = taken_bytes(report, holds)
+    room = room_bytes(report, holds)
+    device = device_for(taken, room, least)
+    if device is None:
+        return None
     total = report.gpus[device].memory_bytes
-    return Grant(device, granted_amount(total, taken[device], room[device], most), total, taken[device])
+    return Grant(device, total if taken[device] == 0 else room[device], total, taken[device])
 
 
-def granted_amount(total: int, taken: int, room: int, most: int | None) -> int:
-    if most is not None:
-        return min(most, room)
-    return total if taken == 0 else room
+def engine_amount(total: int, taken: int, room: int, serving: int, reserve: int, spare: bool) -> int:
+    if taken > 0:
+        return min(serving, room)
+    whole = usable(total)
+    return whole if spare or whole - reserve < serving else whole - reserve
+
+
+def choose_engine(report: NodeReport, holds: list[Hold], least: int, serving: int, reserve: int) -> Grant | None:
+    taken = taken_bytes(report, holds)
+    room = room_bytes(report, holds)
+    device = device_for(taken, room, least)
+    if device is None:
+        return None
+    spare = any(amount == 0 for index, amount in enumerate(taken) if index != device)
+    total = report.gpus[device].memory_bytes
+    amount = engine_amount(total, taken[device], room[device], serving, reserve, spare)
+    return Grant(device, amount, total, taken[device])
 
 
 def holders_of(device: int, holds: list[Hold]) -> str:

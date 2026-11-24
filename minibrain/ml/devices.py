@@ -1,7 +1,10 @@
 import os
 import platform
+from collections.abc import Mapping
 
 import torch
+
+from minibrain.models.gpus import granted_budget
 
 TRAIN_DEVICE_ENV = "MINIBRAIN_TRAIN_DEVICE"
 
@@ -55,3 +58,12 @@ def device_name(device: str) -> str:
     if kind == "mps":
         return f"Apple GPU ({platform.machine()})"
     return platform.processor() or platform.machine() or "CPU"
+
+
+def cap_to_grant(environ: Mapping[str, str] = os.environ) -> float | None:
+    budget = granted_budget(environ)
+    if budget is None or not torch.cuda.is_available():
+        return None
+    share = min(1.0, budget / torch.cuda.get_device_properties(0).total_memory)
+    torch.cuda.set_per_process_memory_fraction(share, 0)
+    return share

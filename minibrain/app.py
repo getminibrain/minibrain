@@ -292,7 +292,7 @@ def create_app(
     app.state.store = store_for(settings)
     with sessions() as session:
         apply_storage(app.state.store, session, settings)
-    app.state.gpus = GpuBook(sessions)
+    app.state.gpus = GpuBook(sessions, settings)
     app.state.queue = SqlJobQueue(sessions, DomainEffects(settings), gpus=app.state.gpus)
     app.state.queue.grace()
     engines = None

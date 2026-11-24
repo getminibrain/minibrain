@@ -6,7 +6,7 @@ from typing import Any
 from minibrain.data.splits import read_split
 from minibrain.ml.completion import Completion
 from minibrain.ml.context import JobSpec, emit, run_child, write_result
-from minibrain.ml.devices import device_name
+from minibrain.ml.devices import cap_to_grant, device_name
 from minibrain.ml.runtime import Runtime
 from minibrain.registry.models import VersionKind
 from minibrain.registry.prices import DEVICE_TIME
@@ -132,4 +132,5 @@ def main(spec: JobSpec) -> None:
 
 
 if __name__ == "__main__":
+    cap_to_grant()
     run_child(main)

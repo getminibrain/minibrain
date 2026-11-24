@@ -860,8 +860,10 @@ Built (2026-11-05). Each run picks how the base fits the memory of the machine t
   it. Runs here stays about serving.
 - On an NVIDIA machine the job runs on the one GPU main gave it at claim (Serving › GPUs on one machine): it sees
   only that GPU (`CUDA_VISIBLE_DEVICES`) and plans within the memory it was given (`MINIBRAIN_GPU_BYTES`, the
-  whole GPU when it was idle, else what was left on it). The claim needs the planned peak over 85% (at most the
-  largest GPU's usable memory, so a plan made for a bigger machine plans again on a whole GPU); scoring, judging
+  whole GPU when it was idle, else what was left on it), held there by PyTorch's per-process memory fraction, so an
+  overrun fails the job and never the engine beside it. The claim needs the smallest workable plan over 85% (any
+  strategy, checkpointing on, one row at a time, at the recipe's sequence length; else the planned peak, at most the
+  largest GPU's usable memory), since the job plans again inside whatever it gets; scoring, judging
   and exports need the base's serving memory (`weights × 1.2 + 0.5 GB`). A run uses that one GPU; the Trainer no
   longer spreads it over every visible GPU (multi-GPU training is v2).
 - Measured on an M1 Pro (`docs/findings.md`); QLoRA and the CUDA estimates have not run on an NVIDIA GPU yet.
@@ -1172,8 +1174,11 @@ before. Not yet run on an NVIDIA GPU.
   Each GPU counts 90% of its memory as usable; the rest covers CUDA contexts and activations.
 - Whole GPUs first: an engine or job takes an idle GPU when one has room, else a share of the GPU with the most
   room, and only when the base fits in what is left.
-- An engine needs the base's serving memory (`weights × 1.2 + 0.5 GB`, as Runs here) and takes that plus a KV
-  cache allowance of a quarter of the weights, at least 2 GB, never the whole GPU, so jobs can run beside it. It
+- An engine needs the base's serving memory (`weights × 1.2 + 0.5 GB`, as Runs here). Alone on a GPU it takes the
+  whole usable GPU for its KV cache, except on the machine's last idle GPU, where it leaves the smallest training
+  run of its base (`planner.smallest_run`: QLoRA where the worker quantizes, else LoRA, one 512-token row, over
+  85%) so the next version trains beside the live one; if both cannot fit it takes the whole GPU. On a GPU already
+  in use it takes its serving memory plus a KV allowance of a quarter of the weights, at least 2 GB (2026-11-24). It
   starts with `CUDA_VISIBLE_DEVICES` and a memory fraction: SGLang `--mem-fraction-static` (its share plus what
   others held on that GPU when it started, since SGLang counts every process's memory against the fraction), vLLM
   `--gpu-memory-utilization` (its own share). One GPU per engine; tensor parallel across GPUs comes later.
@@ -2077,6 +2082,7 @@ it finds:
       and rollback
 - [ ] Trace ids carried across main, gateway and engines in the JSON logs
 
+
 ## v2
 
 - Air-gapped installs (moved from v1 on 2026-11-20: air-gapped is an option, not the main audience; `MINIBRAIN_OFFLINE=1`
@@ -2158,6 +2164,11 @@ it finds:
 
 Known defects and leftovers, smallest first. No users yet, so leftovers are deleted rather than kept.
 
+- [x] The GPU split capped a live engine at its serving memory plus a quarter of its weights even alone on a GPU
+  (about a third of the KV cache SGLang's default gave), training only planned within its share and was not held to
+  it, and a training job waited for its fastest plan, so beside a live model on one GPU it never started. An engine
+  now takes its whole GPU except a training reserve on the machine's last idle GPU, a GPU job is held to its grant
+  by PyTorch, and a training job waits only for its smallest workable plan (2026-11-24).
 - [x] Where a model is deployed was stored twice, as the same columns on `models` and `base_models` (`deployed`,
   `pool`, `replicas`, `moving_from`, `moving_since`, `move_failure`, plus `models.deployed_base`), so the gateway
   config, placement, pool moves, teardown, the deploy endpoints, problems and the model rows each read both. One
