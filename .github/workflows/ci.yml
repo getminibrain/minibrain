@@ -66,6 +66,41 @@ jobs:
         if: inputs.skip-tests != true
         run: uv run pytest -q -m serial
 
+  postgres:
+    name: Postgres
+    if: inputs.part != 'package' && inputs.skip-tests != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: minibrain
+          POSTGRES_PASSWORD: minibrain
+          POSTGRES_DB: minibrain_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U minibrain -d minibrain_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      MINIBRAIN_TEST_POSTGRES_URL: postgresql+psycopg://minibrain:minibrain@localhost:5432/minibrain_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install with the postgres extra
+        run: uv sync --locked --extra postgres
+      - name: Migrations, schema against the ORM and the Postgres tests
+        run: uv run pytest -q -rs $(grep -l needs_postgres tests/*.py)
+
   web:
     name: Web
     if: inputs.part != 'package'

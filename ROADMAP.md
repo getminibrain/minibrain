@@ -2195,6 +2195,14 @@ Known defects and leftovers, smallest first. No users yet, so leftovers are dele
   it, and a training job waited for its fastest plan, so beside a live model on one GPU it never started. An engine
   now takes its whole GPU except a training reserve on the machine's last idle GPU, a GPU job is held to its grant
   by PyTorch, and a training job waits only for its smallest workable plan (2026-11-24).
+- [x] A fresh install on Postgres stopped at migration 0008: migrations 0008, 0010, 0011, 0015, 0016, 0019, 0021 and
+  0038 rebuilt their table (`batch_alter_table(recreate="always")`, SQLite's way to change columns and foreign keys),
+  and Postgres refuses to drop `jobs_pkey` while other tables point at it. On Postgres they now run plain `ALTER
+  TABLE`s, and 0008 swaps the `ON DELETE` of `jobs.model_id`, `jobs.version_id` and `request_logs.model_id` by
+  dropping and re-adding `<table>_<column>_fkey`; SQLite keeps the rebuild, so its schema and the dev databases do
+  not change. `tests/test_schema.py` also migrates an empty Postgres to head, and down to base and up again, and
+  checks columns, types, defaults, foreign keys with `ON DELETE`, indexes, uniques and checks against the ORM. CI
+  runs it and the other `needs_postgres` tests against a `postgres:17` service (2026-11-24).
 - [x] Where a model is deployed was stored twice, as the same columns on `models` and `base_models` (`deployed`,
   `pool`, `replicas`, `moving_from`, `moving_since`, `move_failure`, plus `models.deployed_base`), so the gateway
   config, placement, pool moves, teardown, the deploy endpoints, problems and the model rows each read both. One

@@ -1,17 +1,23 @@
+from typing import Any
+
 import sqlalchemy as sa
 from alembic import op
 
 revision = "0011"
 down_revision = "0010"
 
-KEEP = {"recreate": "always", "table_kwargs": {"sqlite_autoincrement": True}}
+
+def keep() -> dict[str, Any]:
+    if op.get_bind().dialect.name == "sqlite":
+        return {"recreate": "always", "table_kwargs": {"sqlite_autoincrement": True}}
+    return {}
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("jobs", **KEEP) as batch:
+    with op.batch_alter_table("jobs", **keep()) as batch:
         batch.add_column(sa.Column("delete_requested", sa.Boolean(), server_default=sa.false(), nullable=False))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("jobs", **KEEP) as batch:
+    with op.batch_alter_table("jobs", **keep()) as batch:
         batch.drop_column("delete_requested")

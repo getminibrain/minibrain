@@ -1,3 +1,5 @@
+from typing import Any
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -10,12 +12,33 @@ def link(target: str, column: str, ondelete: str) -> sa.Column:
 
 
 JOB_LINKS = {"model_id": "models.id", "version_id": "versions.id"}
+LOG_LINKS = {"model_id": "models.id"}
 KEEP = {"recreate": "always", "table_kwargs": {"sqlite_autoincrement": True}}
 
 
+def on_sqlite() -> bool:
+    return op.get_bind().dialect.name == "sqlite"
+
+
+def sqlite_rebuild(links: dict[str, str], ondelete: str) -> dict[str, Any]:
+    if not on_sqlite():
+        return {}
+    return {"reflect_args": tuple(link(target, column, ondelete) for column, target in links.items()), **KEEP}
+
+
+def swap_foreign_keys(table: str, links: dict[str, str], ondelete: str) -> None:
+    for column, target in links.items():
+        name = f"{table}_{column}_fkey"
+        referent, referred = target.split(".")
+        op.drop_constraint(name, table, type_="foreignkey")
+        op.create_foreign_key(name, table, referent, [column], [referred], ondelete=ondelete)
+
+
 def relink(ondelete: str) -> None:
-    jobs = tuple(link(target, column, ondelete) for column, target in JOB_LINKS.items())
-    with op.batch_alter_table("jobs", reflect_args=jobs, **KEEP) as batch:
+    if not on_sqlite():
+        swap_foreign_keys("jobs", JOB_LINKS, ondelete)
+        swap_foreign_keys("request_logs", LOG_LINKS, ondelete)
+    with op.batch_alter_table("jobs", **sqlite_rebuild(JOB_LINKS, ondelete)) as batch:
         if ondelete == "SET NULL":
             batch.add_column(sa.Column("model_slug", sa.String(), nullable=True))
             batch.add_column(sa.Column("model_name", sa.String(), nullable=True))
@@ -26,8 +49,7 @@ def relink(ondelete: str) -> None:
             batch.drop_column("version_number")
             batch.drop_column("model_name")
             batch.drop_column("model_slug")
-    logs = (link("models.id", "model_id", ondelete),)
-    with op.batch_alter_table("request_logs", reflect_args=logs, **KEEP) as batch:
+    with op.batch_alter_table("request_logs", **sqlite_rebuild(LOG_LINKS, ondelete)) as batch:
         if ondelete == "SET NULL":
             batch.add_column(sa.Column("model_slug", sa.String(), nullable=True))
             batch.add_column(sa.Column("model_name", sa.String(), nullable=True))
