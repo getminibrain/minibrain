@@ -26,6 +26,12 @@ function Progress({ stages }: { stages: Stage[] }) {
     );
 }
 
+function columnsOf(stages: Stage[], next: Stage | undefined): string {
+    return stages
+        .map((stage) => (stage === next ? "minmax(max-content, 1fr)" : "minmax(0, 1fr)"))
+        .join(" ");
+}
+
 function many(value: number, one: string, other: string): string {
     return value === 1 ? one : other;
 }
@@ -94,27 +100,46 @@ function stagesOf(models: ModelRow[], datasets: number | undefined, requests: nu
     ];
 }
 
+type Band = "done" | "next" | "todo";
+
+const BANDS: Record<Band, string> = {
+    done: "bg-success/10 text-success",
+    next: "bg-primary/10 text-primary",
+    todo: "text-muted-foreground",
+};
+
+function bandOf(stage: Stage, next: boolean): Band {
+    if (stage.done) {
+        return "done";
+    }
+    return next ? "next" : "todo";
+}
+
+function StageTitle({ stage, band }: { stage: Stage; band: Band }) {
+    return (
+        <span
+            className={cn(
+                "-mx-4 -mt-3 mb-2 flex items-center gap-2 px-4 py-2 text-sm",
+                BANDS[band],
+            )}
+        >
+            {band === "done" && (
+                <IconCheck aria-hidden="true" className="size-4 shrink-0" strokeWidth={3} />
+            )}
+            {band === "next" && (
+                <IconArrowRight aria-hidden="true" className="size-4 shrink-0" strokeWidth={2.5} />
+            )}
+            <span className="truncate">{stage.title}</span>
+            <span className="sr-only">{stage.done ? ", done" : ", not done"}</span>
+        </span>
+    );
+}
+
 function StageCell({ stage, next, actions }: { stage: Stage; next: boolean; actions: boolean }) {
     return (
-        <li className="relative flex min-w-0 flex-col justify-between gap-3 px-4 py-3">
-            {next && (
-                <span aria-hidden="true" className="absolute inset-x-0 -top-px h-0.5 bg-primary" />
-            )}
+        <li className="flex min-w-0 flex-col justify-between gap-3 px-4 py-3">
             <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span
-                        aria-hidden="true"
-                        className={cn(
-                            "flex size-4 shrink-0 items-center justify-center rounded-full border border-input",
-                            stage.done && "border-success bg-success text-success-foreground",
-                            !stage.done && next && "border-primary",
-                        )}
-                    >
-                        {stage.done && <IconCheck className="size-3" strokeWidth={3} />}
-                    </span>
-                    {stage.title}
-                    <span className="sr-only">{stage.done ? ", done" : ", not done"}</span>
-                </span>
+                <StageTitle stage={stage} band={bandOf(stage, next)} />
                 <Link
                     href={stage.link}
                     className="w-fit text-2xl font-semibold text-foreground tabular-nums hover:underline"
@@ -161,10 +186,8 @@ export function JourneyStrip({ data }: { data: HomeData }) {
             }
         >
             <ol
-                className={cn(
-                    "grid divide-x overflow-clip rounded-lg border bg-card",
-                    stages.length === 7 ? "grid-cols-7" : "grid-cols-6",
-                )}
+                className="grid divide-x overflow-clip rounded-lg border bg-card"
+                style={{ gridTemplateColumns: columnsOf(stages, can.build ? next : undefined) }}
             >
                 {stages.map((stage) => (
                     <StageCell

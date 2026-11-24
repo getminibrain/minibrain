@@ -28,7 +28,7 @@ export function scored(model: ModelRow): boolean {
 }
 
 export function deployedModel(model: ModelRow): boolean {
-    return model.current_version !== null;
+    return model.deployment.state !== "not_deployed";
 }
 
 export function connected(model: ModelRow): boolean {

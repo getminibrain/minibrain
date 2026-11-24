@@ -8,6 +8,7 @@ import { SectionError } from "~/components/ErrorState";
 import { FLUSH_GRID, PanelSection } from "~/components/Section";
 import { Latency, Requests } from "~/components/models/ModelMetrics";
 import { useCan } from "~/lib/access";
+import { count } from "~/lib/format";
 import { modelPageHref, trainHref } from "~/lib/modelLinks";
 import { ModelAvatar, Muted, ScoreGain, StatusLineText } from "~/pages/models/list/cells";
 import {
@@ -154,7 +155,11 @@ export function ModelsPanel({ data }: { data: HomeData }) {
             flush
             icon={IconCube}
             title="Models"
-            description="Live first, then the most recently changed."
+            description={
+                data.shown.length > rows.length
+                    ? `${count(rows.length)} of ${count(data.shown.length)}: live first, then the most recently changed.`
+                    : "Live first, then the most recently changed."
+            }
             actions={
                 <Button asChild variant="ghost">
                     <Link href="/models">
