@@ -1,7 +1,7 @@
 # Product
 
 Users: product, engineer, ml, admin
-Principles: any size, own hardware or cloud, private, gated on scores
+Principles: easy, any size, own hardware or cloud, private, gated on scores
 
 ## Data
 - **Upload sources** · shipped · product, ml

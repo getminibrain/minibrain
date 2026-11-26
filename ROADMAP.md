@@ -9,6 +9,9 @@ Standards: HF transformers + PEFT + TRL, OpenAI API. No Axolotl, no LLaMA-Factor
 
 ## Positioning
 
+- Easy first (2026-11-26): one product, one command, on the customer's own servers or cloud, with nothing to
+  assemble. Every feature keeps the path from data to a live model straightforward; where it is not easy yet, it
+  is made easy on the way.
 - Size follows the job: a small base where latency and cost matter, a large one where breadth matters. A model can
   do one task or be a general-purpose assistant for a domain.
 - A model learns **behaviour** (task, format, house style, labels) and **stable domain knowledge** (jargon, how
