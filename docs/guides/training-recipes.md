@@ -139,4 +139,4 @@ print("Training version", run.json()["number"])
 ```
 
 These paths can change between releases: pin scripts to a minibrain version. Every endpoint is listed under **API
-reference** in the app's account menu.
+reference** in minibrain's account menu.

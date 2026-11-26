@@ -1,12 +1,12 @@
 ---
 title: Air-gapped installs
-description: Run minibrain with no outbound calls, and carry the app, model weights and DuckDB extensions into a closed network.
+description: Run minibrain with no outbound calls, and carry minibrain, model weights and DuckDB extensions into a closed network.
 sidebar:
   order: 13
 ---
 
 By default minibrain reaches the internet to download base models when you add them. In a closed network, turn that
-off and carry everything it needs across on disk: the app, its signatures, the model weights and, for native installs,
+off and carry everything it needs across on disk: minibrain, its signatures, the model weights and, for native installs,
 the DuckDB extensions.
 
 ## Turn off outbound calls
@@ -36,7 +36,7 @@ The compose file passes only those two through; add `HF_DATASETS_OFFLINE: "1"` u
 With an internal Hugging Face mirror instead of no network at all, set `MINIBRAIN_HF_ENDPOINT` and use the Allowlist
 network policy ([Policies](../security/policies.md)).
 
-## Carry the app across
+## Carry minibrain across
 
 Docker: on a connected machine, pull the image, [verify it](verify-release.md#verify-images), save it, and load it on
 the target. Pull with `--platform linux/arm64` when the target's architecture differs.

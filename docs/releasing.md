@@ -217,5 +217,5 @@ identity is the workflow file at the tag, which is what a verifier checks:
   online and offline: [Install → Verify a release](install.md#verify-a-release).
 - A tag whose Sign and attest job fails has pushed and tagged its images but has no GitHub Release. Fix the cause,
   delete the tag and push it again: the image tags move to the new digests.
-- Update bundles (the roadmap's signed offline bundles for the app and base models) will reuse the blob signing:
+- Update bundles (the roadmap's signed offline bundles for minibrain and base models) will reuse the blob signing:
   one more file per bundle with its `.sigstore.json`.

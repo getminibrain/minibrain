@@ -111,7 +111,7 @@ Fields that are not in OpenAI's API, such as `top_k` or `safety`, go in `extra_b
 | `POST /v1/completions` | Continues a prompt without the chat template ([Text completions](text-completions.md)) |
 | `POST /v1/feedback` | Rates or corrects an answer ([Chat completions](chat-completions.md#send-feedback-on-an-answer)) |
 
-The full schema is in the app: open the account menu, then **API reference**.
+The full schema is in minibrain: open the account menu, then **API reference**.
 
 ## Errors
 
