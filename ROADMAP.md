@@ -1063,6 +1063,33 @@ once it matches; only deleting a base removes its files.
   score 2 points and golden and held-out scores differed by 8–11 points.
 - Deploying a version moves `current` and loads its adapter into the pool. Rollback deploys an earlier version.
 
+### Reference models
+
+Added 2026-11-26. The question every buyer asks first: is it better than GPT, Claude or Gemini, and how much cheaper?
+
+- An admin adds a reference model: OpenAI, Anthropic, Google or any OpenAI-compatible URL, with its key as a
+  write-only connection secret and its list price per 1M tokens. A policy, off by default and lockable, allows it;
+  `MINIBRAIN_OFFLINE=1` turns it off.
+- A model's Evaluation tab picks the reference models to score: they answer the same held-out rows as version 0, with
+  the same instructions and contract, through the same graders. The page says plainly that those rows go to that
+  provider, and every run is audited.
+- Results sit beside the versions, never as one: a reference model is never deployable and never the live baseline of
+  the promotion rule. The headline adds it ("v3 91%, GPT-x 89%, at 1/40 of its cost"), its cost at list price
+  (`list_price`) beside local GPU time.
+- The same connection becomes the API teacher in v2.
+
+### General ability
+
+Added 2026-11-26. Training on one task can cost general skills an app still relies on: following instructions,
+reasoning, formats.
+
+- A small fixed suite ships with each release and runs offline: a few hundred rows each of instruction following,
+  maths word problems and general knowledge, from permissively licensed benchmarks, scored with their own graders.
+- It runs on version 0 once per base and on every trained version as its own job after the task scores; the version
+  page shows "General ability 71 → 69" beside the task score.
+- A drop past a threshold warns on the version, and the promotion rule can require it
+  (`general_ability >= v0 - 2`).
+
 ### Rebase
 
 1. A new base model is registered (offline bundle, pinned commit). Its chat template parity test runs first.
@@ -1131,6 +1158,22 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
    lists them (Test examples: conversation, expected answer, the model's answer, the version it was found on, who saved it),
    the Data page says per model in Used by how many it adds, and the Feedback page marks them as Playground test
    examples, where rejecting one takes it out again.
+
+### Live scoring
+
+Added 2026-11-26. Held-out scores say how a version did before it went live; live scoring says how it does now, the
+ongoing monitoring model-risk rules ask for.
+
+- Per model, off by default: score a share of live answers (5% by default) with the graders that need no expected
+  answer (JSON valid, in the label set, the judge with the model's rubric). It needs "Keep request inputs and
+  answers".
+- Scores land on each request log; the model's Overview and Monitoring chart the live score by day against the live
+  version's held-out score, and a gap past a threshold is a problem (Problems), and a notification in v2.
+- Failure modes: low-scoring answers grouped by the judge's reason, the label or the schema field that broke, and by
+  topic once embedding models land (Retrieval); each group shows its count, its trend and examples.
+- One action sends a failure mode's examples to the review queue, where accepted answers become training rows or test
+  examples (Feedback loop).
+- Scoring runs as jobs on the judge's pool, never in the `/v1` path.
 
 ## Retrieval
 
@@ -1277,6 +1320,15 @@ before. Not yet run on an NVIDIA GPU.
   delete need Admin), custom-only sub-resources (`/versions`, `/training-plan`, `/contract`, `/dataset`, ...),
   base-only actions (`/verify`, `/repair`, `/reimport`, `/relocate`, `/recheck`, `/retry`, `/test`), and the page's
   views (`/overview`, `/traffic`, `/activity`).
+
+### MCP server
+
+Added 2026-11-26. Claude, Cursor and other agents run minibrain with a key.
+
+- `minibrain mcp` (stdio) and `/mcp` on main (streamable HTTP), both calling the same `/api` routes with the key's
+  role, so a key cannot do through MCP what it cannot do through the API.
+- Tools: list and read models, datasets, versions and scores; add a model; train; score; compare two versions; deploy
+  a version that passes its rule; call a model. Each call is audited under the key.
 
 ### Accounts and roles
 
@@ -2109,6 +2161,18 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
       (route existing OpenAI calls through minibrain, log them, train a cheaper model), then Teacher labelling, ahead
       of Extract and Rebase.
 
+### Added to v1 (2026-11-26)
+
+Gaps found against comparable platforms.
+
+- [ ] Training methods: full fine-tuning, DPO from feedback pairs, GRPO with the graders as rewards (Task types).
+- [ ] Models larger than one GPU (Review follow-ups) is v1, not v2: tensor-parallel serving and multi-GPU training on
+      one machine. Multi-node stays v2.
+- [ ] Reference models: GPT, Claude or Gemini scored on the same held-out rows, opt-in (Reference models).
+- [ ] Live scoring and failure modes (Live scoring).
+- [ ] General ability per version (General ability).
+- [ ] MCP server (MCP server).
+
 ## v2
 
 - Air-gapped installs (moved from v1 on 2026-11-20: air-gapped is an option, not the main audience; `MINIBRAIN_OFFLINE=1`
@@ -2122,6 +2186,10 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
   - `generate_qa` with check pass: documents into checked question and answer pairs
   - Distill: gateway upstream routes log a teacher's answers; distil what you run into a smaller model
   - Private frontier endpoint: the teacher model through the gateway, scoped keys
+  - Synthetic data aimed at failure modes (Live scoring): the teacher writes new examples like a failure mode's,
+    checked by the graders, a sample reviewed by a person; multi-turn tool-use conversations from a model's tools
+  - On-policy distillation: the student answers, the teacher scores its tokens, and the student learns from its
+    own answers, needing fewer rows than distilling logged answers
 - Split into services: data, train, serve, gateway
 - Adapters trained to answer from retrieved context and cite it
 - dlt API connectors: Zendesk, Jira, Confluence, Salesforce, HubSpot
@@ -2141,8 +2209,17 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - Preset recipes
 - Arbitrary Python transforms (admin-only, sandboxed)
 - Teams, sharing
-- Multi-GPU and multi-node (Ray), serving pools across nodes
-- Kubernetes launcher: training as Jobs, engine replicas as autoscaled Deployments; cloud VM launcher later
+- Multi-node training (Ray) and serving pools across nodes; multi-GPU on one machine is v1
+- Launchers: Kubernetes (training as Jobs, engine replicas as autoscaled Deployments), Slurm, and cloud VMs
+  started for a run and stopped after it
+- Guided setup: describe the task in plain language or point at a table; a model on this install proposes the
+  preset, mapping, graders, base and recipe, runs version 0 and the first training, and stops for a person's
+  approval at each step. It never deploys on its own (replaces Start from data)
+- Agents: score and train multi-turn tool-use conversations; bring your own harness (an app's agent loop calls
+  `/v1` and minibrain records and scores the whole conversation); GRPO in environments the customer defines
+- Hyperparameter search: a few runs over learning rate, rank and epochs, chosen by Bayesian search within a GPU
+  budget, the best on held-out rows kept
+- Vision-language models: images in datasets, the Playground and `/v1`; LoRA on vision bases
 - sgl-router per pool under the gateway for many SGLang replicas of one model; llm-d on Kubernetes
 - AMD ROCm production image, LoRA adapters on llama.cpp; the vLLM backend run on GPUs
 - Dedicated or merged-adapter instances for high-traffic models
@@ -2155,12 +2232,12 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - [ ] Export a version merged and quantised as GGUF via llama.cpp (`convert_hf_to_gguf` and `llama-quantize`),
       packaged per platform for offline installs; the Export dialog lists it as Coming soon (moved from v1 on
       2026-11-17)
+- [ ] Export a version merged and quantised as AWQ, GPTQ or FP8 for vLLM and SGLang
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
 - Preinstalled appliance
 - [ ] Release a reserved name: an admin frees a deleted model's API name from Settings, with a warning that apps
   still calling it will reach the next model to take it, audited as `model.name_release`
 - Later, kept simple until the engine settles:
-  - [ ] Start from data: point at a table or folder and get a proposed preset, mapping, graders and base
   - [ ] Pick the base from a chart: train two or three bases at once, plot quality against cost and latency
   - [ ] Recipes: worked use cases, designed properly later.
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins

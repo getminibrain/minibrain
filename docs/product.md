@@ -121,6 +121,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Generated Q&A** · planned · product, ml
   Turn documents into checked question and answer pairs.
   Roadmap: v2
+- **Synthetic data** · planned · ml
+  Generate checked examples aimed at failure modes, tool use included.
+  Roadmap: v2
 - **Distillation data** · planned · ml
   Use a teacher's logged answers as training examples.
   Roadmap: v2
@@ -288,6 +291,12 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **OCI model sources** · planned · admin
   Pull models from Harbor, Quay or KitOps ModelKits.
   Roadmap: v2
+- **Guided setup** · planned · product
+  Describe the task; an assistant proposes each step for approval.
+  Roadmap: v2
+- **Vision-language models** · planned · product, ml
+  Train and serve models that read images as well as text.
+  Roadmap: v2
 - **GGUF and adapter imports** · planned · ml
   Import GGUF models and standalone LoRA adapters.
   Roadmap: v2
@@ -353,9 +362,21 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **GGUF export** · planned · ml
   Download a version merged and quantised as GGUF for llama.cpp.
   UI: Models › model › version › Export · Roadmap: v2
+- **Multi-GPU models** · planned · ml, admin
+  Train and serve bases larger than one GPU on one machine.
+  Roadmap: Review follow-ups (added 2026-11-24)
 - **Multi-node training** · planned · ml, admin
-  Train across GPUs and nodes with Ray.
+  Train across nodes with Ray.
   Roadmap: v2
+- **Hyperparameter search** · planned · ml
+  Try several settings; keep the best on held-out rows.
+  Roadmap: v2
+- **On-policy distillation** · planned · ml
+  A teacher scores the student's own answers as it trains.
+  Roadmap: v2
+- **Quantised export** · planned · ml
+  Download a version as AWQ, GPTQ or FP8 for vLLM and SGLang.
+  UI: Models › model › version › Export · Roadmap: v2
 - **MLflow tracking** · planned · ml
   Log runs to an MLflow server you run.
   Roadmap: v2
@@ -391,6 +412,15 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Target score** · planned · product
   Say when the prompt-only version is good enough to skip training.
   Roadmap: Eval and promote
+- **Reference models** · planned · product, ml
+  Score GPT, Claude or Gemini on the same rows, opt-in.
+  Roadmap: Reference models
+- **General ability** · planned · ml
+  Catch general skills lost in training with a standard suite.
+  Roadmap: General ability
+- **Agent evaluation** · planned · ml, engineer
+  Score and train multi-turn tool-use conversations from your harness.
+  Roadmap: v2
 - **Re-score on grader change** · shipped · ml
   Re-score every version when the graders or judge change.
   UI: Models › model › Evaluation › How it's scored · API: POST /api/models/{name}/rescore
@@ -456,6 +486,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Harness configs** · shipped · engineer
   Copy ready configs, create a key and see the first request.
   UI: Models › model › Use › API Connect · API: POST /api/keys, GET /api/requests, POST /v1/chat/completions
+- **MCP server** · planned · engineer
+  Let Claude, Cursor and other agents run minibrain with a key.
+  CLI: minibrain mcp · Roadmap: MCP server
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions
@@ -526,6 +559,12 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged in; Train shows how many rows.
   UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary, GET /api/models/{name}/feedback/training-rows
+- **Live scoring** · planned · product, ml
+  Score a share of live answers and chart it against held-out.
+  Roadmap: Live scoring
+- **Failure modes** · planned · product, ml
+  Group low-scoring live answers and send them to review.
+  Roadmap: Live scoring
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2
@@ -606,6 +645,9 @@ Principles: any size, own hardware or cloud, private, gated on scores
 - **Highly available main** · shipped · admin
   Run several mains on Postgres, with a leader for background work.
   Config: MINIBRAIN_DATABASE_URL
+- **Slurm and cloud launchers** · planned · admin
+  Run jobs on Slurm or on cloud VMs started for the run.
+  Roadmap: v2
 - **Kubernetes launcher** · planned · admin
   Run training as Jobs and engines as autoscaled Deployments.
   Roadmap: v2
