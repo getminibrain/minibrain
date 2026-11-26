@@ -23,50 +23,51 @@ def publisher_of(repo: str | None) -> str | None:
 LICENCES = {
     "apache-2.0": (
         "Apache 2.0",
-        "Permissive: commercial use, changes and redistribution allowed; keep the licence and notices.",
+        "Permissive: commercial use, changes and redistribution are allowed as long as you keep the licence and "
+        "notices.",
         "https://www.apache.org/licenses/LICENSE-2.0",
     ),
     "mit": (
         "MIT",
-        "Permissive: commercial use, changes and redistribution allowed; keep the copyright notice.",
+        "Permissive: commercial use, changes and redistribution are allowed as long as you keep the copyright notice.",
         "https://opensource.org/license/mit",
     ),
     "llama3.1": (
         "Llama 3.1 Community Licence",
-        "Commercial use allowed under Meta's acceptable-use policy; over 700M monthly users needs a separate "
-        "licence; credit 'Built with Llama'.",
+        "Commercial use is allowed under Meta's acceptable-use policy with a 'Built with Llama' credit, but services "
+        "over 700M monthly users need a separate licence.",
         "https://www.llama.com/llama3_1/license/",
     ),
     "llama3.2": (
         "Llama 3.2 Community Licence",
-        "Commercial use allowed under Meta's acceptable-use policy; over 700M monthly users needs a separate "
-        "licence; credit 'Built with Llama'.",
+        "Commercial use is allowed under Meta's acceptable-use policy with a 'Built with Llama' credit, but services "
+        "over 700M monthly users need a separate licence.",
         "https://www.llama.com/llama3_2/license/",
     ),
     "llama3.3": (
         "Llama 3.3 Community Licence",
-        "Commercial use allowed under Meta's acceptable-use policy; over 700M monthly users needs a separate "
-        "licence; credit 'Built with Llama'.",
+        "Commercial use is allowed under Meta's acceptable-use policy with a 'Built with Llama' credit, but services "
+        "over 700M monthly users need a separate licence.",
         "https://www.llama.com/llama3_3/license/",
     ),
     "gemma": (
         "Gemma Terms of Use",
-        "Commercial use allowed under Google's prohibited-use policy; pass the terms on with the model.",
+        "Commercial use is allowed under Google's prohibited-use policy, and the terms must go with the model.",
         "https://ai.google.dev/gemma/terms",
     ),
     "qwen": (
         "Qwen Licence",
-        "Commercial use allowed; over 100M monthly users needs a separate licence from Alibaba Cloud.",
+        "Commercial use is allowed, but services over 100M monthly users need a separate licence from Alibaba Cloud.",
         "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/main/LICENSE",
     ),
     "deepseek": (
         "DeepSeek Model Licence",
-        "Commercial use allowed under DeepSeek's use restrictions; pass the terms on with the model.",
+        "Commercial use is allowed under DeepSeek's use restrictions, and the terms must go with the model.",
         "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/LICENSE-MODEL",
     ),
     "nvidia-open-model-license": (
         "NVIDIA Open Model Licence",
-        "Commercial use allowed; derivatives must keep NVIDIA's terms and attribution.",
+        "Commercial use is allowed, but derivatives must keep NVIDIA's terms and attribution.",
         "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
     ),
 }
