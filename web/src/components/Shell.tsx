@@ -186,14 +186,7 @@ function Version() {
         return null;
     }
     return (
-        <a
-            href={changelogUrl(version)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate px-1.5 text-sm text-faint tabular-nums transition-colors duration-150 hover:text-muted-foreground"
-        >
-            {`${PRODUCT_NAME} ${version}`}
-        </a>
+        <p className="truncate px-1.5 text-sm text-faint tabular-nums">{`${PRODUCT_NAME} ${version}`}</p>
     );
 }
 
