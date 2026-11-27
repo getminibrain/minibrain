@@ -14,8 +14,8 @@ package with the web UI built in, and one command runs it on a single machine.
 - Models of any size, from a fast task model to a private frontier endpoint, on the open base model that fits the job.
 - Evaluation first: every model starts as a scored baseline, and each trained version is compared on the same
   held-out rows.
-- Private by default: no telemetry and signed releases. It can also run fully air-gapped.
-- Yours to keep: weights, data, scores and logs stay on your servers, and you can export a model at any time.
+- Private by default: it runs on your infrastructure, from signed releases. It can also run fully air-gapped.
+- Yours to keep: weights, data, scores and logs stay on your infrastructure, and you can export a model at any time.
 
 ## From data to an API
 

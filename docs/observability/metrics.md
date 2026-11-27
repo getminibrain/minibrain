@@ -8,8 +8,8 @@ sidebar:
 minibrain serves Prometheus metrics on `/metrics`: requests, errors, latency and tokens per model, queued jobs and
 workers online. The endpoint stays off until you say who may scrape it.
 
-minibrain sends nothing anywhere by default. It has three outputs for your own monitoring, each off until you turn it
-on, and none of them ever carries a prompt, an answer or an API key:
+minibrain has three outputs for your own monitoring, each off until you turn it on, and none of them ever carries a
+prompt, an answer or an API key:
 
 - Prometheus metrics on `/metrics`, on this page.
 - [OpenTelemetry export](opentelemetry.md): a span per `/v1` request and the same metrics, pushed to your collector.

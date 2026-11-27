@@ -25,8 +25,8 @@ the numbers say it pays, and serve the winner on an OpenAI-compatible endpoint. 
 
 - **Any size.** From a fast task model to a private frontier endpoint, on the base model that fits the job.
 - **Eval first.** Every model starts as a scored baseline; each trained version is compared on the same held-out rows.
-- **Private by default.** No telemetry and signed releases; it runs fully air-gapped when you need it to.
-- **Yours to keep.** Weights, data, scores and logs stay on your servers; export a model at any time.
+- **Private by default.** It runs on your infrastructure from signed releases, and fully air-gapped when you need it.
+- **Yours to keep.** Weights, data, scores and logs stay on your infrastructure; export a model at any time.
 
 ## Quick start
 

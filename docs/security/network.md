@@ -88,8 +88,6 @@ database credentials, and there is no switch that lets machines join unchecked. 
 
 ## What leaves your network
 
-minibrain sends no telemetry: no usage data, crash reports or analytics go to its developers or anyone else.
-
 - Governed by the Network policy (Open, Allowlist or Offline; [Policies](policies.md)): Hugging Face downloads, model
   imports from S3, catalogue updates, connections to buckets and databases, and DuckDB extension installs from a URL.
 - Always used, because an admin configured them: artifact storage in a bucket, the SIEM, the OpenTelemetry collector,
