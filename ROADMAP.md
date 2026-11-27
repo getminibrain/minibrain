@@ -1967,6 +1967,10 @@ Two modes, same code, same adapter format (PEFT safetensors).
 
 Everything in the v1 scope below, after M1.
 
+v1 names a scope, not a version number (2026-11-27). Releases stay 0.x while the scope is built. 1.0.0 comes later:
+once everything in the v1 scope is done and real users have run it for a while, since 1.0.0 is the promise that the
+API and the data survive upgrades.
+
 ### Large datasets
 
 Small, curated fine-tunes stay the default path. This milestone makes training scale to datasets that do not fit in
