@@ -49,6 +49,7 @@ machines: [Concepts](concepts.md) explains every term.
 
 ## Where to go next
 
+- [Quickstart](quickstart.md): install, add the demo model and get an answer over the API, in three steps.
 - [Installation](installation.md): run minibrain on your machine in a few minutes.
 - [Your first model](first-model.md): the steps above, click by click, ending with a call from Python.
 - [Data](../guides/data.md) and [Base models](../guides/models.md): what goes into a model.

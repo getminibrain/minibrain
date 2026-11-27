@@ -2,7 +2,7 @@
 title: Installation
 description: The fastest ways to get minibrain running, and where to find the details for each.
 sidebar:
-  order: 2
+  order: 3
 ---
 
 minibrain is one Python package for Python 3.12 or 3.13, with the web UI built in. Pick one of the ways below; each

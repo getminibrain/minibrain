@@ -2,7 +2,7 @@
 title: Your first model
 description: From an empty install to an app calling a model trained on your own data, through the OpenAI-compatible API.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 This walkthrough builds a classifier that sorts support messages into labels such as `billing`, `bug` and `refund`.

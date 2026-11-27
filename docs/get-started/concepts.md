@@ -2,7 +2,7 @@
 title: Concepts
 description: The terms minibrain uses, from base model and dataset to pool and engine, each with the page that covers it.
 sidebar:
-  order: 4
+  order: 5
 ---
 
 These are the things you work with in minibrain, in the order you meet them: what goes into a model, how its versions
