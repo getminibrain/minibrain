@@ -7,6 +7,9 @@ import {
     CardHeader,
     CardTitle,
     CodeBlock,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     Field,
     FieldGroup,
     InfoTip,
@@ -23,9 +26,10 @@ import {
 import { signOutReason } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { BrandLockup } from "~/components/brand/BrandMark";
-import { ACCOUNT_PATH } from "~/components/navigation";
+import { ACCOUNT_PATH, DOCS_URL } from "~/components/navigation";
 
 const MIN_PASSWORD = 12;
+const FIRST_ADMIN_DOCS = `${DOCS_URL}/install/first-admin#use-the-setup-link`;
 
 function AuthFrame({
     title,
@@ -304,6 +308,36 @@ function AdminForm({ linkToken }: { linkToken: string }) {
     );
 }
 
+function LostLink() {
+    return (
+        <Collapsible className="flex w-full flex-col gap-2">
+            <CollapsibleTrigger className="self-start text-sm font-normal text-muted-foreground">
+                Lost the link?
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-2">
+                <span>Run this on the server for a new one:</span>
+                <CodeBlock
+                    code="minibrain admin setup-link"
+                    language="bash"
+                    copyLabel="Copy the command"
+                />
+                <span>
+                    Running in Docker or Compose?{" "}
+                    <a
+                        href={FIRST_ADMIN_DOCS}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                    >
+                        See the docs
+                    </a>{" "}
+                    for its command.
+                </span>
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
 export function SetupPage() {
     const [linkToken] = useState(tokenFromQuery);
     return (
@@ -314,16 +348,7 @@ export function SetupPage() {
                     ? "Create the admin account to get started."
                     : "Create the admin account to get started, with the setup token minibrain printed in its log when it started."
             }
-            footer={
-                <div className="flex flex-col gap-2">
-                    <span>Lost the link? Run this on the server for a new one:</span>
-                    <CodeBlock
-                        code="minibrain admin setup-link"
-                        language="bash"
-                        copyLabel="Copy the command"
-                    />
-                </div>
-            }
+            footer={<LostLink />}
         >
             <div className="flex flex-col gap-5">
                 <InsecureNotice />
