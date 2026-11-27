@@ -18,6 +18,9 @@ curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install
 minibrain serve
 ```
 
+If the terminal answers `minibrain: command not found`, open a new terminal or run the start command the
+installer printed: it puts minibrain on the `PATH` of new terminals.
+
 Options, pinned versions and the Docker mode: [Installer](../install/installer.md).
 
 ## uv

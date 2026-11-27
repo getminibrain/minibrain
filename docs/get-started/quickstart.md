@@ -17,6 +17,9 @@ curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install
 minibrain serve
 ```
 
+If the terminal answers `minibrain: command not found`, open a new terminal or run the start command the
+installer printed: it puts minibrain on the `PATH` of new terminals.
+
 You should see a one-time setup link in the terminal. Open it, enter an email and a password of at least 12
 characters, and click **Create admin account**. You land on **Home**.
 

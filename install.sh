@@ -11,6 +11,10 @@ uv_installer="https://astral.sh/uv/install.sh"
 mode=native
 variant=""
 install_uv=yes
+modify_path=yes
+if [ -n "${MINIBRAIN_NO_MODIFY_PATH:-}" ]; then
+    modify_path=no
+fi
 version="${MINIBRAIN_VERSION:-}"
 image="${MINIBRAIN_IMAGE:-ghcr.io/${repo}}"
 workdir=""
@@ -27,12 +31,14 @@ Options:
   --cpu, --cuda     The image --docker pulls (default: cuda when nvidia-smi sees a GPU, else cpu)
   --version V       Install release V instead of the latest (same as MINIBRAIN_VERSION=V)
   --no-install-uv   Stop and explain instead of installing uv when it is missing
+  --no-modify-path  Leave shell startup files alone instead of putting minibrain on PATH
   -h, --help        Show this help
 
 Environment:
   MINIBRAIN_VERSION       Release to install, such as 0.1.0 (default: the latest)
   MINIBRAIN_RELEASE_BASE  URL of a folder holding one release's files, such as a mirror (default: GitHub Releases)
   MINIBRAIN_IMAGE         Image repository for --docker (default: ghcr.io/${repo})
+  MINIBRAIN_NO_MODIFY_PATH=1  Same as --no-modify-path
   UV_TORCH_BACKEND        PyTorch build for uv (default on Linux: auto, picked from the GPU driver)
 
 The wheel is checked against the release's SHA256SUMS. When cosign is installed, SHA256SUMS
@@ -72,6 +78,7 @@ parse_args() {
                 ;;
             (--version=*) version=${1#--version=} ;;
             (--no-install-uv) install_uv=no ;;
+            (--no-modify-path) modify_path=no ;;
             (-h | --help)
                 usage
                 exit 0
@@ -207,22 +214,39 @@ default_torch_backend() {
     fi
 }
 
-print_native_next_steps() {
-    bin_dir=$("$1" tool dir --bin)
-    say ""
-    say "minibrain $2 is installed: ${bin_dir}/minibrain"
-    case ":$PATH:" in
-        (*":${bin_dir}:"*) ;;
-        (*)
-            say ""
-            say "${bin_dir} is not on PATH yet. Add it with"
-            say "  $1 tool update-shell"
-            say "and open a new shell, or run ${bin_dir}/minibrain."
-            ;;
+shown_path() {
+    case "$1" in
+        ("$HOME"/*) printf '%s/%s\n' "\$HOME" "${1#"$HOME"/}" ;;
+        (*) printf '%s\n' "$1" ;;
     esac
+}
+
+on_path() {
+    case ":$PATH:" in
+        (*":$1:"*) return 0 ;;
+        (*) return 1 ;;
+    esac
+}
+
+add_to_path() {
+    [ "$modify_path" = yes ] && "$uv" tool update-shell </dev/null >/dev/null 2>&1
+}
+
+print_native_next_steps() {
+    say ""
+    say "minibrain $release is installed."
     say ""
     say "Start it:"
-    say "  minibrain serve"
+    if on_path "$bin_dir"; then
+        say "  minibrain serve"
+    else
+        say "  $(shown_path "$bin_dir")/minibrain serve"
+        if add_to_path; then
+            say "New terminals also find it as minibrain: $(shown_path "$bin_dir") is now on their PATH."
+        else
+            say "To run it as minibrain, put $(shown_path "$bin_dir") on PATH: $uv tool update-shell"
+        fi
+    fi
     say ""
     say "On first start it prints a one-time setup link: open it to create the admin account."
     say "The UI is at http://127.0.0.1:8000. To upgrade, run this installer again."
@@ -248,8 +272,9 @@ install_native() {
     verify_wheel "$wheel"
     default_torch_backend
     say "Installing minibrain $release with uv (Python ${python_version}${UV_TORCH_BACKEND:+, PyTorch backend $UV_TORCH_BACKEND})"
-    "$uv" tool install --force --python "$python_version" "$workdir/$wheel" </dev/null
-    print_native_next_steps "$uv" "$release"
+    bin_dir=$("$uv" tool dir --bin)
+    PATH="$bin_dir:$PATH" "$uv" tool install --force --python "$python_version" "$workdir/$wheel" </dev/null
+    print_native_next_steps
 }
 
 pick_variant() {

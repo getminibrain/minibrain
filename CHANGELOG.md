@@ -5,6 +5,8 @@ What changed in each minibrain release, newest first. To move to a new version, 
 
 ## Unreleased
 
+- The installer puts `minibrain` on the `PATH` of new terminals and prints a start command that works in the
+  current one, instead of finishing with a `minibrain serve` that the terminal cannot find.
 - New installs that keep their data in Postgres set up their database again instead of stopping partway.
 - Busy models answer 503 with Retry-After instead of slowing the app, and a model still starting says when to try again.
 - On machines with NVIDIA GPUs, each model's engine and each training or scoring job gets its own GPU, or a share

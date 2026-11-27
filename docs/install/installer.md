@@ -18,6 +18,9 @@ minibrain serve
 `minibrain serve` prints a one-time setup link: open it to create the admin account ([First admin](first-admin.md)).
 The UI is then at http://127.0.0.1:8000.
 
+If the terminal answers `minibrain: command not found`, open a new terminal or run the start command the
+installer printed: it puts minibrain on the `PATH` of new terminals.
+
 It runs on Linux (x86_64 or arm64, with glibc) and macOS on Apple silicon. Elsewhere:
 
 - Windows: run it in WSL, or use Docker Desktop.
@@ -32,7 +35,9 @@ It runs on Linux (x86_64 or arm64, with glibc) and macOS on Apple silicon. Elsew
 3. Runs `uv tool install --python 3.12` on the wheel. On Linux it sets `UV_TORCH_BACKEND=auto` unless you set it:
    the CUDA build of PyTorch when an NVIDIA driver is installed, otherwise the smaller CPU build. macOS gets the Metal
    build.
-4. Prints the next step. If uv's tool folder is not on your `PATH` yet, it says to run `uv tool update-shell`.
+4. Prints the command that starts it. If uv's tool folder (`~/.local/bin`) is not on your `PATH` yet, it runs
+   `uv tool update-shell` so new terminals find `minibrain`, and prints the full path to use in this one.
+   `--no-modify-path` leaves your shell startup files alone.
 
 ## Options
 
@@ -49,6 +54,7 @@ curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install
 | `--docker` | Pulls the Docker image instead of installing the package (below) |
 | `--cpu`, `--cuda` | Chooses the image `--docker` pulls |
 | `--no-install-uv` | Stops with instructions when uv is missing |
+| `--no-modify-path`, `MINIBRAIN_NO_MODIFY_PATH=1` | Leaves shell startup files alone instead of putting minibrain on `PATH` |
 | `MINIBRAIN_RELEASE_BASE=<url>` | Takes the files from a folder that holds one release, such as a mirror or `file:///path`, instead of GitHub |
 | `MINIBRAIN_IMAGE=<repository>` | Pulls the `--docker` image from a mirror |
 | `UV_TORCH_BACKEND` | Another PyTorch build ([GPUs](gpus.md)) |
