@@ -2148,12 +2148,12 @@ it finds:
 - [ ] Image scan at release: Trivy or Grype on the CPU and CUDA images, the result published with the release
 - [ ] Abuse tests of our own, run in CI: every `/api` route against each role, the SQL sandbox, connections and
       imports pointed at internal addresses, path traversal on artifacts and server folders, join and call tokens
-- [ ] A paid penetration test is not a v1 gate: commission one when a customer asks for the report
+- A paid penetration test is not a v1 gate: commission one when a customer asks for the report
 - [ ] Documentation: install, first model, joining machines, training, serving, API, security, upgrades
 - [x] Logo and icon set: the Volt badge with the bolt-split brain (`web/src/components/brand/mark.ts`), the favicon in
       the app and on getminibrain.com
-- [ ] Website: product page, docs, install, contact (built: getminibrain.com in its own repo; deploying on Coolify is
-      left)
+- [x] Website: product page, docs, install, contact (getminibrain.com in its own repo, served by Cloudflare since
+      2026-11-27, with release email signups through Resend)
 - [x] Core journey end to end on a fresh install, scripted as a release check: `web/e2e/core-journey.spec.ts`
       (Playwright, Chromium; `mise run e2e`, and the CI job Core journey in a browser) takes the setup link, adds the
       demo travel intents, adds a model on Qwen3 0.6B with v0 scored, trains v1 (scored against v0), deploys it,
@@ -2195,7 +2195,7 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - [ ] Undeploy then delete, with a base switch in between, may not wait for an engine on the old base.
 - [ ] Windows (WSL) install verified.
 - [ ] Measure time from install to the first scored and trained model, on a Mac and on a GPU box.
-- [ ] Decide: labels before more presets. Most new users have data without answers. Decided 2026-11-27: Upstream
+- [x] Decide: labels before more presets. Most new users have data without answers. Decided 2026-11-27: Upstream
       routes, Distillation data and labelling by a reference model are v1 (Added to v1, 2026-11-27). The Extract
       preset, then Rewrite, are built first, before Rebase (Order).
 
