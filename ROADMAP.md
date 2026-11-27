@@ -608,7 +608,7 @@ The label is the assistant message: the correct output for an input.
 | Documents (wiki, PDFs) | Teacher writes Q&A per chunk and checks each pair against it (`generate_qa`); or raw text as a Rewrite style source |
 | Gateway logs | The teacher's logged answers (Distill) |
 
-Teacher labelling:
+Teacher labelling (in v1 the teacher is a reference model, opt-in; the local teacher pool is v2):
 
 1. The teacher labels every row with the task's prompt and output schema.
 2. Review queue: the user accepts or corrects rows, uncertain ones first (the teacher disagrees with itself across a few
@@ -1079,7 +1079,8 @@ Added 2026-11-26. The question every buyer asks first: is it better than GPT, Cl
 - Results sit beside the versions, never as one: a reference model is never deployable and never the live baseline of
   the promotion rule. The headline adds it ("v3 91%, GPT-x 89%, at 1/40 of its cost"), its cost at list price
   (`list_price`) beside local GPU time.
-- The same connection serves upstream routes in v1 (API and access) and becomes the API teacher in v2.
+- The same connection serves upstream routes and labelling in v1 (API and access, Labelling) and becomes the API
+  teacher in v2.
 
 ### General ability
 
@@ -2162,8 +2163,8 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - [ ] Windows (WSL) install verified.
 - [ ] Measure time from install to the first scored and trained model, on a Mac and on a GPU box.
 - [ ] Decide: labels before more presets. Most new users have data without answers. Decided 2026-11-27: Upstream
-      routes and Distillation data are v1 (Added to v1, 2026-11-27). Still open: Teacher labelling in v1, and the
-      order against Extract and Rebase.
+      routes, Distillation data and labelling by a reference model are v1 (Added to v1, 2026-11-27). Still open:
+      the order against Extract and Rebase.
 
 ### Added to v1 (2026-11-26)
 
@@ -2185,6 +2186,10 @@ Moved back from v2: a team with no labelled data can still start, from the model
       forwards them and logs the request and the answer (API and access).
 - [ ] Distillation data: those logs as a dataset source for any preset, so a smaller model is trained on them and
       scored against the reference model on the same held-out rows (Labelling, Reference models).
+- [ ] Labelling by a reference model: rows without answers get one from a reference model, with the task's prompt and
+      output schema, then go to the review queue, uncertain rows first. Opt-in and off with `MINIBRAIN_OFFLINE=1`,
+      like every use of a reference model; the page says those rows go to that provider, and each run is audited
+      (Labelling).
 
 ## v2
 
@@ -2193,10 +2198,10 @@ Moved back from v2: a team with no labelled data can still start, from the model
   - Offline install bundle and an air-gap CI test
   - Signed offline update bundles (app and base models) with rollback, reusing the cosign signing of release files
   - The offline bundle tested on an air-gapped machine, then an upgrade with rollback
-- Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers, or on answers logged from a
-  reference model):
+- Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers, or on answers logged from or
+  written by a reference model):
   - Teacher pool, permanent or temporary; API teacher opt-in, off by default; prompt-only version 0 on it
-  - Teacher labelling with the review queue, uncertain rows first
+  - Labelling by the local teacher (labelling by a reference model with the review queue moved to v1 on 2026-11-27)
   - `generate_qa` with check pass: documents into checked question and answer pairs
   - Distill from the local teacher: upstream routes to the teacher pool (routes to a reference model and their
     logs as training data moved to v1 on 2026-11-27)

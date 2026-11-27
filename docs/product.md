@@ -116,8 +116,8 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
   Flag near-duplicate rows with MinHash before training.
   Roadmap: Quality score
 - **Teacher labelling** · planned · product, ml
-  Label unlabelled rows with a local teacher, then review a sample.
-  Roadmap: v2
+  Label unlabelled rows with a reference model, then review uncertain ones first.
+  Roadmap: Labelling
 - **Generated Q&A** · planned · product, ml
   Turn documents into checked question and answer pairs.
   Roadmap: v2
