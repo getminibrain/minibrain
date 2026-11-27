@@ -2224,6 +2224,10 @@ Moved back from v2: a team with no labelled data can still start, from the model
       like every use of a reference model; the page says those rows go to that provider, and each run is audited
       (Labelling).
 - [ ] Usage statistics, on by default with one setting to turn them off (Observability › Usage statistics).
+- [ ] Several mains share their tokens: today each main makes its own gateway and worker tokens in its home folder,
+      so a second main needs `MINIBRAIN_GATEWAY_TOKEN` and `MINIBRAIN_WORKER_TOKEN` set by hand, and a bucket key
+      saved in the UI lives on one main only. Keep them in the database, encrypted under the master key like
+      connection secrets, so every main reads the same ones.
 - [ ] The vLLM backend run on a GPU (moved from v2): built on 2026-11-06 and tested against a fake process; serve a
       base and load adapters at run time on the rented GPU day (Review follow-ups).
 

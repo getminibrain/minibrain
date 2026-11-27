@@ -189,8 +189,10 @@ the others stand by; if it stops, another takes over.
   a folder on one main's disk is not on the others.
 - Every main needs the same master key: mount one key file and set `MINIBRAIN_MASTER_KEY_FILE`, or use Vault, an HSM
   or KMS ([Local key file](../security/key-providers.md#local-key-file)).
-- Every main needs the same tokens. Each main makes its own `secrets/` folder on first use, so copy the first main's
-  `secrets/` folder into the home folder of each other main before it starts. This is manual today.
+- Every main needs the same tokens. Each main makes its own gateway and worker tokens on first use, so set
+  `MINIBRAIN_GATEWAY_TOKEN` and `MINIBRAIN_WORKER_TOKEN` to the same values on every main, or copy the first main's
+  `secrets/` folder into the home folder of each other main before it starts. Give the bucket's secret key through
+  `secret_file` in `minibrain.yaml` (step 4), not in the UI: a key saved in the UI is stored on one main only.
 - For an upgrade, stop every main, then start one and wait until `/readyz` answers before you start the others
   ([Upgrades](upgrades.md#upgrade-main)).
 
