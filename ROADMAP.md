@@ -2237,6 +2237,9 @@ Gaps found against comparable platforms.
       2026-11-17)
 - [ ] Export a version merged and quantised as AWQ, GPTQ or FP8 for vLLM and SGLang
 - [ ] Public catalogue page on the website (browse, pinned revision, checksums, download command)
+- [ ] Security overview and architecture overview as PDFs on the website, for a buyer's security and architecture
+      review: generated from the docs at each release, never written by hand, stamped with the version and date,
+      linked from the Security page and not behind a form (added 2026-11-27)
 - Preinstalled appliance
 - [ ] Release a reserved name: an admin frees a deleted model's API name from Settings, with a warning that apps
   still calling it will reach the next model to take it, audited as `model.name_release`
