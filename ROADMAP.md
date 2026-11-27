@@ -301,8 +301,8 @@ Otherwise: source → DuckDB (query in place or stage) → mapping / SQL → bui
 teacher and version 0 on the golden set + human review → promote → load adapter into pool → gateway
 `/v1/chat/completions`
 
-Distill shortcut: the gateway forwards calls to the teacher and logs them → the logs are the dataset → train → apps
-change the model name.
+Distill shortcut: the gateway forwards calls to an upstream model and logs them → the logs are the dataset → train →
+apps change the model name. The upstream is a reference model in v1 and the local teacher in v2.
 
 Index, alongside: the same sources → chunks → embeddings → index, synced continuously → the gateway retrieves from it
 at answer time.
@@ -1079,7 +1079,7 @@ Added 2026-11-26. The question every buyer asks first: is it better than GPT, Cl
 - Results sit beside the versions, never as one: a reference model is never deployable and never the live baseline of
   the promotion rule. The headline adds it ("v3 91%, GPT-x 89%, at 1/40 of its cost"), its cost at list price
   (`list_price`) beside local GPU time.
-- The same connection becomes the API teacher in v2.
+- The same connection serves upstream routes in v1 (API and access) and becomes the API teacher in v2.
 
 ### General ability
 
@@ -1266,8 +1266,10 @@ before. Not yet run on an NVIDIA GPU.
   `docs/api/safety.md`. Hidden from the UI for v1 (2026-11-14): running a guard means deploying and
   keeping a second model, too much to manage at first; the API and settings stay and the UI returns as an advanced
   option.
-- Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
-  logs the calls. Apps switch to the model by changing the model name.
+- Upstream routes: the gateway forwards a model name to an upstream model and logs the calls. Apps switch to the
+  trained model by changing the model name. In v1 the upstream is a reference model (Reference models): opt-in, off
+  by default and off with `MINIBRAIN_OFFLINE=1`, and the page says plainly that those calls go to that provider. In
+  v2 it is the local teacher, the default from then on.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and
   logging like any model.
 - `POST /v1/feedback` (see Feedback loop).
@@ -2159,10 +2161,9 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - [ ] Undeploy then delete, with a base switch in between, may not wait for an engine on the old base.
 - [ ] Windows (WSL) install verified.
 - [ ] Measure time from install to the first scored and trained model, on a Mac and on a GPU box.
-- [ ] Decide: labels before more presets. Most new users have data without answers, and Teacher labelling,
-      Distillation data and Upstream routes are all unbuilt. Proposed order: Upstream routes and Distillation data
-      (route existing OpenAI calls through minibrain, log them, train a cheaper model), then Teacher labelling, ahead
-      of Extract and Rebase.
+- [ ] Decide: labels before more presets. Most new users have data without answers. Decided 2026-11-27: Upstream
+      routes and Distillation data are v1 (Added to v1, 2026-11-27). Still open: Teacher labelling in v1, and the
+      order against Extract and Rebase.
 
 ### Added to v1 (2026-11-26)
 
@@ -2176,6 +2177,15 @@ Gaps found against comparable platforms.
 - [ ] General ability per version (General ability).
 - [ ] MCP server (MCP server).
 
+### Added to v1 (2026-11-27)
+
+Moved back from v2: a team with no labelled data can still start, from the model it already calls.
+
+- [ ] Upstream routes to a reference model: apps send their existing OpenAI-style calls through the gateway, which
+      forwards them and logs the request and the answer (API and access).
+- [ ] Distillation data: those logs as a dataset source for any preset, so a smaller model is trained on them and
+      scored against the reference model on the same held-out rows (Labelling, Reference models).
+
 ## v2
 
 - Air-gapped installs (moved from v1 on 2026-11-20: air-gapped is an option, not the main audience; `MINIBRAIN_OFFLINE=1`
@@ -2183,11 +2193,13 @@ Gaps found against comparable platforms.
   - Offline install bundle and an air-gap CI test
   - Signed offline update bundles (app and base models) with rollback, reusing the cosign signing of release files
   - The offline bundle tested on an air-gapped machine, then an upgrade with rollback
-- Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers):
+- Teacher (moved from v1 on 2026-11-17; v1 trains on data that already has answers, or on answers logged from a
+  reference model):
   - Teacher pool, permanent or temporary; API teacher opt-in, off by default; prompt-only version 0 on it
   - Teacher labelling with the review queue, uncertain rows first
   - `generate_qa` with check pass: documents into checked question and answer pairs
-  - Distill: gateway upstream routes log a teacher's answers; distil what you run into a smaller model
+  - Distill from the local teacher: upstream routes to the teacher pool (routes to a reference model and their
+    logs as training data moved to v1 on 2026-11-27)
   - Private frontier endpoint: the teacher model through the gateway, scoped keys
   - Synthetic data aimed at failure modes (Live scoring): the teacher writes new examples like a failure mode's,
     checked by the graders, a sample reviewed by a person; multi-turn tool-use conversations from a model's tools

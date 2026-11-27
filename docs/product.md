@@ -126,7 +126,7 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
   Roadmap: v2
 - **Distillation data** · planned · ml
   Use a teacher's logged answers as training examples.
-  Roadmap: v2
+  Roadmap: Labelling
 - **Zero-copy lakehouse versions** · planned · ml
   Pin Iceberg and Delta snapshot ids instead of copying rows.
   Roadmap: Dataset versions
@@ -526,7 +526,7 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
   Roadmap: v2
 - **Upstream routes** · planned · engineer
   Forward calls to a teacher and log them for distillation.
-  Roadmap: v2
+  Roadmap: API and access
 - **Retrieval index** · planned · product, engineer
   Answer from a synced per-model index, with citations and access filters.
   Roadmap: Retrieval
