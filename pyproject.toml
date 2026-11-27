@@ -1,7 +1,8 @@
 [project]
 name = "minibrain"
 version = "0.1.2"
-description = "Private AI platform: train, evaluate and serve models of any size on your own data and hardware"
+description = "Train, evaluate and serve AI models of any size on your own data and infrastructure"
+readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12,<3.14"
 dependencies = [
