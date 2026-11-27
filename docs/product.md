@@ -844,6 +844,9 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
 - **Term sheet extraction** · planned · uses: Extract preset, Structured output
 - **Communications surveillance** · partial · uses: Classify preset, Deploy rule, Review queue
 - **Research notes in house style** · planned · uses: General preset, Graders
+- **Trade requests from chat** · planned · uses: Extract preset, Structured output, Feedback API
+- **Complaint responses** · planned · uses: General preset, Graders, Review queue
+- **Call notes in your format** · planned · uses: General preset, Graders, Train with feedback
 - **Claims triage** · partial · uses: Classify preset, Dataset versions
 - **Contract clause extraction** · planned · uses: Extract preset, Structured output
 - **Clinical note coding** · planned · uses: Extract preset, Air-gapped bundle
