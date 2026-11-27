@@ -158,7 +158,8 @@ replaced, not migrated.
 3. Done (2026-11-05). General, shown as Chat assistant: free text over turns, chat JSONL and question and answer
    tables as data, a system prompt, text similarity plus a judge with a default rubric, the judge model setting, the
    answer review and the default rule. Later: distillation from a teacher, DPO from feedback.
-4. Extract.
+4. Extract, then Rewrite (decided 2026-11-27: the two presets buyers ask for first, built before Rebase and the
+   rest of v1).
 5. For ML engineers: sandboxed Python graders, training settings and saved recipes, the CLI with `minibrain.yaml`,
    reinforcement fine-tuning with the graders as rewards, exports.
 6. Text-to-SQL with the execution grader.
@@ -1761,6 +1762,25 @@ Off by default, and only ever towards systems the customer runs. Details: `docs/
   request id and response id; plain text stays the default. Every response carries `X-Request-ID`.
 - A Grafana dashboard over the Prometheus metrics ships in `docs/grafana/minibrain.json`.
 
+### Usage statistics
+
+Decided 2026-11-27: on by default, so we learn which features people use; one setting turns them off. The only
+thing minibrain sends to us.
+
+- Sent: anonymous counts only. The version, the operating system, the engines and accelerators in use, how many
+  models, versions, datasets, machines and requests there are (in ranges, not exact numbers) and which features were
+  used. A random install id made on first start.
+- Never sent: prompts, answers, data, the names of models, datasets, machines or people, addresses, keys.
+- Said out loud: `minibrain serve` prints one line at every start while they are on, with how to turn them off.
+  Settings › This install shows the same line and the last payload sent, in full.
+- Off with `MINIBRAIN_TELEMETRY=0`, `telemetry: false` in `minibrain.yaml`, or the switch in Settings (a policy, so
+  config locks it). `MINIBRAIN_OFFLINE=1` and the Offline network policy turn them off; under Allowlist they are sent
+  only when our host is on the list.
+- At most once a day, over HTTPS, to our own endpoint. A send that fails is dropped: it never retries in a loop and
+  never delays start or a request.
+- Every field is listed in `docs/observability/usage-statistics.md`, and the destination shows under This install ›
+  Network like any other.
+
 ## Offline
 
 Air-gapped installs are an option, not the main audience (2026-11-20): most installs are connected and download base
@@ -1773,7 +1793,8 @@ labelling, training, serving or gateway path calls out, and everything below hol
   in by disk or an internal mirror, registered by local path. `HF_HUB_OFFLINE=1` everywhere.
 - Install bundle: Docker images, Python wheels, Presidio's spaCy model, the frontend build. Nothing downloads at install
   or run time.
-- No telemetry. OpenTelemetry export is opt-in and goes only to the customer's collector (see Observability).
+- Usage statistics are off (Observability › Usage statistics). OpenTelemetry export is opt-in and goes only to the
+  customer's collector (see Observability).
 - DuckDB extensions: S3, database, Iceberg and Delta Lake sources need httpfs, postgres_scanner, mysql_scanner,
   iceberg, avro and delta. DuckDB downloads extensions from the internet by default; minibrain never lets it
   (`autoinstall_known_extensions` and `autoload_known_extensions` off on every connection) and loads them only from its
@@ -2116,6 +2137,14 @@ it finds:
 - [ ] Settings: every section checked against what it controls
 - [ ] Light mode fixed across the app: every page, dialog and chart checked and corrected in light, not only dark
 - [ ] Security review: auth, roles, joining, worker and engine tokens, secrets, audit; an outside review if possible
+- [x] Free checks on GitHub (2026-11-27): CodeQL code scanning on every push, Dependabot alerts, secret scanning with
+      push protection, private vulnerability reporting and `SECURITY.md`
+- [ ] Dependency audit in CI: `pip-audit` on the locked Python packages and `pnpm audit` on the UI, failing on a
+      known vulnerability that has a fix
+- [ ] Image scan at release: Trivy or Grype on the CPU and CUDA images, the result published with the release
+- [ ] Abuse tests of our own, run in CI: every `/api` route against each role, the SQL sandbox, connections and
+      imports pointed at internal addresses, path traversal on artifacts and server folders, join and call tokens
+- [ ] A paid penetration test is not a v1 gate: commission one when a customer asks for the report
 - [ ] Documentation: install, first model, joining machines, training, serving, API, security, upgrades
 - [x] Logo and icon set: the Volt badge with the bolt-split brain (`web/src/components/brand/mark.ts`), the favicon in
       the app and on getminibrain.com
@@ -2163,8 +2192,8 @@ From the project review of 2026-11-24. Most bugs it found are fixed (Fixes); the
 - [ ] Windows (WSL) install verified.
 - [ ] Measure time from install to the first scored and trained model, on a Mac and on a GPU box.
 - [ ] Decide: labels before more presets. Most new users have data without answers. Decided 2026-11-27: Upstream
-      routes, Distillation data and labelling by a reference model are v1 (Added to v1, 2026-11-27). Still open:
-      the order against Extract and Rebase.
+      routes, Distillation data and labelling by a reference model are v1 (Added to v1, 2026-11-27). The Extract
+      preset, then Rewrite, are built first, before Rebase (Order).
 
 ### Added to v1 (2026-11-26)
 
@@ -2190,6 +2219,7 @@ Moved back from v2: a team with no labelled data can still start, from the model
       output schema, then go to the review queue, uncertain rows first. Opt-in and off with `MINIBRAIN_OFFLINE=1`,
       like every use of a reference model; the page says those rows go to that provider, and each run is audited
       (Labelling).
+- [ ] Usage statistics, on by default with one setting to turn them off (Observability › Usage statistics).
 
 ## v2
 
