@@ -27,7 +27,7 @@ On its first start, `minibrain serve` prints a one-time setup link and opens it 
     http://127.0.0.1:8000/setup?token=…
 ```
 
-1. Open the link. The page says **Welcome to minibrain**.
+1. Open the link. The page says **Welcome**.
 2. Enter an email, then a password of at least 12 characters twice.
 3. Click **Create admin account**. You are signed in and land on **Home**.
 

@@ -27,7 +27,7 @@ On the first start with no accounts, `minibrain serve` prints a one-time setup l
   Lost it? minibrain admin setup-link prints a new one.
 ```
 
-1. Open the link. The page says **Welcome to minibrain**.
+1. Open the link. The page says **Welcome**.
 2. Enter an email, then a password of at least 12 characters twice.
 3. Click **Create admin account**. You are signed in.
 

@@ -308,19 +308,11 @@ export function SetupPage() {
     const [linkToken] = useState(tokenFromQuery);
     return (
         <AuthFrame
-            title="Welcome to minibrain"
+            title="Welcome"
             description={
-                <span className="flex flex-col gap-2">
-                    <span>
-                        Train, evaluate and serve models of any size on your own data and your own
-                        hardware.
-                    </span>
-                    <span>
-                        {linkToken
-                            ? "Create the admin account to get started. You can invite everyone else later from Settings, Accounts."
-                            : "Create the admin account to get started, with the setup token minibrain printed in its log when it started."}
-                    </span>
-                </span>
+                linkToken
+                    ? "Create the admin account to get started."
+                    : "Create the admin account to get started, with the setup token minibrain printed in its log when it started."
             }
             footer={
                 <div className="flex flex-col gap-2">
