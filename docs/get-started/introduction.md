@@ -44,17 +44,8 @@ print(reply.choices[0].message.content)
 
 ## Concepts
 
-| Term | Meaning |
-|---|---|
-| Base model | An open model, such as Qwen3, from the catalogue, Hugging Face, a bucket or a folder on the server. Every version builds on one |
-| Model | What apps call, by its API name. It has one base model, one dataset and a list of versions |
-| Version | One fixed result: the base model, its instructions and, once trained, an adapter and the dataset version it learned from. Versions are numbered from v0, the untrained baseline, and never change |
-| Dataset | Rows of text the model reads and the answer it should give. Each change saves a new dataset version |
-| Held-out rows | Rows of each dataset version that no version trains on. Every version is scored on them, so scores stay comparable |
-| Pool | A named group of machines that trains and serves. `local` is the machine minibrain runs on |
-| Deployment | A model's live version running on a pool, with a number of replicas. minibrain keeps it running |
-| API key | A key starting with `mb_` that names the models it may call |
-| Job | Any work minibrain runs for you, such as a download, a training run, scoring or a deploy, with its steps and logs on the Jobs page |
+A model has one base model, one dataset and a list of versions, and a deployment runs its live version on a pool of
+machines: [Concepts](concepts.md) explains every term.
 
 ## Where to go next
 
