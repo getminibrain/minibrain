@@ -535,7 +535,7 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
   Roadmap: v2
 - **vLLM backend** · partial · admin
   Serve on vLLM; ROCm production images and llama.cpp adapters later.
-  CLI: minibrain engine · Roadmap: v2
+  CLI: minibrain engine · Roadmap: Review follow-ups
 - **Dedicated instances** · planned · admin
   Give high-traffic models their own or merged-adapter instances.
   Roadmap: v2

@@ -2220,6 +2220,8 @@ Moved back from v2: a team with no labelled data can still start, from the model
       like every use of a reference model; the page says those rows go to that provider, and each run is audited
       (Labelling).
 - [ ] Usage statistics, on by default with one setting to turn them off (Observability › Usage statistics).
+- [ ] The vLLM backend run on a GPU (moved from v2): built on 2026-11-06 and tested against a fake process; serve a
+      base and load adapters at run time on the rented GPU day (Review follow-ups).
 
 ## v2
 
@@ -2271,7 +2273,7 @@ Moved back from v2: a team with no labelled data can still start, from the model
   budget, the best on held-out rows kept
 - Vision-language models: images in datasets, the Playground and `/v1`; LoRA on vision bases
 - sgl-router per pool under the gateway for many SGLang replicas of one model; llm-d on Kubernetes
-- AMD ROCm production image, LoRA adapters on llama.cpp; the vLLM backend run on GPUs
+- AMD ROCm production image, LoRA adapters on llama.cpp (the vLLM backend run on GPUs moved to v1 on 2026-11-27)
 - Dedicated or merged-adapter instances for high-traffic models
 - Optional MLflow
 - FIPS 140-3 mode, STIG / Iron Bank images, native SAML + CAC / PIV, control mappings
