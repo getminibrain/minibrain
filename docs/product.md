@@ -850,7 +850,5 @@ Principles: easy, any size, own hardware or cloud, private, gated on scores
 - **Claims triage** · partial · uses: Classify preset, Dataset versions
 - **Contract clause extraction** · planned · uses: Extract preset, Structured output
 - **Clinical note coding** · planned · uses: Extract preset, Air-gapped bundle
-- **Ticket routing** · partial · uses: Classify preset, Dataset versions, Deploy and roll back
-- **Incident classification** · partial · uses: Classify preset, Feedback API
-- **Request routing** · partial · uses: Classify preset, Train with feedback
+- **Ticket and request routing** · partial · uses: Classify preset, Feedback API, Train with feedback
 - **Distil an assistant** · planned · uses: Distillation data, Upstream routes, General preset
