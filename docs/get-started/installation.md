@@ -14,7 +14,7 @@ On Linux (x86_64 or arm64) and macOS (Apple silicon), one command installs the l
 download:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
+curl -LsSf https://getminibrain.com/install.sh | sh
 minibrain serve
 ```
 

@@ -33,7 +33,7 @@ Install minibrain on the machine first, the same release as main. The [installer
 on Linux with an NVIDIA driver, installs the CUDA build of torch:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | MINIBRAIN_VERSION=<version> sh
+curl -LsSf https://getminibrain.com/install.sh | MINIBRAIN_VERSION=<version> sh
 ```
 
 Then, as an admin:

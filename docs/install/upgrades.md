@@ -87,8 +87,8 @@ commands. Back up before running any of them on the new release.
 ### Installer
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | MINIBRAIN_VERSION=<version> sh
+curl -LsSf https://getminibrain.com/install.sh | sh
+curl -LsSf https://getminibrain.com/install.sh | MINIBRAIN_VERSION=<version> sh
 ```
 
 It checks the wheel's SHA-256 and reinstalls minibrain over the old one. With `--docker` it only pulls the new image:

@@ -7,11 +7,13 @@ sidebar:
 
 The installer is a shell script that installs a minibrain release from GitHub Releases with uv, or pulls the Docker
 image instead. Use it for the quickest native install on Linux or macOS.
+`https://getminibrain.com/install.sh` serves [`install.sh`](https://github.com/getminibrain/minibrain/blob/main/install.sh)
+from the `main` branch on GitHub.
 
 ## Run it
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
+curl -LsSf https://getminibrain.com/install.sh | sh
 minibrain serve
 ```
 
@@ -44,8 +46,8 @@ It runs on Linux (x86_64 or arm64, with glibc) and macOS on Apple silicon. Elsew
 Flags go after `sh -s --`; environment variables go before `sh`:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh -s -- --docker
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | MINIBRAIN_VERSION=0.1.2 sh
+curl -LsSf https://getminibrain.com/install.sh | sh -s -- --docker
+curl -LsSf https://getminibrain.com/install.sh | MINIBRAIN_VERSION=0.1.2 sh
 ```
 
 | Option | Does |
@@ -72,7 +74,7 @@ command to start it. Docker on macOS has no GPU access, so `--cuda` stops there.
 Download the script, read it, then run it with `sh`:
 
 ```sh
-curl -LsSfO https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh
+curl -LsSfO https://getminibrain.com/install.sh
 sh install.sh --help
 sh install.sh
 ```

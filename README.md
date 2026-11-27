@@ -37,7 +37,7 @@ the numbers say it pays, and serve the winner on an OpenAI-compatible endpoint. 
 On Linux, or a Mac with Apple silicon:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
+curl -LsSf https://getminibrain.com/install.sh | sh
 minibrain serve
 ```
 

@@ -13,7 +13,7 @@ or a Mac with Apple silicon, and internet access for the downloads.
 Install minibrain and start it:
 
 ```sh
-curl -LsSf https://raw.githubusercontent.com/getminibrain/minibrain/main/install.sh | sh
+curl -LsSf https://getminibrain.com/install.sh | sh
 minibrain serve
 ```
 

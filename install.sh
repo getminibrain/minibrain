@@ -23,8 +23,8 @@ usage() {
     cat <<EOF
 Install minibrain from its GitHub Release.
 
-  curl -LsSf https://raw.githubusercontent.com/${repo}/main/install.sh | sh
-  curl -LsSf https://raw.githubusercontent.com/${repo}/main/install.sh | sh -s -- --docker
+  curl -LsSf https://getminibrain.com/install.sh | sh
+  curl -LsSf https://getminibrain.com/install.sh | sh -s -- --docker
 
 Options:
   --docker          Pull the Docker image instead and print the command that runs it
